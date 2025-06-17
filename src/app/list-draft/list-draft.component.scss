@@ -1,0 +1,502 @@
+/* list-draft.component.scss */
+.drafts-container {
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    margin-top: 5%;
+    background-color: white;
+    margin-top: 5%;
+  }
+  
+  h2 {
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .action-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .left-actions, .right-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  
+  .entries-selector {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    
+    select {
+      padding: 5px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+  }
+  
+  .search-box input {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-top: 4%;
+  }
+  
+  .btn {
+    padding: 6px 12px;
+    border-color: #0a0a0a;
+    border-radius: 15px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    
+    &-export {
+      background-color:white;
+      color: rgb(17, 16, 16);
+      
+      &:hover {
+        background-color: #0a0a0a;
+        color: white;
+      }
+    }
+    
+    &-print {
+        background-color:white;
+        color: rgb(17, 16, 16);
+      &:hover {
+        background-color: #0a0a0a;
+        color: white;
+      }
+    }
+    
+    &-columns {
+        background-color:white;
+        color: rgb(17, 16, 16);
+      
+      &:hover {
+        background-color: #0a0a0a;
+        color: white;
+      }
+    }
+  }
+  
+  .drafts-table {
+    overflow-x: auto;
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      
+      th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+      }
+      
+      th {
+        background-color: #eaeaec;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+      }
+      
+  
+      .sortable {
+        cursor: pointer;
+        
+        &:hover {
+          background-color: #e9ecef;
+        }
+      }
+      
+      .no-data {
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+      }
+    }
+  }
+  
+  .status-badge {
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    
+    &-pending {
+      background-color: #FFF3CD;
+      color: #856404;
+    }
+    
+    &-shipped {
+      background-color: #D1ECF1;
+      color: #0C5460;
+    }
+    
+    &-delivered {
+      background-color: #D4EDDA;
+      color: #155724;
+    }
+    
+    &-cancelled {
+      background-color: #F8D7DA;
+      color: #721C24;
+    }
+    
+    &-default {
+      background-color: #e9ecef;
+      color: #495057;
+    }
+  }
+  
+  .actions {
+    white-space: nowrap;
+    
+    button {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 8px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      
+      i {
+        margin-right: 6px;
+        font-size: 13px;
+      }
+    }
+    
+    .btn-edit {
+      background-color:white;
+      color: rgb(33, 70, 233);
+      
+      &:hover {
+        background-color: #9aa1f8;
+      }
+    }
+    
+    .btn-delete {
+      background-color: white;
+      color:red;
+      
+      &:hover {
+        background-color: #f8bbb7;
+      }
+    }
+  }
+  
+  .bottom-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+  }
+  
+  .pagination-info {
+    color: #6c757d;
+  }
+  
+  .pagination {
+    display: flex;
+    gap: 5px;
+    
+    .btn-page {
+      padding: 6px 12px;
+      border: 1px solid #ddd;
+      background-color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      
+      &:hover:not(:disabled) {
+        background-color: #e9ecef;
+      }
+      
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .action-bar {
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .left-actions, .right-actions {
+      width: 100%;
+      justify-content: space-between;
+    }
+    
+    .bottom-actions {
+      flex-direction: column;
+      gap: 15px;
+    }
+  }/* list-draft.component.scss */
+/* ... (keep all existing styles) ... */
+
+/* Modal Styles */
+.disabled {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+  }
+  
+  .modal-container {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    animation: slideIn 0.3s ease-out;
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+      
+      h3 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #333;
+      }
+      
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #666;
+        padding: 5px;
+        
+        &:hover {
+          color: #333;
+        }
+      }
+    }
+    
+    .modal-body {
+      padding: 20px;
+    }
+  }
+  
+  /* Form Styles */
+  .form-group {
+    margin-bottom: 20px;
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #444;
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+      
+      &:focus {
+        border-color: #2196F3;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+      }
+      
+      &.ng-invalid.ng-touched {
+        border-color: #f44336;
+      }
+    }
+    
+    .error-message {
+      color: #f44336;
+      font-size: 0.85rem;
+      margin-top: 5px;
+    }
+  }
+  
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s;
+      
+      &-cancel {
+        background-color: #f5f5f5;
+        color: #333;
+        
+        &:hover {
+          background-color: #e0e0e0;
+        }
+      }
+      
+      &-save {
+        background-color: #2196F3;
+        color: white;
+        
+     
+      }
+    }
+  }
+  
+  /* Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideIn {
+    from { 
+      transform: translateY(-20px);
+      opacity: 0.5;
+    }
+    to { 
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Responsive Styles */
+  @media (max-width: 768px) {
+    .modal-container {
+      width: 95%;
+      max-height: 85vh;
+    }
+    
+    .form-actions {
+      flex-direction: column;
+      
+      .btn {
+        width: 100%;
+      }
+    }
+  }
+  .btn-add {
+    background-color: #1e1aec;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 25px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    transition: background-color 0.3s;
+    margin-left: auto; /* This pushes the button to the right */
+    margin-top: -5%;
+  
+  
+  
+    i {
+      font-size: 12px;
+    }
+  }
+  .status-badge {
+    padding: 4px 8px;
+    border-radius:none ;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+    display: inline-block;
+    min-width: 80px;
+    text-align: center;
+    border: none;
+  }
+  
+  .status-pending {
+    background-color: #FEF3C7; /* Light yellow */
+    color: #92400E; /* Dark yellow */
+  }
+  
+  .status-shipped {
+    background-color: #DBEAFE; /* Light blue */
+    color: #1E40AF; /* Dark blue */
+  }
+  
+  .status-delivered {
+    background-color: #D1FAE5; /* Light green */
+    color: #065F46; /* Dark green */
+  }
+  /* Add these styles to your list-draft.component.scss file */
+
+.column-visibility-container {
+  position: relative;
+  display: inline-block;
+}
+
+.column-visibility-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 8px 0;
+  margin-top: 5px;
+  background-color: #2d2ae7;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border: 1px solid #ddd;
+  color: white;
+}
+
+.visibility-option {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.visibility-option:hover {
+  background-color: #f5f5f5;
+}
+
+.visibility-option input[type="checkbox"] {
+  margin-right: 10px;
+}
+
+.btn-columns {
+  position: relative;
+}

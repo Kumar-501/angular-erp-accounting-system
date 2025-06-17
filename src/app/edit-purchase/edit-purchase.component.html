@@ -1,0 +1,347 @@
+<div class="container">
+    <h2>Edit Purchase</h2>
+    <div *ngIf="isLoading" class="alert alert-info">
+      Loading purchase data...
+    </div>
+  
+    <form [formGroup]="purchaseForm" (ngSubmit)="updatePurchase()">
+        <!-- Card 1: Purchase Order -->
+        <div class="card mb-3">
+            <div class="card-header">Purchase Order</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Supplier *</label>
+                            <div class="d-flex align-items-center">
+                              <select formControlName="supplierId" class="form-control" required
+                                      (change)="onSupplierChange($any($event.target).value)">
+                                <option value="" disabled selected>Select Supplier</option>
+                                <option *ngFor="let supplier of suppliers" [value]="supplier.id">
+                                  {{ getSupplierDisplayName(supplier) }}
+                                </option>
+                              </select>
+                              <button type="button" class="btn btn-sm btn-primary ml-2" (click)="navigateToAddSupplier()">
+                                <i class="fa fa-plus"></i>
+                              </button>
+                            </div>
+                            <input type="hidden" formControlName="supplierName">
+                          </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Address:</label>
+                            <input type="text" formControlName="address" class="form-control" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                          <label>Reference No:</label>
+                          <input type="text" formControlName="referenceNo" class="form-control" required readonly />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Purchase Date:</label>
+                            <input type="date" formControlName="purchaseDate" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label>Purchase Status:</label>
+                        <select formControlName="purchaseStatus" class="form-control" required>
+                          <option value="">Select Status</option>
+                          <option value="Received">Received</option>
+                          <option value="Ordered">Ordered</option>
+                          <option value="Pending">Pending</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label>Business Location:</label>
+                        <select formControlName="businessLocation" class="form-control" required>
+                          <option value="">Select Business Location</option>
+                          <option *ngFor="let location of businessLocations" [value]="location.name">
+                            {{ location.name }} ({{ location.locationId || 'BL000' + (businessLocations.indexOf(location) + 1) }})
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Pay Term *</label>
+                            <select formControlName="payTerm" class="form-control" required>
+                              <option value="" disabled selected>Select Payment Term</option>
+                              <option value="15 days">15 days</option>
+                              <option value="30 days">30 days</option>
+                              <option value="6 months">6 months</option>
+                              <option value="1 year">1 year</option>
+                            </select>
+                          </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Attach Document:</label>
+                            <input type="file" (change)="onFileSelected($event)" class="form-control" />
+                        </div>
+                    </div>
+                    <!-- New fields -->
+                    <div class="col-md-6">
+                      <div class="form-group">
+                          <label>Invoice No:</label>
+                          <input type="text" formControlName="invoiceNo" class="form-control" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                          <label>Invoiced Date:</label>
+                          <input type="date" formControlName="invoicedDate" class="form-control" />
+                      </div>
+                    </div>
+                    <div class="col-md-6">
+                      <div class="form-group">
+                          <label>Received Date:</label>
+                          <input type="date" formControlName="receivedDate" class="form-control" />
+                      </div>
+                    </div>
+                    <!-- End new fields -->
+                    <div class="col-md-6" formGroupName="addedBy">
+                        <div class="form-group">
+                            <label>Assigned To:</label>
+                            <select formControlName="assignedTo" class="form-control">
+                              <option value="" disabled selected>Select User</option>
+                              <option *ngFor="let user of users" [value]="user.id">
+                                {{ user.displayName || user.email }}
+                              </option>
+                            </select>
+                          </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Product Table -->
+      <!-- Card 2: Product Table -->
+<div class="card mb-3">
+  <div class="card-header">Product Details</div>
+  <div class="card-body">
+    <!-- Add the search input -->
+    <div class="row mb-3">
+      <div class="col-md-12">
+        <div class="position-relative">
+          <input type="text" 
+                 class="form-control form-control-lg" 
+                 placeholder="Enter Product name / SKU / Scan bar code"
+                 (keyup)="onSearchInput($event)"
+                 (keydown)="handleKeyDown($event)"
+                 (focus)="onSearchFocus()"
+                 (blur)="onSearchBlur()"
+                 [(ngModel)]="searchTerm"
+                 [ngModelOptions]="{standalone: true}"/>
+          
+          <div *ngIf="showSearchResults" 
+               class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm mt-1" 
+               style="z-index: 1050; max-height: 300px; overflow-y: auto;">
+            <div class="list-group">
+              <button type="button" 
+                      class="list-group-item list-group-item-action text-start py-2"
+                      *ngFor="let product of searchResults"
+                      (mousedown)="addProductFromSearch(product); $event.preventDefault()"
+                      (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
+                      tabindex="0">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="text-truncate pe-2">
+                    <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
+                    <small *ngIf="product.sku" class="text-muted ms-2">
+                      SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
+                    </small>
+                  </div>
+                  <div class="text-nowrap">
+                    <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
+                    <span class="badge bg-success">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2'}}</span>
+                  </div>
+                </div>
+                <small *ngIf="product.barcode" class="text-muted d-block text-truncate">
+                  Barcode: {{ product.barcode }}
+                </small>
+              </button>
+              <div *ngIf="searchResults.length === 0" class="list-group-item text-muted py-2">
+                No products found matching "{{ searchTerm }}"
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Purchase Quantity</th>
+            <th>Unit Cost (Before Discount)</th>
+            <th>Discount Percent</th>
+            <th>Unit Cost (Before Tax)</th>
+            <th>Subtotal</th>
+            <th>Tax Amount</th>
+            <th>Line Total</th>
+            <th>Batch Number</th>
+            <th>Expiry Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody formArrayName="products">
+          <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i">
+            <td>
+           
+<!-- Fixed select element - change the method call to pass the event -->
+<select formControlName="productId" class="form-control" (change)="onProductSelect(i, $event)" required>
+  <option value="">Select Product</option>
+  <option *ngFor="let product of productsList" [value]="product.id">{{ product.productName }}</option>
+</select>
+            </td>
+            <td>
+              <input type="number" formControlName="quantity" class="form-control" min="1" (input)="calculateLineTotal(i)" required>
+            </td>
+            <td>
+              <input type="number" formControlName="unitCost" class="form-control" min="0" step="0.01" (input)="calculateLineTotal(i)" required>
+            </td>
+            <td>
+              <input type="number" formControlName="discountPercent" class="form-control" min="0" max="100" (input)="calculateLineTotal(i)">
+            </td>
+            <td>
+              <input type="number" formControlName="unitCostBeforeTax" class="form-control" readonly>
+            </td>
+            <td>
+              <input type="number" formControlName="subtotal" class="form-control" readonly>
+            </td>
+            <td>
+              <input type="number" formControlName="taxAmount" class="form-control" readonly>
+            </td>
+            <td>
+              <input type="number" formControlName="lineTotal" class="form-control" readonly>
+            </td>
+            <td>
+              <input type="text" formControlName="batchNumber" class="form-control">
+            </td>
+            <td>
+              <input type="date" formControlName="expiryDate" class="form-control">
+            </td>
+            <td>
+              <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <button type="button" class="btn btn-primary btn-sm" (click)="addProduct()">
+        <i class="fas fa-plus"></i> Add Product
+      </button>
+    </div>
+    
+    <div class="row mt-3">
+      <div class="col-md-6">
+        <div class="form-group">
+          <label>Total Items:</label>
+          <input type="number" class="form-control" [value]="totalItems" readonly>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="form-group">
+          <label>Net Total Amount:</label>
+          <input type="number" class="form-control" [value]="netTotalAmount" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <!-- Card 4: Shipping Details -->
+        <div class="card mb-3">
+            <div class="card-header">Shipping Details</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Additional Shipping Charges:</label>
+                            <input type="number" formControlName="shippingCharges" class="form-control" (change)="calculateTotals()" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Round Off Amount:</label>
+                            <input type="number" formControlName="roundOffAmount" class="form-control" readonly />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Rounded Total:</label>
+                            <input type="number" formControlName="roundedTotal" class="form-control" readonly />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Payment Details -->
+        <div class="card mb-3">
+            <div class="card-header">Payment Details</div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Amount:</label>
+                            <input type="number" formControlName="paymentAmount" class="form-control" required 
+                                   (change)="calculatePaymentBalance()"/>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Paid On:</label>
+                            <input type="date" formControlName="paidOn" class="form-control" required />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Payment Method:</label>
+                            <select formControlName="paymentMethod" class="form-control" required>
+                                <option value="">Select Payment Method</option>
+                                <option value="Cash">Cash</option>
+                                <option value="Credit/Debit Card">Credit/Debit Card</option>
+                                <option value="Bank Transfer">Bank Transfer</option>
+                                <option value="Mobile Payment">Mobile Payment</option>
+                                <option value="Digital Wallet">Digital Wallet</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Payment Note:</label>
+                            <textarea formControlName="paymentNote" class="form-control"></textarea>
+                        </div>
+                    </div>
+                    <!-- New Balance Field -->
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Balance:</label>
+                            <input type="number" formControlName="balance" class="form-control" readonly />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Total Payable:</label>
+                            <input type="number" formControlName="totalPayable" class="form-control" readonly />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Save Button -->
+        <button type="submit" class="btn btn-success mt-3">Update Purchase</button>
+        <button type="button" class="btn btn-secondary mt-3 ms-2" (click)="router.navigate(['/list-purchase'])">Cancel</button>
+    </form>
+</div>

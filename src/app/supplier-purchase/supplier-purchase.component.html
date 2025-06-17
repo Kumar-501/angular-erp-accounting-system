@@ -1,0 +1,94 @@
+<div class="container-fluid mt-4">
+    <div class="card">
+      <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">
+            Purchases for: {{ supplierDetails?.businessName || 
+                            (supplierDetails?.firstName + ' ' + (supplierDetails?.lastName || '')) }}
+          </h4>
+          <button class="btn btn-light btn-sm" (click)="goBack()">
+            <i class="fas fa-arrow-left"></i> Back
+          </button>
+        </div>
+      </div>
+  
+      <div class="card-body">
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <div class="card text-white bg-info">
+              <div class="card-body">
+                <h5 class="card-title">Total Purchases</h5>
+                <p class="card-text h4">₹ {{ totalPurchases | number:'1.2-2' }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card text-white bg-success">
+              <div class="card-body">
+                <h5 class="card-title">Total Paid</h5>
+                <p class="card-text h4">₹ {{ totalPaid | number:'1.2-2' }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card text-white bg-danger">
+              <div class="card-body">
+                <h5 class="card-title">Total Due</h5>
+                <p class="card-text h4">₹ {{ totalDue | number:'1.2-2' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Purchases Table -->
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Reference No</th>
+                <th>Invoice No</th>
+                <th>Total Amount</th>
+                <th>Payment Status</th>
+                <th>Due Amount</th>
+                <th>Payment Method</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="isLoading">
+                <td colspan="8" class="text-center">
+                  <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                </tr>
+  
+              <tr *ngFor="let purchase of purchases">
+                <td>{{ purchase.purchaseDate | date:'mediumDate' }}</td>
+                <td>{{ purchase.referenceNo }}</td>
+                <td>{{ purchase.invoiceNo || 'N/A' }}</td>
+                <td>₹ {{ purchase.grandTotal | number:'1.2-2' }}</td>
+                <td>
+                  <span [class]="getStatusClass(purchase.paymentStatus)">
+                    {{ purchase.paymentStatus || 'N/A' }}
+                  </span>
+                </td>
+                <td>₹ {{ purchase.paymentDue | number:'1.2-2' }}</td>
+                <td>{{ purchase.paymentMethod || 'N/A' }}</td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary" title="View Details">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </td>
+              </tr>
+  
+              <tr *ngIf="!isLoading && purchases.length === 0">
+                <td colspan="8" class="text-center">No purchases found for this supplier</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,629 @@
+<div>
+  <div class="text-center mt-4 mb-4">
+    <button *ngIf="!currentAttendance" class="btn btn-primary" 
+    (click)="openClockInModal()">
+<i class="bi bi-clock"></i>
+<div>Clock In</div>
+</button>
+
+<!-- Show Clock Out button if user is clocked in -->
+<button *ngIf="currentAttendance" 
+        class="btn btn-danger ms-2" 
+        style="width: 90px; height: 90px;" 
+        (click)="openClockOutModal(currentAttendance)">
+  <i class="bi bi-clock-history"></i>
+  <div>Clock Out</div>
+</button>
+<div class="modal fade" [class.show]="showClockOutModal" [style.display]="showClockOutModal ? 'block' : 'none'">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5>Clock Out</h5>
+        <button (click)="closeClockOutModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Employee: {{ clockOutData.employee }}</p>
+        <textarea [(ngModel)]="clockOutData.clockOutNote" placeholder="Note"></textarea>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Clock Out Time</label>
+        <input type="text" class="form-control" [value]="currentTime | date:'medium'" readonly>
+      </div>
+      <div class="modal-footer">
+        <button (click)="submitClockOut()">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+  
+    <!-- Pill Navigation -->
+    <ul class="nav nav-pills mb-4">
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'shifts'" (click)="setActiveTab('shifts')">Shifts</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'all'" (click)="setActiveTab('all')">All Attendance</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'byShift'" (click)="setActiveTab('byShift')">Attendance by Shift</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'byDate'" (click)="setActiveTab('byDate')">Attendance by Date</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [class.active]="activeTab === 'import'" (click)="setActiveTab('import')">Import Attendance</a>
+      </li>
+    </ul>
+  
+    <!-- Tab Content -->
+    <div [ngSwitch]="activeTab">
+  
+      <!-- Shifts Tab -->
+      <div *ngSwitchCase="'shifts'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="mb-0">Shifts Management</h4>
+          <button class="btn btn-primary d-flex align-items-center" (click)="openModal()">
+            <i class="bi bi-plus-circle me-2"></i> Add Shift
+          </button>
+        </div>
+  
+        <!-- Shifts Table Control Panel -->
+        <div class="card mb-4 border-0 shadow-sm">
+          <div class="card-body bg-light p-3">
+            <div class="row g-2 align-items-center">
+              <div class="col-auto">
+                <label class="col-form-label">Show</label>
+              </div>
+              <div class="col-auto">
+                <select class="form-select form-select-sm">
+                  <option>25</option>
+                  <option>50</option>
+                  <option>100</option>
+                </select>
+              </div>
+              <div class="col-auto">
+                <span>entries</span>
+              </div>
+              <div class="col ms-auto">
+                <div class="input-group">
+                  <span class="input-group-text bg-white">
+                    <i class="bi bi-search"></i>
+                  </span>
+                  <input type="text" class="form-control" placeholder="Search shifts...">
+                </div>
+              </div>
+              <div class="col-auto">
+             
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <!-- Shifts Table -->
+        <div class="card border-0 shadow-sm">
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th class="border-0">
+                    <div class="d-flex align-items-center">
+                      Name
+                      <i class="bi bi-arrow-down-up ms-1 text-muted"></i>
+                    </div>
+                  </th>
+                  <th class="border-0">
+                    <div class="d-flex align-items-center">
+                      Shift Type
+                      <i class="bi bi-arrow-down-up ms-1 text-muted"></i>
+                    </div>
+                  </th>
+                  <th class="border-0">
+                    <div class="d-flex align-items-center">
+                      Start Time
+                      <i class="bi bi-arrow-down-up ms-1 text-muted"></i>
+                    </div>
+                  </th>
+                  <th class="border-0">
+                    <div class="d-flex align-items-center">
+                      End Time
+                      <i class="bi bi-arrow-down-up ms-1 text-muted"></i>
+                    </div>
+                  </th>
+                  <th class="border-0">
+                    <div class="d-flex align-items-center">
+                      Holiday
+                      <i class="bi bi-arrow-down-up ms-1 text-muted"></i>
+                    </div>
+                  </th>
+               
+                  <th class="border-0 text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let shift of shifts">
+                  <td>{{ shift.shiftName }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="shift.shiftType === 'Fixed shift' ? 'bg-primary' : 'bg-info'">
+                      {{ shift.shiftType }}
+                    </span>
+                  </td>
+                  <td>{{ shift.startTime }}</td>
+                  <td>{{ shift.endTime }}</td>
+                  <td>
+                    <div *ngIf="shift.holiday">
+                      <span class="badge bg-light text-dark">{{ shift.holiday }}</span>
+                    </div>
+                    <div *ngIf="!shift.holiday">-</div>
+                  </td>
+                 
+                  <td class="text-end">
+                    <div class="btn-group">
+                      <button class="btn btn-sm btn-outline-primary" (click)="openEditModal(shift)">
+                        <i class="bi bi-pencil me-1"></i> Edit
+                      </button>
+                      <button class="btn btn-sm btn-outline-danger" (click)="deleteShift(shift)">
+                        <i class="bi bi-trash me-1"></i> Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer bg-white">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>Showing 1 to {{ shifts.length }} of {{ shifts.length }} entries</div>
+              <nav>
+                <ul class="pagination pagination-sm mb-0">
+                  <li class="page-item disabled">
+                    <a class="page-link" href="#">Previous</a>
+                  </li>
+                  <li class="page-item active">
+                    <a class="page-link" href="#">1</a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="#">Next</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- All Attendance Tab -->
+      <div *ngSwitchCase="'all'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4>All Attendance</h4>
+          <button class="btn btn-primary" (click)="openAttendanceModal()">+ Add Attendance</button>
+        </div>
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Clock In</th>
+              <th>Clock Out</th>
+              <th>Shift</th>
+              <th>IP Address</th>
+              <th>Clock In Note</th>
+              <th>Clock Out Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let a of attendances">
+              <td>{{ a.employee }}</td>
+              <td>{{ a.clockInTime | date:'medium' }}</td>
+              <td>{{ a.shift }}</td>
+              <td>{{ a.ipAddress }}</td>
+              <td>{{ a.clockInNote }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+  
+      <!-- Attendance by Shift Tab -->
+      <div *ngSwitchCase="'byShift'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4>Attendance by Shift</h4>
+          <div class="input-group" style="width: 200px;">
+            <input type="date" class="form-control" [(ngModel)]="selectedDate" (change)="loadAttendanceByShift()">
+          </div>
+        </div>
+  
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h5 class="mb-3">Present</h5>
+                <div *ngIf="presentEmployees.length > 0; else noPresentData">
+                  <div class="table-responsive">
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>Employee</th>
+                          <th>Shift</th>
+                          <th>Clock In</th>
+                          <th>Clock Out</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let emp of presentEmployees">
+                          <td>{{ emp.employee }}</td>
+                          <td>{{ emp.shift }}</td>
+                          <td>{{ emp.clockInTime | date:'shortTime' }}</td>
+                          <td>
+                            <!-- Show clock out time if available, otherwise show dash -->
+                            {{ emp.clockOutTime ? (emp.clockOutTime | date:'shortTime') : '—' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="mt-2 text-muted">
+                    Total Present: {{ presentEmployees.length }}
+                  </div>
+                </div>
+                <ng-template #noPresentData>
+                  <div class="alert alert-light">
+                    No data found
+                  </div>
+                </ng-template>
+              </div>
+  
+              <div class="col-md-6">
+                <h5 class="mb-3">Absent</h5>
+                <div *ngIf="absentEmployees.length > 0; else noAbsentData">
+                  <div class="table-responsive">
+                    <table class="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>Employee</th>
+                          <th>Shift</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let emp of absentEmployees">
+                          <td>{{ emp.name }}</td>
+                          <td>{{ emp.shift }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="mt-2 text-muted">
+                    Total Absent: {{ absentEmployees.length }}
+                  </div>
+                </div>
+                <ng-template #noAbsentData>
+                  <div class="alert alert-light">
+                    No data found
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Attendance by Date Tab -->
+      <div *ngSwitchCase="'byDate'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4>Attendance by Date</h4>
+          <div class="input-group" style="width: 300px;">
+            <input type="date" class="form-control" [(ngModel)]="startDate" (change)="onDateRangeChange()">
+            <span class="input-group-text">to</span>
+            <input type="date" class="form-control" [(ngModel)]="endDate" (change)="onDateRangeChange()">
+          </div>
+        </div>
+  
+        <div class="card border-0 shadow-sm mb-4">
+          <div class="card-header bg-light">
+            <h5 class="mb-0">{{ dateRangeText }}</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Present</th>
+                    <th>Absent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let day of dateWiseAttendance">
+                    <td>{{ day.date }}</td>
+                    <td>{{ day.present }}</td>
+                    <td>{{ day.absent }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Import Attendance Tab - Updated to match the UI in the screenshot -->
+      <div *ngSwitchCase="'import'">
+        <h2>Attendance</h2>
+        
+       
+       
+        
+        <!-- File Import Section -->
+        <div class="mt-4">
+          <div class="form-group mb-3">
+            <label for="fileImport">File To Import:</label>
+            <div class="d-flex">
+              <input type="file" id="fileImport" class="form-control form-control-sm" style="width: auto;" (change)="onFileSelect($event)">
+              <button class="btn btn-primary ms-2" (click)="uploadFile()">Submit</button>
+            </div>
+          </div>
+          
+          <div class="mt-4">
+            <button class="btn btn-success">
+              <i class="bi bi-download"></i> Download template file
+            </button>
+          </div>
+          
+          <!-- Template Instructions Table -->
+          <div class="mt-4">
+            <table class="table table-bordered">
+              <thead class="bg-light">
+                <tr>
+                  <th class="text-center align-middle" style="width: 15%">Column Number</th>
+                  <th class="text-center align-middle" style="width: 25%">Column Name</th>
+                  <th class="text-center align-middle" style="width: 60%">Instruction</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-center align-middle">1</td>
+                  <td class="align-middle">Email <span class="text-danger fw-bold">(Required)</span></td>
+                  <td class="align-middle">Email id of the user</td>
+                </tr>
+                <tr>
+                  <td class="text-center align-middle">2</td>
+                  <td class="align-middle">Clock in time <span class="text-danger fw-bold">(Required)</span></td>
+                  <td class="align-middle">Clock in time in "Y-m-d H:i:s" format (2025-04-15 04:45:14)</td>
+                </tr>
+                <tr>
+                  <td class="text-center align-middle">3</td>
+                  <td class="align-middle">Clock out time <span class="text-secondary">(Optional)</span></td>
+                  <td class="align-middle">Clock out time in "Y-m-d H:i:s" format (2025-04-15 04:45:14)</td>
+                </tr>
+                <tr>
+                  <td class="text-center align-middle">4</td>
+                  <td class="align-middle">Clock in note <span class="text-secondary">(Optional)</span></td>
+                  <td class="align-middle"></td>
+                </tr>
+                <tr>
+                  <td class="text-center align-middle">5</td>
+                  <td class="align-middle">Clock out note <span class="text-secondary">(Optional)</span></td>
+                  <td class="align-middle"></td>
+                </tr>
+                <tr>
+                  <td class="text-center align-middle">6</td>
+                  <td class="align-middle">IP Address <span class="text-secondary">(Optional)</span></td>
+                  <td class="align-middle"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+  
+      <div *ngSwitchDefault>
+        <div class="card border-0 shadow-sm">
+          <div class="card-body text-center py-5">
+            <i class="bi bi-calendar-check fs-1 text-muted"></i>
+            <h4 class="mt-3">Select a tab to view content</h4>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <!-- Modal for Adding/Editing Shift -->
+    <div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showModal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ isEditMode ? 'Edit Shift' : 'Add Shift' }}</h5>
+            <button type="button" class="btn-close" (click)="closeModal()"></button>
+          </div>
+          <div class="modal-body">
+            <form>
+              <div class="mb-3">
+                <label class="form-label">Name:*</label>
+                <input type="text" class="form-control" [(ngModel)]="newShift.shiftName" name="shiftName" placeholder="Name" required />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Shift Type:*</label>
+                <div class="input-group">
+                  <select class="form-select" [(ngModel)]="newShift.shiftType" name="shiftType" required>
+                    <option value="Fixed shift">Fixed shift</option>
+                    <option value="Flexible shift">Flexible shift</option>
+                  </select>
+                  <span class="input-group-text bg-info text-white rounded-circle ms-2" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: help;" title="Type of shift schedule">i</span>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Start time:*</label>
+                <div class="input-group">
+                  <input type="time" class="form-control" [(ngModel)]="newShift.startTime" name="startTime" placeholder="Start time" required />
+                  <button class="btn btn-outline-secondary" type="button">
+                    <i class="bi bi-clock"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">End time:*</label>
+                <div class="input-group">
+                  <input type="time" class="form-control" [(ngModel)]="newShift.endTime" name="endTime" placeholder="End time" required />
+                  <button class="btn btn-outline-secondary" type="button">
+                    <i class="bi bi-clock"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Holiday:</label>
+                <select class="form-select" [(ngModel)]="newShift.holiday" name="holiday">
+                  <option value="">Select day</option>
+                  <option value="Sunday">Sunday</option>
+                  <option value="Monday">Monday</option>
+                  <option value="Tuesday">Tuesday</option>
+                  <option value="Wednesday">Wednesday</option>
+                  <option value="Thursday">Thursday</option>
+                  <option value="Friday">Friday</option>
+                  <option value="Saturday">Saturday</option>
+                </select>
+              </div>
+              <div class="mb-3 form-check">
+                  Do auto clock out
+                  <span class="badge bg-info text-white rounded-circle ms-2" style="cursor: help;" title="Automatically clock out employees">i</span>
+              </div>
+              
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-primary" (click)="addShift()">{{ isEditMode ? 'Update' : 'Submit' }}</button>
+            <button class="btn btn-secondary" (click)="closeModal()">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+<!-- Add this modal for Clock In at the bottom of the file, before the closing </div> tag -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockInModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Clock In</h5>
+        <button type="button" class="btn-close" (click)="closeClockInModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="mb-3">
+            <label class="form-label">Employee Name*</label>
+            <select class="form-select" [(ngModel)]="clockInData.employee" name="employee" required>
+              <option value="">Select Employee</option>
+              <option *ngFor="let user of users" [value]="user.username || user.email">
+                {{ user.username || user.email }}
+              </option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Shift*</label>
+            <select class="form-select" [(ngModel)]="clockInData.shift" name="shift" required>
+              <option value="">Select Shift</option>
+              <option *ngFor="let shift of shifts" [value]="shift.shiftName">
+                {{ shift.shiftName }} ({{ shift.startTime }} - {{ shift.endTime }})
+              </option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">IP Address</label>
+            <input type="text" class="form-control" [(ngModel)]="clockInData.ipAddress" name="ipAddress" readonly />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Clock In Note</label>
+            <textarea class="form-control" [(ngModel)]="clockInData.clockInNote" name="clockInNote" placeholder="Optional note"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeClockInModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitClockIn()" [disabled]="isClockingIn">
+          <span *ngIf="!isClockingIn">Clock In</span>
+          <span *ngIf="isClockingIn" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add this success modal after the clock in modal -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockInSuccessModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Clock In Successful</h5>
+        <button type="button" class="btn-close" (click)="closeClockInSuccessModal()"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-3">
+          <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+        </div>
+        <h4>Successfully Clocked In</h4>
+        <p *ngIf="clockInData.employee">Employee: {{ clockInData.employee }}</p>
+        <p *ngIf="clockInData.shift">Shift: {{ clockInData.shift }}</p>
+        <p>Time: {{ currentTime | date:'mediumTime' }}</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button class="btn btn-primary" (click)="closeClockInSuccessModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+<!-- Clock Out Modal -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockOutModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Clock Out</h5>
+        <button type="button" class="btn-close" (click)="closeClockOutModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="mb-3">
+            <label class="form-label">Employee</label>
+            <input type="text" class="form-control" [(ngModel)]="clockOutData.employee" name="employee" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Shift</label>
+            <input type="text" class="form-control" [(ngModel)]="clockOutData.shift" name="shift" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Clock Out Time</label>
+            <input type="text" class="form-control" [value]="currentTime | date:'medium'" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Clock Out Note</label>
+            <textarea class="form-control" [(ngModel)]="clockOutData.clockOutNote" name="clockOutNote" placeholder="Optional note"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeClockOutModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitClockOut()" [disabled]="isClockingOut">
+          <span *ngIf="!isClockingOut">Clock Out</span>
+          <span *ngIf="isClockingOut" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Clock Out Success Modal -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockOutSuccessModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Clock Out Successful</h5>
+        <button type="button" class="btn-close" (click)="closeClockOutSuccessModal()"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div class="mb-3">
+          <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+        </div>
+        <h4>Successfully Clocked Out</h4>
+        <p *ngIf="clockOutData.employee">Employee: {{ clockOutData.employee }}</p>
+        <p *ngIf="clockOutData.shift">Shift: {{ clockOutData.shift }}</p>
+        <p>Time: {{ currentTime | date:'mediumTime' }}</p>
+        <p *ngIf="workDuration">Duration: {{ workDuration }}</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button class="btn btn-primary" (click)="closeClockOutSuccessModal()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>

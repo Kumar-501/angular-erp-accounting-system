@@ -1,0 +1,46 @@
+<div class="supplier-summary-container">
+  <div class="header-section">
+    <h2>Supplier Summary</h2>
+    <div class="summary-actions">
+      <div class="supplier-count">
+        <strong>Total Suppliers: {{ suppliers.length }}</strong>
+      </div>
+      <button class="export-btn" (click)="exportToExcel()" [disabled]="suppliers.length === 0">
+        <i class="fa fa-download"></i> Export to Excel
+      </button>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="supplier-summary-table">
+      <thead>
+        <tr>
+          <th>Contact ID</th>
+          <th>Name</th>
+          <th>Business Name</th>
+          <th>Status</th>
+          <!-- Add more columns as needed -->
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let supplier of suppliers">
+          <td>{{ supplier.contactId || 'N/A' }}</td>
+          <td>
+            <div *ngIf="supplier.isIndividual">
+              {{ supplier.prefix || '' }} {{ supplier.firstName || '' }} {{ supplier.middleName || '' }} {{ supplier.lastName || '' }}
+            </div>
+          </td>
+          <td>{{ !supplier.isIndividual ? (supplier.businessName || 'N/A') : 'N/A' }}</td>
+          <td>
+            <span class="status-badge" [class.active]="supplier.status === 'Active'">
+              {{ supplier.status || 'Inactive' }}
+            </span>
+          </td>
+        </tr>
+        <tr *ngIf="suppliers.length === 0">
+          <td colspan="4" class="no-data">No suppliers found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

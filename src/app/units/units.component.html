@@ -1,0 +1,164 @@
+<div class="units-container">
+  <div class="units-header">
+    <h1>Units</h1>
+    <p class="subtitle">Manage your measurement units</p>
+  </div>
+
+  <div class="card">
+    <div class="table-header-controls">
+      <div class="table-top-row">
+        <button class="btn-primary floating-add-btn" (click)="openPopup()">
+          <i class="fas fa-plus"></i> Add 
+        </button>
+    
+      </div>
+      
+      <div class="table-controls">
+        <div class="entries-control">
+          <span>Show</span>
+          <select (change)="changePageSize($event)">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <span>entries</span>
+        </div>
+        
+        <div class="export-controls">
+          <button class="btn-outline" (click)="exportToCSV()">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+          <button class="btn-outline" (click)="exportToExcel()">
+            <i class="fas fa-file-excel"></i> Export Excel
+          </button>
+          <button class="btn-outline" (click)="print()">
+            <i class="fas fa-print"></i> Print
+          </button>
+          <button class="btn-outline" (click)="exportToPDF()">
+            <i class="fas fa-file-pdf"></i> Export PDF
+          </button>
+          
+              
+        <div class="search-control">
+          <input 
+            type="text" 
+            placeholder="Search..." 
+            (input)="search($event)"
+          >
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th (click)="sortBy('name')">Name</th>
+              <th (click)="sortBy('shortName')">Short name</th>
+              <th (click)="sortBy('allowDecimal')">
+                Allow decimal
+                <i class="fa fa-info-circle tooltip-icon" title="Whether decimal values are allowed for this unit"></i>
+              </th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let unit of filteredUnits">
+              <td>{{ unit.name }}</td>
+              <td>{{ unit.shortName }}</td>
+              <td>{{ unit.allowDecimal ? 'Yes' : 'No' }}</td>
+              <td class="actions">
+                <button class="btn-edit" (click)="openPopup(unit)">
+                  <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn-delete" (click)="deleteUnit(unit.id!)">
+                  <i class="fas fa-trash"></i> Delete
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredUnits.length === 0">
+              <td colspan="4" class="no-data">No units found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="showing-entries">
+          Showing {{ (currentPage - 1) * pageSize + 1 }} to 
+          {{ Math.min(currentPage * pageSize, units.length) }} of {{ units.length }} entries
+        </div>
+        <div class="pagination">
+          <button class="page-btn" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)">
+            Previous
+          </button>
+          <button class="page-btn" [class.active]="currentPage === page" *ngFor="let page of getPageArray()" 
+            (click)="changePage(page)">
+            {{ page }}
+          </button>
+          <button class="page-btn" [disabled]="currentPage === totalPages" (click)="changePage(currentPage + 1)">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" *ngIf="showPopup">
+  <div class="modal-backdrop" (click)="closePopup()"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Add Unit</h2>
+      <button class="close-btn" (click)="closePopup()">×</button>
+    </div>
+    <div class="modal-body">
+      <form [formGroup]="unitForm" (ngSubmit)="saveUnit()">
+        <div class="form-group">
+          <label>Name:</label>
+          <input type="text" formControlName="name" placeholder="Name">
+        </div>
+        
+        <div class="form-group">
+          <label>Short name:</label>
+          <input type="text" formControlName="shortName" placeholder="Short name">
+        </div>
+        
+        <div class="form-group">
+          <label>Allow decimal:</label>
+          <select formControlName="allowDecimal">
+            <option value="">Please Select</option>
+            <option [value]="true">Yes</option>
+            <option [value]="false">No</option>
+          </select>
+        </div>
+        
+        <div class="checkbox-group">
+          <label>
+            <input type="checkbox" formControlName="isMultiple">
+            Add as multiple of other unit
+          </label>
+        </div>
+        
+        <div class="unit-conversion" *ngIf="unitForm.get('isMultiple')?.value">
+          <div class="conversion-row">
+            <span>1 Unit =</span>
+            <input type="number" formControlName="multiplier" placeholder="times">
+            <span>times base unit</span>
+            <select formControlName="baseUnit">
+              <option value="">Select base unit</option>
+              <option *ngFor="let u of units" [value]="u.id">{{ u.name }}</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-save">Save</button>
+          <button type="button" class="btn-cancel" (click)="closePopup()">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>

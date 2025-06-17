@@ -1,0 +1,372 @@
+:host {
+  display: block;
+  width: 100%;
+}
+.sort-icon {
+  display: inline-flex;
+  flex-direction: column;
+  margin-left: 5px;
+  position: relative;
+  top: -2px;
+  
+  i {
+    font-size: 12px;
+    line-height: 0.8;
+    color: #ccc;
+    
+    &.active {
+      color: #333;
+    }
+  }
+}
+
+th {
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+}
+.business-locations-container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  padding: 1rem;
+  max-width: 100%;
+  background-color: #f5f7fa;
+  margin-top: 8%;
+  
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  
+  p {
+    margin: 0.25rem 0 1.5rem;
+    color: #4a4a4a;
+    font-size: 0.9rem;
+  }
+}
+
+.locations-table-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  
+  h2 {
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: #333;
+  }
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.search-container {
+  flex-grow: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  outline: none;
+  
+  &:focus {
+    border-color: #4e73df;
+  }
+}
+
+.btn-add {
+  background-color: #4e73df;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 15px 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: right;
+  transition: background-color 0.2s;
+  margin-left: 92%;
+  margin-top: -2%;
+
+  
+  i {
+    margin-right: 0.5rem;
+  }
+  
+  &:hover {
+    background-color: #3a5ccc;
+  }
+}
+
+.table-responsive {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.locations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  
+  th, td {
+    padding: 0.75rem 0.5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+  
+  th {
+    color: #1b1a1a;
+    font-weight: 750;
+    border-bottom: 1px solid #e0e0e0;
+    position: sticky;
+    top: 0;
+    background-color: white;
+    
+    i {
+      margin-left: 0.25rem;
+      color: #bbb;
+      font-size: 0.8rem;
+    }
+  }
+  
+  tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    
+    &:hover {
+      background-color: #f8f9ff;
+    }
+  }
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  
+  .btn {
+    padding: 0.35rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    
+    i {
+      margin-right: 0.25rem;
+      font-size: 0.75rem;
+    }
+  }
+  
+  .edit {
+    background-color: white;
+    color: rgb(56, 27, 221);
+    border-color: #3a5ccc;
+    
+    &:hover {
+      background-color: #3a5ccc;
+      color: white;
+    }
+  }
+  
+  .settings {
+    background-color:white;
+    color:  #1cc88a;
+    border-color: #1cc88a;
+    
+    &:hover {
+      background-color: #17a673;
+      color: white;
+    }
+  }
+  
+  .deactivate {
+    background-color:white;
+    color:red;
+    border-color: red;
+    
+    &:hover {
+      background-color: #d52a1a;
+      color: white;
+    }
+  }
+}
+
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #666;
+  padding: 0.5rem 0;
+}
+
+.pagination {
+  width: 200px;
+  height: 10px;
+  
+  .pagination-track {
+    height: 10px;
+    width: 100%;
+    background-color: #e9ecef;
+    border-radius: 5px;
+    position: relative;
+    
+    &:after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 20%;
+      background-color: #4e73df;
+      border-radius: 5px;
+    }
+  }
+}
+
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popup {
+  background-color: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  padding: 1.5rem;
+  
+  h3 {
+    margin: 0 0 1.5rem;
+    font-size: 1.2rem;
+    color: #333;
+  }
+  
+  h4 {
+    margin: 1.5rem 0 1rem;
+    font-size: 1rem;
+    color: #444;
+  }
+}
+
+.form-group {
+  margin-bottom: 1rem;
+  
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #555;
+  }
+  
+  input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    
+    &:focus {
+      outline: none;
+      border-color: #4e73df;
+    }
+  }
+}
+
+.payment-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  
+  button {
+    padding: 0.5rem 1.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  
+  .btn-save {
+    background-color: #4e73df;
+    color: white;
+    border: none;
+    
+    &:hover {
+      background-color: #3a5ccc;
+    }
+  }
+  
+  .btn-close {
+    background-color: white;
+    color: #666;
+    border: 1px solid #ddd;
+    
+    &:hover {
+      background-color: #f8f8f8;
+    }
+  }
+}
+/* New style for the close button */
+.popup {
+  position: relative;
+  /* Other existing styles */
+}
+
+.close-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #777;
+  z-index: 10;
+  padding: 5px 10px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background-color: #f0f0f0;
+  color: #333;
+}/* No text wrapping in table cells */
+.locations-table th,
+.locations-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

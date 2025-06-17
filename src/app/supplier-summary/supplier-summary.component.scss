@@ -1,0 +1,201 @@
+/* Supplier Summary Container */
+.supplier-summary-container {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+/* Header Section */
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.header-section h2 {
+  margin: 0;
+  color: #333;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* Summary Actions */
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.supplier-count {
+  font-size: 16px;
+  color: #555;
+}
+
+.supplier-count strong {
+  color: #333;
+  font-weight: 700;
+}
+
+/* Export Button */
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.export-btn:hover:not(:disabled) {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.export-btn i {
+  font-size: 14px;
+}
+
+/* Table Responsive Wrapper */
+.table-responsive {
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Supplier Summary Table */
+.supplier-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+  font-size: 14px;
+}
+
+/* Table Header */
+.supplier-summary-table thead {
+  background-color: #f8f9fa;
+}
+
+.supplier-summary-table th {
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #dee2e6;
+  white-space: nowrap;
+}
+
+/* Table Body */
+.supplier-summary-table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s ease;
+}
+
+.supplier-summary-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.supplier-summary-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.supplier-summary-table td {
+  padding: 12px;
+  vertical-align: top;
+  color: #666;
+}
+
+/* Status Badge */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  background-color: #dc3545;
+  color: white;
+}
+
+.status-badge.active {
+  background-color: #28a745;
+}
+
+/* No Data Message */
+.no-data {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-style: italic;
+  font-size: 16px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .supplier-summary-container {
+    padding: 15px;
+    margin: 10px 0;
+  }
+  
+  .header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .summary-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .header-section h2 {
+    font-size: 20px;
+  }
+  
+  .supplier-summary-table {
+    font-size: 12px;
+  }
+  
+  .supplier-summary-table th,
+  .supplier-summary-table td {
+    padding: 8px 6px;
+  }
+  
+  .export-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-section {
+    text-align: center;
+  }
+  
+  .summary-actions {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .export-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

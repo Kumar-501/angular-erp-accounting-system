@@ -1,0 +1,20 @@
+// supplier-purchase.component.scss
+.status-active {
+    color: #28a745;
+    font-weight: 500;
+  }
+  
+  .status-inactive {
+    color: #dc3545;
+    font-weight: 500;
+  }
+  
+  .status-partial {
+    color: #ffc107;
+    font-weight: 500;
+  }
+  
+  .table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+    cursor: pointer;
+  }

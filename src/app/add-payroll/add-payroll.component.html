@@ -1,0 +1,327 @@
+<div class="container-fluid py-3">
+  <div class="card">
+    <div class="card-header bg-light">
+      <h4 class="mb-0">Add Payroll</h4>
+    </div>
+    <div class="card-body">
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <h5>Payroll for {{ formatMonthYear(payrollGroup.monthYear) }}</h5>
+          <p class="mb-0">Location: {{ payrollGroup.location }}</p>
+        </div>
+        <div class="col-md-6">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="payrollName">Payroll group name:*</label>
+                <input type="text" class="form-control" id="payrollName" [(ngModel)]="payrollGroup.name">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="status">Status:* <i class="fas fa-info-circle text-info"></i></label>
+                <select class="form-control" id="status" [(ngModel)]="payrollGroup.status">
+                  <option value="Draft">Draft</option>
+                  <option value="Final">Final</option>
+                </select>
+                <small class="text-muted">Payroll cannot be deleted if status is final</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee Selector -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <div class="form-group">
+            <label for="employeeSelect">Select Employee:</label>
+            <select class="form-control" id="employeeSelect" [(ngModel)]="selectedEmployeeId" (change)="fetchEmployeeDetails()">
+              <option value="">-- Select Employee --</option>
+              <option *ngFor="let user of users" [value]="user.id">{{ user.username || user.name }}</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-group">
+            <label for="monthYearSelect">Month/Year:</label>
+            <input type="month" class="form-control" id="monthYearSelect" [(ngModel)]="payrollGroup.monthYear" (change)="fetchEmployeeDetails()">
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee Attendance Summary -->
+      <div *ngIf="selectedEmployee" class="row mb-4">
+        <div class="col-12">
+          <div class="card bg-light">
+            <div class="card-body">
+              <h5 class="card-title">Attendance Summary for {{ selectedEmployee.username || selectedEmployee.name }}</h5>
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="card text-white bg-success mb-3">
+                    <div class="card-body text-center">
+                      <h2 class="mb-0">{{ attendanceStats.presentDays || 0 }}</h2>
+                      <p class="mb-0">Present Days</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-danger mb-3">
+                    <div class="card-body text-center">
+                      <h2 class="mb-0">{{ attendanceStats.absentDays || 0 }}</h2>
+                      <p class="mb-0">Absent Days</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-warning mb-3">
+                    <div class="card-body text-center">
+                      <h2 class="mb-0">{{ attendanceStats.leaveDays || 0 }}</h2>
+                      <p class="mb-0">Leaves</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="card text-white bg-info mb-3">
+                    <div class="card-body text-center">
+                      <h2 class="mb-0">{{ attendanceStats.totalWorkHours || 0 }}</h2>
+                      <p class="mb-0">Work Hours</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Monthly calendar view for attendance -->
+              <div class="mt-3">
+                <h6>Monthly Attendance Overview</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span><strong>Working days this month:</strong> {{ getWorkingDaysInSelectedMonth() }}</span>
+                  <span><strong>Attendance rate:</strong> {{ getAttendanceRate() }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Employee Payroll Details Form -->
+      <div *ngIf="selectedEmployee" class="employee-details">
+        <div class="row">
+          <div class="col-md-3">
+            <h5>Employee Details</h5>
+            <p class="mb-1"><strong>{{ selectedEmployee.username || selectedEmployee.name }}</strong></p>
+            <p class="mb-1">Present: {{ attendanceStats.presentDays || 0 }} days</p>
+            <p class="mb-1">Absent: {{ attendanceStats.absentDays || 0 }} days</p>
+            <p class="mb-1">Leaves: {{ attendanceStats.leaveDays || 0 }} days</p>
+            <p class="mb-1">Work Hours: {{ attendanceStats.totalWorkHours || 0 }} hours</p>
+            <div class="mt-3">
+              <h6>Attendance Records</h6>
+              <div *ngIf="getMonthlyAttendanceSummary(selectedEmployee.id).attendanceRecords.length > 0; else noAttendance">
+                <div class="attendance-scroll" style="max-height: 250px; overflow-y: auto;">
+                  <div *ngFor="let record of getMonthlyAttendanceSummary(selectedEmployee.id).attendanceRecords" class="mb-2 p-2 border rounded">
+                    <small class="d-block"><strong>{{ record.clockInTime | date:'mediumDate' }}</strong></small>
+                    <small class="d-block">In: {{ record.clockInTime | date:'shortTime' }}</small>
+                    <small class="d-block">Out: {{ record.clockOutTime ? (record.clockOutTime | date:'shortTime') : 'Not clocked out' }}</small>
+                    <small class="d-block">Hours: {{ calculateRecordHours(record) }}</small>
+                  </div>
+                </div>
+              </div>
+              <ng-template #noAttendance>
+                <p class="text-muted small">No attendance records found for this month</p>
+              </ng-template>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <h5>Basic Salary Calculation</h5>
+            <div class="form-group">
+              <label>Total work duration:*</label>
+              <input type="number" class="form-control" [(ngModel)]="selectedEmployee.totalWorkDuration" (input)="calculateTotals()" step="0.01+">
+              <small class="form-text text-muted">Based on attendance data</small>
+            </div>
+            <div class="form-group">
+              <label>Duration Unit:</label>
+              <select class="form-control" [(ngModel)]="selectedEmployee.durationUnit" (change)="calculateTotals()">
+                <option value="Day">Day</option>
+                <option value="Month">Month</option>
+                <option value="Year">Year</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Amount per unit duration:*</label>
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">$</span>
+                </div>
+                <input type="number" class="form-control" [(ngModel)]="selectedEmployee.amountPerUnit" 
+                      (input)="calculateTotals()" step="0.01">
+              </div>
+            </div>
+            <div class="form-group mt-3">
+              <label>Total Basic Salary:</label>
+              <div class="input-group">
+                <div class="input-group-prepend">
+                  <span class="input-group-text">$</span>
+                </div>
+                <input type="number" class="form-control" [(ngModel)]="selectedEmployee.totalAmount" readonly>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <h5>Earnings</h5>
+            <div *ngFor="let earning of selectedEmployee.earnings; let i = index" class="mb-2">
+              <div class="input-group mb-1">
+                <input type="text" class="form-control" placeholder="Description" 
+                      [(ngModel)]="earning.description">
+              </div>
+              <div class="input-group mb-1">
+                <select class="form-control" [(ngModel)]="earning.amountType" (change)="calculateTotals()">
+                  <option value="Fixed">Fixed</option>
+                  <option value="Percentage">Percentage</option>
+                </select>
+                <input type="number" class="form-control" [(ngModel)]="earning.amount" 
+                      (input)="calculateTotals()" step="0.01">
+                <div class="input-group-append">
+                  <span class="input-group-text" *ngIf="earning.amountType === 'Percentage'">%</span>
+                  <span class="input-group-text" *ngIf="earning.amountType === 'Fixed'">$</span>
+                </div>
+                <button class="btn btn-danger" type="button" (click)="removeEarning(i)">-</button>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" (click)="addEarning()">+</button>
+            <div class="mt-3">
+              <strong>Total Earnings: $ {{ selectedEmployee.earningsTotal || 0 | number:'1.2-2' }}</strong>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <h5>Deductions</h5>
+            <div *ngFor="let deduction of selectedEmployee.deductions; let i = index" class="mb-2">
+              <div class="input-group mb-1">
+                <input type="text" class="form-control" placeholder="Description" 
+                      [(ngModel)]="deduction.description">
+              </div>
+              <div class="input-group mb-1">
+                <select class="form-control" [(ngModel)]="deduction.amountType" (change)="calculateTotals()">
+                  <option value="Fixed">Fixed</option>
+                  <option value="Percentage">Percentage</option>
+                </select>
+                <input type="number" class="form-control" [(ngModel)]="deduction.amount" 
+                      (input)="calculateTotals()" step="0.01">
+                <div class="input-group-append">
+                  <span class="input-group-text" *ngIf="deduction.amountType === 'Percentage'">%</span>
+                  <span class="input-group-text" *ngIf="deduction.amountType === 'Fixed'">$</span>
+                </div>
+                <button class="btn btn-danger" type="button" (click)="removeDeduction(i)">-</button>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" (click)="addDeduction()">+</button>
+            <div class="mt-3">
+              <strong>Total Deductions: $ {{ selectedEmployee.deductionsTotal || 0 | number:'1.2-2' }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="row mt-4">
+          <div class="col-md-9">
+            <div class="form-group">
+              <label>Note:</label>
+              <textarea class="form-control" rows="3" [(ngModel)]="selectedEmployee.note"></textarea>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-light">
+              <div class="card-body">
+                <h5 class="card-title">Salary Summary</h5>
+                <div class="d-flex justify-content-between mb-2">
+                  <span>Basic Salary:</span>
+                  <span>$ {{ selectedEmployee.totalAmount || 0 | number:'1.2-2' }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                  <span>Total Earnings:</span>
+                  <span class="text-success">$ {{ selectedEmployee.earningsTotal || 0 | number:'1.2-2' }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                  <span>Total Deductions:</span>
+                  <span class="text-danger">$ {{ selectedEmployee.deductionsTotal || 0 | number:'1.2-2' }}</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                  <h6>Net Salary:</h6>
+                  <h5 class="text-primary">$ {{ selectedEmployee.grossAmount || 0 | number:'1.2-2' }}</h5>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Employee Button -->
+        <div class="row mt-3">
+          <div class="col-12">
+            <button class="btn btn-info" (click)="saveEmployeeData()">Save Employee Data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Employee List Table -->
+      <div class="row mt-4" *ngIf="payrollGroup.employees.length > 0">
+        <div class="col-12">
+          <h5>Employees in this Payroll</h5>
+          <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Employee</th>
+                  <th>Working Days</th>
+                  <th>Present</th>
+                  <th>Basic Salary</th>
+                  <th>Earnings</th>
+                  <th>Deductions</th>
+                  <th>Net Salary</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let emp of payrollGroup.employees; let i = index">
+                  <td>{{ i + 1 }}</td>
+                  <td>{{ emp.username || emp.name }}</td>
+                  <td>{{ getWorkingDaysInSelectedMonth() }}</td>
+                  <td>{{ emp.attendance || 0 }}</td>
+                  <td>$ {{ emp.totalAmount || 0 | number:'1.2-2' }}</td>
+                  <td>$ {{ emp.earningsTotal || 0 | number:'1.2-2' }}</td>
+                  <td>$ {{ emp.deductionsTotal || 0 | number:'1.2-2' }}</td>
+                  <td class="fw-bold">$ {{ emp.grossAmount || 0 | number:'1.2-2' }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary" (click)="editEmployee(i)">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot class="table-light">
+                <tr>
+                  <td colspan="4" class="text-end fw-bold">Total:</td>
+                  <td>$ {{ getTotalBasicSalary() }}</td>
+                  <td>$ {{ getTotalEarnings() }}</td>
+                  <td>$ {{ getTotalDeductions() }}</td>
+                  <td colspan="2">$ {{ getTotalGrossAmount() }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="row mt-4">
+        <div class="col-12 text-end">
+          <button class="btn btn-secondary me-2" routerLink="/payroll">Cancel</button>
+          <button class="btn btn-primary" (click)="submitPayroll()">Proceed</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

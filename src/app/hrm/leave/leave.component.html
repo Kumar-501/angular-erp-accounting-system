@@ -1,0 +1,617 @@
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="importModalLabel">Import Leaves</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert" [ngClass]="importMessageClass" *ngIf="importMessage">
+          {{ importMessage }}
+        </div>
+
+        <div class="mb-3">
+          <label for="importFile" class="form-label">Select Excel File</label>
+          <input 
+            class="form-control" 
+            type="file" 
+            id="importFile" 
+            accept=".xlsx, .xls, .csv"
+            (change)="onFileChange($event)"
+          >
+          <div class="form-text">Please upload an Excel file matching the template format</div>
+        </div>
+
+        <div class="progress mb-3" *ngIf="importInProgress">
+          <div 
+            class="progress-bar progress-bar-striped progress-bar-animated" 
+            role="progressbar" 
+            [style.width]="importProgress + '%'"
+            [attr.aria-valuenow]="importProgress" 
+            aria-valuemin="0" 
+            aria-valuemax="100"
+          >
+            {{ importProgress }}%
+          </div>
+        </div>
+
+        <div *ngIf="importData.length > 0" class="mb-3">
+          <h6>Preview ({{ importData.length }} records)</h6>
+          <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+            <table class="table table-sm table-bordered">
+              <thead>
+                <tr>
+                  <th *ngFor="let key of getImportDataKeys()">{{ key }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of importData.slice(0, 5)">
+                  <td *ngFor="let key of getImportDataKeys()">
+                    <!-- Special handling for dates -->
+                    <ng-container *ngIf="key === 'startDate' || key === 'endDate'">
+                      {{ formatDisplayDate(row[key]) }}
+                    </ng-container>
+                    <ng-container *ngIf="key !== 'startDate' && key !== 'endDate'">
+                      {{ row[key] }}
+                    </ng-container>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button 
+          type="button" 
+          class="btn btn-success" 
+          (click)="downloadTemplateFile()"
+        >
+          <i class="bi bi-download"></i> Download Template
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-primary" 
+          (click)="importLeaves()" 
+          [disabled]="importData.length === 0 || importInProgress"
+        >
+          <i class="bi bi-upload"></i> Import Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="container mt-4">
+  <div class="d-flex justify-content-between mb-3">
+    <!-- Search Container -->
+    <div class="search-container ms-auto me-3">
+      <div class="input-group">
+        <input 
+          type="text" 
+          class="form-control" 
+          placeholder="Search leaves..." 
+          [(ngModel)]="searchQuery"
+          (input)="applySearch()"
+        >
+        <button class="btn btn-outline-secondary" type="button" (click)="clearSearch()">
+          <i class="bi bi-x"></i>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div>
+      <button class="btn btn-primary" (click)="toggleForm()">Add +</button>
+      <button class="btn btn-secondary ms-2" (click)="toggleFilterSidebar()">
+        <i class="bi bi-funnel"></i> Filter
+      </button>
+      <button class="btn btn-info ms-2" (click)="openImportModal()">
+        <i class="bi bi-upload"></i> Import
+      </button>
+    </div>
+    
+    <!-- Export and Bulk Action Buttons -->
+    <div class="d-flex align-items-center">
+      <!-- Export Dropdown -->
+      <div class="dropdown me-2">
+        <button class="btn btn-outline-primary dropdown-toggle" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-download"></i> Export
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+          <li><a class="dropdown-item" href="hrm/leave" (click)="exportToCSV()"><i class="bi bi-file-earmark-excel me-2"></i> CSV</a></li>
+          <li><a class="dropdown-item" href="hrm/leave" (click)="exportToExcel()"><i class="bi bi-file-excel me-2"></i> Excel</a></li>
+        </ul>
+      </div>
+      
+      <!-- Print Button -->
+    
+      <!-- Column Visibility Dropdown -->
+      <div class="dropdown me-2">
+        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="columnVisibilityDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-eye"></i> Columns
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="columnVisibilityDropdown">
+          <li *ngFor="let column of columns">
+            <div class="form-check ms-2">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                [(ngModel)]="column.visible" 
+                (change)="updateColumnVisibility()"
+                [id]="'col-' + column.field"
+              >
+              <label class="form-check-label" [for]="'col-' + column.field">
+                {{ column.header }}
+              </label>
+            </div>
+          </li>
+        </ul>
+      </div>
+      
+      <!-- Bulk Action Buttons -->
+      <button *ngIf="hasSelectedLeaves" class="btn btn-success me-2" (click)="openBulkApproveModal()">
+        Approve Selected ({{ selectedLeaveCount }})
+      </button>
+      <button *ngIf="hasSelectedLeaves" class="btn btn-danger" (click)="openBulkRejectModal()">
+        Reject Selected ({{ selectedLeaveCount }})
+      </button>
+    </div>
+  </div>
+
+
+  <!-- Filter Sidebar -->
+  <div class="offcanvas offcanvas-end" [class.show]="showFilterSidebar" tabindex="-1" id="filterSidebar">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterSidebarLabel">Filters</h5>
+      <button type="button" class="btn-close" (click)="toggleFilterSidebar()" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form [formGroup]="filterForm">
+        <div class="mb-3">
+          <label for="employeeFilter" class="form-label">Employee:</label>
+          <select id="employeeFilter" class="form-select" formControlName="employee">
+            <option value="">All</option>
+            <option *ngFor="let user of users" [value]="user.id">{{ user.username }}</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label for="statusFilter" class="form-label">Status:</label>
+          <select id="statusFilter" class="form-select" formControlName="status">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label for="leaveTypeFilter" class="form-label">Leave Type:</label>
+          <select id="leaveTypeFilter" class="form-select" formControlName="leaveType">
+            <option value="">All</option>
+            <option *ngFor="let type of leaveTypes" [value]="type.id">{{ type.leaveType }}</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label for="approvalStatusFilter" class="form-label">Supervisor Approval Status:</label>
+          <select id="approvalStatusFilter" class="form-select" formControlName="approvalStatus">
+            <option value="">All</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Date Range:</label>
+          <div class="input-group mb-2">
+            <span class="input-group-text">From</span>
+            <input type="date" class="form-control" formControlName="startDate">
+          </div>
+          <div class="input-group">
+            <span class="input-group-text">To</span>
+            <input type="date" class="form-control" formControlName="endDate">
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Quick Date Filters:</label>
+          <div class="list-group">
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('today')">Today</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('yesterday')">Yesterday</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('last7days')">Last 7 Days</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('last30days')">Last 30 Days</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('thisMonth')">This Month</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('lastMonth')">Last Month</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('thisYear')">This Year</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('lastYear')">Last Year</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('currentFinancialYear')">Current Financial Year</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('lastFinancialYear')">Last Financial Year</button>
+            <button type="button" class="list-group-item list-group-item-action" (click)="applyDateFilter('customRange')">Custom Range</button>
+          </div>
+        </div>
+        
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" (click)="applyFilters()">Apply Filters</button>
+          <button type="button" class="btn btn-outline-secondary" (click)="resetFilters()">Reset Filters</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Leave Modal -->
+  <div class="modal fade" id="addLeaveModal" tabindex="-1" aria-labelledby="addLeaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addLeaveModalLabel">Add Leave</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form [formGroup]="leaveForm" (ngSubmit)="submitForm()">
+            <div class="mb-3">
+              <label for="employeeSelect" class="form-label">Select employee:</label>
+              <select id="employeeSelect" class="form-select" formControlName="employeeId">
+                <option value="">-- Select --</option>
+                <option *ngFor="let user of users" [value]="user.id">{{ user.username }}</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="leaveTypeSelect" class="form-label">Leave Type:*</label>
+              <select id="leaveTypeSelect" class="form-select" formControlName="leaveTypeId">
+                <option value="">Please Select</option>
+                <option *ngFor="let type of leaveTypes" [value]="type.id">{{ type.leaveType }}</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="sessionSelect" class="form-label">Session:*</label>
+              <select id="sessionSelect" class="form-select" formControlName="session">
+                <option value="">Please Select</option>
+                <option value="Full Day">Full Day</option>
+                <option value="First Half">First Half</option>
+                <option value="Second Half">Second Half</option>
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label for="startDate" class="form-label">Start Date:*</label>
+              <input id="startDate" type="date" class="form-control" formControlName="startDate">
+            </div>
+
+            <div class="mb-3">
+              <label for="reason" class="form-label">Reason:</label>
+              <textarea id="reason" class="form-control" rows="3" formControlName="reason"></textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" (click)="submitForm()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="table-responsive mt-4" id="leaveTable">
+    <table class="table table-bordered table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th *ngIf="columns[0].visible">
+            <div class="form-check">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                [checked]="selectAll" 
+                (change)="toggleSelectAll()" 
+                id="selectAllCheckbox"
+              >
+              <label class="form-check-label" for="selectAllCheckbox">
+                All
+              </label>
+            </div>
+          </th>
+          <th *ngIf="columns[1].visible">Reference No</th>
+          <th *ngIf="columns[2].visible">Leave Type</th>
+          <th *ngIf="columns[3].visible">Employee</th>
+          <th *ngIf="columns[4].visible">Dates</th>
+          <th *ngIf="columns[5].visible">Session</th>
+          <th *ngIf="columns[6].visible">Reason</th>
+          <th *ngIf="columns[7].visible">Status</th>
+          <th *ngIf="columns[8].visible">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let leave of filteredLeaves">
+          <td *ngIf="columns[0].visible">
+            <div class="form-check">
+              <input 
+                class="form-check-input" 
+                type="checkbox" 
+                [checked]="selectedLeaves[leave.id]" 
+                (change)="toggleSelect(leave.id)" 
+                [id]="'checkbox-' + leave.id"
+              >
+            </div>
+          </td>
+          <td *ngIf="columns[1].visible">{{ leave.referenceNo }}</td>
+          <td *ngIf="columns[2].visible">{{ leave.leaveType }}</td>
+          <td *ngIf="columns[3].visible">{{ leave.employeeName }}</td>
+          <td *ngIf="columns[4].visible">{{ leave.startDate | date:'dd-MM-yyyy' }}</td>
+          <td *ngIf="columns[5].visible">{{ leave.session }}</td>
+          <td *ngIf="columns[6].visible">{{ leave.reason }}</td>
+          <td *ngIf="columns[7].visible">
+            <span 
+              class="badge rounded-pill"
+              [ngClass]="getStatusBadgeClass(leave.status)"
+              (click)="openStatusModal(leave)"
+              style="cursor: pointer;"
+              role="button"
+              tabindex="0"
+              aria-label="Change leave status"
+            >
+              {{ leave.status | titlecase }}
+            </span>
+          </td>
+          <td *ngIf="columns[8].visible">
+            <button class="btn btn-info btn-sm" (click)="viewActivity(leave)">
+              <i class="bi bi-activity"></i> Activity
+            </button>
+            <button class="btn btn-danger btn-sm ms-1" (click)="deleteLeave(leave.id)">
+              <i class="bi bi-trash"></i> Delete
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- Leave Status Modal -->
+<div #statusModal class="modal fade" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="statusModalLabel">Change Leave Status</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form [formGroup]="statusForm">
+          <div class="mb-3">
+            <label for="statusSelect" class="form-label fw-bold">Status:*</label>
+            <select id="statusSelect" class="form-select" formControlName="status">
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div *ngIf="statusForm.get('status')?.value === 'approved'" class="mb-3">
+            <label for="statusApprovedBy" class="form-label fw-bold">Approved By:*</label>
+            <select 
+              id="statusApprovedBy" 
+              class="form-select" 
+              formControlName="approvedBy" 
+              required
+            >
+              <option value="">-- Select Approver --</option>
+              <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+            </select>
+            <div *ngIf="statusForm.get('status')?.value === 'approved' && !statusForm.get('approvedBy')?.value" class="text-danger mt-1">
+              Please select an approver
+            </div>
+          </div>
+
+          <div *ngIf="statusForm.get('status')?.value === 'rejected'" class="mb-3">
+            <label for="statusRejectedBy" class="form-label fw-bold">Rejected By:*</label>
+            <select 
+              id="statusRejectedBy" 
+              class="form-select" 
+              formControlName="approvedBy" 
+              required
+            >
+              <option value="">-- Select Rejector --</option>
+              <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+            </select>
+            <div *ngIf="statusForm.get('status')?.value === 'rejected' && !statusForm.get('approvedBy')?.value" class="text-danger mt-1">
+              Please select who rejected this request
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="statusNote" class="form-label fw-bold">Note:</label>
+            <textarea id="statusNote" class="form-control" formControlName="note" rows="3" placeholder="Optional notes..."></textarea>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button 
+          type="button" 
+          class="btn btn-primary" 
+          (click)="updateStatus()" 
+          [disabled]="statusForm.invalid || (statusForm.get('status')?.value === 'approved' && !statusForm.get('approvedBy')?.value) || (statusForm.get('status')?.value === 'rejected' && !statusForm.get('approvedBy')?.value)"
+        >
+          Update
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Approve Modal -->
+<div #bulkApproveModal class="modal fade" tabindex="-1" aria-labelledby="bulkApproveModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title" id="bulkApproveModalLabel">Approve Selected Leaves</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form [formGroup]="bulkApproveForm">
+          <div class="mb-3">
+            <label for="approvedBy" class="form-label fw-bold">Approved By:*</label>
+            <select 
+              id="approvedBy" 
+              class="form-select" 
+              formControlName="approvedBy" 
+              required
+            >
+              <option value="">-- Select Approver --</option>
+              <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+            </select>
+            <div *ngIf="bulkApproveForm.get('approvedBy')?.touched && bulkApproveForm.get('approvedBy')?.invalid" class="text-danger mt-1">
+              Please select an approver
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="bulkNote" class="form-label fw-bold">Note:</label>
+            <textarea 
+              id="bulkNote" 
+              class="form-control" 
+              formControlName="note" 
+              rows="3" 
+              placeholder="Optional approval notes..."
+            ></textarea>
+          </div>
+
+          <div class="alert alert-info">
+            <p>You are about to approve {{ selectedLeaveCount }} leave request(s).</p>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" (click)="approveBulkLeaves()" [disabled]="bulkApproveForm.invalid">
+          Approve Leaves
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Reject Modal -->
+<div #bulkRejectModal class="modal fade" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="bulkRejectModalLabel">Reject Selected Leaves</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <form [formGroup]="bulkRejectForm">
+          <div class="mb-3">
+            <label for="rejectedBy" class="form-label fw-bold">Rejected By:*</label>
+            <select 
+              id="rejectedBy" 
+              class="form-select" 
+              formControlName="rejectedBy" 
+              required
+            >
+              <option value="">-- Select Rejector --</option>
+              <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+            </select>
+            <div *ngIf="bulkRejectForm.get('rejectedBy')?.touched && bulkRejectForm.get('rejectedBy')?.invalid" class="text-danger mt-1">
+              Please select who is rejecting these requests
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="bulkRejectNote" class="form-label fw-bold">Rejection Reason:</label>
+            <textarea 
+              id="bulkRejectNote" 
+              class="form-control" 
+              formControlName="note" 
+              rows="3" 
+              placeholder="Optional rejection reason..."
+            ></textarea>
+          </div>
+
+          <div class="alert alert-warning">
+            <p>You are about to reject {{ selectedLeaveCount }} leave request(s).</p>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" (click)="rejectBulkLeaves()" [disabled]="bulkRejectForm.invalid">
+          Reject Leaves
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Modal -->
+<div #activityModal class="modal fade" tabindex="-1" aria-labelledby="activityModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title" id="activityModalLabel">Leave Request History</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="card mb-3">
+          <div class="card-header bg-light">
+            <h6>Leave Request Details</h6>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>Reference No:</strong> {{ selectedLeave?.referenceNo }}</p>
+                <p><strong>Employee:</strong> {{ selectedLeave?.employeeName }}</p>
+                <p><strong>Leave Type:</strong> {{ selectedLeave?.leaveType }}</p>
+              </div>
+              <div class="col-md-6">
+                <p><strong>Date:</strong> {{ selectedLeave?.startDate | date:'dd-MM-yyyy' }}</p>
+                <p><strong>Session:</strong> {{ selectedLeave?.session }}</p>
+                <p><strong>Current Status:</strong> 
+                  <span class="badge rounded-pill" [ngClass]="getStatusBadgeClass(selectedLeave?.status)">
+                    {{ selectedLeave?.status | titlecase }}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p><strong>Reason:</strong> {{ selectedLeave?.reason }}</p>
+          </div>
+        </div>
+
+        <h6 class="mt-4">Activity Timeline</h6>
+        <div class="timeline mt-3">
+          <div class="timeline-item" *ngFor="let activity of leaveActivities">
+            <div class="timeline-item-content">
+              <div class="d-flex align-items-center mb-2">
+                <i class="bi me-2" [ngClass]="getActivityIcon(activity.action)"></i>
+                <strong>{{ activity.action | titlecase }}</strong> 
+                <span class="badge ms-2" [ngClass]="getStatusBadgeClass(activity.status)">
+                  {{ activity.status | titlecase }}
+                </span>
+              </div>
+              <p class="text-muted small mb-1">
+                {{ activity.timestamp?.toDate ? (activity.timestamp.toDate() | date:'medium') : (activity.timestamp | date:'medium') }}
+                by {{ activity.by }}
+              </p>
+              <p *ngIf="activity.note" class="mt-2 mb-0">{{ activity.note }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

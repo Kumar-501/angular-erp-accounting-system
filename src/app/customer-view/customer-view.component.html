@@ -1,0 +1,1034 @@
+<style> .summary-label {
+      flex: 1;
+  text-align: left;
+  padding-right: 10px;
+  font-weight: bold;
+  color: #212529;
+    }
+    
+    .summary-value {
+          flex: 2;
+    text-align: right;
+    color: #0069d9;
+    font-weight: bold;}</style>
+
+
+
+  
+  <div *ngIf="isLoading" class="loading-container">
+    <i class="fa fa-spinner fa-spin"></i> Loading customer details...
+  </div>
+
+
+  <div *ngIf="!isLoading && customer" class="customer-details">
+    
+    <div class="customer-card">
+      <!-- Profile circle at top -->
+      <div class="profile-container">
+        <div class="profile-circle">
+          {{ getInitials(customer.firstName, customer.lastName) }}
+        </div>
+        <div class="profile-name">
+          {{ customer.firstName }} {{ customer.lastName }}
+        </div>
+      </div>
+  
+           <!-- Customer name below circle -->
+          
+    <!-- Combined details section -->
+    <div class="combined-details">
+   <div class="details-section">
+  <h5>Customer Information</h5>
+  <div class="summary-content">
+    <div class="summary-row">
+      <span class="summary-label">Mobile:</span>
+      <span class="summary-value">{{ customer.mobile || '-' }}</span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Assigned To:</span>
+      <span class="summary-value">{{ customer.assignedTo || 'Not assigned' }}</span>
+    </div>
+    <!-- Add Life Stage row -->
+    <div class="summary-row">
+      <span class="summary-label">Life Stage:</span>
+      <span class="summary-value">
+        {{ customer.lifeStage || '-' }}
+        <button class="btn-edit" (click)="openLifeStageModal()">
+          <i class="fa fa-edit"></i>
+        </button>
+      </span>
+    </div>
+<div class="summary-row">
+  <span class="summary-label">Alternate Number:</span>
+  <span class="summary-value">
+    {{ customer.alternateContact || '-' }}
+    <button class="btn-edit" (click)="openAlternateContactModal()">
+      <i class="fa fa-edit"></i>
+    </button>
+  </span>
+</div>
+    <!-- Add Lead Category row -->
+    <div class="summary-row">
+      <span class="summary-label">Lead Category:</span>
+      <span class="summary-value">
+        {{ customer.leadCategory || '-' }}
+        <button class="btn-edit" (click)="openLeadCategoryModal()">
+          <i class="fa fa-edit"></i>
+        </button>
+      </span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Department:</span>
+      <span class="summary-value">
+        {{ customer.department || 'Not assigned' }}
+        <button class="btn-edit" (click)="openDepartmentModal()">
+          <i class="fa fa-edit"></i>
+        </button>
+      </span>
+    </div>
+    <div class="summary-row">
+      <span class="summary-label">Status:</span>
+      <span class="summary-value">{{ customer.status || '-' }}</span>
+    </div>
+  </div>
+</div>
+
+      <div class="details-section">
+       
+        <div class="summary-content">
+          <div class="summary-row">
+            <span class="summary-label">Last Call Time:</span>
+            <span class="summary-value">{{ getFormattedDate(customer.lastCallTime) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Call Count:</span>
+            <span class="summary-value">{{ customer.callCount || 0 }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Current State:</span>
+            <span class="summary-value">{{ customer.currentState || '-' }}</span>
+          </div>
+        </div>
+      <!-- Status controls moved inside card at bottom -->
+      <div class="status-controls-bottom">
+        <button *ngIf="customer.status === 'Active'" class="btn-lost" (click)="markAsLost()" [disabled]="isUpdatingStatus">
+          <i class="fa fa-times-circle"></i> Mark as Lost
+        </button>
+        <button *ngIf="customer.status !== 'Active'" class="btn-activate" (click)="activateCustomer()" [disabled]="isUpdatingStatus">
+          <i class="fa fa-check-circle"></i> Activate Customer
+        </button>
+      </div>
+    </div>
+  </div>
+      
+      </div>
+   
+<!-- Navigation Tabs -->
+<div *ngIf="!isLoading && customer" class="customer-content-wrapper">
+<div class="customer-tabs">
+  <nav>
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link" [ngClass]="{'active': activeTab === 'info'}" (click)="changeTab('info')">
+          <i class="fa fa-info-circle"></i> Info
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [ngClass]="{'active': activeTab === 'calls'}" (click)="changeTab('calls')">
+          <i class="fa fa-phone"></i> Call Logs
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [ngClass]="{'active': activeTab === 'purchases'}" (click)="changeTab('purchases')">
+          <i class="fa fa-shopping-cart"></i> Purchases
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" [ngClass]="{'active': activeTab === 'followups'}" (click)="changeTab('followups')">
+          <i class="fa fa-calendar-check-o"></i> Follow-ups
+        </a>
+      </li>
+    </ul>
+  </nav>
+</div>
+
+    <!-- Tab Content -->
+    <!-- Info Tab Content -->
+<!-- Info Tab Content -->
+<!-- Info Tab Content -->
+<!-- Info Tab Content -->
+<div *ngIf="activeTab === 'info'" class="tab-content">
+  <div class="info-section">
+    <h3>Additional Information</h3>
+    <div class="additional-info-card">
+      <div class="info-row">
+        <span class="info-label">Email:</span>
+        <span class="info-value">{{ customer.email || '-' }}</span>
+      </div>
+      
+      <!-- Billing Address Section -->
+      <div class="address-section">
+        <h4>Billing Address</h4>
+        <div class="info-row">
+          <span class="info-label">Street:</span>
+          <span class="info-value">{{ customer.billingAddress?.street || customer.addressLine1 || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">City:</span>
+          <span class="info-value">{{ customer.billingAddress?.city || customer.city || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">State:</span>
+          <span class="info-value">{{ customer.billingAddress?.state || customer.state || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Postal Code:</span>
+          <span class="info-value">{{ customer.billingAddress?.postalCode || customer.zipCode || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Country:</span>
+          <span class="info-value">{{ customer.billingAddress?.country || customer.country || '-' }}</span>
+        </div>
+      </div>
+      
+      <!-- Shipping Address Section -->
+      <div class="address-section">
+        <h4>Shipping Address</h4>
+        <div class="info-row">
+          <span class="info-label">Street:</span>
+          <span class="info-value">{{ customer.shippingAddress?.street || customer.addressLine1 || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">City:</span>
+          <span class="info-value">{{ customer.shippingAddress?.city || customer.city || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">State:</span>
+          <span class="info-value">{{ customer.shippingAddress?.state || customer.state || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Postal Code:</span>
+          <span class="info-value">{{ customer.shippingAddress?.postalCode || customer.zipCode || '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Country:</span>
+          <span class="info-value">{{ customer.shippingAddress?.country || customer.country || '-' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <!-- Call Logs Tab Content -->
+    <div *ngIf="activeTab === 'calls'" class="tab-content">
+      <!-- Call Logs Section -->
+      <div class="call-logs-section">
+        <div class="call-logs-header">
+          <h3>Call Logs</h3>
+          <button class="btn-primary" (click)="toggleAddCallLogForm()">
+            <i class="fa fa-plus"></i> {{ showAddCallLogForm ? 'Cancel' : 'Add Call Log' }}
+          </button>
+        </div>
+
+        <!-- Add Call Log Form -->
+        <div class="call-log-form" *ngIf="showAddCallLogForm">
+          <form [formGroup]="callLogForm" (ngSubmit)="addCallLog()">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="subject">Subject *</label>
+                <input type="text" id="subject" class="form-control" formControlName="subject">
+                <div class="error-message" *ngIf="callLogForm.get('subject')?.invalid && callLogForm.get('subject')?.touched">
+                  Subject is required
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="callType">Call Type</label>
+                <select id="callType" class="form-control" formControlName="callType">
+                  <option value="Inbound">Inbound</option>
+                  <option value="Outbound">Outbound</option>
+                  <option value="Missed">Missed</option>
+                  <option value="Follow-up">Follow-up</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="description">Description *</label>
+              <textarea id="description" class="form-control" formControlName="description" rows="3"></textarea>
+              <div class="error-message" *ngIf="callLogForm.get('description')?.invalid && callLogForm.get('description')?.touched">
+                Description is required
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="callOutcome">Call Outcome</label>
+                <select id="callOutcome" class="form-control" formControlName="callOutcome">
+                  <option value="">Select outcome</option>
+                  <option value="Successful">Successful</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="Busy">Busy</option>
+                  <option value="Left Message">Left Message</option>
+                  <option value="Wrong Number">Wrong Number</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="callDuration">Duration (seconds)</label>
+                <input type="number" id="callDuration" class="form-control" formControlName="callDuration" min="0">
+              </div>
+            </div>
+            
+            <div class="form-row follow-up-section">
+              <div class="form-check">
+                <input type="checkbox" id="followUpRequired" class="form-check-input" 
+                       formControlName="followUpRequired" (change)="toggleFollowUp($event)">
+                <label for="followUpRequired" class="form-check-label">Follow-up Required</label>
+              </div>
+              
+              <div class="form-group" *ngIf="callLogForm.get('followUpRequired')?.value">
+                <label for="followUpDate">Follow-up Date</label>
+                <input type="date" id="followUpDate" class="form-control" formControlName="followUpDate">
+              </div>
+            </div>
+            
+            <div class="form-actions">
+              <button type="button" class="btn btn-secondary" (click)="toggleAddCallLogForm()">Cancel</button>
+              <button type="submit" class="btn btn-primary" [disabled]="callLogForm.invalid || isAddingCallLog">
+                <i class="fa fa-spinner fa-spin" *ngIf="isAddingCallLog"></i>
+                {{ isAddingCallLog ? 'Saving...' : 'Save Call Log' }}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Call Logs List -->
+        <div class="call-logs-container">
+          <div *ngIf="callLogs.length === 0" class="no-data">No call logs found</div>
+          
+          <div class="call-log-item" *ngFor="let log of callLogs">
+            <div class="call-log-header">
+              <div class="call-log-subject">{{ log.subject }}</div>
+              <div class="call-log-meta">
+                <span class="badge" [ngClass]="{
+                  'badge-primary': log.callType === 'Inbound',
+                  'badge-success': log.callType === 'Outbound',
+                  'badge-warning': log.callType === 'Missed',
+                  'badge-info': log.callType === 'Follow-up'
+                }">
+                  {{ log.callType }}
+                </span>
+                <span class="call-log-date">{{ getFormattedDate(log.createdAt) }}</span>
+              </div>
+            </div>
+            
+            <div class="call-log-description">{{ log.description }}</div>
+            
+            <div class="call-log-footer">
+              <div class="call-log-outcome" *ngIf="log.callOutcome">
+                Outcome: {{ log.callOutcome }}
+              </div>
+              <div class="call-log-duration" *ngIf="log.callDuration">
+                Duration: {{ log.callDuration }} seconds
+              </div>
+              <div class="call-log-actions">
+                <button class="btn btn-sm btn-danger" (click)="deleteCallLog(log.id)">
+                  <i class="fa fa-trash"></i> Delete
+                </button>
+              </div>
+            </div>
+            
+            <div class="call-log-followup" *ngIf="log.followUpRequired">
+              <div class="followup-badge">
+                <i class="fa fa-bell"></i> Follow-up required on {{ getFormattedDate(log.followUpDate) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+<!-- Purchases Tab Content -->
+<div *ngIf="activeTab === 'purchases'" class="tab-content">
+  <div class="purchases-section">
+    <div class="section-header">
+      <h3>Purchase History</h3>
+      <div class="purchase-filters">
+        <select class="form-select form-select-sm" [(ngModel)]="purchaseStatusFilter" (change)="applyPurchaseFilters()">
+          <option value="all">All Purchases</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <input type="text" class="form-control" placeholder="Search purchases..." 
+               [(ngModel)]="purchaseSearchTerm" (input)="applyPurchaseFilters()">
+      </div>
+    </div>
+    
+    <div *ngIf="isSalesLoading" class="loading-container">
+      <i class="fa fa-spinner fa-spin"></i> Loading purchase history...
+    </div>
+    
+    <div *ngIf="!isSalesLoading && filteredCustomerSales.length === 0" class="no-data">
+      No purchase history found for this customer.
+    </div>
+    
+<div class="table-responsive" *ngIf="!isSalesLoading && filteredCustomerSales.length > 0">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Products</th>
+        <th>Status</th>
+        <th>Total Amount</th>
+        <th>Payment</th>
+        <th>Shipping Details</th>
+        <th>Balance</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let sale of filteredCustomerSales">
+        <td>{{ getFormattedDate(sale.saleDate) }}</td>
+        <td>
+          <div class="d-flex align-items-center">
+            <span>{{ getProductsDisplayText(sale.products) }}</span>
+            <button class="btn btn-sm btn-link" (click)="toggleProductDetails(sale.id)">
+              <i class="fa" [ngClass]="expandedSaleId === sale.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </button>
+          </div>
+        </td>
+        <td>
+          <span class="badge" [ngClass]="{
+            'bg-success': sale.status === 'Completed',
+            'bg-warning': sale.status === 'Pending',
+            'bg-danger': sale.status === 'Cancelled'
+          }">
+            {{ sale.status }}
+          </span>
+        </td>
+        <td>{{ sale.total | currency:'INR' }}</td>
+        <td>{{ sale.paymentAmount | currency:'INR' }}</td>
+        <td>{{ sale.shippingDetails || 'N/A' }}</td>
+        <td>{{ sale.balance | currency:'INR' }}</td>
+      
+      </tr>
+    </tbody>
+  </table>
+  
+  <!-- Pagination controls -->
+  <div class="pagination-controls" *ngIf="filteredCustomerSales.length > 0">
+    <button class="btn btn-sm btn-light" [disabled]="currentPurchasePage === 1" 
+            (click)="previousPurchasePage()">
+      Previous
+    </button>
+    <span class="page-info">
+      Page {{ currentPurchasePage }} of {{ totalPurchasePages }}
+    </span>
+    <button class="btn btn-sm btn-light" [disabled]="currentPurchasePage === totalPurchasePages" 
+            (click)="nextPurchasePage()">
+      Next
+    </button>
+  </div>
+</div>
+  </div>
+</div>
+<div *ngIf="activeTab === 'followups'" class="tab-content">
+  <div class="followups-section">
+    <div class="section-header">
+      <h3>Follow-ups</h3>
+      <button class="btn btn-primary" (click)="openAddFollowUpModal()">
+        <i class="fa fa-plus"></i> Add Follow-up
+      </button>
+    </div>
+    
+    <div class="followups-table-container">
+      <div *ngIf="isLoadingFollowUps" class="loading-container">
+        <i class="fa fa-spinner fa-spin"></i> Loading follow-ups...
+      </div>
+      
+      <div *ngIf="!isLoadingFollowUps && getAllFollowUps().length === 0" class="no-data">
+        No follow-ups scheduled for this customer.
+      </div>
+      
+      <!-- Follow-ups Table -->
+      <table class="table table-hover" *ngIf="!isLoadingFollowUps && getAllFollowUps().length > 0">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Assigned To</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Standalone follow-ups -->
+          <tr *ngFor="let followUp of customerFollowUps">
+            <td>{{ followUp.title }}</td>
+            <td>
+              <span class="badge" [ngClass]="{
+                'badge-warning': followUp.status === 'Pending',
+                'badge-info': followUp.status === 'In Progress',
+                'badge-success': followUp.status === 'Completed'
+              }">
+                {{ followUp.status }}
+              </span>
+            </td>
+            <td>{{ getFormattedDate(followUp.startDatetime) }}</td>
+            <td>{{ getFormattedDate(followUp.endDatetime) }}</td>
+            <td>{{ getUserName(followUp.assignedTo) || 'Not assigned' }}</td>
+            <td>Standard</td>
+            <td>
+              <div class="table-actions">
+                <button class="btn btn-sm btn-primary" (click)="editFollowUp(followUp)">
+                  <i class="fa fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" (click)="deleteFollowUp(followUp.id)">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Call log follow-ups -->
+          <tr *ngFor="let log of getFollowUpLogs()">
+            <td>{{ log.subject }}</td>
+            <td>
+              <span class="badge badge-warning">Pending</span>
+            </td>
+            <td>{{ getFormattedDate(log.followUpDate) }}</td>
+            <td>-</td>
+            <td>-</td>
+            <td>From Call Log</td>
+            <td>
+              <div class="table-actions">
+                <button class="btn btn-sm btn-success" (click)="markFollowUpComplete(log)">
+                  <i class="fa fa-check"></i>
+                </button>
+                <button class="btn btn-sm btn-secondary" (click)="rescheduleFollowUp(log)">
+                  <i class="fa fa-calendar"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  
+  <!-- Add New Follow-up Modal -->
+  <div class="modal-backdrop" *ngIf="showAddFollowUpModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">Add New Follow-up</h4>
+        <button type="button" class="close" (click)="closeAddFollowUpModal()">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="followUpForm" (ngSubmit)="saveFollowUp()">
+          <div class="form-group">
+            <label for="title">Title *</label>
+            <input type="text" id="title" class="form-control" formControlName="title" required>
+            <div class="error-message" *ngIf="followUpForm.get('title')?.invalid && followUpForm.get('title')?.touched">
+              Title is required
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="status">Status *</label>
+            <select id="status" class="form-control" formControlName="status" required>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="startDatetime">Start Date/Time *</label>
+              <input type="datetime-local" id="startDatetime" class="form-control" formControlName="startDatetime" required>
+              <div class="error-message" *ngIf="followUpForm.get('startDatetime')?.invalid && followUpForm.get('startDatetime')?.touched">
+                Start date/time is required
+              </div>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="endDatetime">End Date/Time *</label>
+              <input type="datetime-local" id="endDatetime" class="form-control" formControlName="endDatetime" required>
+              <div class="error-message" *ngIf="followUpForm.get('endDatetime')?.invalid && followUpForm.get('endDatetime')?.touched">
+                End date/time is required
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" class="form-control" formControlName="description" rows="3"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="assignedTo">Assigned To</label>
+            <select id="assignedTo" class="form-control" formControlName="assignedTo">
+              <option value="">Select User</option>
+              <option *ngFor="let user of availableUsers" [value]="user.id">{{ user.name }}</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="priority">Priority</label>
+            <select id="priority" class="form-control" formControlName="priority">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          
+          <div class="form-check">
+            <input type="checkbox" id="sendNotification" class="form-check-input" formControlName="sendNotification">
+            <label for="sendNotification" class="form-check-label">Send Notification</label>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeAddFollowUpModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="followUpForm.invalid || isSavingFollowUp">
+              <i class="fa fa-spinner fa-spin" *ngIf="isSavingFollowUp"></i>
+              {{ isSavingFollowUp ? 'Saving...' : 'Save Follow-up' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Edit Follow-up Modal -->
+  <div class="modal-backdrop" *ngIf="showEditFollowUpModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">Edit Follow-up</h4>
+        <button type="button" class="close" (click)="closeEditFollowUpModal()">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="followUpForm" (ngSubmit)="updateFollowUp()">
+          <!-- Same form fields as in Add modal -->
+          <div class="form-group">
+            <label for="editTitle">Title *</label>
+            <input type="text" id="editTitle" class="form-control" formControlName="title" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="editStatus">Status *</label>
+            <select id="editStatus" class="form-control" formControlName="status" required>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="editStartDatetime">Start Date/Time *</label>
+              <input type="datetime-local" id="editStartDatetime" class="form-control" formControlName="startDatetime" required>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="editEndDatetime">End Date/Time *</label>
+              <input type="datetime-local" id="editEndDatetime" class="form-control" formControlName="endDatetime" required>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="editDescription">Description</label>
+            <textarea id="editDescription" class="form-control" formControlName="description" rows="3"></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="editAssignedTo">Assigned To</label>
+            <select id="editAssignedTo" class="form-control" formControlName="assignedTo">
+              <option value="">Select User</option>
+              <option *ngFor="let user of availableUsers" [value]="user.id">{{ user.name }}</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="editPriority">Priority</label>
+            <select id="editPriority" class="form-control" formControlName="priority">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          
+          <div class="form-check">
+            <input type="checkbox" id="editSendNotification" class="form-check-input" formControlName="sendNotification">
+            <label for="editSendNotification" class="form-check-label">Send Notification</label>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeEditFollowUpModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="followUpForm.invalid || isUpdatingFollowUp">
+              <i class="fa fa-spinner fa-spin" *ngIf="isUpdatingFollowUp"></i>
+              {{ isUpdatingFollowUp ? 'Updating...' : 'Update Follow-up' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Reschedule Follow-up Modal -->
+  <div class="modal-backdrop" *ngIf="showRescheduleModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title">Reschedule Follow-up</h4>
+        <button type="button" class="close" (click)="closeRescheduleModal()">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="newFollowUpDate">New Follow-up Date:</label>
+          <input type="datetime-local" class="form-control" id="newFollowUpDate" [(ngModel)]="newFollowUpDate">
+          <div class="error-message" *ngIf="!newFollowUpDate">Follow-up date is required</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeRescheduleModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="updateFollowUpDate()" 
+                [disabled]="!newFollowUpDate">
+          Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Follow-up Details Modal -->
+<div class="modal-backdrop" *ngIf="showViewFollowUpModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Follow-up Details</h4>
+      <button type="button" class="close" (click)="closeViewFollowUpModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body" *ngIf="selectedFollowUp">
+      <div class="followup-details">
+        <div class="detail-row">
+          <span class="detail-label">Title:</span>
+          <span class="detail-value">{{ selectedFollowUp.title }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Status:</span>
+          <span class="detail-value">
+            <span class="badge" [ngClass]="{
+              'badge-warning': selectedFollowUp.status === 'Pending',
+              'badge-info': selectedFollowUp.status === 'In Progress',
+              'badge-success': selectedFollowUp.status === 'Completed'
+            }">
+              {{ selectedFollowUp.status }}
+            </span>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Start Date/Time:</span>
+          <span class="detail-value">{{ getFormattedDate(selectedFollowUp.startDatetime) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">End Date/Time:</span>
+          <span class="detail-value">{{ getFormattedDate(selectedFollowUp.endDatetime) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Description:</span>
+          <span class="detail-value">{{ selectedFollowUp.description || 'No description' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Assigned To:</span>
+          <span class="detail-value">{{ getUserName(selectedFollowUp.assignedTo) || 'Not assigned' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Created On:</span>
+          <span class="detail-value">{{ getFormattedDate(selectedFollowUp.createdAt) }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeViewFollowUpModal()">Close</button>
+      <button type="button" class="btn btn-primary" (click)="editSelectedFollowUp()">Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Follow-up Modal -->
+<div class="modal-backdrop" *ngIf="showEditFollowUpModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Edit Follow-up</h4>
+      <button type="button" class="close" (click)="closeEditFollowUpModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form [formGroup]="editFollowUpForm" (ngSubmit)="updateFollowUp()">
+        <div class="form-group">
+          <label for="editTitle">Title *</label>
+          <input type="text" id="editTitle" class="form-control" formControlName="title" required>
+          <div class="error-message" *ngIf="editFollowUpForm.get('title')?.invalid && editFollowUpForm.get('title')?.touched">
+            Title is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="editStatus">Status *</label>
+          <select id="editStatus" class="form-control" formControlName="status" required>
+            <option value="Pending">Pending</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label for="editStartDatetime">Start Date/Time *</label>
+            <input type="datetime-local" id="editStartDatetime" class="form-control" formControlName="startDatetime" required>
+          </div>
+          <div class="form-group col-md-6">
+            <label for="editEndDatetime">End Date/Time *</label>
+            <input type="datetime-local" id="editEndDatetime" class="form-control" formControlName="endDatetime" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="editDescription">Description</label>
+          <textarea id="editDescription" class="form-control" formControlName="description" rows="3"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="editAssignedTo">Assigned To</label>
+          <select id="editAssignedTo" class="form-control" formControlName="assignedTo">
+            <option value="">Select User</option>
+            <option *ngFor="let user of availableUsers" [value]="user.id">{{ user.name }}</option>
+          </select>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeEditFollowUpModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="editFollowUpForm.invalid || isUpdatingFollowUp">
+            <i class="fa fa-spinner fa-spin" *ngIf="isUpdatingFollowUp"></i>
+            {{ isUpdatingFollowUp ? 'Updating...' : 'Update Follow-up' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reschedule Follow-up Modal -->
+<div class="modal-backdrop" *ngIf="showRescheduleModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Reschedule Follow-up</h4>
+      <button type="button" class="close" (click)="closeRescheduleModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="newFollowUpDate">New Follow-up Date:</label>
+        <input type="datetime-local" class="form-control" id="newFollowUpDate" [(ngModel)]="newFollowUpDate">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeRescheduleModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateFollowUpDate()" 
+              [disabled]="!newFollowUpDate">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+
+
+  <div *ngIf="!isLoading && !customer" class="no-customer">
+    <p>No customer found with this ID.</p>
+    <button class="btn-back" (click)="navigateToCustomers()">
+      <i class="fa fa-arrow-left"></i> Back to Customers
+    </button>
+  </div>
+</div>
+
+<!-- Department Modal -->
+<div class="modal-backdrop" *ngIf="showDepartmentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Assign Department</h4>
+      <button type="button" class="close" (click)="closeDepartmentModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="departmentSelect">Select Department:</label>
+        <select class="form-control" id="departmentSelect" [(ngModel)]="selectedDepartment">
+          <option value="">-- Select Department --</option>
+          <option *ngFor="let dept of availableDepartments" [value]="dept">
+            {{ dept }}
+          </option>
+        </select>
+      </div>
+      <div class="form-group">
+        <button class="btn btn-primary" (click)="addNewDepartment()">
+          <i class="fa fa-plus"></i> Add New Department
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeDepartmentModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateDepartment()" 
+              [disabled]="!selectedDepartment">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add New Department Modal -->
+<div class="modal-backdrop" *ngIf="showAddDepartmentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Add New Department</h4>
+      <button type="button" class="close" (click)="closeAddDepartmentModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="newDepartmentName">Department Name:</label>
+        <input type="text" class="form-control" id="newDepartmentName" [(ngModel)]="newDepartmentName">
+        <div class="error-message" *ngIf="newDepartmentError">{{ newDepartmentError }}</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeAddDepartmentModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="saveNewDepartment()" 
+              [disabled]="!newDepartmentName">
+        Add Department
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Reschedule Follow-up Modal -->
+<div class="modal-backdrop" *ngIf="showRescheduleModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Reschedule Follow-up</h4>
+      <button type="button" class="close" (click)="closeRescheduleModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="newFollowUpDate">New Follow-up Date:</label>
+        <input type="date" class="form-control" id="newFollowUpDate" [(ngModel)]="newFollowUpDate">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeRescheduleModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateFollowUpDate()" 
+              [disabled]="!newFollowUpDate">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+</div>
+<!-- Life Stage Modal -->
+<div class="modal-backdrop" *ngIf="showLifeStageModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Update Life Stage</h4>
+      <button type="button" class="close" (click)="closeLifeStageModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Select Life Stage:</label>
+        <select class="form-control" [(ngModel)]="selectedLifeStage">
+          <option value="">-- Select Life Stage --</option>
+          <option *ngFor="let stage of availableLifeStages" [value]="stage">
+            {{ stage }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeLifeStageModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateLifeStage()" 
+              [disabled]="!selectedLifeStage || isUpdatingStatus">
+        Update
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Lead Category Modal -->
+<div class="modal-backdrop" *ngIf="showLeadCategoryModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Update Lead Category</h4>
+      <button type="button" class="close" (click)="closeLeadCategoryModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Select Lead Category:</label>
+        <select class="form-control" [(ngModel)]="selectedLeadCategory">
+          <option value="">-- Select Lead Category --</option>
+          <option *ngFor="let category of availableLeadCategories" [value]="category">
+            {{ category }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeLeadCategoryModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateLeadCategory()" 
+              [disabled]="!selectedLeadCategory || isUpdatingStatus">
+        Update
+      </button>
+    </div>
+  </div>
+</div>
+<!-- Alternate Contact Modal -->
+<div class="modal-backdrop" *ngIf="showAlternateContactModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Update Alternate Contact</h4>
+      <button type="button" class="close" (click)="closeAlternateContactModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="alternateContact">Alternate Contact Number:</label>
+        <input type="text" id="alternateContact" class="form-control" 
+               [(ngModel)]="selectedAlternateContact" placeholder="Enter alternate contact number">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeAlternateContactModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateAlternateContact()" 
+              [disabled]="isUpdatingStatus">
+        <i class="fa fa-spinner fa-spin" *ngIf="isUpdatingStatus"></i>
+        {{ isUpdatingStatus ? 'Updating...' : 'Update' }}
+      </button>
+    </div>
+  </div>
+</div>

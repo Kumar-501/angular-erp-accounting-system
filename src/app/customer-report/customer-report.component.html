@@ -1,0 +1,88 @@
+<!-- customer-report.component.html -->
+<div class="report-container">
+  <div class="report-header">
+    <h2>Customer Reports</h2>
+    <div class="report-type-toggle">
+      <button class="btn-toggle" (click)="toggleReportType()">
+        Switch to {{ reportType === 'department' ? 'Executive' : 'Department' }} Report
+      </button>
+    </div>
+  </div>
+
+  <div class="report-controls">
+    <div class="filter-section" *ngIf="reportType === 'department'">
+      <label>Select Department:</label>
+      <select [(ngModel)]="selectedDepartment" (change)="generateReport()">
+        <option *ngFor="let dept of departments" [value]="dept">{{ dept }}</option>
+      </select>
+    </div>
+
+    <div class="filter-section" *ngIf="reportType === 'executive'">
+      <label>Select Executive:</label>
+      <select [(ngModel)]="selectedExecutive" (change)="generateReport()">
+        <option *ngFor="let exec of executives" [value]="exec.username">{{ exec.username }}</option>
+      </select>
+    </div>
+
+    <div class="action-buttons">
+      <button class="btn-generate" (click)="generateReport()" [disabled]="loading">
+        <span *ngIf="!loading">Generate Report</span>
+        <span *ngIf="loading">Generating...</span>
+      </button>
+      <button class="btn-export" (click)="exportToExcel()" [disabled]="reportData.length === 0">
+        Export to Excel
+      </button>
+      <button class="btn-export" (click)="exportToPDF()" [disabled]="reportData.length === 0">
+        Export to PDF
+      </button>
+    </div>
+  </div>
+
+  <div class="report-summary" *ngIf="reportData.length > 0">
+    <div class="summary-card">
+      <h3>Total Customers</h3>
+      <p>{{ totalCustomers }}</p>
+    </div>
+    <div class="summary-card" *ngIf="reportType === 'department'">
+      <h3>Active Customers</h3>
+      <p>{{ activeCustomers }}</p>
+    </div>
+    <div class="summary-card" *ngIf="reportType === 'executive'">
+      <h3>Departments</h3>
+      <p>{{ uniqueDepartments }}</p>
+    </div>
+  </div>
+
+  <div class="chart-container" *ngIf="showChart">
+    <canvas #chartCanvas width="400" height="200"></canvas>
+  </div>
+
+  <div class="report-table" *ngIf="reportData.length > 0">
+    <table>
+      <thead>
+        <tr>
+          <th *ngFor="let col of columns">{{ col.label }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of reportData">
+          <td>{{ item.contactId }}</td>
+          <td>{{ item.name }}</td>
+          <td>{{ item.businessName }}</td>
+          <td>{{ item.mobile }}</td>
+          <td>{{ item.email }}</td>
+          <td>
+            <span class="status-badge" [class.active]="isCustomerActive(item.status)">
+              {{ item.status }}
+            </span>
+          </td>
+          <td>{{ item.createdAt }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="no-data" *ngIf="reportData.length === 0 && !loading">
+    <p>No report data available. Please generate a report.</p>
+  </div>
+</div>

@@ -1,0 +1,168 @@
+<div class="stock-details-container">
+  <div class="header">
+    <h2>Stock Details for {{product?.productName}}</h2>
+    <button class="back-btn" (click)="goBack()">← Back to Stock Report</button>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <div *ngIf="!isLoading && product" class="product-summary">
+    <div class="summary-card">
+      <h3>Stock Summary</h3>
+      <div class="summary-grid">
+        <div><strong>Total Purchased:</strong> {{totalPurchased}} {{product.unit}}</div>
+        <div><strong>Total Sold:</strong> {{totalSold}} {{product.unit}}</div>
+        <div><strong>Remaining Stock:</strong> {{remainingStock}} {{product.unit}}</div>
+        <div [class.profit]="totalProfitLoss > 0" [class.loss]="totalProfitLoss < 0">
+          <strong>Total Profit/Loss:</strong> 
+          {{totalProfitLoss | currency:'INR':'symbol'}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters-section">
+    <form [formGroup]="filterForm" (ngSubmit)="applyFilters()">
+      <div class="filter-row">
+        <div class="filter-group">
+          <label>Start Date</label>
+          <input type="date" formControlName="startDate">
+        </div>
+        <div class="filter-group">
+          <label>End Date</label>
+          <input type="date" formControlName="endDate">
+        </div>
+        <div class="filter-group">
+          <label>Supplier/Customer</label>
+          <input type="text" formControlName="counterparty" placeholder="Filter by name">
+        </div>
+        <div class="filter-actions">
+          <button type="submit" class="apply-btn">Apply Filters</button>
+          <button type="button" class="reset-btn" (click)="resetFilters()">Reset</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="tabs-container">
+    <div class="tabs-header">
+      <button 
+        [class.active]="activeTab === 'purchases'" 
+        (click)="setActiveTab('purchases')">
+        Purchase History
+      </button>
+      <button 
+        [class.active]="activeTab === 'sales'" 
+        (click)="setActiveTab('sales')">
+        Sales History
+      </button>
+>
+    </div>
+
+    <div class="tab-content" *ngIf="activeTab === 'purchases'">
+      <div *ngIf="purchases.length === 0" class="no-data">
+        No purchase history found for this product
+      </div>
+
+      <div *ngIf="purchases.length > 0" class="table-responsive">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference No</th>
+              <th>Supplier</th>
+              <th>Quantity</th>
+              <th>Unit Cost</th>
+              <th>Total</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let purchase of purchases">
+              <td>{{purchase.purchaseDate | date:'mediumDate'}}</td>
+              <td>{{purchase.referenceNo}}</td>
+              <td>{{purchase.supplierName}}</td>
+              <td>{{getPurchaseProductQuantity(purchase)}} {{product?.unit}}</td>
+              <td>{{getPurchaseProductUnitPrice(purchase) | currency:'INR':'symbol'}}</td>
+              <td>{{getPurchaseProductTotal(purchase) | currency:'INR':'symbol'}}</td>
+              <td [class]="purchase.paymentStatus?.toLowerCase()">{{purchase.paymentStatus}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  <!-- In stock-details.component.html -->
+<div class="tab-content" *ngIf="activeTab === 'sales'">
+  <div *ngIf="sales.length === 0" class="no-data">
+    No sales history found for this product
+  </div>
+
+  <div *ngIf="sales.length > 0" class="table-responsive">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Invoice No</th>
+          <th>Customer</th>
+          <th>Quantity</th>
+          <th>Unit Price</th>
+          <th>Total</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let sale of sales">
+          <td>{{sale.saleDate | date:'mediumDate'}}</td>
+          <td>{{sale.invoiceNo}}</td>
+          <td>{{sale.customer}}</td>
+       <td>{{sale.products?.[0]?.quantity}} {{product?.unit}}</td>
+<td>{{sale.products?.[0]?.unitPrice | currency:'INR':'symbol'}}</td>
+<td>{{sale.products?.[0]?.lineTotal | currency:'INR':'symbol'}}</td>
+          <td [class]="sale.status.toLowerCase()">{{sale.status}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+    <div class="tab-content" *ngIf="activeTab === 'profit-loss'">
+      <div *ngIf="profitLossData.length === 0" class="no-data">
+        No profit/loss data available
+      </div>
+
+      <div *ngIf="profitLossData.length > 0" class="table-responsive">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Reference</th>
+              <th>Counterparty</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+              <th>Profit/Loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of profitLossData">
+              <td>{{item.date | date:'mediumDate'}}</td>
+              <td [class]="item.type">{{item.type | titlecase}}</td>
+              <td>{{item.reference}}</td>
+              <td>{{item.counterparty}}</td>
+              <td>{{item.quantity}} {{product?.unit}}</td>
+              <td>{{item.unitPrice | currency:'INR':'symbol'}}</td>
+              <td>{{item.total | currency:'INR':'symbol'}}</td>
+              <td [class.profit]="item.profitLoss > 0" [class.loss]="item.profitLoss < 0">
+                {{item.profitLoss | currency:'INR':'symbol'}}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

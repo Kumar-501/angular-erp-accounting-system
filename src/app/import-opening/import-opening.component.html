@@ -1,0 +1,112 @@
+<div class="import-container">
+  <h2>Import Opening Stock</h2>
+  
+  <div class="import-card">
+    <div class="import-section">
+      <div class="file-input-group">
+        <label>File To Import:</label>
+        <div class="file-input-wrapper">
+          <input type="file" id="file" class="file-input" 
+                 (change)="onFileSelect($event)" accept=".xlsx,.xls">
+          <label for="file" class="file-label">{{ selectedFileName }}</label>
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button class="btn btn-primary" (click)="onSubmit()" [disabled]="!selectedFile || isImporting">
+          Submit
+        </button>
+        
+        <button class="btn btn-success" (click)="downloadTemplate()">
+          <i class="fas fa-download"></i> Download template file
+        </button>
+        
+        <button class="btn btn-info" (click)="downloadCurrentStockTemplate()">
+          <i class="fas fa-download"></i> Download Current Stock Template
+        </button>
+      </div>
+    </div>
+
+    <!-- Import Results -->
+    <div class="import-results" *ngIf="importSummary.total > 0">
+      <div class="result-item" [ngClass]="{'success': importSummary.success > 0}">
+        <i class="fas fa-check-circle"></i>
+        <span>{{ importSummary.success }} Successful</span>
+      </div>
+      
+      <div class="result-item" [ngClass]="{'error': importSummary.errors > 0}" *ngIf="importSummary.errors > 0">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>{{ importSummary.errors }} Errors</span>
+      </div>
+    </div>
+    
+    <!-- Error Details Table -->
+    <div class="error-details" *ngIf="importSummary.errorDetails.length > 0">
+      <h4>Error Details</h4>
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>SKU</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let error of importSummary.errorDetails">
+              <td>{{ error.row }}</td>
+              <td>{{ error.sku }}</td>
+              <td>{{ error.error }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions Section -->
+  <div class="instructions-card">
+    <h4>Instructions</h4>
+    <p><strong>Stock updates will immediately reflect in the products list.</strong></p>
+    <p>The system will:</p>
+    <ul>
+      <li>Update current stock quantity</li>
+      <li>Update the purchase price (if provided)</li>
+      <li>Maintain all other product details</li>
+    </ul>
+    
+    <div class="table-responsive">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Required</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>SKU</td>
+            <td><span class="required">Yes</span></td>
+            <td>Unique product identifier</td>
+          </tr>
+          <tr>
+            <td>Quantity</td>
+            <td><span class="required">Yes</span></td>
+            <td>Stock quantity to set</td>
+          </tr>
+          <tr>
+            <td>Unit Cost (Before Tax)</td>
+            <td>No</td>
+            <td>Purchase price per unit</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle"></i>
+      <span>You can download your current stock as a template, update the quantities, and re-upload for bulk stock adjustment.</span>
+    </div>
+  </div>
+</div>

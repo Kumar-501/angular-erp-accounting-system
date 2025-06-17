@@ -1,0 +1,97 @@
+<div class="roles-container">
+  <div class="roles-card">
+    <div class="card-header">
+      <h2>All Roles</h2>
+    </div>
+
+    <div class="roles-actions">
+      <div class="entries-selector">
+        <span>Show</span>
+        <select [(ngModel)]="itemsPerPage" class="entries-dropdown" (change)="currentPage = 1">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+
+      <div class="search-box">
+        <input type="text" placeholder="Search ..." [(ngModel)]="searchTerm" 
+               (input)="onSearchChange()" class="search-input">
+      </div>
+
+      <button class="add-button" (click)="addRole()">
+        <span class="plus-icon">+</span>
+        Add Role
+      </button>
+    </div>
+
+    <div class="roles-table">
+      <div *ngIf="isLoading" class="loading-indicator">
+        Loading roles...
+      </div>
+      
+      <table *ngIf="!isLoading">
+        <thead>
+          <tr>
+            <th class="roles-column" (click)="toggleSort('name')">
+              Role Name
+              <span class="sort-icon">
+                <i *ngIf="sortColumn === 'name' && sortDirection === 'asc'" class="arrow-up">↑</i>
+                <i *ngIf="sortColumn === 'name' && sortDirection === 'desc'" class="arrow-down">↓</i>
+                <i *ngIf="sortColumn !== 'name'" class="arrow-default">↑↓</i>
+              </span>
+            </th>
+            <th class="action-column">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let role of paginatedRoles">
+            <td>{{ role.name }}</td>
+            <td class="action-buttons">
+              <button class="edit-button" (click)="editRole(role)" [disabled]="!role.id">
+                <i class="edit-icon"></i>
+                Edit
+              </button>
+              <button class="delete-button" (click)="deleteRole(role)" [disabled]="!role.id">
+                <i class="delete-icon"></i>
+                Delete
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="filteredRoles.length === 0 && !isLoading">
+            <td colspan="4" class="no-data">No roles found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="pagination-info" *ngIf="!isLoading">
+      <div class="showing-text">
+        Showing {{ ((currentPage - 1) * itemsPerPage) + 1 }} to 
+        {{ Math.min(currentPage * itemsPerPage, filteredRoles.length) }} of 
+        {{ filteredRoles.length }} entries
+      </div>
+    </div>
+
+    <div class="pagination-controls" *ngIf="!isLoading && filteredRoles.length > 0">
+      <button class="prev-button" [disabled]="currentPage === 1" (click)="previousPage()">
+        Previous
+      </button>
+      
+      <div class="page-buttons">
+        <button class="page-button" 
+                *ngFor="let page of getPageNumbers()" 
+                [class.active]="currentPage === page" 
+                (click)="goToPage(page)">
+          {{ page }}
+        </button>
+      </div>
+      
+      <button class="next-button" [disabled]="currentPage >= totalPages" (click)="nextPage()">
+        Next
+      </button>
+    </div>
+  </div>
+</div>

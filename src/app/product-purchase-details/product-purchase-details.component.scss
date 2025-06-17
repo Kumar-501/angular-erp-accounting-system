@@ -1,0 +1,27 @@
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+  &.show {
+    display: block;
+  }
+}
+
+.product-image-container {
+  img {
+    max-height: 200px;
+    object-fit: contain;
+  }
+  
+  .no-image-placeholder {
+    height: 200px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+  }
+}
+
+.table-responsive {
+  max-height: 400px;
+  overflow-y: auto;
+}

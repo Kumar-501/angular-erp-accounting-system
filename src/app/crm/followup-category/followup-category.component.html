@@ -1,0 +1,120 @@
+<!-- HTML Template -->
+<div class="followup-category-container">
+  <div class="header">
+    <h2>Followup Category</h2>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="entries-control">
+        <span>Show</span>
+        <select class="form-select" [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+
+      <div class="button-group">
+        <button class="btn btn-outline-secondary" (click)="exportToCSV()"><i class="fa fa-file-csv"></i> Export CSV</button>
+        <button class="btn btn-outline-secondary" (click)="print()"><i class="fa fa-print"></i> Print</button>
+        <button class="btn btn-outline-secondary" (click)="toggleColumnVisibility()"><i class="fa fa-columns"></i> Column visibility</button>
+      </div>
+
+      <div class="search-box">
+        <input type="text" class="form-control" placeholder="Search..." [(ngModel)]="searchText" (input)="applyFilter()">
+      </div>
+
+      <button class="btn btn-primary add-button" (click)="toggleForm()">
+        <i class="fa fa-plus"></i> Add
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th *ngIf="visibleColumns.name">Followup Category <i class="fa fa-sort" (click)="sort('name')"></i></th>
+            <th *ngIf="visibleColumns.description">Description <i class="fa fa-sort" (click)="sort('description')"></i></th>
+            <th *ngIf="visibleColumns.action">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="filteredCategories.length === 0">
+            <td [attr.colspan]="getVisibleColumnCount()" class="text-center">No data available in table</td>
+          </tr>
+          <tr *ngFor="let category of getPaginatedData()">
+            <td *ngIf="visibleColumns.name">{{ category.name }}</td>
+            <td *ngIf="visibleColumns.description">{{ category.description }}</td>
+            <td *ngIf="visibleColumns.action">
+              <button class="btn btn-sm btn-primary" (click)="editCategory(category)">Edit</button>
+              <button class="btn btn-sm btn-danger" (click)="deleteCategory(category)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      <div class="showing-entries">
+        Showing {{ getStartIndex() }} to {{ getEndIndex() }} of {{ filteredCategories.length }} entries
+      </div>
+      <div class="pagination">
+        <button class="btn btn-outline-secondary" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+        <button class="btn btn-outline-secondary" [disabled]="currentPage * pageSize >= filteredCategories.length" (click)="nextPage()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Form Modal -->
+  <div class="modal" [class.show]="showForm" [style.display]="showForm ? 'block' : 'none'">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">{{ isEditing ? 'Edit' : 'Add' }} Followup Category</h5>
+          <button type="button" class="close" (click)="toggleForm()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="category-name">Followup Category*</label>
+            <input id="category-name" type="text" class="form-control" [(ngModel)]="followupCategory.name" required>
+          </div>
+          <div class="form-group">
+            <label for="category-description">Description*</label>
+            <textarea id="category-description" class="form-control" [(ngModel)]="followupCategory.description" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="toggleForm()">Close</button>
+          <button type="button" class="btn btn-primary" (click)="onSave()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" *ngIf="showForm"></div>
+
+  <!-- Column Visibility Modal -->
+  <div class="modal" [class.show]="showColumnVisibility" [style.display]="showColumnVisibility ? 'block' : 'none'">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Column Visibility</h5>
+          <button type="button" class="close" (click)="toggleColumnVisibility()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-check" *ngFor="let column of columnOptions">
+            <input class="form-check-input" type="checkbox" [(ngModel)]="visibleColumns[column.key]" id="{{column.key}}-visibility">
+            <label class="form-check-label" for="{{column.key}}-visibility">
+              {{column.label}}
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" (click)="toggleColumnVisibility()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop fade show" *ngIf="showColumnVisibility"></div>
+</div>

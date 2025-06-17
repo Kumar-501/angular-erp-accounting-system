@@ -1,0 +1,564 @@
+<div class="container-fluid">
+  <!-- Add user role badge near the header -->
+  <div class="row mb-3">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+      <h3>Sales Order</h3>
+      <div *ngIf="currentUser" class="user-role-badge">
+        <span class="badge" 
+              [ngClass]="{
+                'bg-danger': currentUser.role === 'admin',
+                'bg-warning': currentUser.role === 'supervisor',
+                'bg-info': currentUser.role === 'executive'
+              }">
+          {{ currentUser.role | uppercase }}
+        </span>
+      </div>
+    </div>
+  </div>
+<div class="container-fluid">
+  <div class="row mb-3">
+    <div class="col-12">
+      <h3>Sales Order</h3>
+    </div>
+  </div>
+  
+  <!-- Add this near the search bar (after the search input group) -->
+  <div class="input-group mb-3">
+    <!-- ... existing search input ... -->
+    
+    <!-- Add Filter Button -->
+    <button class="btn btn-outline-secondary" type="button" (click)="toggleFilters()">
+      <i class="fa fa-filter"></i> Filters
+    </button>
+  </div>
+
+  <!-- Filter Sidebar - Add this at the end of your container-fluid div -->
+  <div class="filter-sidebar" [class.show]="showFilters">
+    <div class="filter-header">
+      <h5>Filter Sales Orders</h5>
+      <button type="button" class="btn-close" (click)="toggleFilters()"></button>
+    </div>
+<!-- Date Filter Drawer -->
+<div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+  <div class="drawer-header">
+    <h5>Date Range Filter</h5>
+    <button class="btn-close" (click)="toggleDateDrawer()"></button>
+  </div>
+  
+  <div class="drawer-body">
+    <!-- Predefined Date Ranges -->
+    <div class="date-options">
+      <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+        <span>Today</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+        <span>Yesterday</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+        <span>Last 7 Days</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+        <span>Last 30 Days</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+        <span>Last Month</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'thisMonth'" (click)="filterByDate('thisMonth')">
+        <span>This Month</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'thisFinancialYear'" (click)="filterByDate('thisFinancialYear')">
+        <span>This Financial Year</span>
+      </div>
+      <div class="date-option" [class.active]="selectedRange === 'lastFinancialYear'" (click)="filterByDate('lastFinancialYear')">
+        <span>Last Financial Year</span>
+      </div>
+      <button class="btn btn-outline-secondary" type="button" (click)="toggleDateDrawer()">
+  <i class="fa fa-calendar"></i> Date Range
+</button>
+      <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+        <span>Custom Range</span>
+      </div>
+    </div>
+    
+    <!-- Custom Date Range Picker -->
+    <div class="custom-date-container" *ngIf="isCustomDate">
+      <div class="mb-3">
+        <label class="form-label">From Date</label>
+        <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.startDate">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">To Date</label>
+        <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.endDate">
+      </div>
+    </div>
+  </div>
+  
+  <div class="drawer-footer" *ngIf="isCustomDate">
+    <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+    <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+  </div>
+</div>
+
+<!-- Show only when custom range is selected -->
+<div class="mb-3" *ngIf="filterOptions.quickDateFilter === 'custom'">
+  <label class="form-label">Custom Date Range</label>
+  <div class="input-group mb-2">
+    <span class="input-group-text">From</span>
+    <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.startDate">
+  </div>
+  <div class="input-group">
+    <span class="input-group-text">To</span>
+    <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.endDate">
+  </div>
+</div>
+<!-- Add this near your filter button -->
+
+<!-- Add this to show the current date range -->
+<div *ngIf="filterOptions.dateRange.startDate && filterOptions.dateRange.endDate" 
+     class="mb-2 text-muted small">
+  {{ getCurrentDateRangeDisplay() }}
+</div>
+
+
+    <!-- Add this near the filter button -->
+<div class="alert alert-info" *ngIf="currentUser">
+  <strong>Viewing:</strong> 
+  <span *ngIf="currentUser.role === 'admin'">All Sales Orders</span>
+  <span *ngIf="currentUser.role === 'supervisor'">Sales from {{currentUser.department}} Department</span>
+  <span *ngIf="currentUser.role === 'executive'">Your Sales Orders</span>
+</div>
+    <div class="filter-body">
+      <div class="mb-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" [(ngModel)]="filterOptions.status">
+          <option value="">All Statuses</option>
+          <option value="Completed">Completed</option>
+          <option value="Pending">Pending</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+      <!-- Add this in your filter sidebar -->
+<div class="mb-3">
+  <label class="form-label">Type of Service</label>
+  <select class="form-select" [(ngModel)]="filterOptions.serviceType">
+    <option value="">All Service Types</option>
+    <option *ngFor="let service of serviceTypes" [value]="service.id">
+      {{ service.name }}
+    </option>
+  </select>
+</div>
+         <!-- Shipping Status -->
+              <div class="col-md-6">
+                <label for="shippingStatus" class="form-label">Shipping Status:</label>
+                <select id="shippingStatus" formControlName="shippingStatus" class="form-control">
+                  <option value="">Select Status</option>
+                  <option value="Pending">Pending</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Onhold">Onhold</option>
+            <option value="Ordered">Ordered</option>
+            <option value="Print">Print</option>
+            <option value="Reached hub">Reached hub</option>
+            <option value="Out for delivery">Out for delivery</option>
+            <option value="Returned">Returned</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="Delivered">Delivered</option>
+                </select>
+              </div>
+     <!-- In your filter sidebar template -->
+<div class="form-group">
+  <label>Location</label>
+  <select class="form-control" 
+          [(ngModel)]="filterOptions.businessLocation" 
+          name="businessLocation">
+      <option value="">All Locations</option>
+      <option *ngFor="let loc of businessLocations" 
+              [value]="loc.id">
+          {{loc.name}}
+      </option>
+  </select>
+</div>
+      <div class="mb-3">
+        <label class="form-label">Customer</label>
+        <select class="form-select" [(ngModel)]="filterOptions.customer">
+          <option value="">All Customers</option>
+          <option *ngFor="let customer of customers" [value]="customer.id">
+            {{ customer.displayName }}
+          </option>
+        </select>
+      </div>
+      
+      <div class="mb-3">
+        <label class="form-label">Date Range</label>
+        <div class="input-group mb-2">
+          <span class="input-group-text">From</span>
+          <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.startDate">
+        </div>
+        <div class="input-group">
+          <span class="input-group-text">To</span>
+          <input type="date" class="form-control" [(ngModel)]="filterOptions.dateRange.endDate">
+        </div>
+      </div>
+      
+      <div class="d-grid gap-2">
+        <button class="btn btn-primary" (click)="applyFilters()">Apply Filters</button>
+        <button class="btn btn-outline-secondary" (click)="resetFilters()">Reset Filters</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add this overlay div to close sidebar when clicking outside -->
+  <div class="sidebar-overlay" [class.show]="showFilters" (click)="toggleFilters()"></div>
+  
+  <div class="input-group mb-3">
+    <span class="input-group-text"><i class="fa fa-search"></i></span>
+    <input 
+      type="text" 
+      class="form-control" 
+      placeholder="Search by customer, invoice, order, status, product, location, etc..." 
+      [formControl]="searchControl">
+    <button class="btn btn-outline-secondary" type="button" *ngIf="searchControl.value" 
+      (click)="searchControl.setValue('')">
+      <i class="fa fa-times"></i> Clear
+    </button>
+  </div>
+  
+  <!-- Main content card -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <!-- Entries control and Add button -->
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center">
+              <span>Show</span>
+              <select class="form-select form-select-sm mx-2" style="width: auto;" [(ngModel)]="pageSize" (change)="changePageSize(pageSize)">
+                <option [value]="25">25</option>
+                <option [value]="50">50</option>
+                <option [value]="100">100</option>
+              </select>
+              <span>entries</span>
+            </div>
+
+            <div>
+              <button class="btn btn-primary" routerLink="/add-sale">
+                <i class="fa fa-plus"></i> Add Sales Order
+              </button>
+            </div>
+          </div>
+
+          <!-- Export buttons - centered -->
+          <div class="export-controls">
+            <div class="export-buttons">
+                          <!-- Add this with the export buttons -->
+<button class="export-btn" id="bulk-delete" (click)="deleteSelectedSales()" [disabled]="!hasSelectedSales()">
+  <i class="fa fa-trash"></i> Delete Selected
+</button>
+              
+              <button class="export-btn" id="export-csv" (click)="exportData('csv')">
+                <i class="fa fa-file-csv"></i> Export CSV
+              </button>
+             
+              <button class="export-btn" id="export-print" (click)="printData()">
+                <i class="fa fa-print"></i> Print
+              </button>
+  
+              <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="columnVisibilityDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fa fa-columns"></i> Columns
+              </button>
+              
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="columnVisibilityDropdown">
+                <li *ngFor="let column of columns">
+                  <a class="dropdown-item" href="javascript:void(0)" (click)="toggleColumnVisibility(column.key)">
+                    <i class="fa" [class.fa-check-square]="column.visible" [class.fa-square-o]="!column.visible"></i>
+                    {{ column.label }}
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+<!-- Table with responsive wrapper -->
+<div class="table-responsive">
+  <table class="table table-hover table-striped align-middle">
+    <thead>
+      <tr class="table-light">
+          <th class="text-center" style="width: 40px;" [hidden]="!isColumnVisible('select')">
+    <input type="checkbox" [(ngModel)]="allSelected" (change)="toggleSelectAll()">
+  </th>
+        <th class="text-center" style="width: 120px;" [hidden]="!isColumnVisible('actions')">Actions</th>
+        <th class="text-center" style="width: 70px;" [hidden]="!isColumnVisible('sno')">S.No</th>
+        <th class="text-start" (click)="sortData('saleDate')" style="cursor: pointer;" [hidden]="!isColumnVisible('saleDate')">
+          Sale Date
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'saleDate'"
+             [class.fa-sort-up]="sortColumn === 'saleDate' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'saleDate' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" (click)="sortData('orderNo')" style="cursor: pointer;" [hidden]="!isColumnVisible('orderNo')">
+          Order No
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'orderNo'"
+             [class.fa-sort-up]="sortColumn === 'orderNo' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'orderNo' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" (click)="sortData('customer')" style="cursor: pointer;" [hidden]="!isColumnVisible('customer')">
+          Customer Name
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'customer'"
+             [class.fa-sort-up]="sortColumn === 'customer' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'customer' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" (click)="sortData('customerPhone')" style="cursor: pointer;" [hidden]="!isColumnVisible('customerPhone')">
+          Contact Number
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'customerPhone'"
+             [class.fa-sort-up]="sortColumn === 'customerPhone' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'customerPhone' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" (click)="sortData('location')" style="cursor: pointer;" [hidden]="!isColumnVisible('location')">
+          Location
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'location'"
+             [class.fa-sort-up]="sortColumn === 'location' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'location' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-center" (click)="sortData('status')" style="cursor: pointer;" [hidden]="!isColumnVisible('status')">
+          Status
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'status'"
+             [class.fa-sort-up]="sortColumn === 'status' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'status' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" [hidden]="!isColumnVisible('typeOfService')">Type of Service</th>
+
+
+<th class="text-start" [hidden]="!isColumnVisible('alternateContact')">
+  Alternate Contact
+</th>
+
+        <th class="text-center" (click)="sortData('shippingStatus')" style="cursor: pointer;" [hidden]="!isColumnVisible('shippingStatus')">
+          Shipping Status
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'shippingStatus'"
+             [class.fa-sort-up]="sortColumn === 'shippingStatus' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'shippingStatus' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" (click)="sortData('addedByDisplayName')" style="cursor: pointer;" [hidden]="!isColumnVisible('addedBy')">
+          Added By
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'addedByDisplayName'"
+             [class.fa-sort-up]="sortColumn === 'addedByDisplayName' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'addedByDisplayName' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" [hidden]="!isColumnVisible('product')">Product</th>
+        <th class="text-start" [hidden]="!isColumnVisible('shippingDetails')">Shipping Details</th>
+        <th class="text-start" (click)="sortData('paymentMethod')" style="cursor: pointer;" [hidden]="!isColumnVisible('paymentMethod')">
+          Payment Method
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'paymentMethod'"
+             [class.fa-sort-up]="sortColumn === 'paymentMethod' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'paymentMethod' && sortDirection === 'desc'"></i>
+        </th>
+        <th class="text-start" [hidden]="!isColumnVisible('paymentAccount')" (click)="sortData('paymentAccount')">
+  Payment Account
+  <i class="fa" [ngClass]="getSortIconClass('paymentAccount')"></i>
+</th>
+        <th class="text-start" [hidden]="!isColumnVisible('transactionId')">Transaction ID</th>
+        <th class="text-start" (click)="sortData('invoiceNo')" style="cursor: pointer;" [hidden]="!isColumnVisible('invoiceNo')">
+          Invoice No
+          <i class="fa" 
+             [class.fa-sort]="sortColumn !== 'invoiceNo'"
+             [class.fa-sort-up]="sortColumn === 'invoiceNo' && sortDirection === 'asc'"
+             [class.fa-sort-down]="sortColumn === 'invoiceNo' && sortDirection === 'desc'"></i>
+        </th>
+
+
+
+
+        <th class="text-end" [hidden]="!isColumnVisible('totalPayable')" (click)="sortData('totalPayable')">
+  Total Payable
+  <i class="fa" [ngClass]="getSortIconClass('totalPayable')"></i>
+</th>
+        <th class="text-center" *ngIf="isColumnVisible('paymentDue')" (click)="sortData('paymentDue')">
+          Payment Due <i class="fa" [ngClass]="getSortIconClass('paymentDue')"></i>
+        </th>
+        <th class="text-end" *ngIf="isColumnVisible('balanceAmount')" (click)="sortData('balanceAmount')">
+          Balance Amount <i class="fa" [ngClass]="getSortIconClass('balanceAmount')"></i>
+        </th>
+        <th class="text-end" [hidden]="!isColumnVisible('taxAmount')" (click)="sortData('taxAmount')">
+  Tax Amount
+  <i class="fa" [ngClass]="getSortIconClass('taxAmount')"></i>
+</th>
+<th class="text-end" [hidden]="!isColumnVisible('cgstAmount')">
+  CGST
+</th>
+<th class="text-end" [hidden]="!isColumnVisible('sgstAmount')">
+  SGST
+</th>
+<th class="text-end" [hidden]="!isColumnVisible('igstAmount')">
+  IGST
+</th>
+        
+      </tr>
+    </thead>
+    <tbody>
+      <ng-container *ngFor="let sale of (sortedSales$ | async)?.slice((currentPage-1)*pageSize, currentPage*pageSize); let i = index">
+        <tr (click)="toggleProductDetails(sale.id)" style="cursor: pointer;">
+  <td class="text-center" [hidden]="!isColumnVisible('select')">
+    <input type="checkbox" 
+           [checked]="isSaleSelected(sale.id)"
+           (change)="toggleSelectSale(sale.id, $event)"
+           (click)="$event.stopPropagation()">
+  </td>
+          <td class="text-center" [hidden]="!isColumnVisible('actions')">
+            <div class="custom-dropdown">
+              <div class="dropdown">
+          <!-- Replace the dropdown div with this button -->
+<button class="btn btn-sm btn-outline-secondary" type="button" 
+        (click)="openActionModal(sale)">
+  Actions
+</button>
+             <!-- Action Modal -->
+<div class="modal fade" id="actionModal" tabindex="-1" aria-labelledby="actionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="actionModalLabel">Sale Actions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="list-group">
+          <a class="list-group-item list-group-item-action" 
+             [routerLink]="['/sales/view', selectedSaleForAction?.id]"
+             data-bs-dismiss="modal">
+            <i class="fa fa-eye me-2"></i> View
+          </a>
+          <a class="list-group-item list-group-item-action" 
+             [routerLink]="['/sales-order/edit', selectedSaleForAction?.id]"
+             data-bs-dismiss="modal">
+            <i class="fa fa-edit me-2"></i> Edit
+          </a>
+          <a class="list-group-item list-group-item-action text-danger" 
+             href="javascript:void(0)" 
+             (click)="deleteSale(selectedSaleForAction?.id!); $event.preventDefault()">
+            <i class="fa fa-trash me-2"></i> Delete
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+              </div>
+            </div>
+          </td>
+          <td class="text-center" [hidden]="!isColumnVisible('sno')">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('saleDate')">{{ sale.saleDate | date: 'shortDate' }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('orderNo')">{{ sale.orderNo || 'N/A' }}</td>       
+          <td class="text-start" [hidden]="!isColumnVisible('customer')">{{ sale.customer }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('customerPhone')">{{ sale.customerPhone }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('location')">{{ sale.location }}</td>
+          <td class="text-center" [hidden]="!isColumnVisible('status')">
+            <span class="badge"
+                  [ngClass]="{
+                    'bg-success text-white': sale.status === 'Completed' || sale.status === 'active', 
+                    'bg-warning text-dark': sale.status === 'Pending' || sale.status === 'pending', 
+                    'bg-danger text-white': sale.status === 'Cancelled' || sale.status === 'inactive'
+                  }">
+              {{ (sale.status === 'active') ? 'Completed' : (sale.status || 'Pending') }}
+            </span>
+          </td>
+          <td class="text-start" [hidden]="!isColumnVisible('typeOfService')">{{ sale.typeOfServiceName || sale.typeOfService || 'N/A' }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('alternateContact')">
+  {{ sale.alternateContact || 'N/A' }}
+</td>
+          <td class="text-center" [hidden]="!isColumnVisible('shippingStatus')">
+            <span class="badge"
+                  [ngClass]="{
+                    'bg-success text-white': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered', 
+                    'bg-warning text-dark': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending', 
+                    'bg-info text-white': sale.shippingStatus === 'Shipped' || sale.shippingStatus === 'shipped',
+                    'bg-secondary text-white': sale.shippingStatus === 'Returned' || sale.shippingStatus === 'returned',
+                    'bg-primary text-white': sale.shippingStatus === 'Ordered' || sale.shippingStatus === 'Onhold' || 
+                                            sale.shippingStatus === 'Print' || sale.shippingStatus === 'Reached hub' ||
+                                            sale.shippingStatus === 'Out for delivery'
+                  }">
+              {{ sale.shippingStatus || 'Pending' }}
+            </span>
+          </td>
+          <td class="text-start" [hidden]="!isColumnVisible('addedBy')">{{ sale.addedByDisplayName }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('product')">{{ getProductsDisplayText(sale.products) }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('shippingDetails')">{{ sale.shippingDetails || 'N/A' }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('paymentMethod')">
+            <span class="badge" 
+                  [ngClass]="{
+                    'bg-success text-white': sale.paymentMethod === 'Cash',
+                    'bg-primary text-white': sale.paymentMethod === 'Card',
+                    'bg-info text-white': sale.paymentMethod === 'Bank Transfer',
+                    'bg-warning text-dark': sale.paymentMethod === 'Cheque',
+                    'bg-secondary text-white': sale.paymentMethod === 'Other' || !sale.paymentMethod
+                  }">
+              {{ sale.paymentMethod || 'N/A' }}
+            </span>
+          </td>
+          <td class="text-start" [hidden]="!isColumnVisible('paymentAccount')">
+  {{ sale.paymentAccountName || 'N/A' }}
+</td>
+          <td class="text-start" [hidden]="!isColumnVisible('transactionId')">{{ sale.transactionId || 'N/A' }}</td>
+          <td class="text-start" [hidden]="!isColumnVisible('invoiceNo')">{{ sale.invoiceNo || 'N/A' }}</td>
+          <td class="text-end" [hidden]="!isColumnVisible('totalPayable')">
+  ₹{{ sale.totalPayable | number:'1.2-2' }}
+</td>
+          <td class="text-center" [hidden]="!isColumnVisible('paymentDue')">
+            <span class="badge" 
+                  [ngClass]="{
+                    'bg-success': sale.paymentStatus === 'Paid',
+                    'bg-danger': sale.paymentStatus === 'Due',
+                    'bg-warning': sale.paymentStatus === 'Partial'
+                  }">
+              {{ sale.paymentStatus || 'Due' }}
+            </span>
+          </td>
+       <td class="text-end" *ngIf="isColumnVisible('balanceAmount')">
+  ₹{{ sale.balanceAmount | number:'1.2-2' }}
+</td>
+<td class="text-end" [hidden]="!isColumnVisible('taxAmount')">
+  ₹{{ getProductTaxTotal(sale.products) | number:'1.2-2' }}
+</td>
+<td class="text-end" [hidden]="!isColumnVisible('cgstAmount')">
+  ₹{{ getProductTaxBreakdown(sale.products, 'cgst') | number:'1.2-2' }}
+</td>
+<td class="text-end" [hidden]="!isColumnVisible('sgstAmount')">
+  ₹{{ getProductTaxBreakdown(sale.products, 'sgst') | number:'1.2-2' }}
+</td>
+<td class="text-end" [hidden]="!isColumnVisible('igstAmount')">
+  ₹{{ getProductTaxBreakdown(sale.products, 'igst') | number:'1.2-2' }}
+</td>
+        </tr>
+        
+
+      </ng-container>
+      
+      <tr *ngIf="!(sortedSales$ | async)?.length">
+        <td [attr.colspan]="getColSpanCount()" class="text-center py-3">No data available in table</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+          <!-- Pagination -->
+          <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+              <span>Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, (sortedSales$ | async)?.length || 0) }} of {{ (sortedSales$ | async)?.length || 0 }} entries</span>
+            </div>
+            <div>
+              <button class="btn btn-outline-secondary btn-sm me-1" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+              <button class="btn btn-outline-secondary btn-sm" [disabled]="currentPage * pageSize >= ((sortedSales$ | async)?.length || 0)" (click)="nextPage()">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,322 @@
+<div class="container">
+  <div class="card mb-4">
+    <div class="card-header bg-success text-white">
+      <h2 class="mb-0">Prescription Form</h2>
+    </div>
+    <div class="card-body">
+      <form [formGroup]="prescriptionForm">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label for="patientName" class="form-label">Patient Name</label>
+            <input type="text" class="form-control" id="patientName" formControlName="patientName">
+          </div>
+          <div class="col-md-6">
+            <label for="date" class="form-label">Date</label>
+            <input type="date" class="form-control" id="date" formControlName="date">
+          </div>
+        </div>
+      </form>
+
+      <div *ngIf="allPrescriptions.length > 0" class="alert alert-info mb-3">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        Saved Prescriptions: {{ allPrescriptions.length }}
+        <button class="btn btn-sm btn-outline-primary float-end" (click)="viewPrescriptions()">
+          <i class="bi bi-list"></i> View All
+        </button>
+      </div>
+
+      <div *ngIf="currentMedicines.length > 0" class="mb-4">
+        <h5 class="mb-3">Current Medicines:</h5>
+        <div *ngFor="let medicine of currentMedicines; let i = index" class="card mb-2">
+          <div class="card-body">
+            <div class="d-flex justify-content-between">
+              <div>
+                <h6 class="text-success">{{ medicine.type }}</h6>
+                <p class="mb-0">{{ medicine.instructions }}</p>
+              </div>
+              <button class="btn btn-sm btn-danger" (click)="removeMedicine(i)">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-header">
+          <h5 class="mb-0">Select Medicine Type</h5>
+        </div>
+        <div class="card-body">
+          <div class="btn-group btn-group-sm flex-wrap" role="group">
+            <button *ngFor="let type of ['Kasayam', 'Buligha', 'Bhasmam', 'Krudham', 'Suranam', 'Rasayanam', 'Lagium']"
+              type="button" class="btn" 
+              [class.btn-primary]="selectedMedicineType === type"
+              [class.btn-outline-primary]="selectedMedicineType !== type"
+              (click)="selectedMedicineType = type">
+              {{ type }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="selectedMedicineType" class="mb-4">
+        <div class="card">
+          <div class="card-body">
+            <ng-container [ngSwitch]="selectedMedicineType">
+              <!-- Kasayam Form -->
+              <form *ngSwitchCase="'Kasayam'" [formGroup]="kasayamForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>കഷായം 15 ml എടുത്ത് 45 ml തിളപ്പിച്ചാറ്റിയ വെള്ളം ചേർത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Gulika" formControlName="gulika">
+                  </div>
+                  <div class="col-auto">
+                    <span>ഗുളിക</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Powder" formControlName="powder">
+                  </div>
+                  <div class="col-auto">
+                    <span>പൊടി ചേർത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Kasayam')">
+                  Add Kasayam
+                </button>
+              </form>
+
+              <!-- Buligha Form -->
+              <form *ngSwitchCase="'Buligha'" [formGroup]="bulighaForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>ഗുളിക</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Count" formControlName="count">
+                  </div>
+                  <div class="col-auto">
+                    <span>എണ്ണം എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Water" formControlName="water">
+                  </div>
+                  <div class="col-auto">
+                    <span>ml തിളപ്പിച്ചാറ്റിയ വെള്ളം ചേർത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷಣത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Buligha')">
+                  Add Buligha
+                </button>
+              </form>
+
+              <!-- Bhasmam Form -->
+              <form *ngSwitchCase="'Bhasmam'" [formGroup]="bhasmamForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>ഭസ്മം</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Amount" formControlName="amount">
+                  </div>
+                  <div class="col-auto">
+                    <span>മുഴ്‌ എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Liquid" formControlName="liquid">
+                  </div>
+                  <div class="col-auto">
+                    <span>ml തേൻ/നാരങ്ങാനീര് ചേർത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Bhasmam')">
+                  Add Bhasmam
+                </button>
+              </form>
+
+              <!-- Krudham Form -->
+              <form *ngSwitchCase="'Krudham'" [formGroup]="krudhamForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>ഘൃതം ഒരു ടീസ്പൂൺ എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Krudham')">
+                  Add Krudham
+                </button>
+              </form>
+
+              <!-- Suranam Form -->
+              <form *ngSwitchCase="'Suranam'" [formGroup]="suranamForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>ചൂർണ്ണം ഒരു ടീസ്പൂൺ എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Suranam')">
+                  Add Suranam
+                </button>
+              </form>
+
+              <!-- Rasayanam Form -->
+              <form *ngSwitchCase="'Rasayanam'" [formGroup]="rasayanamForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>രസായനം ഒരു ടീസ്പൂൺ എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Rasayanam')">
+                  Add Rasayanam
+                </button>
+              </form>
+
+              <!-- Lagium Form -->
+              <form *ngSwitchCase="'Lagium'" [formGroup]="lagiumForm">
+                <div class="row g-3 align-items-center mb-3">
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Name" formControlName="name">
+                  </div>
+                  <div class="col-auto">
+                    <span>ലേഹ്യം ഒരു ടീസ്പൂൺ എടുത്ത്</span>
+                  </div>
+                  <div class="col-auto">
+                    <input type="text" class="form-control form-control-sm" placeholder="Time" formControlName="time">
+                  </div>
+                  <div class="col-auto">
+                    <span>നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</span>
+                  </div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" (click)="addMedicine('Lagium')">
+                  Add Lagium
+                </button>
+              </form>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary" (click)="clearForm()">
+          <i class="bi bi-x-circle me-1"></i> Clear Form
+        </button>
+        <button type="button" class="btn btn-primary" (click)="saveCurrentPrescription()">
+          <i class="bi bi-save me-1"></i> Save & Add Another
+        </button>
+        <button type="button" class="btn btn-success" (click)="submitAllPrescriptions()">
+          <i class="bi bi-check-circle me-1"></i> Submit All
+        </button>
+        <button type="button" class="btn btn-warning text-white" (click)="downloadAllPrescriptions()">
+          <i class="bi bi-printer me-1"></i> Print All
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prescriptions Modal -->
+<div class="modal fade" id="prescriptionsModal" tabindex="-1" aria-labelledby="prescriptionsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="prescriptionsModalLabel">Saved Prescriptions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngFor="let prescription of allPrescriptions; let i = index" class="card mb-3">
+          <div class="card-header">
+            <div class="d-flex justify-content-between">
+              <h6 class="mb-0">Prescription {{ i + 1 }}</h6>
+              <button class="btn btn-sm btn-danger" (click)="deletePrescription(i)">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p><strong>Patient:</strong> {{ prescription.patientName }}</p>
+            <p><strong>Date:</strong> {{ prescription.date }}</p>
+            <p><strong>Medicines:</strong> {{ prescription.medicines.length }}</p>
+            <button class="btn btn-sm btn-outline-primary" (click)="viewPrescriptionDetails(prescription)">
+              View Details
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prescription Details Modal -->
+<div class="modal fade" id="prescriptionDetailsModal" tabindex="-1" aria-labelledby="prescriptionDetailsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="prescriptionDetailsModalLabel">Prescription Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <pre *ngIf="selectedPrescription">{{ getFormattedText(selectedPrescription) }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

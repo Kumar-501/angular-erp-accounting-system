@@ -1,0 +1,58 @@
+<div class="container">
+    <button class="add-btn" (click)="openPopup()">Add +</button>
+  
+    <!-- Popup Form -->
+    <div *ngIf="showPopup" class="popup-overlay">
+      <div class="popup-form">
+        <h2>{{ isEditMode ? 'Edit Designation' : 'Add Designation' }}</h2>
+        <form [formGroup]="designationForm" (ngSubmit)="saveDesignation()">
+          <div class="form-group">
+            <label for="designation">Designation</label>
+            <input id="designation" formControlName="designation" placeholder="Enter designation" />
+          </div>
+  
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" formControlName="description" rows="3" placeholder="Enter description"></textarea>
+          </div>
+  
+          <div class="form-group">
+            <label for="department">Department</label>
+            <select id="department" formControlName="department">
+              <option value="" disabled>-- Select Department --</option>
+              <option *ngFor="let dept of departments" [value]="dept.department">{{ dept.department }}</option>
+            </select>
+          </div>
+  
+          <div class="button-group">
+            <button type="submit" class="primary-btn">{{ isEditMode ? 'Update' : 'Save' }}</button>
+            <button type="button" class="secondary-btn" (click)="closePopup()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  
+    <!-- Table -->
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Designation</th>
+          <th>Description</th>
+          <th>Department</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of designations">
+          <td>{{ item.designation }}</td>
+          <td>{{ item.description }}</td>
+          <td>{{ item.department }}</td>
+          <td>
+            <button class="edit-btn" (click)="editDesignation(item)">Edit</button>
+            <button class="delete-btn" (click)="deleteDesignation(item.id)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  

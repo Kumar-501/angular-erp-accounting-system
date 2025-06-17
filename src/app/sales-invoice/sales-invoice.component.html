@@ -1,0 +1,117 @@
+<div class="sales-report-container">
+  <!-- Header -->
+  <div class="report-header">
+    <h2 class="report-title">Sales Invoice Summary</h2>
+    <div class="export-buttons">
+      <button class="btn btn-success export-btn" (click)="exportToExcel()">
+        <i class="fas fa-file-excel"></i> Export to Excel
+      </button>
+      <button class="btn btn-outline-success export-btn" (click)="exportToCSV()">
+        <i class="fas fa-file-csv"></i> Export to CSV
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters-card">
+    
+      </div>
+      <div class="search-filter">
+        <div class="form-group">
+          <label for="searchText">Search</label>
+          <input 
+            type="text" 
+            id="searchText"
+            class="form-control search-input" 
+            [(ngModel)]="searchText"
+            placeholder="Search by invoice, order, or user...">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-primary apply-btn" (click)="applyFilters()">
+          <i class="fas fa-filter"></i> Apply
+        </button>
+        <button class="btn btn-secondary reset-btn" (click)="resetFilters()">
+          <i class="fas fa-undo"></i> Reset
+        </button>
+      </div>
+  
+
+  <!-- Data Table -->
+  <div class="table-container">
+    <div class="table-responsive">
+      <table class="modern-table">
+        <thead class="table-header">
+          <tr>
+            <th class="sortable">
+              S.No
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+            <th class="sortable">
+              Invoice No
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+            <th class="sortable">
+              Date
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+            <th class="sortable">
+              Sales Value
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+            <th class="sortable">
+              Order No
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+            <th class="sortable">
+              Incentive User
+              <i class="fas fa-sort sort-icon"></i>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="table-body">
+          <tr *ngFor="let sale of filteredSales$ | async; let i = index" class="table-row">
+            <td class="cell-content">{{ i + 1 }}</td>
+            <td class="cell-content invoice-cell">
+              <span class="invoice-badge">{{ sale.invoiceNo || 'N/A' }}</span>
+            </td>
+            <td class="cell-content">{{ sale.saleDate | date:'dd/MM/yyyy' }}</td>
+            <td class="cell-content amount-cell">
+              <span class="amount">{{ sale.totalPayable | currency:'INR':'symbol':'1.2-2' }}</span>
+            </td>
+            <td class="cell-content">{{ sale.orderNo || 'N/A' }}</td>
+            <td class="cell-content user-cell">
+              <div class="user-info">
+                <span class="user-avatar">{{ (sale.addedByDisplayName || sale.addedBy || 'N/A').charAt(0).toUpperCase() }}</span>
+                <span class="user-name">{{ sale.addedByDisplayName || sale.addedBy || 'N/A' }}</span>
+              </div>
+            </td>
+       
+          </tr>
+          <tr *ngIf="(filteredSales$ | async)?.length === 0" class="no-data-row">
+            <td colspan="7" class="no-data-cell">
+              <div class="no-data-content">
+                <i class="fas fa-inbox no-data-icon"></i>
+                <p class="no-data-text">No sales data found</p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Summary Footer -->
+  <div class="summary-footer" *ngIf="(filteredSales$ | async)?.length! > 0">
+    <div class="summary-content">
+      <div class="summary-item">
+        <span class="summary-label">Total Records:</span>
+        <span class="summary-value">{{ (filteredSales$ | async)?.length || 0 }}</span>
+      </div>
+      <div class="summary-item total-sales">
+        <span class="summary-label">Total Sales:</span>
+        <span class="summary-value amount">{{ getTotalSales() | currency:'INR':'symbol':'1.2-2' }}</span>
+      </div>
+    </div>
+  </div>
+</div>

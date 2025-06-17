@@ -1,0 +1,122 @@
+<div class="card">
+    <div class="card-header">
+      <h3 class="card-title">Product Sales Report</h3>
+    </div>
+    <div class="card-body">
+      <!-- Filter and Export Section -->
+      <div class="row mb-4">
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Date Filter</h5>
+              <div class="row">
+                <div class="col-md-4">
+                  <label class="form-label">From Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="startDate">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">To Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="endDate">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                  <div class="btn-group">
+                    <button class="btn btn-primary" (click)="applyDateFilter()">
+                      <i class="fa fa-filter"></i> Apply
+                    </button>
+                    <button class="btn btn-secondary" (click)="resetFilters()">
+                      <i class="fa fa-sync"></i> Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 d-flex align-items-center justify-content-end">
+          <button class="btn btn-success" (click)="exportToCSV()">
+            <i class="fa fa-download"></i> Export to CSV
+          </button>
+        </div>
+      </div>
+  
+      <!-- Loading indicator -->
+      <div *ngIf="isLoading" class="text-center my-4">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Loading product sales data...</p>
+      </div>
+  
+      <!-- Table Section -->
+      <div class="table-responsive" *ngIf="!isLoading">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>S.No</th>
+              <th (click)="sortData('productName')">
+                Product Name
+                <i class="fa" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'productName',
+                  'fa-sort-up': currentSortColumn === 'productName' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'productName' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortData('sku')">
+                SKU
+                <i class="fa" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'sku',
+                  'fa-sort-up': currentSortColumn === 'sku' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'sku' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortData('quantity')">
+                Quantity Sold
+                <i class="fa" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'quantity',
+                  'fa-sort-up': currentSortColumn === 'quantity' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'quantity' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortData('averagePrice')">
+                Average Price
+                <i class="fa" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'averagePrice',
+                  'fa-sort-up': currentSortColumn === 'averagePrice' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'averagePrice' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortData('totalSales')">
+                Total Sales
+                <i class="fa" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'totalSales',
+                  'fa-sort-up': currentSortColumn === 'totalSales' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'totalSales' && !isAscending
+                }"></i>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of products; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>{{ product.productName }}</td>
+              <td>{{ product.sku }}</td>
+              <td>{{ product.quantity }}</td>
+              <td>₹{{ product.averagePrice | number:'1.2-2' }}</td>
+              <td>₹{{ product.totalSales | number:'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="products.length === 0">
+              <td colspan="6" class="text-center">No product sales data available</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-active">
+              <td colspan="3" class="text-end fw-bold">Totals:</td>
+              <td class="fw-bold">{{ totalQuantity }}</td>
+              <td></td>
+              <td class="fw-bold">₹{{ totalSales | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,76 @@
+<div class="sources-container">
+  <div class="header">
+    <h1>Sources</h1>
+    <button class="add-button" (click)="toggleForm()">Add Source +</button>
+  </div>
+  <div class="dropdown">
+    <button class="column-toggle" (click)="toggleColumnVisibility($event)">
+      <i class="fas fa-columns"></i> Columns
+    </button>
+    <div class="dropdown-menu" [class.show]="showColumnVisibility">
+      <div *ngFor="let column of columns" class="dropdown-item">
+        <label>
+          <input type="checkbox" [(ngModel)]="column.visible" (change)="updateVisibleColumns()">
+          {{column.name}}
+        </label>
+      </div>
+    </div>
+  </div>
+  <!-- Search filter -->
+  <div class="search-container">
+    <input 
+      type="text" 
+      placeholder="Search sources..." 
+      [(ngModel)]="searchText" 
+      (input)="filterSources()"
+      class="search-input"
+    />
+  </div>
+
+  <!-- Show form only when 'showForm' is true -->
+  <div *ngIf="showForm" class="form-container">
+    <h2>{{ isEditMode ? 'Edit Source' : 'Add Source' }}</h2>
+    
+    <div class="form-field">
+      <label for="source-name">Source*</label>
+      <input id="source-name" type="text" [(ngModel)]="source.name" required />
+    </div>
+    
+    <div class="form-field">
+      <label for="source-description">Description*</label>
+      <textarea id="source-description" [(ngModel)]="source.description" required></textarea>
+    </div>
+    
+    <div class="form-actions">
+      <button class="close-btn" (click)="toggleForm()">Close</button>
+      <button class="save-btn" (click)="onSave()">{{ isEditMode ? 'Update' : 'Save' }}</button>
+    </div>
+  </div>
+  
+  <!-- Display added sources -->
+  <div class="sources-list" *ngIf="filteredSources.length > 0">
+    <table class="sources-table">
+      <thead>
+        <tr>
+          <th *ngIf="columns[0].visible">Source</th>
+          <th *ngIf="columns[1].visible">Description</th>
+          <th *ngIf="columns[2].visible">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let source of filteredSources">
+          <td *ngIf="columns[0].visible">{{ source.name }}</td>
+          <td *ngIf="columns[1].visible">{{ source.description }}</td>
+          <td *ngIf="columns[2].visible" class="action-buttons">
+            <button class="edit-btn" (click)="onEdit(source)">Edit</button>
+            <button class="delete-btn" (click)="onDelete(source.id)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div *ngIf="filteredSources.length === 0" class="no-sources">
+    <p>No sources found.</p>
+  </div>
+</div>

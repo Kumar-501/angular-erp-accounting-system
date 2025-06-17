@@ -1,0 +1,273 @@
+<div class="container">
+  <h2>Add Purchase Requisition</h2>
+
+  <form [formGroup]="purchaseForm" (ngSubmit)="savePurchase()">
+    <!-- First Container -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Brand:</label>
+              <select formControlName="brand" class="form-control" required>
+                <option value="">Select Brand</option>
+                <option *ngFor="let brand of brands" [value]="brand.name">{{ brand.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Category:</label>
+              <select formControlName="category" class="form-control" required>
+                <option value="">Select Category</option>
+                <option *ngFor="let category of categories" [value]="category.name">{{ category.name }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Business Location:</label>
+              <select formControlName="location" class="form-control" required>
+                <option value="" disabled selected>Select a Business Location</option>
+                <option *ngFor="let location of businessLocations" [value]="location.id">
+                  {{ location.name }} ({{ location.locationId || 'BL000' + (businessLocations.indexOf(location) + 1) }})
+                </option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Second Container -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Reference No: <i class="fa fa-info-circle text-info" title="Auto-generated reference number"></i></label>
+              <input type="text" formControlName="referenceNo" class="form-control" readonly />
+            </div>
+          </div>
+
+          <div class="col-md-4">
+<!-- To this -->
+<div class="form-group">
+  <label>Required by date:</label>
+  <div class="input-group">
+    <input type="date" formControlName="requiredByDate" class="form-control" />
+    <span class="input-group-text">
+      <i class="fa fa-calendar"></i>
+    </span>
+  </div>
+</div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Date:</label>
+              <div class="input-group">
+                <input type="date" formControlName="date" class="form-control" required />
+                <span class="input-group-text">
+                  <i class="fa fa-calendar"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Supplier:</label>
+              <select formControlName="supplier" class="form-control">
+                <option value="">Select Supplier</option>
+                <option *ngFor="let supplier of suppliers" [value]="supplier.id">
+                  {{ supplier.businessName || supplier.firstName + ' ' + supplier.lastName }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+<div class="form-group">
+  <label>Shipping Date:</label>
+  <div class="input-group">
+    <input type="date" formControlName="shippingDate" class="form-control" />
+    <span class="input-group-text">
+      <i class="fa fa-calendar"></i>
+    </span>
+  </div>
+</div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="form-group">
+              <label>Added By:</label>
+              <select formControlName="addedBy" class="form-control" required>
+                <option value="">Select User</option>
+                <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Status:</label>
+              <select formControlName="status" class="form-control" required>
+                <option value="">Select Status</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Shipping Status:</label>
+              <select formControlName="shippingStatus" class="form-control">
+                <option value="">Select Shipping Status</option>
+                <option value="not_shipped">Not Shipped</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+<!-- Add this search bar above the products table -->
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="position-relative mb-3">
+      <input type="text" 
+             class="form-control" 
+             placeholder="Enter Product name / SKU / Scan bar code"
+             (keyup)="onSearchInput($event)"
+             (keydown)="handleKeyDown($event)"
+             (focus)="onSearchFocus()"
+             (blur)="onSearchBlur()"
+             [(ngModel)]="searchTerm"
+             [ngModelOptions]="{standalone: true}"/>
+      <div *ngIf="showSearchResults" 
+           class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm" 
+           style="top: 100%; z-index: 1050; max-height: 300px; overflow-y: auto;">
+        <div class="list-group">
+          <button type="button" 
+                  class="list-group-item list-group-item-action text-start"
+                  *ngFor="let product of searchResults"
+                  (mousedown)="addProductFromSearch(product); $event.preventDefault()"
+                  (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
+                  tabindex="0">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <strong [innerHTML]="highlightMatch(product.productName, searchTerm)"></strong>
+                <small *ngIf="product.sku" class="text-muted ms-2">
+                  SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
+                </small>
+              </div>
+              <div class="text-end">
+                <span class="badge bg-primary me-1">Stock: {{ product.currentStock || 0 }}</span>
+                <span class="badge bg-success">₹{{ product.defaultPurchasePrice || 0 | number:'1.2-2'}}</span>
+              </div>
+            </div>
+            <small *ngIf="product.barcode" class="text-muted d-block">
+              Barcode: {{ product.barcode }}
+            </small>
+          </button>
+          <div *ngIf="searchResults.length === 0" class="list-group-item text-muted">
+            No products found matching "{{ searchTerm }}"
+          </div>
+        </div>
+      </div>
+    </div>
+    
+
+
+<div class="card mb-3">
+  <div class="card-body">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>
+            <input type="checkbox" (change)="selectAll($event)" [checked]="allSelected">
+          </th>
+          <th>Product</th>
+          <th>Alert quantity</th>
+          <th>Current Stock</th>
+          <th>Unit Purchase Price</th>
+          <th>Purchase Price (Inc Tax)</th>
+          <th>Required quantity</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody formArrayName="products">
+        <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
+          <td>
+            <input type="checkbox" [checked]="selectedItems.has(i)" (change)="toggleSelection(i)">
+          </td>
+          <td>
+            <select formControlName="productId" class="form-control" (change)="onProductSelect(i)" required>
+              <option value="">Select a product</option>
+              <option *ngFor="let product of filteredProducts" [value]="product.id">
+                {{ product.productName }} ({{ product.sku }})
+              </option>
+            </select>
+            <input type="hidden" formControlName="productName">
+          </td>
+          <td>
+            <input type="number" formControlName="alertQuantity" class="form-control" readonly />
+          </td>
+          <td>
+            <input type="number" formControlName="currentStock" class="form-control" readonly />
+          </td>
+          <td>
+            <input type="number" formControlName="unitPurchasePrice" class="form-control" 
+                   (input)="onUnitPriceChange(i); calculateSubtotal(i)" />
+          </td>
+          <td>
+            <input type="number" formControlName="purchasePriceIncTax" class="form-control" readonly />
+          </td>
+          <td>
+            <input type="number" formControlName="requiredQuantity" class="form-control" 
+                   (input)="calculateSubtotal(i)" required />
+          </td>
+          <td>
+            <input type="number" formControlName="subtotal" class="form-control" readonly />
+          </td>
+          <td class="text-center">
+            <button type="button" class="btn btn-link text-danger" (click)="removeProduct(i)">
+              <i class="fa fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="8" class="text-right"><strong>Total:</strong></td>
+          <td><strong>{{ calculateTotal() | currency:'INR' }}</strong></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="text-center mt-3">
+      <button type="button" class="btn btn-info mr-2" (click)="addProduct()">
+        <i class="fa fa-plus"></i> Add Product
+      </button>
+      <button type="button" class="btn btn-danger" (click)="bulkDelete()" [disabled]="selectedItems.size === 0">
+        <i class="fa fa-trash"></i> Delete Selected
+      </button>
+<button type="submit" class="btn btn-primary" 
+        [disabled]="!purchaseForm.valid || products.length === 0">
+  Save
+</button>    </div>
+  </div>
+</div>

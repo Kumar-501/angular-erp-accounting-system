@@ -1,0 +1,84 @@
+<div class="opening-stock-container">
+    <h2>Add Opening Stock</h2>
+    
+    <div *ngIf="isLoading" class="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+    
+    <div class="stock-form-wrapper">
+     
+      <form [formGroup]="stockForm" (ngSubmit)="onSubmit()">
+        <div class="table-responsive">
+          <table class="stock-table">
+            <thead>
+              <tr>
+                <th>Product Name</th>
+                <th>Quantity Remaining</th>
+                <th>Unit Cost (Before Tax)</th>
+                <th>Lot Number</th>
+                <th>Subtotal (Before Tax)</th>
+                <th>Date</th>
+                <th>Note</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody formArrayName="items">
+              <tr *ngFor="let item of items.controls; let i = index" [formGroupName]="i">
+                <td>
+                  <input type="text" formControlName="productName" class="form-control">
+                  <!-- Hidden fields for product reference -->
+                  <input type="hidden" formControlName="productId">
+                  <input type="hidden" formControlName="sku">
+                </td>
+                <td class="quantity-cell">
+                  <input type="number" formControlName="quantity" class="form-control quantity-input">
+                  <select formControlName="unit" class="form-control unit-select">
+                    <option value="NOS">NOS</option>
+                    <option value="KG">KG</option>
+                    <option value="L">L</option>
+                    <option value="BOX">BOX</option>
+                  </select>
+                </td>
+                <td>
+                  <input type="number" formControlName="unitCost" class="form-control">
+                </td>
+                <td>
+                  <input type="text" formControlName="lotNumber" class="form-control">
+                </td>
+                <td>
+                  {{ calculateSubtotal(i).toFixed(2) }}
+                </td>
+                <td>
+                  <input type="date" formControlName="date" class="form-control">
+                </td>
+                <td>
+                  <textarea formControlName="note" class="form-control note-field"></textarea>
+                </td>
+                <td class="action-cell">
+                  <button type="button" class="btn btn-add" (click)="addItem()" *ngIf="i === items.length - 1">+</button>
+                  <button type="button" class="btn btn-remove" (click)="removeItem(i)" *ngIf="items.length > 1">-</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="total-section">
+          <p><strong>Total Amount (Exc. Tax):</strong> {{ calculateTotal().toFixed(2) }}</p>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary" [disabled]="!stockForm.valid || isLoading">
+            {{ isLoading ? 'Saving...' : 'Save' }}
+          </button>
+          <button type="button" class="btn btn-secondary" [routerLink]="['/products']">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+    
+    <div class="footer">
+      <p>HYBRID CRM - V6.2 | Copyright © {{ currentYear }} All rights reserved.</p>
+    </div>
+  </div>

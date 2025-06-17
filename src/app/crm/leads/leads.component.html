@@ -1,0 +1,1280 @@
+<!-- Customer Management Section -->
+<div class="customer-management">
+  <!-- Header Section -->
+ 
+  <h2>Leads</h2>
+<br>
+  
+  <div class="metrics-row">
+  <div class="metric-card">
+    <div class="metric-content d-flex align-items-center justify-content-between flex-wrap">
+      
+      <!-- Left: Label and Value -->
+      <div class="d-flex align-items-center gap-2">
+        <span class="metric-label">Today's Total Lead ({{ currentDate | date:'dd MMM yyyy' }}) :</span>
+        <span class="metric-value">{{ todaysLeadsCount }}</span>
+      </div>
+
+      <!-- Right: Filter Button -->
+      <div class="filter-controls">
+        <button class="filter-toggle" (click)="toggleFilterSidebar()">
+          <i class="filter-icon"></i> Filters
+        </button>
+      </div>
+
+    </div>
+  </div>
+  <br>
+  <div class="filter-section">
+    <div class="filter-controls">
+    
+     <div class="header-actions" style="  margin-left: 200px;">
+      <button class="bulk-select-btn" (click)="selectAllFilteredLeads()" [disabled]="filteredLeads.length === 0">
+  Bulk Select Leads
+</button>
+
+
+
+
+
+      <button class="random-assign-btn" (click)="openAssignModal(true)" [disabled]="selectedLeads.size === 0">
+        Random Assign Leads
+      </button>
+      <button class="assign-btn" (click)="openAssignModal(false)" [disabled]="selectedLeads.size === 0">
+        Assign Leads
+      </button>
+      <button class="assign-btn" (click)="openLifeStagePopup()" [disabled]="selectedLeads.size === 0">
+        Update Life Stage
+      </button>
+      <button 
+    [class.disabled]="selectedLeads.size === 0" 
+    [disabled]="selectedLeads.size === 0"
+    class="bulk-assign-btn" 
+    (click)="selectedLeads.size > 0 && openDepartmentPopup()">
+    Assign Department to Selected
+  </button>
+   <button class="add-btn" [routerLink]="['/crm/lead-add']">
+  <span class="icon">+</span> Add Lead
+</button>
+    
+    </div>
+    
+  <div class="table-controls">
+    <div class="pagination-control">
+  <span>Show</span>
+  <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+    <option value="10">10</option>
+    <option value="25">25</option>
+    <option value="50">50</option>
+    <option value="100">100</option>
+  </select>
+  <span>entries</span>
+</div>
+  <div class="search-box">
+    <input type="text" [(ngModel)]="filters.searchTerm" 
+           (input)="applyFilters()" 
+           placeholder="Search all fields...">
+  </div>
+
+    
+    <div class="export-controls">
+      <button class="export-btn" (click)="exportExcel()">Export Excel</button>
+      <button class="export-btn" (click)="printTable()">Print</button>
+      <!-- Add the column visibility toggle button -->
+      <div class="column-visibility-container">
+        <button class="export-btn" (click)="toggleColumnDropdown()">Columns ▼</button>
+        <div class="column-dropdown" *ngIf="showColumnDropdown">
+          <div class="column-options">
+            <div *ngFor="let column of allColumns" class="column-option">
+              <label>
+                <input type="checkbox" 
+                       [checked]="isColumnVisible(column.key)"
+                       (change)="toggleColumnVisibility(column.key)">
+                {{column.label}}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="responsive-container">
+  <div class="table-container">
+    <table class="customer-table">
+      <thead>
+        <tr>
+          <th *ngIf="isColumnVisible('select')">
+            <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll($event)">
+          </th>
+          <th *ngIf="isColumnVisible('action')">Action</th>
+          <th *ngIf="isColumnVisible('createdAt')" (click)="sortTable('createdAt')">
+            Created Date
+            <span class="sort-icon" *ngIf="sortColumn === 'createdAt'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('contactId')" (click)="sortTable('contactId')">
+            Contact ID
+            <span class="sort-icon" *ngIf="sortColumn === 'contactId'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('fullName')" (click)="sortTable('fullName')">
+            Name
+            <span class="sort-icon" *ngIf="sortColumn === 'fullName'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('leadCategory')" (click)="sortTable('leadCategory')">
+  Lead Category
+  <span class="sort-icon" *ngIf="sortColumn === 'leadCategory'">
+    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+  </span>
+</th>
+          <th *ngIf="isColumnVisible('productName')" (click)="sortTable('productName')">
+            Product Interested
+            <span class="sort-icon" *ngIf="sortColumn === 'productName'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('addedBy')" (click)="sortTable('addedBy')">
+            Added By
+            <span class="sort-icon" *ngIf="sortColumn === 'addedBy'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('mobile')" (click)="sortTable('mobile')">
+            Mobile
+            <span class="sort-icon" *ngIf="sortColumn === 'mobile'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+                    <th *ngIf="isColumnVisible('alternateContact')" (click)="sortTable('alternateContact')">
+            Alternate Contact
+            <span class="sort-icon" *ngIf="sortColumn === 'alternateContact'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+
+          <th *ngIf="isColumnVisible('lifeStage')" (click)="sortTable('lifeStage')">
+            Life Stage
+            <span class="sort-icon" *ngIf="sortColumn === 'lifeStage'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('dealStatus')" (click)="sortTable('dealStatus')">
+            Deal
+            <span class="sort-icon" *ngIf="sortColumn === 'dealStatus'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('source')" (click)="sortTable('source')">
+            Source
+            <span class="sort-icon" *ngIf="sortColumn === 'source'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('leadStatus')" (click)="sortTable('leadStatus')">
+            Adcode
+            <span class="sort-icon" *ngIf="sortColumn === 'leadStatus'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('priority')" (click)="sortTable('priority')">
+            Priority
+            <span class="sort-icon" *ngIf="sortColumn === 'priority'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('note')">Note</th>
+          <th *ngIf="isColumnVisible('department')" (click)="sortTable('department')">
+            Department
+            <span class="sort-icon" *ngIf="sortColumn === 'department'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+        <!-- In the table header -->
+<th *ngIf="isColumnVisible('assignedTo')" (click)="sortTable('assignedTo')">
+  Assigned To
+  <span class="sort-icon" *ngIf="sortColumn === 'assignedTo'">
+    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+  </span>
+</th>
+          <th *ngIf="isColumnVisible('upcomingFollowUp')" (click)="sortTable('upcomingFollowUp')">
+            Upcoming follow up
+            <span class="sort-icon" *ngIf="sortColumn === 'upcomingFollowUp'">
+              {{ sortDirection === 'asc' ? '▲' : '▼' }}
+            </span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let lead of filteredLeads">
+          <td *ngIf="isColumnVisible('select')">
+            <input type="checkbox" [checked]="isSelected(lead.id)" (change)="toggleLeadSelection(lead.id)">
+          </td>
+          <td *ngIf="isColumnVisible('action')" class="action-cell">
+            <div class="dropdown">
+              <button class="dropdown-btn">Actions</button>
+              <div class="dropdown-content">
+                <a (click)="editLead(lead)">Edit</a>
+                <a (click)="viewLead(lead)">View</a>
+                <a *ngIf="lead.isDuplicate" (click)="mergeDuplicate(lead.id, true)">Merge into Original</a>
+                <a *ngIf="lead.isDuplicate" (click)="mergeDuplicate(lead.id, false)">Keep This as Original</a>
+                <a 
+                  [routerLink]="lead.mobileExists ? '/add-sale' : 'javascript:void(0)'" 
+                  (click)="!lead.mobileExists && convertToCustomer(lead); lead.mobileExists && prepareForSalesOrder(lead)"
+                  class="convert-btn">
+                  {{ lead.mobileExists ? 'Create Sales Order' : 'Convert to Customer' }}
+                </a>
+                <a (click)="addFollowUp(lead)">Add Follow Up</a>
+              </div>
+            </div>
+          </td>
+          <td *ngIf="isColumnVisible('createdAt')">{{ lead.createdAt | date:'short' }}</td>
+          <td *ngIf="isColumnVisible('contactId')">{{ lead.contactId || '-' }}</td>
+          <td *ngIf="isColumnVisible('fullName')" class="name-cell">
+            <div class="name-wrapper">
+              <div class="name-line">
+                {{ lead.firstName || lead.businessName || '-' }}
+                <span *ngIf="lead.isReordered" class="reordered-badge">Reordered</span>
+                <span *ngIf="lead.isDuplicate" class="duplicate-badge">Duplicate Lead</span>
+              </div>
+             
+            </div>
+          </td>
+          <td *ngIf="isColumnVisible('leadCategory')">
+  <div class="category-tags">
+    <ng-container *ngIf="lead.leadCategory">
+      <span class="category-tag">{{ lead.leadCategory }}</span>
+    </ng-container>
+ <div class="category-section">
+                <div class="category-tags">
+                  <ng-container *ngIf="lead.categories && lead.categories.length > 0">
+                    <span class="category-tag" *ngFor="let category of lead.categories">{{ category }}</span>
+                  </ng-container>
+                </div>
+              </div>
+  </div>
+</td>
+          <td *ngIf="isColumnVisible('productName')">
+            {{ getProductNames(lead.productInterested) || '-' }}
+          </td>
+          <td *ngIf="isColumnVisible('addedBy')">
+            {{ lead.addedBy?.userName || lead.addedBy || '-' }}
+          </td>
+          <td *ngIf="isColumnVisible('mobile')">{{ lead.mobile || '-' }}</td>
+                    <td *ngIf="isColumnVisible('alternateContact')">{{ lead.alternateContact || '-' }}</td>
+
+          <td *ngIf="isColumnVisible('lifeStage')" (click)="openLifeStagePopup(lead)">
+            <span class="lifestage-badge" [ngClass]="getLifeStageClass(lead.lifeStage)">
+              {{ lead.lifeStage || '-' }}
+            </span>
+          </td>
+          <td *ngIf="isColumnVisible('dealStatus')">
+            <span class="deal-badge">{{ lead.dealStatus || '-' }}</span>
+          </td>
+          <td *ngIf="isColumnVisible('source')">
+            <span class="source-badge">{{ lead.source || '-' }}</span>
+          </td>
+          <td *ngIf="isColumnVisible('leadStatus')">
+            <span class="status-badge">{{ lead.leadStatus || '-' }}</span>
+          </td>
+          <td *ngIf="isColumnVisible('priority')">
+            <span class="priority-badge">{{ lead.priority || '-' }}</span>
+          </td>
+          <td *ngIf="isColumnVisible('note')">
+            <ng-container *ngIf="lead.notes; else addNoteBtn">
+              <span (click)="openNotes(lead)" class="note-text">
+                {{ lead.notes | slice:0:15 }}{{ lead.notes.length > 15 ? '...' : '' }}
+              </span>
+            </ng-container>
+            <ng-template #addNoteBtn>
+              <button class="add-note-btn" (click)="openNotes(lead)">+ Add Note</button>
+            </ng-template>
+          </td>
+          <td *ngIf="isColumnVisible('department')" (click)="openDepartmentPopup(lead)">
+            <span class="department-badge">{{ lead.department || '-' }}</span>
+          </td>
+<!-- In leads.component.html -->
+<td *ngIf="isColumnVisible('assignedTo')">
+  <span class="assigned-user">
+    {{ lead.assignedTo || '-' }}
+    <span *ngIf="getUserDepartment(lead.assignedTo)" class="department-badge">
+      [{{ getUserDepartment(lead.assignedTo) }}]
+    </span>
+  </span>
+</td>          <td *ngIf="isColumnVisible('upcomingFollowUp')">
+            <span *ngIf="lead.upcomingFollowUp" class="follow-up-date">
+              {{ lead.upcomingFollowUp | date:'short' }}
+            </span>
+            <button *ngIf="!lead.upcomingFollowUp" class="follow-up-btn" (click)="addFollowUp(lead)">
+              Add Follow Up
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredLeads.length === 0">
+          <td [attr.colspan]="visibleColumns.length" class="no-data">No leads found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+  
+ 
+ 
+<div class="filter-section">
+  <div class="filter-controls">
+    <!-- Filter Button in your main controls -->
+   
+<!-- Filter Section -->
+
+
+    <!-- Filter Sidebar - Updated to match the second image -->
+    <div class="filter-sidebar" [class.active]="showFilterSidebar">
+      <div class="sidebar-header">
+        <h3>Filters</h3>
+        <button class="close-sidebar" (click)="toggleFilterSidebar()">&times;</button>
+      </div>
+      
+      <div class="sidebar-content">
+        
+        
+<div class="date-range-picker">
+  <div class="date-input">
+    <label for="fromDate">From:</label>
+    <input type="date" id="fromDate" #fromDateInput
+           [value]="filters.fromDate" 
+           (change)="applyFromDateFilter(fromDateInput.value)"
+           placeholder="Select date">
+  </div>
+  <div class="date-input">
+    <label for="toDate">To:</label>
+    <input type="date" id="toDate" #toDateInput
+           [value]="filters.toDate" 
+           (change)="applyToDateFilter(toDateInput.value)"
+           placeholder="Select date">
+  </div>
+  <button class="clear-date-btn" (click)="clearDateFilter()">
+    Clear Dates
+  </button>
+</div>
+        <!-- Source Filter -->
+        <div class="filter-group">
+          <h4>Source:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.source || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('source')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'source'">
+              <div class="dropdown-option" (click)="applySourceFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let source of sources" 
+                   (click)="applySourceFilter(source.name)">
+                {{source.name}}
+              </div>
+            </div>
+          </div>
+        </div>
+<!-- Inside your filter-sidebar div, add this filter group -->
+<!-- Inside your filter-sidebar div, add this filter group -->
+<div class="filter-group">
+  <h4>Ad Code:</h4>
+  <div class="filter-input-container">
+    <input type="text" class="filter-input" 
+           [value]="filters.adCode || 'All'" 
+           readonly
+           (click)="toggleDropdown('adCode')">
+    <div class="dropdown-options" *ngIf="activeDropdown === 'adCode'">
+      <div class="dropdown-option" (click)="applyAdCodeFilter('')">All</div>
+      <div class="dropdown-option" *ngFor="let code of leadStatuses" 
+           (click)="applyAdCodeFilter(code.leadStatus)">
+        {{code.leadStatus}}
+      </div>
+    </div>
+  </div>
+</div>
+        <!-- Life Stage Filter -->
+        <div class="filter-group">
+          <h4>Life Stage:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.lifeStage || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('lifeStage')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'lifeStage'">
+              <div class="dropdown-option" (click)="applyLifeStageFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let stage of lifeStages" 
+                   (click)="applyLifeStageFilter(stage.name)">
+                {{stage.name}}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lead Status Filter -->
+        <div class="filter-group">
+          <h4>Lead Status:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.leadStatus || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('leadStatus')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'leadStatus'">
+              <div class="dropdown-option" (click)="applyLeadStatusFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let status of leadStatuses" 
+                   (click)="applyLeadStatusFilter(status.leadStatus)">
+                {{status.leadStatus}}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Assigned to Filter -->
+        <!-- Assigned to Filter -->
+        <div class="filter-group">
+          <h4>Assigned to:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.assignedTo || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('assignedTo')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'assignedTo'">
+              <div class="dropdown-option" (click)="applyAssignedToFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let user of usersList" 
+                   (click)="applyAssignedToFilter(user.name)">
+                {{user.name}}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deal Status Filter -->
+        <div class="filter-group">
+          <h4>Deal Status:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.dealStatus || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('dealStatus')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'dealStatus'">
+              <div class="dropdown-option" (click)="applyDealStatusFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let status of dealStatuses" 
+                   (click)="applyDealStatusFilter(status)">
+                {{status}}
+              </div>
+            </div>
+          </div>
+        </div>
+       
+
+        <!-- Priority Filter -->
+        <div class="filter-group">
+          <h4>Priority:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.priority || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('priority')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'priority'">
+              <div class="dropdown-option" (click)="applyPriorityFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let priority of priorities" 
+                   (click)="applyPriorityFilter(priority)">
+                {{priority}}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Department Filter -->
+        <div class="filter-group">
+          <h4>Department:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.department || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('department')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'department'">
+              <div class="dropdown-option" (click)="applyDepartmentFilter('')">All</div>
+              <div class="dropdown-option" *ngFor="let dept of departments" 
+                   (click)="applyDepartmentFilter(dept)">
+                {{dept}}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-group">
+          <h4>Order Status:</h4>
+          <div class="filter-input-container">
+            <input type="text" class="filter-input" 
+                   [value]="filters.orderStatus || 'All'" 
+                   readonly
+                   (click)="toggleDropdown('orderStatus')">
+            <div class="dropdown-options" *ngIf="activeDropdown === 'orderStatus'">
+              <div class="dropdown-option" (click)="applyOrderStatusFilter('')">All</div>
+              <div class="dropdown-option" (click)="applyOrderStatusFilter('Reordered')">Reordered</div>
+              <div class="dropdown-option" (click)="applyOrderStatusFilter('No Reordered')">No Reordered</div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button class="clear-btn" (click)="clearAllFilters()">Clear All Filters</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Overlay -->
+    <div class="sidebar-overlay" [class.active]="showFilterSidebar" (click)="toggleFilterSidebar()"></div>
+  </div>
+</div>
+<br>
+  <!-- Form and Recent Leads Container -->
+  <!-- <div *ngIf="showForm" class="form-leads-container"> -->
+    <!-- Lead Form (60%) -->
+   <!-- <div class="lead-form-section">
+<label for="productintersted">Product Interested</label> -->
+    
+<!-- <div class="search-container">
+  <input 
+    type="text" 
+    [(ngModel)]="searchQuery" 
+    (input)="onSearchInput()" 
+    (focus)="onSearchFocus()"
+    (blur)="onSearchBlur()"
+    placeholder="Search products..."
+    class="search-input"
+  >
+   -->
+  <!-- <div *ngIf="showSearchDropdown" class="search-dropdown">
+    <div 
+      *ngFor="let product of searchResults" 
+      (mousedown)="preventBlur($event)"
+      (click)="toggleProductSelection(product)"
+      class="dropdown-item"
+      [class.selected]="isProductSelected(product)"
+    >
+      {{ product.productName }} ({{ product.sku }})
+      <span *ngIf="isProductSelected(product)" class="selected-checkmark">✓</span>
+    </div>
+  </div>
+</div> -->
+      <!-- <div class="modal-content">
+        <h5>{{ editingLeadId ? 'Edit Lead' : 'Add a new Lead' }}</h5>
+         -->
+          <!-- <div *ngIf="validationMessage" class="validation-popup" [ngClass]="{'error': validationMessage.type === 'error', 'success': validationMessage.type === 'success'}"> -->
+            <!-- <div class="popup-content">
+              <span class="popup-message">{{validationMessage.text}}</span>
+              <button class="popup-close" (click)="closeValidationPopup()">&times;</button>
+            </div> -->
+          <!-- </div> -->
+          
+            <!-- <div class="form-group">
+              <label for="contactId">Contact ID</label>
+              <input type="text" id="contactId" class="form-control" [value]="leadForm.get('contactId')?.value" readonly>
+            </div> -->
+
+         <!-- <div class="form-group">
+      <label for="contactType">Contact type<span class="required-asterisk">*</span></label>
+      <div class="input-container">
+        <span class="icon-container">
+          <i class="user-icon"></i>
+        </span>
+        <select formControlName="contactType" id="contactType" class="form-control">
+          <option value="Lead">Lead</option>
+          <option value="Customer">Customer</option>
+          <option value="Supplier">Supplier</option>
+        </select>
+      </div>
+    </div> -->
+            
+              <!-- <div class="form-group radio-group">
+      <div class="radio-options">
+        <label>
+          <input type="radio" formControlName="isIndividual" [value]="true"> Individual
+        </label>
+        <label>
+          <input type="radio" formControlName="isIndividual" [value]="false"> Business
+        </label>
+      </div>
+    </div> -->
+
+            <!-- <div class="form-group">
+               Empty slot for 4th field or can add another field if needed -->
+            <!-- </div>
+          </div>  -->
+
+          <!-- Second Row - 4 fields (conditional based on isIndividualType) -->
+          <!-- <div *ngIf="isIndividualType" class="form-row">
+            <div class="form-group">
+              <label for="prefix">Prefix</label>
+              <select formControlName="prefix" id="prefix" class="form-control">
+                <option value="">Select Prefix</option>
+                <option *ngFor="let prefix of prefixes" [value]="prefix">{{prefix}}</option>
+              </select>
+            </div> -->
+            
+         <!-- <div class="form-group">
+      <label for="firstName">First Name<span class="required-asterisk">*</span></label>
+      <input type="text" formControlName="firstName" id="firstName" placeholder="First Name" class="form-control" 
+             [ngClass]="{'invalid': isIndividualType && f['firstName'].touched && f['firstName'].invalid}">
+      <small class="error-text" *ngIf="isIndividualType && f['firstName'].touched && f['firstName'].errors?.['required']">
+        First name is required
+      </small>
+    </div> -->
+
+            <!-- <div class="form-group">
+              <label for="middleName">Middle Name</label>
+              <input type="text" formControlName="middleName" id="middleName" placeholder="Middle Name" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="lastName">Last Name</label>
+              <input type="text" formControlName="lastName" id="lastName" placeholder="Last Name" class="form-control">
+            </div>
+          </div> -->
+
+          <!-- Third Row - 3 fields (conditional based on isIndividualType) -->
+          <!-- <div *ngIf="isIndividualType" class="form-row">
+            <div class="form-group">
+              <label for="age">Age</label>
+              <input type="number" formControlName="age" id="age" placeholder="Age" class="form-control">
+            </div> -->
+
+            <!-- <div class="form-group">
+              <label for="gender">Gender</label>
+              <select formControlName="gender" id="gender" class="form-control">
+                <option value="">Select Gender</option>
+                <option *ngFor="let gender of genders" [value]="gender">{{gender}}</option>
+              </select>
+            </div> -->
+<!--             
+            <div class="form-group">
+              <label for="dateOfBirth">Date of Birth</label>
+              <input type="date" formControlName="dateOfBirth" id="dateOfBirth" class="form-control">
+            </div>
+          </div> -->
+<!-- 
+           Business Name (full width when not individual) -->
+         <!-- <div *ngIf="!isIndividualType" class="form-group full-width">
+    <label for="businessName">Business Name<span class="required-asterisk">*</span></label>
+    <input type="text" formControlName="businessName" id="businessName" placeholder="Enter Business Name" 
+           class="form-control" [ngClass]="{'invalid': !isIndividualType && f['businessName'].touched && f['businessName'].invalid}">
+    <small class="error-text" *ngIf="!isIndividualType && f['businessName'].touched && f['businessName'].errors?.['required']">
+      Business name is required
+    </small>
+  </div> --> 
+
+       <!-- Mobile field -->
+  <!-- <div class="form-group">
+    <label for="mobile">Mobile<span class="required-asterisk">*</span></label>
+    <div class="input-container">
+      <span class="icon-container">
+        <i class="mobile-icon"></i>
+      </span>
+      <input type="text" formControlName="mobile" id="mobile" 
+             placeholder="Mobile" class="form-control" 
+             [ngClass]="{'invalid': f['mobile'].touched && f['mobile'].invalid}"
+             (input)="validateMobileNumber()"
+             (blur)="validateMobileNumber()"
+             maxlength="10"> -->
+    <!-- </div>
+    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['required']">
+      Mobile number is required
+    </small>
+    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['pattern']">
+      Mobile number must be exactly 10 digits
+    </small>
+  </div> -->
+
+<!-- 
+          <div class="form-row">
+            <div class="form-group">
+              <label for="landline">Landline</label>
+              <input type="text" formControlName="landline" id="landline" 
+                     placeholder="Landline" class="form-control"
+                     (input)="validateLandline()"
+                     (blur)="validateLandline()"
+                     maxlength="10">
+              <small class="error-text" *ngIf="landlineValidationMessage">
+                {{ landlineValidationMessage }}
+              </small>
+            </div> -->
+<!-- <div class="form-group">
+  <label for="alternateContact">Alternate Contact</label>
+  <div class="input-container">
+    <input type="text" formControlName="alternateContact" id="alternateContact" 
+           placeholder="Alternate Contact" class="form-control"
+           (input)="validateAlternateContact()"
+           (blur)="validateAlternateContact()"
+           maxlength="10">
+  </div>
+  <small class="error-text" *ngIf="f['alternateContact'].touched && f['alternateContact'].errors?.['pattern']">
+    Alternate contact must be exactly 10 digits
+  </small>
+</div> -->
+
+
+<!-- 
+  <div class="form-group">
+    <label for="email">Email<span class="required-asterisk"></span></label>
+    <div class="input-container">
+      <span class="icon-container">
+        <i class="email-icon"></i>
+      </span>
+      <input type="email" formControlName="email" id="email" placeholder="Email" 
+             class="form-control" [ngClass]="{'invalid': f['email'].touched && f['email'].invalid}">
+    </div>
+    <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['required']">
+      Email is required
+    </small>
+    <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['email']">
+      Please enter a valid email
+    </small>
+  </div>
+
+          </div>
+
+
+
+          <div class="form-row">
+            
+             -->
+            <!-- <div class="form-group">
+              <label for="leadCategory">Lead Category</label>
+              <select formControlName="leadCategory" id="leadCategory" class="form-control">
+                <option value="">Select Category</option>
+                <option *ngFor="let category of leadCategories" [value]="category">{{category}}</option>
+              </select>
+            </div>
+          </div> -->
+
+          <!-- <div class="form-row"> -->
+            <!-- <div class="form-group">
+              <label for="dealStatus">Deal Status</label>
+              <select formControlName="dealStatus" id="dealStatus" class="form-control">
+                <option value="">Select Status</option>
+                <option *ngFor="let status of dealStatuses" [value]="status">{{status}}</option>
+              </select>
+        </div> -->
+            
+            <!-- <div class="form-group">
+              <label for="priority">Priority</label>
+              <select formControlName="priority" id="priority" class="form-control">
+                <option value="">Select Priority</option>
+                <option *ngFor="let priority of priorities" [value]="priority">{{priority}}</option>
+              </select>
+            </div>
+          </div> --> 
+
+          <!-- <div class="form-row">
+            <div class="form-group">
+              <label for="estimatedValue">Estimated Value</label>
+              <input type="number" formControlName="estimatedValue" id="estimatedValue" placeholder="Estimated Value" class="form-control">
+            </div> -->
+<!--           
+            <div class="form-group">
+              <label for="leadStatus">Ad Code</label>
+              <select formControlName="leadStatus" id="leadStatus" class="form-control">
+                <option value="">Select Status</option>
+                <ng-container *ngIf="leadStatuses && leadStatuses.length > 0; else noStatuses">
+                  <option *ngFor="let status of leadStatuses" [value]="status.leadStatus">{{status.leadStatus}}</option>
+                </ng-container>
+                <ng-template #noStatuses>
+                  <option value="" disabled>No statuses available</option>
+                </ng-template>
+              </select>
+            </div>
+          </div> -->
+
+
+
+
+          <!-- <div class="form-row"> -->
+<!-- Inside your lead form -->
+  <!-- <div class="form-group">
+    <label for="source">Source<span class="required-asterisk">*</span></label>
+    <select formControlName="source" id="source" class="form-control" required>
+      <option value="">Select Source</option>
+      <option *ngFor="let source of sources" [value]="source.name">{{source.name}}</option>
+    </select>
+    <small class="error-text" *ngIf="f['source'].touched && f['source'].errors?.['required']">
+      Source is required
+    </small>
+  </div> -->
+<!--             
+             <div class="form-group">
+    <label for="lifeStage">Life Stage<span class="required-asterisk">*</span></label>
+    <select formControlName="lifeStage" id="lifeStage" class="form-control">
+      <option *ngFor="let stage of lifeStages" [value]="stage.name">{{stage.name}}</option>
+    </select>
+    <small class="error-text" *ngIf="f['lifeStage'].touched && f['lifeStage'].errors?.['required']">
+      Life stage is required
+    </small>
+  </div>
+          </div> -->
+<!-- <label for="productintersted">Product Interested</label>
+
+<div class="search-container">
+   <input 
+    type="text" 
+    [(ngModel)]="searchQuery" 
+    (input)="onSearchInput()" 
+    (focus)="searchQuery && searchQuery.length >= 2 ? showSearchDropdown = true : null"
+    (blur)="onSearchBlur()"
+    placeholder="Search products..."
+    class="search-input"
+  > 
+   -->
+  <!-- <div *ngIf="showSearchDropdown && searchResults.length" class="search-dropdown">
+    <div 
+      *ngFor="let product of searchResults" 
+      (click)="selectProduct(product)"
+      class="dropdown-item"
+    >
+      {{ product.productName }} ({{ product.sku }})
+    </div>
+  </div>
+</div>
+<div class="selected-products-container" *ngIf="selectedProducts.length > 0">
+    <div class="selected-product-tag" *ngFor="let product of selectedProducts">
+      {{ product.productName || product.name }}
+      <span class="remove-product" (click)="removeSelectedProduct(product)">×</span>
+    </div>
+  </div>     -->
+
+
+<!-- Add this after the source field in your form -->
+<!-- <div class="form-row">
+  <div class="form-group">
+    <label for="department">Department</label>
+    <select formControlName="department" id="department" class="form-control" 
+            (change)="onDepartmentChange($event)">
+      <option value="">Select Department</option>
+      <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="assignedTo">Assigned To</label>
+    <select formControlName="assignedTo" id="assignedTo" class="form-control">
+      <option value="">Select a user</option>
+      <option *ngFor="let user of filteredUsers" [value]="user.id">
+        {{user.name}} ({{user.department || 'No Dept'}})
+      </option>
+    </select>
+  </div>
+</div>
+
+Add this to show the department of selected user -->
+<!-- <div class="form-group" *ngIf="selectedUserDepartment">
+  <label>Department</label>
+  <input type="text" class="form-control" [value]="selectedUserDepartment" readonly>
+</div>
+          -->
+          <!-- <div class="form-group">
+            <label for="leadStatusNote">Lead Status Note</label>
+            <textarea formControlName="leadStatusNote" id="leadStatusNote" placeholder="Notes about lead status" class="form-control" rows="2"></textarea>
+          </div>
+
+          <button type="button" class="more-info-btn" (click)="toggleMoreInfo()">
+            More Information <i class="down-icon"></i>
+          </button>
+
+          <div *ngIf="showMoreInfo" class="more-info-fields">
+            <div class="form-group">
+              <label for="notes">Notes:</label>
+              <textarea formControlName="notes" id="notes" placeholder="Any additional notes about the lead" class="form-control" rows="3"></textarea>
+            </div> -->
+            
+            <!-- <div class="form-row">
+              <div class="form-group">
+                <label for="addressLine1">Address line 1:</label>
+                <input type="text" formControlName="addressLine1" id="addressLine1" placeholder="Address line 1" class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="addressLine2">Address line 2:</label>
+                <input type="text" formControlName="addressLine2" id="addressLine2" placeholder="Address line 2" class="form-control">
+              </div>
+            </div> -->
+            
+            <!-- <div class="form-row">
+              <div class="form-group">
+                <label for="state">State:</label>
+                <select formControlName="state" id="state" class="form-control" (change)="onStateChange()">
+                  <option value="">Select State</option>
+                  <option *ngFor="let state of states" [value]="state">{{state}}</option>
+                </select>
+              </div> -->
+              
+              <!-- <div class="form-group">
+                <label for="city">District:</label>
+                <select formControlName="city" id="city" class="form-control" [disabled]="!leadForm.get('state')?.value">
+                  <option value="">Select District</option>
+                  <option *ngFor="let district of availableDistricts" [value]="district">{{district}}</option>
+                </select>
+              </div>
+            </div> -->
+            
+            <!-- <div class="form-row">
+              <div class="form-group">
+                <label for="country">Country:</label>
+                <input type="text" formControlName="country" id="country" placeholder="Country" class="form-control">
+              </div> -->
+              
+              <!-- <div class="form-group">
+                <label for="zipCode">Zip Code:</label>
+                <input type="text" formControlName="zipCode" id="zipCode" placeholder="Zip/Postal Code" class="form-control">
+              </div>
+            </div>
+          </div> -->
+
+          <!-- <div class="form-actions">
+            <button type="button" (click)="toggleForm()" class="close-btn">Close</button>
+            <button type="submit" class="save-btn">Save</button>
+          </div>
+      </div>
+    </div> -->
+
+  <!-- Recent Leads Section (40%) -->
+    <!-- <div class="recent-leads-section">
+      <div class="bg-white rounded-xl shadow-md p-6 h-full">
+        <h5 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2">
+          Last 10 Leads Added by You
+        </h5>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-gray-100 text-gray-700 uppercase text-sm tracking-wider">
+                <th class="py-3 px-4">Contact ID</th>
+                <th class="py-3 px-4">Name</th>
+                <th class="py-3 px-4">Added On</th>
+                <th class="py-3 px-4">Phone</th>
+                <th class="py-3 px-4">time</th>
+
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let lead of recentLeads" class="border-t hover:bg-gray-50 transition">
+                <td class="py-3 px-4">{{ lead.contactId }}</td>
+                <td class="py-3 px-4">
+                  {{ lead.businessName || (lead.firstName + ' ' + (lead.lastName || '')) }}
+                </td>
+                <td class="py-3 px-4">
+                  <span [ngClass]="getStatusClass(lead.leadStatus || (lead.convertedAt ? 'Converted' : 'New'))" class="status-badge">
+                    {{ lead.convertedAt ? 'Converted' : (lead.leadStatus || 'New') }}
+                  </span>
+                </td>
+                <td class="py-3 px-4">{{ lead.mobile }}</td>
+                <td class="py-3 px-4">{{ lead.createdAt | date:'short' }}</td>
+                
+              </tr>
+              <tr *ngIf="recentLeads.length === 0">
+                <td colspan="5" class="text-center py-6 text-gray-500">No recent leads found</td>
+              </tr>
+            </tbody>
+          </table>
+        </div> -->
+        
+       <!-- Converted Customer Info Section
+     <div *ngIf="convertedCustomer" class="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+          <h4 class="text-lg font-medium text-green-800 mb-2">Recently Converted Customer</h4>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div><span class="font-medium">Name:</span> {{ convertedCustomer.displayName }}</div>
+            <div><span class="font-medium">Contact:</span> {{ convertedCustomer.mobile }}</div>
+            <div><span class="font-medium">Email:</span> {{ convertedCustomer.email || 'N/A' }}</div>
+            <div><span class="font-medium">Converted On:</span> {{ convertedCustomer.convertedAt | date:'short' }}</div>
+          </div>
+          <button (click)="viewCustomerDetails(convertedCustomer.id)" 
+                  class="mt-2 text-sm text-green-600 hover:text-green-800">
+            View Customer Details →
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>   -->
+
+<div class="leads-summary">
+  
+   
+
+<div class="pagination-info">
+  Showing {{startIndex + 1}} to {{Math.min(endIndex, totalItems)}} of {{totalItems}} entries
+</div>
+<!-- Add this after your table -->
+<div class="pagination-controls">
+
+  <!-- <div class="pagination-buttons">
+    <button (click)="goToFirstPage()" [disabled]="currentPage === 1">First</button>
+    <button (click)="prevPage()" [disabled]="currentPage === 1">Previous</button>
+    
+    <span *ngFor="let page of getVisiblePages()" 
+          (click)="goToPage(page)"
+          [class.active]="page === currentPage"
+          class="page-number">
+      {{page}}
+    </span>
+    
+    <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+    <button (click)="goToLastPage()" [disabled]="currentPage === totalPages">Last</button>
+  </div> -->
+<!--   
+  <div class="page-size-selector">
+    <span>Items per page:</span>
+    <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+      <option *ngFor="let size of pageSizeOptions" [value]="size">{{size}}</option>
+    </select>
+  </div>
+</div> -->
+<!-- Category Popup Modal -->
+<div class="modal-wrapper" *ngIf="showCategoryPopup">
+  <div class="modal-overlay" (click)="closeCategoryPopup()"></div>
+  <div class="modal-container">
+    <div class="modal-header">
+      <h2 class="modal-title">
+        Manage Categories for {{ selectedLeadForCategory.firstName || selectedLeadForCategory.businessName }}
+      </h2>
+      <button type="button" class="modal-close-btn" (click)="closeCategoryPopup()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <form [formGroup]="categoryForm" (ngSubmit)="saveCategories()">
+        <div class="form-group">
+          <label class="form-label">Select Categories</label>
+          <div class="category-list">
+            <div *ngFor="let category of availableCategories" class="category-checkbox">
+              <label>
+                <input type="checkbox"
+                       [value]="category"
+                       (change)="onCategoryChange($event, category)"
+                       [checked]="isCategorySelected(category)">
+                {{ category }}
+              </label>
+            </div>
+          </div>
+          <small class="error-text"
+                 *ngIf="categoryForm.get('categories')?.touched && categoryForm.get('categories')?.errors?.['required']">
+            Please select at least one category
+          </small>
+        </div>
+
+        <div class="modal-footer">
+          <button type="submit" class="btn-save">Save Categories</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- Lead Assignment Modal HTML -->
+<div class="lead-assignment-modal" *ngIf="showAssignModal">
+  <div class="modal-overlay"></div>
+  <div class="modal-container">
+    <div class="modal-content">
+      <h3 class="modal-title">{{ randomAssignMode ? 'Randomly Assign Leads' : 'Assign Leads' }}</h3>
+      
+      <div class="form-group">
+        <label for="userSelect">Select User to Assign:</label>
+        <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control">
+          <option *ngFor="let user of availableUsers" [value]="user.id">
+            {{ user.name || user.email }}
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="lifeStageSelect">Select Life Stage:</label>
+        <select id="lifeStageSelect" [(ngModel)]="selectedLifeStage" class="form-control">
+          <option value="">Select Life Stage</option>
+          <option *ngFor="let stage of lifeStages" [value]="stage.name">
+            {{ stage.name }}
+          </option>
+        </select>
+      </div>
+      
+      <div class="selected-leads-info">
+        <p>Number of selected leads: <span class="lead-count">{{ selectedLeads.size }}</span></p>
+        <p *ngIf="randomAssignMode" class="random-note">
+          <i class="info-icon"></i> Leads will be randomly distributed among available users
+        </p>
+      </div>
+      
+      <div class="modal-actions">
+        <button type="button" class="cancel-btn" (click)="closeAssignModal()">Cancel</button>
+        <button type="button" class="assign-btn" (click)="assignSelectedLeads()">
+          {{ randomAssignMode ? 'Randomly Assign' : 'Assign Selected' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+    <div class="modal-actions">
+ 
+   
+    </div>
+  </div>
+</div>
+<div class="custom-notes-popup" *ngIf="showNotesPopup">
+  <div class="custom-notes-popup-content">
+    <h4>Notes</h4>
+    <textarea [(ngModel)]="currentNotes" rows="5" style="width: 100%"></textarea>
+    <div class="custom-notes-actions">
+      <button (click)="closeNotes()">Cancel</button>
+      <button (click)="saveNotes()">Save</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- HTML -->
+<div class="custom-modal-overlay" *ngIf="showLifeStagePopup">
+  <div class="custom-life-stage-modal">
+    <div class="custom-modal-content">
+      <h3 class="custom-modal-title">Update Life Stage</h3>
+      <div class="custom-form-group">
+        <label>Select Life Stage:</label>
+        <select [(ngModel)]="selectedLifeStage" class="custom-form-control">
+          <option *ngFor="let stage of lifeStages" [value]="stage.name">
+            {{ stage.name }}
+          </option>
+        </select>
+      </div>
+      <div class="custom-selected-leads-info">
+        <p *ngIf="selectedLeadsForLifeStage.length === 1">
+          Updating life stage for: {{ getLeadDisplay(selectedLeadsForLifeStage[0]) }}
+        </p>
+        <p *ngIf="selectedLeadsForLifeStage.length > 1">
+          Updating life stage for {{ selectedLeadsForLifeStage.length }} selected leads
+        </p>
+      </div>
+      <div class="custom-modal-actions">
+        <button type="button" class="custom-cancel-btn" (click)="closeLifeStagePopup()">Cancel</button>
+        <button type="button" class="custom-save-btn" (click)="updateSelectedLifeStages()">Update Life Stage</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Department Popup -->
+<div *ngIf="showDepartmentPopup" class="popup-overlay">
+  <div class="popup-container">
+    <div class="popup-box">
+      <h2>Assign Department</h2>
+      <form [formGroup]="departmentForm" (ngSubmit)="saveDepartment()">
+        <div class="form-group">
+          <label>Department</label>
+          <select formControlName="department" class="form-control">
+            <option value="">Select Department</option>
+            <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+          </select>
+        </div>
+        
+        <div class="popup-actions">
+          <button type="submit" class="save-btn">Save</button>
+          <button type="button" class="cancel-btn" (click)="closeDepartmentPopup()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" *ngIf="showLeadDetailsPopup" (click)="closeLeadDetailsPopup()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Lead Details</h3>
+      <button class="close-btn" (click)="closeLeadDetailsPopup()">&times;</button>
+    </div>
+    <div class="modal-body">
+<div class="container">
+  <div class="lead-details-container" *ngIf="selectedLeadDetails">
+  <div class="detail-row">
+    <span class="detail-label">Contact ID:</span>
+    <span class="detail-value">{{selectedLeadDetails.contactId || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Name:</span>
+    <span class="detail-value">
+      {{ (selectedLeadDetails.businessName || 
+          (selectedLeadDetails.firstName + ' ' + (selectedLeadDetails.lastName || ''))) || 'Not available' }}
+    </span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Product Interested:</span>
+    <span class="detail-value">{{getProductNames(selectedLeadDetails.productInterested) || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Added By:</span>
+    <span class="detail-value">{{selectedLeadDetails.addedBy?.userName || selectedLeadDetails.addedBy || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Mobile:</span>
+    <span class="detail-value">{{selectedLeadDetails.mobile || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Email:</span>
+    <span class="detail-value">{{selectedLeadDetails.email || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Life Stage:</span>
+    <span class="detail-value">{{selectedLeadDetails.lifeStage || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Deal Status:</span>
+    <span class="detail-value">{{selectedLeadDetails.dealStatus || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Source:</span>
+    <span class="detail-value">{{selectedLeadDetails.source || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Priority:</span>
+    <span class="detail-value">{{selectedLeadDetails.priority || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Assigned To:</span>
+    <span class="detail-value">{{selectedLeadDetails.assignedTo || 'Not available'}}</span>
+  </div>
+  <div class="detail-row">
+    <span class="detail-label">Created Date:</span>
+    <span class="detail-value">
+      {{(selectedLeadDetails.createdAt | date:'mediumDate') || 'Not available'}}
+    </span>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" (click)="closeLeadDetailsPopup()">Close</button>
+  </div>
+</div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- <div class="search-container">
+  <input 
+    type="text" 
+    [(ngModel)]="searchQuery" 
+    (input)="onSearchInput()" 
+    (focus)="searchQuery && searchQuery.length >= 2 ? showSearchDropdown = true : null"
+    (blur)="onSearchBlur()"
+    placeholder="Search products..."
+    class="search-input"
+  >
+  
+  <div *ngIf="showSearchDropdown && searchResults.length" class="search-dropdown">
+    <div 
+      *ngFor="let product of searchResults" 
+      (click)="selectProduct(product)"
+      class="dropdown-item"
+    >
+      {{ product.productName }} ({{ product.sku }})
+    </div>
+  </div>
+</div>
+<div class="selected-products-container" *ngIf="selectedProducts.length > 0">
+    <div class="selected-product-tag" *ngFor="let product of selectedProducts">
+      {{ product.productName || product.name }}
+      <span class="remove-product" (click)="removeSelectedProduct(product)">×</span>https://one.istellar.in/home#
+    </div>
+  </div> -->

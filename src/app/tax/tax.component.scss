@@ -1,0 +1,226 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    gap: 30px;
+  }
+  
+  .box {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+  }
+  /* tax.component.scss */
+.sort-icon {
+  display: inline-flex;
+  flex-direction: column;
+  margin-left: 5px;
+  
+  i {
+    font-size: 12px;
+    line-height: 0.8;
+    color: #ccc;
+    
+    &.active {
+      color: #333;
+    }
+    
+    &:first-child {
+      margin-bottom: 1px;
+    }
+  }
+}
+
+th {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+}
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  
+  .header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #333;
+  }
+  
+  .btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+  
+  .add-btn {
+    background: #4CAF50;
+    color: white;
+  }
+  
+  .add-btn:hover {
+    background: #3e8e41;
+  }
+  
+  .form-container {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+  }
+  
+  .form-container h4 {
+    margin-top: 0;
+    color: #444;
+    font-size: 1.2rem;
+  }
+  
+  .form {
+    display: grid;
+    gap: 15px;
+  }
+  
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  
+  .form-group label {
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  
+  .form-group select[multiple] {
+    min-height: 100px;
+  }
+  
+  .checkbox {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .checkbox input {
+    margin: 0;
+  }
+  
+  .form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .save-btn {
+    background: #2196F3;
+    color: white;
+  }
+  
+  .save-btn:hover {
+    background: #0b7dda;
+  }
+  
+  .cancel-btn {
+    background: #f44336;
+    color: white;
+  }
+  
+  .cancel-btn:hover {
+    background: #da190b;
+  }
+  
+  .table-wrapper {
+    overflow-x: auto;
+    margin-top: 20px;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f5f5f5;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  tr:hover {
+    background-color: #f9f9f9;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .container {
+      padding: 15px;
+      gap: 20px;
+    }
+    
+    .box {
+      padding: 15px;
+    }
+    
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group select {
+      width: 100%;
+    }
+    
+    th, td {
+      padding: 8px 10px;
+    }
+  }.actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .edit-btn {
+    background-color: #ffc107;
+    color: #212529;
+    &:hover {
+      background-color: #e0a800;
+    }
+  }
+  
+  .delete-btn {
+    background-color: #dc3545;
+    color: white;
+    &:hover {
+      background-color: #c82333;
+    }
+  }
+  
+  /* Keep all your existing styles and add these new ones */

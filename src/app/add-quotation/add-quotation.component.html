@@ -1,0 +1,236 @@
+<!-- add-quotation.component.html -->
+<div class="quotation-container">
+  <h1>{{ isEditMode ? 'Edit' : 'Add' }} Quotation</h1>
+
+  <form (ngSubmit)="onSave()" #quotationForm="ngForm">
+    
+    <!-- Container 1: Customer Information -->
+    <div class="container border p-3 mb-4 rounded bg-white">
+      
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="customer" class="form-label">Customer:*</label>
+          <select id="customer" name="customer" [(ngModel)]="quotation.customer" required class="form-control">
+            <option value="">Select Customer</option>
+            <option *ngFor="let customer of customers" [value]="getCustomerDisplayName(customer)">
+              {{ getCustomerDisplayName(customer) }}
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="payTerm" class="form-label">Pay Term:</label>
+          <select id="payTerm" name="payTerm" [(ngModel)]="quotation.payTerm" class="form-select">
+            <option value="">Please Select</option>
+            <option value="7">7 Days</option>
+            <option value="15">15 Days</option>
+            <option value="30">30 Days</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="billingAddress" class="form-label">Billing Address:</label>
+          <input id="billingAddress" type="text" name="billingAddress" [(ngModel)]="quotation.billingAddress" 
+                 class="form-control" [readonly]="quotation.walkInCustomer" />
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="shippingAddress" class="form-label">Shipping Address:</label>
+          <input id="shippingAddress" type="text" name="shippingAddress" [(ngModel)]="quotation.shippingAddress" 
+                 class="form-control" [readonly]="quotation.walkInCustomer" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <div class="form-check">
+            <input id="walkInCustomer" type="checkbox" name="walkInCustomer" [(ngModel)]="quotation.walkInCustomer" 
+                   (change)="toggleWalkInCustomer()" class="form-check-input" />
+            <label for="walkInCustomer" class="form-check-label">Walk-In Customer</label>
+          </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="saleDate" class="form-label">Sale Date:*</label>
+          <input id="saleDate" type="datetime-local" name="saleDate" [(ngModel)]="quotation.saleDate" 
+                 required class="form-control" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="invoiceNo" class="form-label">Invoice No.:</label>
+          <input id="invoiceNo" type="text" name="invoiceNo" [(ngModel)]="quotation.invoiceNo" 
+                 placeholder="Keep blank to auto-generate" class="form-control" />
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="attachDocument" class="form-label">Attach Document:</label>
+          <input id="attachDocument" type="file" name="attachDocument" 
+                 (change)="onFileChange($event, 'attachDocument')" class="form-control" />
+          <small class="form-text text-muted">Max 5MB. Allowed: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container 2: Products Information -->
+    <div class="container border p-3 mb-4 rounded bg-white">
+
+      <div class="mb-3">
+        <label for="productSearch" class="form-label">Search Product:</label>
+        <input id="productSearch" type="text" class="form-control" placeholder="Enter product name/SKU/barcode" />
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Product*</th>
+              <th>Quantity*</th>
+              <th>Unit Price*</th>
+              <th>Discount</th>
+              <th>Subtotal</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of quotation.salesOrder; let i = index">
+              <td>
+                <!-- Modified to use dropdown selection for products -->
+                <select [(ngModel)]="item.productId" name="productId{{i}}" 
+                       class="form-control" required (change)="onProductSelected(i, item.productId)">
+                  <option value="">Select Product</option>
+                  <option *ngFor="let product of products" [value]="product.id">
+                    {{ product.productName }} ({{ product.sku }})
+                  </option>
+                </select>
+              </td>
+              <td>
+                <input type="number" [(ngModel)]="item.quantity" name="quantity{{i}}" 
+                       (input)="updateSubtotal(i)" min="1" class="form-control" required />
+              </td>
+              <td>
+                <input type="number" [(ngModel)]="item.unitPrice" name="unitPrice{{i}}" 
+                       (input)="updateSubtotal(i)" min="0" step="0.01" class="form-control" required />
+              </td>
+              <td>
+                <input type="number" [(ngModel)]="item.discount" name="discount{{i}}" 
+                       (input)="updateSubtotal(i)" min="0" class="form-control" />
+              </td>
+              <td class="align-middle">
+                {{ item.subtotal | currency:'USD':'symbol':'1.2-2' }}
+              </td>
+              <td class="align-middle">
+                <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)" 
+                        *ngIf="quotation.salesOrder.length > 1">
+                  Remove
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-sm" (click)="addProduct()">
+        + Add Product
+      </button>
+    </div>
+
+    <!-- Container 3: Pricing Information -->
+    <div class="container border p-3 mb-4 rounded bg-white">
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="discountType" class="form-label">Discount Type:</label>
+          <select id="discountType" name="discountType" [(ngModel)]="quotation.discountType" 
+                  (change)="calculateTotal()" class="form-select">
+            <option value="percentage">Percentage</option>
+            <option value="fixed">Fixed Amount</option>
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="discountAmount" class="form-label">Discount Amount:</label>
+          <input id="discountAmount" type="number" name="discountAmount" [(ngModel)]="quotation.discountAmount" 
+                 (input)="calculateTotal()" min="0" class="form-control" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="orderTax" class="form-label">Order Tax:</label>
+          <select id="orderTax" name="orderTax" [(ngModel)]="quotation.orderTax" 
+                  (change)="calculateTotal()" class="form-select">
+            <option value="none">None</option>
+            <option value="5">5%</option>
+            <option value="10">10%</option>
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="shippingCharges" class="form-label">Shipping Charges:</label>
+          <input id="shippingCharges" type="number" name="shippingCharges" [(ngModel)]="quotation.shippingCharges" 
+                 (input)="calculateTotal()" min="0" class="form-control" />
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label for="sellNote" class="form-label">Sell Note:</label>
+        <textarea id="sellNote" name="sellNote" [(ngModel)]="quotation.sellNote" 
+                  class="form-control" rows="3"></textarea>
+      </div>
+    </div>
+
+    <!-- Container 4: Shipping Information -->
+    <div class="container border p-3 mb-4 rounded bg-white">
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="shippingStatus" class="form-label">Shipping Status:</label>
+          <select id="shippingStatus" name="shippingStatus" [(ngModel)]="quotation.shippingStatus" class="form-select">
+            <option value="">Please Select</option>
+            <option value="pending">Pending</option>
+            <option value="shipped">Shipped</option>
+            <option value="delivered">Delivered</option>
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="deliveredTo" class="form-label">Delivered To:</label>
+          <input id="deliveredTo" type="text" name="deliveredTo" [(ngModel)]="quotation.deliveredTo" class="form-control" />
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label for="deliveryPerson" class="form-label">Delivery Person:</label>
+          <input id="deliveryPerson" type="text" name="deliveryPerson" [(ngModel)]="quotation.deliveryPerson" class="form-control" />
+        </div>
+
+        <div class="col-md-6 mb-3">
+          <label for="shippingDocuments" class="form-label">Shipping Documents:</label>
+          <input id="shippingDocuments" type="file" name="shippingDocuments" 
+                 (change)="onFileChange($event, 'shippingDocuments')" class="form-control" />
+          <small class="form-text text-muted">Max 5MB. Allowed: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Total Payable -->
+    <div class="container border p-3 mb-4 rounded bg-white text-center">
+      <h3>Total Payable: <span class="text-success">{{ quotation.totalPayable | currency:'USD':'symbol':'1.2-2' }}</span></h3>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="button-group text-center">
+      <button type="submit" class="btn btn-primary px-4 me-2">
+        {{ isEditMode ? 'Update' : 'Save' }}
+      </button>
+      <button *ngIf="isEditMode" type="button" (click)="onDelete()" class="btn btn-danger px-4">
+        Delete
+      </button>
+    </div>
+  </form>
+</div>

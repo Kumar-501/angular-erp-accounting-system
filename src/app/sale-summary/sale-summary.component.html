@@ -1,0 +1,114 @@
+<!-- sale-summary.component.html -->
+<div class="container-fluid p-4">
+  <!-- Main Header -->
+  <h2 class="mb-4 text-dark fw-semibold">Sales Summary by Service</h2>
+  
+  <!-- Export Section -->
+  <div class="card mb-4 border">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-12 text-end">
+          <button class="btn btn-success" (click)="exportAsCSV()">
+            <i class="bi bi-download me-1"></i> Export to CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Table Section -->
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" id="summaryTable">
+      <thead class="table-header">
+        <tr>
+          <th class="fw-semibold text-dark">S.No</th>
+          <th *ngIf="isColumnVisible('service.name')" class="fw-semibold text-dark">
+            Service Name <i class="bi bi-caret-up-fill ms-1"></i>
+          </th>
+          <th *ngIf="isColumnVisible('service.description')" class="fw-semibold text-dark">Description</th>
+          <th *ngIf="isColumnVisible('salesCount')" class="text-end fw-semibold text-dark">
+            Sales Count <i class="bi bi-caret-down-fill ms-1"></i>
+          </th>
+          <th *ngIf="isColumnVisible('totalValue')" class="text-end fw-semibold text-dark">
+            Total Value <i class="bi bi-caret-down-fill ms-1"></i>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="loading">
+          <td [attr.colspan]="getVisibleColumnsCount() + 1" class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            Loading data...
+          </td>
+        </tr>
+
+        <tr *ngIf="!loading && filteredSummaries.length === 0">
+          <td [attr.colspan]="getVisibleColumnsCount() + 1" class="text-center py-4 text-muted">
+            No data available
+          </td>
+        </tr>
+
+        <tr *ngFor="let summary of filteredSummaries; let i = index" 
+            [class]="i % 2 === 0 ? 'table-row-even' : 'table-row-odd'">
+          <td class="fw-medium text-dark">{{i + 1}}</td>
+          <td *ngIf="isColumnVisible('service.name')" class="text-primary fw-medium">{{summary.service.name}}</td>
+          <td *ngIf="isColumnVisible('service.description')">{{summary.service.description || '-'}}</td>
+          <td *ngIf="isColumnVisible('salesCount')" class="text-end fw-medium">{{summary.salesCount}}</td>
+          <td *ngIf="isColumnVisible('totalValue')" class="text-end fw-medium">
+            {{summary.totalValue | currency:'INR':'symbol':'1.2-2'}}
+          </td>
+        </tr>
+        
+        <!-- Total Row -->
+        <tr class="table-total-row" *ngIf="!loading && filteredSummaries.length > 0">
+          <td></td>
+          <td *ngIf="isColumnVisible('service.name')"></td>
+          <td *ngIf="isColumnVisible('service.description')"></td>
+          <td *ngIf="isColumnVisible('salesCount')" class="text-end fw-bold text-dark">Totals: {{ getTotalSales() }}</td>
+          <td *ngIf="isColumnVisible('totalValue')" class="text-end fw-bold text-dark">
+            {{ getTotalValue() | currency:'INR':'symbol':'1.2-2' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Hidden controls for existing functionality -->
+  <div class="d-none">
+    <div class="input-group">
+      <input type="text" class="form-control" [(ngModel)]="searchText" (keyup)="filterData()">
+      <button class="btn btn-outline-secondary" (click)="clearSearch()" *ngIf="searchText">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" (click)="toggleColumnVisibility()">
+        <i class="bi bi-eye"></i> Columns
+      </button>
+      <ul class="dropdown-menu" [class.show]="showColumnVisibility">
+        <li *ngFor="let col of columns">
+          <div class="dropdown-item">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" 
+                     [(ngModel)]="col.visible" id="col-{{col.field}}">
+              <label class="form-check-label" for="col-{{col.field}}">
+                {{col.header}}
+              </label>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    
+    <div class="dropdown">
+      <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+        <i class="bi bi-download"></i> Export
+      </button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" (click)="exportAsExcel()">Excel</a></li>
+        <li><a class="dropdown-item" (click)="print()">Print</a></li>
+      </ul>
+    </div>
+  </div>
+</div>

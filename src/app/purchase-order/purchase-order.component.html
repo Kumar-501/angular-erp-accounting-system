@@ -1,0 +1,401 @@
+<div class="purchase-order-container">
+  <h1>Purchase Order</h1>
+  
+  <div class="filter-controls">
+    <div class="entries-control">
+      <span>Show</span>
+      <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <span>entries</span>
+    </div>
+    
+    <div class="export-buttons">
+      <button class="export-button" (click)="exportCSV()">Export CSV</button>
+      <button class="export-button" (click)="exportExcel()">Export Excel</button>
+      <button class="export-button" (click)="print()">Print</button>
+      <button class="export-button" (click)="exportPDF()">Export PDF</button>
+      <button class="export-button" (click)="toggleColumnVisibility()">Column Visibility</button>
+      <button class="add-order-button" (click)="addPurchaseOrder()">+ Add Purchase Order</button>
+      <button class="filter-toggle-button" (click)="toggleFilterSidebar()">
+        <i class="fa fa-filter"></i> Filters
+      </button>
+    </div>
+    
+    <!-- Column Visibility Dropdown -->
+    <div class="column-visibility-dropdown" *ngIf="showColumnVisibility">
+      <div class="dropdown-content">
+        <ul class="column-list">
+          <li *ngFor="let column of columns" class="column-item">
+            <label>
+              <input type="checkbox" 
+                     [checked]="column.visible" 
+                     (change)="updateColumnVisibility(column)"
+                     [disabled]="column.visible && !hasVisibleColumns()">
+              {{ column.name }}
+            </label>
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="search-box">
+      <input type="text" placeholder="Search..." [(ngModel)]="searchTerm" (input)="onSearch($event)" />
+    </div>
+  </div>
+  
+  <!-- Filter Sidebar -->
+  <div class="filter-sidebar" [class.active]="showFilterSidebar">
+    <div class="sidebar-header">
+      <h3>Filters</h3>
+      <button class="close-sidebar" (click)="toggleFilterSidebar()">&times;</button>
+    </div>
+    
+    <div class="sidebar-content">
+      <!-- Date Filter -->
+      <div class="filter-group">
+        <label>Date Range:</label>
+        <div class="date-filter-container">
+          <div class="input-group">
+            <input type="text" class="form-control date-range-input" 
+                  [value]="dateRangeLabel || 'Select date range'" 
+                  readonly (click)="toggleDateDrawer()">
+            <button class="btn btn-outline-secondary date-filter-button" (click)="toggleDateDrawer()">
+            </button>
+          </div>
+          
+          <!-- Date Filter Drawer -->
+          <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+            <div class="drawer-header">
+              <h5>Date Range Filter</h5>
+              <button class="btn-close" (click)="toggleDateDrawer()"></button>
+            </div>
+            
+            <div class="drawer-body">
+              <!-- Predefined Date Ranges -->
+         <!-- In your date filter drawer section -->
+<div class="date-options">
+  <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+    <span>Today</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+    <span>Yesterday</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+    <span>Last 7 Days</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+    <span>Last 30 Days</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+    <span>Last Month</span>
+  </div>
+  <!-- Add these new options -->
+  <div class="date-option" [class.active]="selectedRange === 'thisMonth'" (click)="filterByDate('thisMonth')">
+    <span>This Month</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'thisFinancialYear'" (click)="filterByDate('thisFinancialYear')">
+    <span>This Financial Year</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'lastFinancialYear'" (click)="filterByDate('lastFinancialYear')">
+    <span>Last Financial Year</span>
+  </div>
+  <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+    <span>Custom Range</span>
+  </div>
+</div>
+              
+              <!-- Custom Date Range Picker -->
+              <div class="custom-date-container" *ngIf="isCustomDate">
+                <div class="mb-3">
+                  <label class="form-label">From Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="fromDate">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">To Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="toDate">
+                </div>
+              </div>
+            </div>
+            
+            <div class="drawer-footer" *ngIf="isCustomDate">
+              <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+              <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+            </div>
+          </div>
+          
+          <!-- Backdrop when drawer is open -->
+          <div class="drawer-backdrop" [class.backdrop-visible]="isDateDrawerOpen" (click)="toggleDateDrawer()"></div>
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <label for="businessLocation">Business Location:</label>
+        <select id="businessLocation" [(ngModel)]="selectedLocation" (change)="applyFilters()">
+          <option *ngFor="let location of businessLocations" [value]="location">{{ location }}</option>
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label for="supplier">Supplier:</label>
+        <div class="searchable-dropdown">
+          <input type="text" 
+                [(ngModel)]="supplierSearchTerm" 
+                (input)="filterSuppliers()"
+                (focus)="showSupplierDropdown = true"
+                placeholder="Type to search suppliers...">
+          
+          <div class="dropdown-options" *ngIf="showSupplierDropdown">
+            <div *ngFor="let supplier of filteredSuppliers" 
+                (click)="selectSupplier(supplier)"
+                [class.selected]="selectedSupplier === supplier">
+              {{ supplier }}
+            </div>
+            <div *ngIf="filteredSuppliers.length === 0" class="no-results">
+              No matching suppliers found
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <label for="status">Status:</label>
+        <select id="status" [(ngModel)]="selectedStatus" (change)="applyFilters()">
+          <option *ngFor="let status of statuses" [value]="status">{{ status }}</option>
+        </select>
+      </div>
+      
+      <div class="filter-actions">
+        <button class="apply-filters" (click)="applyFilters()">Apply Filters</button>
+        <button class="reset-filters" (click)="resetFilters()">Reset</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Main Table -->
+ <div class="table-responsive">
+  <table class="purchase-order-table">
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th *ngIf="columns[0].visible" (click)="sortTable('date')">
+          Date <i class="fa" [ngClass]="getSortIcon('date')"></i>
+        </th>
+        <th *ngIf="columns[1].visible" (click)="sortTable('referenceNo')">
+          Reference No <i class="fa" [ngClass]="getSortIcon('referenceNo')"></i>
+        </th>
+        <th *ngIf="columns[4].visible" (click)="sortTable('locationName')">
+          Location <i class="fa" [ngClass]="getSortIcon('locationName')"></i>
+        </th>
+        <th *ngIf="columns[5].visible" (click)="sortTable('status')">
+          Status <i class="fa" [ngClass]="getSortIcon('status')"></i>
+        </th>
+        <th *ngIf="columns[6].visible" (click)="sortTable('shippingStatus')">
+          Shipping Status <i class="fa" [ngClass]="getSortIcon('shippingStatus')"></i>
+        </th>
+        <th *ngIf="columns[9].visible" (click)="sortTable('supplierName')">
+          Supplier <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
+        </th>
+        <th *ngIf="columns[14].visible" (click)="sortTable('unitPurchasePrice')">
+          Unit Purchase Price <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
+        </th>
+        <th *ngIf="columns[11].visible" (click)="sortTable('items')">
+          Products <i class="fa" [ngClass]="getSortIcon('items')"></i>
+        </th>
+        <th *ngIf="columns[12].visible" (click)="sortTable('totalQuantity')">
+          Total Required Qty <i class="fa" [ngClass]="getSortIcon('totalQuantity')"></i>
+        </th>
+        <th *ngIf="columns[13].visible" (click)="sortTable('currentStock')">
+          Quantity Remaining <i class="fa" [ngClass]="getSortIcon('currentStock')"></i>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let order of filteredOrders.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage); trackBy: trackByFn">
+        <td>
+          <div class="action-dropdown">
+            <button class="action-button" (click)="toggleActionMenu(order.id, $event)">Actions</button>
+            <div class="action-menu" *ngIf="activeActionMenu === order.id">
+              <button (click)="viewOrder(order)">View</button>
+              <button (click)="editOrder(order)">Edit</button>
+              <button (click)="printOrder(order)">Print</button>
+              <button (click)="downloadPdf(order)">Download PDF</button>
+              <button (click)="deleteOrder(order)">Delete</button>
+              <button (click)="openStatusModal(order, 'statusModal')">Edit Shipping Status</button>
+            </div>
+          </div>
+        </td>
+        <td *ngIf="columns[0].visible">{{ order.date | date }}</td>
+        <td *ngIf="columns[1].visible">{{ order.referenceNo }}</td>      
+        <td *ngIf="columns[4].visible">{{ order.locationName }}</td>
+        <td *ngIf="columns[5].visible">
+          <span class="status-badge" [ngClass]="order.status | lowercase">
+            {{ order.status }}
+          </span>
+        </td>
+        <td *ngIf="columns[6].visible">
+          <span class="status-badge" [ngClass]="order.shippingStatus | lowercase">
+            {{ order.shippingStatus }}
+          </span>
+        </td>
+        <td *ngIf="columns[9].visible">{{ order.supplierName || 'N/A' }}</td>
+        
+        <td *ngIf="columns[14].visible">
+          <div *ngIf="order.items && order.items.length > 0">
+            <span *ngFor="let item of order.items; let last = last">
+              {{ item.unitCost | currency:'INR'}}{{ !last ? ', ' : '' }}
+            </span>
+          </div>
+          <div *ngIf="!order.items || order.items.length === 0">
+            N/A
+          </div>
+        </td>  
+<td *ngIf="columns[11].visible">
+  <div *ngIf="order.items && order.items.length > 0">
+    <span *ngFor="let item of order.items; let last = last">
+      {{ item.productName }} ({{ item.requiredQuantity || item.quantity }}){{ !last ? ', ' : '' }}
+    </span>
+  </div>
+  <div *ngIf="!order.items || order.items.length === 0">
+    No products
+  </div>
+</td>
+    <td *ngIf="columns[12].visible">
+  {{ calculateTotalRequiredQuantity(order.items) }}
+</td>
+   <td *ngIf="columns[13].visible">
+  <div *ngIf="order.items && order.items.length > 0">
+    <span *ngFor="let item of order.items; let last = last">
+      {{ item.currentStock || 0 }}{{ !last ? ', ' : '' }}
+    </span>
+  </div>
+  <div *ngIf="!order.items || order.items.length === 0">
+    N/A
+  </div>
+</td>
+      </tr>
+      <tr *ngIf="filteredOrders.length === 0">
+        <td [attr.colspan]="getVisibleColumnsCount() + 1" class="text-center">No records found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+  <!-- Status Modal -->
+  <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="statusModalLabel">Edit Shipping - {{selectedOrderForEdit?.referenceNo}}</h5>
+          <button type="button" class="btn-close" (click)="closeStatusModal()" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="shipping-details-section">
+            <div class="mb-3">
+              <label class="form-label">Shipping Status:</label>
+              <div class="status-dropdown">
+                <select id="shippingStatus" [(ngModel)]="selectedShippingStatusForEdit" class="d-none">
+          <option value="All">All</option>
+    <option value="Pending">Pending</option>
+    <option value="Processing">Processing</option>
+    <option value="Packed">Packed</option>
+    <option value="Shipped">Shipped</option>
+    <option value="Onhold">Onhold</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Reached hub">Reached hub</option>
+    <option value="Out for delivery">Out for delivery</option>
+    <option value="Returned">Returned</option>
+    <option value="Cancelled">Cancelled</option>
+    <option value="Delivered">Delivered</option>
+                </select>
+                
+                <div class="dropdown">
+                  <button class="btn dropdown-toggle status-toggle" type="button" data-bs-toggle="dropdown">
+                    <span class="status-badge" [ngClass]="selectedShippingStatusForEdit | lowercase">
+                      {{ selectedShippingStatusForEdit || 'Select Status' }}
+                    </span>
+                  </button>
+                 <ul class="dropdown-menu">
+  <li *ngFor="let status of ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled','Onhold','Reached hub','Out for delivery','Returned','Packed','Ordered']">
+    <a class="dropdown-item" (click)="selectedShippingStatusForEdit = status">
+      <span class="status-badge" [ngClass]="status.toLowerCase()">{{ status }}</span>
+    </a>
+  </li>
+</ul>
+
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="deliveredTo" class="form-label">Delivered To (Business Location):</label>
+              <input type="text" class="form-control" id="deliveredTo" [(ngModel)]="selectedDeliveredTo" 
+                    placeholder="Enter business location">
+            </div>
+            
+            <div class="mb-3">
+              <label for="deliveryPerson" class="form-label">Delivery Person:</label>
+              <select class="form-select" id="deliveryPerson" [(ngModel)]="selectedDeliveryPerson">
+                <option value="">Please Select</option>
+                <option *ngFor="let person of deliveryPersons" [value]="person">{{person}}</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="shippingNote" class="form-label">Shipping note:</label>
+              <textarea class="form-control" id="shippingNote" rows="3" [(ngModel)]="shippingNote"></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">Shipping Documents:</label>
+              <div class="file-upload-container">
+                <input type="file" id="shippingDocuments" (change)="onFileSelected($event)" multiple>
+                <label for="shippingDocuments" class="file-upload-label">
+                  <span>Drop files here to upload</span>
+                </label>
+                <div *ngIf="uploadedFiles.length > 0" class="uploaded-files">
+                  <div *ngFor="let file of uploadedFiles" class="uploaded-file">
+                    {{file.name}}
+                  </div>
+                </div>
+                <div *ngIf="uploadedFiles.length === 0" class="no-attachment">
+                  No attachment found
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="activities-section">
+            <h6>Activities:</h6>
+            <table class="activities-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Action</th>
+                  <th>By</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngIf="shippingActivities.length === 0">
+                  <td colspan="4" class="text-center">No records found</td>
+                </tr>
+                <tr *ngFor="let activity of shippingActivities">
+                  <td>{{activity.date | date:'short'}}</td>
+                  <td>{{activity.action}}</td>
+                  <td>{{activity.by}}</td>
+                  <td>{{activity.note}}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeStatusModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" (click)="saveShippingStatusChanges()">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

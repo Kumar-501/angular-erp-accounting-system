@@ -1,0 +1,712 @@
+<style>
+  .table-responsive {
+  overflow-x: auto; /* Keep horizontal scroll if needed */
+  overflow-y: hidden; /* Remove vertical scroll */
+  -webkit-overflow-scrolling: touch;
+}
+</style>
+
+
+<div class="suppliers-container">
+  <div class="suppliers-header">
+    <h3>Suppliers</h3>
+    <p>Manage your Suppliers</p>
+  </div>
+  <!-- Add this below your content-header section -->
+<!-- Your existing content header section -->
+
+<!-- Add a filter button that toggles the filters section -->
+<!-- Add this right after the opening <div class="suppliers-container"> -->
+<div class="filter-overlay" [class.show]="isFilterVisible" (click)="toggleFilters()"></div>
+
+<!-- Replace your current filter button and section with this -->
+<div class="filter-button-container">
+  <button class="btn-filter" (click)="toggleFilters()">
+    <i class="fa fa-filter"></i> Filters
+  </button>
+</div>
+
+<div class="filters-section" [class.show]="isFilterVisible">
+  <h3>Filters</h3>
+<!-- Add this inside your filters-section div, after the existing filters -->
+ <!-- Add this near your other filter controls -->
+<div class="filter-drawer-container">
+  <!-- Drawer Trigger Button -->
+<div class="input-group">
+  <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
+         readonly (click)="toggleDateDrawer()">
+  <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
+    <i class="fas fa-calendar-alt"></i>
+  </button>
+</div>
+  
+  <!-- Drawer Panel -->
+  <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+    <div class="drawer-header">
+      <h5>Date Range Filter</h5>
+      <button class="btn-close" (click)="toggleDateDrawer()"></button>
+    </div>
+    
+    <div class="drawer-body">
+      <!-- Predefined Date Ranges -->
+      <div class="date-options">
+        <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+          <span>Today</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+          <span>Yesterday</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+          <span>Last 7 Days</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+          <span>Last 30 Days</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+          <span>Last Month</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+          <span>Custom Range</span>
+        </div>
+      </div>
+      
+      <!-- Custom Date Range Picker -->
+      <div class="custom-date-container" *ngIf="isCustomDate">
+        <div class="mb-3">
+          <label class="form-label">From Date</label>
+          <input type="date" class="form-control" [(ngModel)]="fromDate">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">To Date</label>
+          <input type="date" class="form-control" [(ngModel)]="toDate">
+        </div>
+      </div>
+    </div>
+    
+    <div class="drawer-footer" *ngIf="isCustomDate">
+      <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+      <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+    </div>
+  </div>
+  <!-- Backdrop when drawer is open -->
+  <div class="drawer-backdrop" [ngClass]="{'backdrop-visible': isDrawerOpen}" (click)="toggleDrawer()"></div>
+</div>
+
+  <!-- Dropdown Filters -->
+  <div class="dropdown-filters">
+    <div class="filter-group">
+      <label>Assigned to:</label>
+      <select [(ngModel)]="filterOptions.assignedTo" (change)="applyFilters()">
+        <option value="">All</option>
+        <option *ngFor="let user of assignedUsers" [value]="user.id">{{user.username}}</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label>Status:</label>
+      <select [(ngModel)]="filterOptions.status" (change)="applyFilters()">
+        <option value="">All</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </div>
+    
+  
+</div>
+  </div>
+  
+  <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
+</div>
+
+  <!-- Main Content Section -->
+  <div class="main-content">
+    <div class="content-header">
+      <h2>All your Suppliers</h2>
+      <button class="btn-add" (click)="toggleForm()">
+        <i class="fa fa-plus"></i> Add
+      </button>
+    </div>
+    
+    <!-- Table Controls -->
+    <div class="table-controls">
+      <div class="entries-control">
+        Show 
+        <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select> 
+        entries
+      </div>
+      
+      <div class="export-controls">
+        <button class="btn-export" (click)="exportCSV()">
+          <i class="fa fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn-export" (click)="exportExcel()">
+          <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+      
+ <div class="search-container">
+  <input type="text" [(ngModel)]="searchTerm" 
+         (ngModelChange)="applyFilters()" 
+         placeholder="Search suppliers...">
+</div>
+    </div>
+    
+    <!-- Suppliers Table -->
+    <div class="table-responsive">
+      <table class="suppliers-table">
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th (click)="sortBy('contactId')">Contact ID</th>
+<th (click)="sortBy('createdAt')">Created Date</th>
+
+            <th (click)="sortBy('businessName')">Business Name</th>
+            <th (click)="sortBy('firstName')">Name</th>
+            <th (click)="sortBy('email')">Email</th>
+            <th (click)="sortBy('taxNumber')">Tax Number</th>
+            <th (click)="sortBy('payTerm')">Pay Term</th>
+            <th (click)="sortBy('openingBalance')">Opening Balance</th>
+            <th (click)="sortBy('city')">Address</th>
+            <th (click)="sortBy('mobile')">Mobile</th>
+            <th (click)="sortBy('landline')">Landline</th>
+            <th (click)="sortBy('alternateContact')">Alternate Contact</th>
+            <th (click)="sortBy('assignedTo')">Assigned To</th>
+            <th (click)="sortBy('prefix')">Prefix</th>
+            <th (click)="sortBy('middleName')">Middle Name</th>
+            <th (click)="sortBy('dob')">Date of Birth</th>
+            <th (click)="sortBy('addressLine1')">Address Line 1</th>
+            <th (click)="sortBy('addressLine2')">Address Line 2</th>
+            <th (click)="sortBy('state')">State</th>
+
+            <th (click)="sortBy('country')">Country</th>
+            <th (click)="sortBy('zipCode')">Zip Code</th>
+            <th (click)="sortBy('contactType')">Contact Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let supplier of paginatedSuppliers">
+            <td>
+       <!-- suppliers.component.html -->
+<!-- Add this to the dropdown actions section -->
+<div class="dropdown">
+    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+            type="button" style="height: 27px;
+    width: 83px;
+    color: aliceblue;
+    background-color: rgb(74, 195, 211);"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            (click)="$event.stopPropagation()">
+      Actions
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <li>
+        <a class="dropdown-item" (click)="editSupplier(supplier)">
+          <i class="fa fa-edit me-2"></i> Edit
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item text-danger" (click)="deleteSupplier(supplier.id)">
+          <i class="fa fa-trash me-2"></i> Delete
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item" (click)="addPayment(supplier)">
+          <i class="fas fa-money-bill-wave text-success me-2"></i> Add Payment
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item" [routerLink]="['/suppliers', supplier.id]">
+          <i class="fa fa-eye me-2"></i> View
+        </a>
+      </li>
+  
+      <li>
+        <a class="dropdown-item" (click)="viewPurchases(supplier)">
+          <i class="fa fa-list-alt me-2"></i> Purchases
+        </a>
+      </li>
+      <li>
+        <a class="dropdown-item" (click)="viewPaymentHistory(supplier)">
+          <i class="fa fa-history me-2"></i> Payment History
+        </a>
+      </li>
+    </ul>
+  </div>
+            </td>
+            <td>{{ supplier.contactId }}</td>
+<!-- In your suppliers.component.html -->
+<td>{{ supplier.createdAt ? (supplier.createdAt | date:'medium') : '' }}</td>
+            <td>{{ !supplier.isIndividual ? supplier.businessName : '' }}</td>
+            
+<td>
+  <div [class]="'status-badge ' + (supplier.status === 'Active' ? 'active' : 'inactive')">
+    {{ supplier.status || 'Inactive' }}
+  </div>
+  <div>
+    {{ supplier.isIndividual ? (supplier.firstName + ' ' + (supplier.lastName || '')) : '' }}
+  </div>
+</td>
+
+
+
+            <td>{{ supplier.email }}</td>
+            <td>{{ supplier.taxNumber }}</td>
+            <td>{{ supplier.payTerm }} Days</td>
+            <td>₹ {{ supplier.openingBalance || '0.00' }}</td>
+            <td>{{ supplier.city }}</td>
+            <td>{{ supplier.mobile }}</td>
+            <td>{{ supplier.landline }}</td>
+            <td>{{ supplier.alternateContact }}</td>
+<td>{{ getAssignedUserName(supplier.assignedTo ?? '') }}</td>
+          <td>{{ supplier.prefix }}</td>
+            <td>{{ supplier.middleName }}</td>
+            <td>{{ supplier.dob | date }}</td>
+            <td>{{ supplier.addressLine1 }}</td>
+            <td>{{ supplier.addressLine2 }}</td>
+<td>{{ supplier.state }}</td>
+
+            <td>{{ supplier.country }}</td>
+            <td>{{ supplier.zipCode }}</td>
+            <td>{{ supplier.contactType }}</td>
+          </tr>
+          <tr *ngIf="paginatedSuppliers.length === 0">
+            <td colspan="22" class="no-data">No suppliers found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Pagination Controls -->
+    <div class="pagination-controls">
+      <button [disabled]="currentPage <= 1" (click)="prevPage()" class="btn-page">Previous</button>
+      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <button [disabled]="currentPage >= totalPages" (click)="nextPage()" class="btn-page">Next</button>
+    </div>
+  </div>
+  
+  
+  <!-- Supplier Form Modal -->
+  <div class="modal" [class.show]="showForm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>{{ editingSupplierId ? 'Edit Supplier' : 'Add Supplier' }}</h2>
+        <span class="close" (click)="toggleForm()">&times;</span>
+      </div>
+      
+      <div class="modal-body">
+        <form [formGroup]="supplierForm" (ngSubmit)="saveSupplier()">
+          <!-- Contact Type Dropdown -->
+          <div class="form-group">
+            <label for="contactType">Contact Type:</label>
+            <select formControlName="contactType" id="contactType" (change)="onContactTypeChange()">
+              <option value="Supplier">Supplier</option>
+              <option value="Customer">Customer</option>
+              <option value="Both">Both Supplier and Customer</option>
+            </select>
+          </div>
+          
+          <!-- Individual or Business Toggle -->
+          <div class="form-group toggle-group">
+            <label>Contact is:</label>
+            <div class="toggle-buttons">
+              <label class="toggle-btn" [class.active]="isIndividual">
+                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="true"> 
+                Individual
+              </label>
+              <label class="toggle-btn" [class.active]="!isIndividual">
+                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="false"> 
+                Business
+              </label>
+            </div>
+          </div>
+          
+          <!-- Common Fields -->
+          <div class="form-group">
+            <label for="contactId">Contact ID:</label>
+            <input 
+              type="text" 
+              formControlName="contactId" 
+              id="contactId" 
+              placeholder="Auto-generated" 
+              readonly>
+          </div>
+          
+          <!-- Individual Specific Fields -->
+          <div *ngIf="isIndividual" class="individual-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="prefix">Prefix:</label>
+                <select formControlName="prefix" id="prefix">
+                  <option value="">Select</option>
+                  <option value="Mr">Mr</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Dr">Dr</option>
+                </select>
+              </div>
+              
+              <div class="form-group required">
+                <label for="firstName">First Name:</label>
+                <input 
+                  type="text" 
+                  formControlName="firstName" 
+                  id="firstName" 
+                  required 
+                  placeholder="Enter First Name" />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="middleName">Middle Name:</label>
+                <input 
+                  type="text" 
+                  formControlName="middleName" 
+                  id="middleName" 
+                  placeholder="Enter Middle Name (Optional)" />
+              </div>
+              
+              <div class="form-group">
+                <label for="lastName">Last Name:</label>
+                <input 
+                  type="text" 
+                  formControlName="lastName" 
+                  id="lastName" 
+                  placeholder="Enter Last Name" />
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="dob">Date of Birth:</label>
+              <input 
+                type="date" 
+                formControlName="dob" 
+                id="dob" />
+            </div>
+          </div>
+          
+          <!-- Business Specific Fields -->
+          <div *ngIf="!isIndividual" class="business-fields">
+            <div class="form-group required">
+              <label for="businessName">Business Name:</label>
+              <input 
+                type="text" 
+                formControlName="businessName" 
+                id="businessName" 
+                required
+                placeholder="Enter Business Name" />
+            </div>
+          </div>
+          
+          <!-- Contact Information -->
+          <h3>Contact Information</h3>
+      <div class="form-row">
+  <div class="form-group required">
+    <label for="mobile">Mobile:</label>
+    <input 
+      type="text" 
+      formControlName="mobile" 
+      id="mobile" 
+      required 
+      (blur)="validatePhoneNumber('mobile')"
+      placeholder="Enter Mobile Number (10 digits)" 
+      maxlength="10"
+      onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+    <div *ngIf="validationErrors.mobile" class="error-message">
+      {{ validationErrors.mobile }}
+    </div>
+  </div>
+            
+            <div class="form-group">
+  <label for="alternateContact">Alternate Contact:</label>
+    <input 
+      type="text" 
+      formControlName="alternateContact" 
+      id="alternateContact" 
+      (blur)="validatePhoneNumber('alternateContact')"
+      placeholder="Enter Alternate Contact Number (10 digits)"
+      maxlength="10"
+      onkeypress="return event.charCode >= 48 && event.charCode <= 57">
+    <div *ngIf="validationErrors.alternateContact" class="error-message">
+      {{ validationErrors.alternateContact }}
+    </div>
+  </div>
+</div>
+          
+          <div class="form-row">
+        
+          
+            
+            <div class="form-group">
+              <label for="email">Email:</label>
+              <input 
+                type="email" 
+                formControlName="email" 
+                id="email" 
+                placeholder="Enter Email Address" />
+            </div>
+          </div>
+          <!-- Inside your form, add this with other fields -->
+<div class="form-group">
+  <label for="createdAt">Created Date:</label>
+  <input 
+    type="datetime-local" 
+    formControlName="createdAt" 
+    id="createdAt" 
+    required>
+</div>
+          <div class="form-group">
+            <label for="assignedTo">Assigned To:</label>
+            <select formControlName="assignedTo" id="assignedTo">
+              <option value="">Select</option>
+              <option *ngFor="let user of assignedUsers" [value]="user.id">{{ user.username }}</option>
+            </select>
+          </div>
+          
+          <!-- More Information Accordion -->
+          <div class="accordion">
+            <div class="accordion-header" (click)="toggleMoreInfo()">
+              <h3>More Information</h3>
+              <span class="accordion-icon">{{ showMoreInfo ? '−' : '+' }}</span>
+            </div>
+            
+            <div class="accordion-content" [class.show]="showMoreInfo">
+              <!-- Tax Information -->
+              <h4>Tax Information</h4>
+              <div class="form-group">
+                <label for="taxNumber">Tax Number:</label>
+                <input 
+                  type="text" 
+                  formControlName="taxNumber" 
+                  id="taxNumber" 
+                  placeholder="Enter Tax Number" />
+              </div>
+              
+              <!-- Financial Information -->
+              <h4>Financial Details</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="openingBalance">Opening Balance:</label>
+                  <input 
+                    type="number" 
+                    formControlName="openingBalance" 
+                    id="openingBalance" 
+                    placeholder="0" />
+                </div>
+                
+                <div class="form-group">
+                  <label for="payTerm">Pay Term:</label>
+                  <select formControlName="payTerm" id="payTerm">
+                    <option value="0">Immediate</option>
+                    <option value="15">15 Days</option>
+                    <option value="30">30 Days</option>
+                    <option value="45">45 Days</option>
+                    <option value="60">60 Days</option>
+                    <option value="90">90 Days</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Address Information -->
+              <h4>Address</h4>
+            <!-- Example for one of the address fields - add similar to others -->
+<div class="form-group">
+  <label for="addressLine1">Address Line 1:</label>
+  <input 
+    type="text" 
+    formControlName="addressLine1" 
+    id="addressLine1" 
+    (input)="onAddressChange()"
+    placeholder="Enter Address Line 1" />
+</div>
+              
+              <div class="form-group">
+                <label for="addressLine2">Address Line 2:</label>
+                <input 
+                  type="text" 
+                  formControlName="addressLine2" 
+                  id="addressLine2" 
+                  placeholder="Enter Address Line 2" />
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="city">City:</label>
+                  <input 
+                    type="text" 
+                    formControlName="city" 
+                    id="city" 
+                    placeholder="Enter City" />
+                </div>
+                
+                <div class="form-group">
+    <label for="state">State:</label>
+    <select formControlName="state" id="state" (change)="onStateChange()">
+      <option value="">Select State</option>
+      <option value="Kerala">Kerala</option>
+      <option value="Tamil Nadu">Tamil Nadu</option>
+    </select>
+  </div>
+               <div class="form-group">
+    <label for="district">District:</label>
+    <select formControlName="district" id="district" [disabled]="!supplierForm.get('state')?.value">
+      <option value="">Select District</option>
+      <option *ngFor="let district of filteredDistricts" [value]="district">
+        {{ district }}
+      </option>
+    </select>
+  </div> </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="country">Country:</label>
+                  <input 
+                    type="text" 
+                    formControlName="country" 
+                    id="country" 
+                    placeholder="Enter Country" />
+                </div>
+                
+                <div class="form-group">
+                  <label for="zipCode">Zip Code:</label>
+                  <input 
+                    type="text" 
+                    formControlName="zipCode" 
+                    id="zipCode" 
+                    placeholder="Enter Zip Code" />
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Add this in your form, perhaps under the individual address fields -->
+<div class="form-group">
+  <label>Combined Address:</label>
+  <textarea class="form-control" readonly rows="3">{{ combinedAddress }}</textarea>
+</div>
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" (click)="toggleForm()">Cancel</button>
+            <button type="submit" class="btn-save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add this at the bottom of your list-purchase.component.html -->
+<div class="modal" [class.show]="showPaymentForm">
+  <div class="modal-content payment-modal">
+    <div class="modal-header">
+      <h2>Add Payment</h2>
+      <span class="close" (click)="closePaymentForm()">&times;</span>
+    </div>
+    
+    <div class="modal-body">
+      <form [formGroup]="paymentForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Supplier:</label>
+            <input type="text" formControlName="supplierName" readonly>
+          </div>
+          
+          <div class="form-group">
+            <label>Reference No:</label>
+            <input type="text" formControlName="referenceNo" readonly>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Payment Method:*</label>
+          <select formControlName="paymentMethod" (change)="onPaymentMethodChange()">
+            <option value="Cash">Cash</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        
+        <div class="form-group" *ngIf="paymentAccounts.length > 0">
+          <label>Payment Account:*</label>
+          <select formControlName="paymentAccount" required>
+            <option value="">Select Account</option>
+            <option *ngFor="let account of paymentAccounts" [value]="account.id">
+              {{ account.name }} ({{ account.accountNumber || 'No Account Number' }})
+            </option>
+          </select>
+        </div>
+        
+        <div class="amount-summary">
+          <div class="summary-row">
+            <span>Total Purchase:</span>
+            <span>₹ {{ paymentSummary.totalPurchase || '0.00' }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Opening Balance:</span>
+            <span>₹ {{ paymentSummary.openingBalance || '0.00' }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Total Owed:</span>
+            <span>₹ {{ (paymentSummary.totalPurchase + paymentSummary.openingBalance) || '0.00' }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Already Paid:</span>
+            <span>₹ {{ paymentSummary.totalPaid || '0.00' }}</span>
+          </div>
+          <div class="summary-row highlight">
+            <span>Balance Due:</span>
+            <span>₹ {{ ((paymentSummary.totalPurchase + paymentSummary.openingBalance) - paymentSummary.totalPaid) || '0.00' }}</span>
+          </div>
+          <div class="summary-row highlight" *ngIf="paymentForm.get('amount')?.value > 0">
+            <span>Remaining Balance:</span>
+            <span>₹ {{ calculateRemainingBalance(paymentForm.get('amount')?.value) | number:'1.2-2' }}</span>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount:*</label>
+            <input type="number" formControlName="amount" step="0.01" min="0" 
+                   [max]="paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue" required>
+          </div>
+          
+          <div class="form-group">
+            <label>Paid on:*</label>
+            <input type="datetime-local" formControlName="paidDate" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Reference Number:</label>
+            <input type="text" formControlName="reference" [value]="generateReferenceNumber()" readonly>
+        </div>
+        
+        <div class="form-group">
+          <label>Payment Note:</label>
+          <textarea formControlName="paymentNote" rows="3"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Attachment:</label>
+          <div class="file-upload">
+            <input type="file" id="paymentAttachment" (change)="onFileSelected($event)" accept=".pdf,.jpg,.jpeg,.png">
+            <label for="paymentAttachment" class="btn-upload">
+              <i class="fa fa-upload"></i> Choose File
+            </label>
+            <span class="file-name">{{ selectedFileName || 'No file chosen' }}</span>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" (click)="closePaymentForm()">Cancel</button>
+          <button type="submit" class="btn-save" (click)="submitPayment()">Save Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

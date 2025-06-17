@@ -1,0 +1,334 @@
+<div class="sales-call-container">
+  <div class="header">
+    <h2>After Sales Call by Sales</h2>
+    <div class="controls">
+      <div class="filter-control">
+        <label for="statusFilter">Filter by Status:</label>
+        <select id="statusFilter" [(ngModel)]="selectedStatus" (change)="applyFilters()">
+          <option value="">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+          <option value="Follow-up">Follow-up</option>
+          <option value="Not Interested">Not Interested</option>
+        </select>
+      </div>
+      <div class="search-control">
+        <label for="searchInput" class="sr-only">Search customers</label>
+        <input type="text" id="searchInput" [(ngModel)]="searchTerm" placeholder="Search by name or mobile..." 
+               (keyup.enter)="applyFilters()">
+        <button (click)="applyFilters()" class="search-button">
+          <i class="fa fa-search"></i> Search
+        </button>
+      </div>
+      <div class="export-controls">
+        <button (click)="exportToExcel()" class="export-button excel">
+          <i class="fa fa-file-excel-o"></i> Excel
+        </button>
+        <button (click)="printTable()" class="export-button print">
+          <i class="fa fa-print"></i> Print
+        </button>
+        <button (click)="toggleColumnDropdown()" class="column-visibility-button">
+          <i class="fa fa-columns"></i> Columns
+        </button>
+        <button (click)="toggleFilterSidebar()" class="filter-button">
+          <i class="fa fa-filter"></i> Filters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Column Visibility Dropdown -->
+  <div class="column-visibility-container">
+    <div class="column-dropdown" *ngIf="showColumnDropdown">
+      <div class="column-dropdown-header">
+        <h4>Visible Columns</h4>
+        <button (click)="resetColumnVisibility()" class="btn-reset">Reset</button>
+      </div>
+      <div class="column-options">
+        <div *ngFor="let column of allColumns" class="column-option">
+          <label>
+            <input type="checkbox" 
+                   [checked]="isColumnVisible(column.key)"
+                   (change)="toggleColumnVisibility(column.key)">
+            {{column.label}}
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bulk Actions -->
+  <div class="bulk-actions" *ngIf="selectedCalls.length > 0">
+    <span class="selected-count">{{ selectedCalls.length }} call(s) selected</span>
+    <div class="bulk-action-controls">
+      <select #bulkStatus (change)="bulkUpdateStatus(bulkStatus.value); bulkStatus.value=''" class="bulk-status-select">
+        <option value="">Update Status To...</option>
+        <option value="Pending">Pending</option>
+        <option value="Completed">Completed</option>
+        <option value="Follow-up">Follow-up</option>
+        <option value="Not Interested">Not Interested</option>
+      </select>
+      
+      <select #bulkAssign (change)="bulkAssignTo(bulkAssign.value); bulkAssign.value=''" class="bulk-assign-select">
+        <option value="">Assign To...</option>
+        <option *ngFor="let user of availableUsers" [value]="user.id">
+          {{ user.firstName }} {{ user.lastName }}
+        </option>
+      </select>
+      
+      <button (click)="clearSelection()" class="btn-clear">
+        <i class="fa fa-times"></i> Clear
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Sidebar -->
+  <div class="filter-sidebar" [class.open]="showFilterSidebar">
+    <div class="sidebar-header">
+      <h3>Advanced Filters</h3>
+      <button (click)="toggleFilterSidebar()" class="close-btn">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="sidebar-content">
+      <div class="filter-group">
+        <label>Status</label>
+        <select [(ngModel)]="filters.status" class="form-control">
+          <option value="">All Statuses</option>
+          <option value="Pending">Pending</option>
+          <option value="Completed">Completed</option>
+          <option value="Follow-up">Follow-up</option>
+          <option value="Not Interested">Not Interested</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Assigned To</label>
+        <select [(ngModel)]="filters.assignedTo" class="form-control">
+          <option value="">All</option>
+          <option *ngFor="let agent of salesAgents" [value]="agent">
+            {{ agent }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Date Range</label>
+        <div class="date-range">
+          <input type="date" [(ngModel)]="filters.startDate" class="form-control">
+          <span>to</span>
+          <input type="date" [(ngModel)]="filters.endDate" class="form-control">
+        </div>
+      </div>
+
+      <div class="filter-group">
+        <label>Transaction Type</label>
+        <select [(ngModel)]="filters.transactionType" class="form-control">
+          <option value="">All</option>
+          <option value="Recent">Recent (Last 14 days)</option>
+          <option value="Older">Older than 14 days</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Call Outcome</label>
+        <select [(ngModel)]="filters.callOutcome" class="form-control">
+          <option value="">All</option>
+          <option value="Successful">Successful</option>
+          <option value="No Answer">No Answer</option>
+          <option value="Left Message">Left Message</option>
+        </select>
+      </div>
+
+      <div class="filter-actions">
+        <button (click)="applyAdvancedFilters()" class="btn-apply">
+          <i class="fa fa-check"></i> Apply Filters
+        </button>
+        <button (click)="resetAdvancedFilters()" class="btn-reset">
+          <i class="fa fa-undo"></i> Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay when sidebar is open -->
+  <div class="sidebar-overlay" *ngIf="showFilterSidebar" (click)="toggleFilterSidebar()"></div>
+
+  <!-- Main Table -->
+  <div class="table-responsive">
+    <table class="sales-call-table">
+      <thead>
+        <tr>
+          <th *ngIf="isColumnVisible('select')" width="40px">
+            <input type="checkbox" [(ngModel)]="selectAll" 
+                   (change)="toggleSelectAll()" class="select-all-checkbox">
+          </th>
+          <th *ngIf="isColumnVisible('customerName')" (click)="sort('customerName')">
+            Customer Name
+            <span class="sort-icon">
+              <i class="fa" 
+                 [class.fa-sort]="sortColumn !== 'customerName'"
+                 [class.fa-sort-up]="sortColumn === 'customerName' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortColumn === 'customerName' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('mobile')" (click)="sort('mobile')">
+            Mobile
+            <span class="sort-icon">
+              <i class="fa" 
+                 [class.fa-sort]="sortColumn !== 'mobile'"
+                 [class.fa-sort-up]="sortColumn === 'mobile' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortColumn === 'mobile' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('lastTransactionDate')" (click)="sort('lastTransactionDate')">
+            Last Transaction
+            <span class="sort-icon">
+              <i class="fa" 
+                 [class.fa-sort]="sortColumn !== 'lastTransactionDate'"
+                 [class.fa-sort-up]="sortColumn === 'lastTransactionDate' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortColumn === 'lastTransactionDate' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('department')" (click)="sort('department')">
+            Department
+            <span class="sort-icon">
+              <i class="fa" 
+                 [class.fa-sort]="sortColumn !== 'department'"
+                 [class.fa-sort-up]="sortColumn === 'department' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortColumn === 'department' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('assignedTo')" (click)="sort('assignedTo')">
+            Assigned To
+            <span class="sort-icon">
+              <i class="fa" 
+                 [class.fa-sort]="sortColumn !== 'assignedTo'"
+                 [class.fa-sort-up]="sortColumn === 'assignedTo' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortColumn === 'assignedTo' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th *ngIf="isColumnVisible('callStatus')">Call Status</th>
+          <th *ngIf="isColumnVisible('notes')">Notes</th>
+          <th *ngIf="isColumnVisible('actions')">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let call of paginatedCalls; trackBy: trackByFn" [class.selected]="isSelected(call.customerId)">
+          <td *ngIf="isColumnVisible('select')">
+            <input type="checkbox" [checked]="isSelected(call.customerId)" 
+                   (change)="toggleCallSelection(call.customerId)">
+          </td>
+          
+          <td *ngIf="isColumnVisible('customerName')" class="customer-name-cell">
+            <div class="customer-name-wrapper">
+              <span class="customer-name">{{ call.customerName }}</span>
+              <small *ngIf="call.businessName" class="business-name">({{ call.businessName }})</small>
+            </div>
+          </td>
+          
+          <td *ngIf="isColumnVisible('mobile')" class="mobile-cell">
+            <a [href]="'tel:' + call.mobile">{{ call.mobile }}</a>
+          </td>
+          
+          <td *ngIf="isColumnVisible('lastTransactionDate')" class="transaction-date-cell">
+            {{ call.lastTransactionDate ? (call.lastTransactionDate | date:'dd-MM-yyyy') : 'None' }}
+          </td>
+          
+          <td *ngIf="isColumnVisible('department')" class="department-cell">
+            {{ call.department || 'Not assigned' }}
+          </td>
+          
+          <td *ngIf="isColumnVisible('assignedTo')" class="assigned-cell">
+            <span>{{ call.assignedTo || 'Not assigned' }}</span>
+          </td>
+          
+          <!-- FIXED: Added proper status dropdown for individual calls -->
+          <td *ngIf="isColumnVisible('callStatus')" class="status-cell">
+            <select 
+              [value]="call.callStatus || 'Pending'"
+              (change)="updateIndividualCallStatus(call.customerId, $event)"
+              [disabled]="isUpdatingStatus.has(call.customerId)"
+              class="status-select"
+              [ngClass]="'status-' + (call.callStatus || 'pending').toLowerCase().replace(' ', '-')">
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Not Interested">Not Interested</option>
+            </select>
+            <i *ngIf="isUpdatingStatus.has(call.customerId)" class="fa fa-spinner fa-spin updating-icon"></i>
+          </td>
+          
+          <td *ngIf="isColumnVisible('notes')" class="notes-cell">
+            <textarea [(ngModel)]="call.notes" 
+                      (blur)="updateCallNotes(call.customerId, call.notes)"
+                      placeholder="Add notes..."
+                      [title]="call.notes"
+                      rows="2"></textarea>
+          </td>
+          
+          <td *ngIf="isColumnVisible('actions')" class="actions-cell">
+            <button (click)="viewCustomerDetails(call.customerId)" 
+                    class="btn-action btn-view" title="View Customer">
+              <i class="fa fa-eye"></i>
+            </button>
+            <button (click)="addNewCallLog(call.customerId)" 
+                    class="btn-action btn-call" title="Add Call Log">
+              <i class="fa fa-phone"></i>
+            </button>
+          </td>
+        </tr>
+        
+        <tr *ngIf="filteredCalls.length === 0">
+          <td [attr.colspan]="getVisibleColumnCount()" class="no-data">
+            <div class="no-data-content">
+              <i class="fa fa-exclamation-circle"></i>
+              <p>No sales calls found matching your criteria</p>
+              <button (click)="resetFilters()" class="btn-reset">Reset Filters</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-controls" *ngIf="filteredCalls.length > 0">
+    <div class="pagination-info">
+      Showing {{ (currentPage - 1) * itemsPerPage + 1 }} - 
+      {{ Math.min(currentPage * itemsPerPage, filteredCalls.length) }} of {{ filteredCalls.length }} calls
+    </div>
+    <div class="pagination-buttons">
+      <button (click)="pageChanged(1)" [disabled]="currentPage === 1" class="btn-first">
+        <i class="fa fa-angle-double-left"></i>
+      </button>
+      <button (click)="pageChanged(currentPage - 1)" [disabled]="currentPage === 1" class="btn-prev">
+        <i class="fa fa-angle-left"></i> Previous
+      </button>
+      <div class="page-numbers">
+        <span *ngFor="let page of getPageNumbers()" 
+              (click)="pageChanged(page)"
+              [class.active]="page === currentPage"
+              class="page-number">
+          {{ page }}
+        </span>
+      </div>
+      <button (click)="pageChanged(currentPage + 1)" [disabled]="currentPage === totalPages" class="btn-next">
+        Next <i class="fa fa-angle-right"></i>
+      </button>
+      <button (click)="pageChanged(totalPages)" [disabled]="currentPage === totalPages" class="btn-last">
+        <i class="fa fa-angle-double-right"></i>
+      </button>
+    </div>
+    <div class="items-per-page">
+      <label for="itemsPerPageSelect">Items per page:</label>
+      <select id="itemsPerPageSelect" [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+      </select>
+    </div>
+  </div>
+</div>

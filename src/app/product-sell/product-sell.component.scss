@@ -1,0 +1,206 @@
+/* Layout Containers */
+.sales-container {
+  padding: 1rem;
+}
+
+.card {
+  border-radius: 0.5rem;
+}
+
+/* Header */
+.card-header {
+  padding: 1rem 1.25rem;
+}
+
+.header-actions button i {
+  margin-right: 0.3rem;
+}
+
+/* Filters Section */
+.filters-section {
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.quick-filters-container select,
+.filter-sidebar select {
+  min-width: 100%;
+}
+
+/* Search Bar */
+.search-wrapper .input-group {
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.input-group-text {
+  background-color: #fff;
+}
+
+/* Sidebar */
+.filter-sidebar {
+  position: fixed;
+  top: 0;
+  right: -360px;
+  width: 360px;
+  height: 100%;
+  background-color: #fff;
+  transition: right 0.3s ease-in-out;
+  z-index: 1055;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-sidebar.show {
+  right: 0;
+}
+
+.sidebar-header {
+  background-color: #0d6efd;
+  color: white;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-body {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.filter-group {
+  margin-bottom: 1rem;
+}
+
+.filter-label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Table Styles */
+.table-container {
+  overflow-x: auto;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #343a40;
+  color: white;
+  z-index: 10;
+}
+
+.table-row-first {
+  background-color: #f9f9f9;
+}
+
+.product-name strong {
+  font-weight: 600;
+}
+
+.customer-info strong {
+  font-weight: 600;
+}
+
+.address-cell small {
+  word-wrap: break-word;
+  display: block;
+}
+
+/* Column Menu Modal */
+.column-menu-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 1060;
+  display: flex;
+  justify-content: flex-end;
+  padding: 2rem;
+}
+
+.column-menu-modal {
+  background-color: #fff;
+  width: 300px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 1rem;
+  border-radius: 0.5rem;
+}
+
+.column-menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+/* Pagination */
+.pagination-container {
+  padding: 1rem 0;
+  border-top: 1px solid #dee2e6;
+}
+
+.items-per-page label {
+  margin-bottom: 0;
+}
+
+/* Modal */
+.modal-header, .modal-footer {
+  border: none;
+}
+
+.info-card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.info-card-title {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.info-card-body p {
+  margin-bottom: 0.3rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-state i {
+  opacity: 0.5;
+}
+
+/* Utility */
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sortable-header i {
+  margin-left: 0.5rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .filter-sidebar {
+    width: 100%;
+  }
+
+  .column-menu-modal {
+    width: 100%;
+  }
+
+  .header-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

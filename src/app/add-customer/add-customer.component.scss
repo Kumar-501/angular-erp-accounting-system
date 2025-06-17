@@ -1,0 +1,332 @@
+/* Main Form Styling */
+form {
+  padding: 1.5rem;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 2rem;
+}
+
+/* Section Headers */
+.card-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.25rem;
+}
+
+.card-header h5 {
+  margin: 0;
+  color: #495057;
+  font-weight: 600;
+}
+
+/* Form Group Styling */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #495057;
+  display: block;
+}
+
+/* Form Controls */
+.form-control {
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0.625rem 0.875rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-control:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.form-control::placeholder {
+  color: #adb5bd;
+  opacity: 0.8;
+}
+
+/* Required Fields */
+label:after {
+  content: "*";
+  color: #dc3545;
+  margin-left: 4px;
+}
+
+label:not([for="contactNumber"]):not([for="address"]):not([for="billingAddress"]):not([for="shippingAddress"]):not([for="city"]):not([for="state"]):not([for="country"]):not([for="zipCode"]):not([for="status"]):not([for="invoiceScheme"]):not([for="invoiceNo"]):not([for="document"]):not([for="discountType"]):not([for="discountAmount"]):not([for="orderTax"]):not([for="shippingCharges"]):not([for="sellNote"]):not([for="shippingStatus"]):not([for="deliveryPerson"]):not([for="shippingDocuments"]):not([for="paidOn"]):not([for="paymentNote"]):not([for="changeReturn"]):not([for="balance"]):after {
+  content: "*";
+  color: #dc3545;
+  margin-left: 4px;
+}
+
+/* Error Messages */
+.error-message {
+  color: #dc3545;
+  font-size: 0.875rem;
+  margin-top: 0.375rem;
+}
+
+/* Alert Styling */
+.alert {
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.alert-success {
+  color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+/* Button Styling */
+.btn {
+  border-radius: 4px;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+.btn-primary:disabled {
+  background-color: #80bdff;
+  border-color: #80bdff;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  margin-left: 0.75rem;
+}
+
+.btn-secondary:hover, .btn-secondary:focus {
+  background-color: #5a6268;
+  border-color: #545b62;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-danger:hover, .btn-danger:focus {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+/* Table Styling */
+.table {
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.table th {
+  font-weight: 600;
+  color: #495057;
+  border-bottom-width: 2px;
+}
+
+.table-bordered {
+  border: 1px solid #dee2e6;
+}
+
+.table-bordered th,
+.table-bordered td {
+  border: 1px solid #dee2e6;
+  padding: 0.75rem;
+}
+
+.table-light {
+  background-color: #f8f9fa;
+}
+
+/* Product Table Enhancements */
+.table-responsive {
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin-bottom: 2rem;
+}
+
+.text-nowrap {
+  white-space: nowrap;
+}
+
+/* Alignment Classes */
+.text-end {
+  text-align: right !important;
+}
+
+.text-muted {
+  color: #6c757d !important;
+  font-size: 0.875rem;
+}
+
+.fw-semibold {
+  font-weight: 600 !important;
+}
+
+.fw-bold {
+  font-weight: 700 !important;
+}
+
+/* Spacing Utilities */
+.mt-2 {
+  margin-top: 0.5rem !important;
+}
+
+.mt-3 {
+  margin-top: 1rem !important;
+}
+
+.mt-4 {
+  margin-top: 1.5rem !important;
+}
+
+.mb-3 {
+  margin-bottom: 1rem !important;
+}
+
+.mb-4 {
+  margin-bottom: 1.5rem !important;
+}
+
+.ml-2 {
+  margin-left: 0.5rem !important;
+}
+
+/* Card Styling */
+.card {
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+/* Responsive Improvements */
+@media (max-width: 768px) {
+  .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -5px;
+    margin-left: -5px;
+  }
+  
+  .form-row > .form-group {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+  
+  .form-group.col-md-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+  
+  .btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .btn-secondary {
+    margin-left: 0;
+  }
+}
+
+/* Product Search Field */
+input[type="text"][placeholder="Search products for stock adjustment"] {
+  border-radius: 20px;
+  padding-left: 1rem;
+  border: 1px solid #ced4da;
+  background-color: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+input[type="text"][placeholder="Search products for stock adjustment"]:focus {
+  background-color: #fff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+}
+
+/* Icon Styling */
+.fa,
+.fas {
+  margin-right: 0.375rem;
+}
+
+/* Input with icons */
+.input-group {
+  position: relative;
+}
+
+/* Form row styling for better alignment */
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+
+.form-row > .form-group {
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+/* Subtotals and totals */
+tfoot td {
+  background-color: #f8f9fa;
+  font-weight: 500;
+}
+
+/* Add Product Button Styling */
+button[type="button"].btn-primary {
+  display: inline-flex;
+  align-items: center;
+  background-color: #28a745;
+  border-color: #28a745;
+  margin-bottom: 1rem;
+}
+
+button[type="button"].btn-primary:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+/* Remove Product Button */
+.btn-danger.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}.badge {
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+}
+
+.bg-success, .bg-danger, .bg-info, .bg-secondary {
+  color: white !important;
+}
+
+.bg-warning {
+  color: #212529 !important;
+}

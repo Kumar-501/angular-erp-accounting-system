@@ -1,0 +1,441 @@
+.packing-slip-container {
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: Arial, sans-serif;
+}
+
+.packing-slip-actions {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.packing-slip-content {
+  background: white;
+  padding: 20px;
+  border: 1px solid #ddd;
+}
+
+.packing-slip-header {
+  margin-bottom: 15px;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.company-details {
+  flex: 1;
+}
+
+.company-name {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.customer-info, .contact-info, .contract-info {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.service-type-section {
+  text-align: center;
+  min-width: 150px;
+}
+
+.service-type {
+  font-weight: bold;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.qr-placeholder {
+  width: 80px;
+  height: 80px;
+  border: 2px solid #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 10px auto;
+  font-size: 12px;
+}
+
+.invoice-date {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.header-divider, .section-divider, .footer-divider {
+  border: none;
+  border-top: 2px solid #000;
+  margin: 15px 0;
+}
+
+.address-section {
+  margin: 20px 0;
+}
+
+.address-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.from-section, .to-section {
+  flex: 1;
+  max-width: 45%;
+}
+
+.address-label {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.address-details div {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+.company-name {
+  font-weight: bold;
+}
+
+.invoice-meta-section {
+  margin: 20px 0;
+}
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.invoice-title {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.customer-label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.customer-details div {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.invoice-details-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.invoice-info div {
+  margin-bottom: 3px;
+  font-size: 13px;
+}
+
+.items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+}
+
+.items-table th,
+.items-table td {
+  border: 1px solid #000;
+  padding: 8px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.items-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.product-code {
+  font-size: 11px;
+  color: #666;
+}
+
+.text-end {
+  text-align: right;
+}
+
+.shipping-row td {
+  font-weight: bold;
+}
+
+.packing-slip-footer {
+  margin-top: 20px;
+}
+
+.footer-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+@media print {
+  .packing-slip-actions {
+    display: none;
+  }
+  
+  .packing-slip-content {
+    border: none;
+    padding: 0;
+  }
+}/* packing-slip.component.scss */
+@media print {
+  /* Hide everything except the printable content */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Show only the packing slip content */
+  .packing-slip-container,
+  .packing-slip-container * {
+    visibility: visible;
+  }
+  
+  /* Position the packing slip at the top left */
+  .packing-slip-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Hide the action buttons when printing */
+  .packing-slip-actions {
+    display: none !important;
+  }
+  
+  /* Ensure tables and other elements print properly */
+  .items-table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  /* Adjust spacing for print */
+  .packing-slip-content {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  /* Remove any background colors for better printing */
+  * {
+    background-color: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Adjust table borders for print */
+  table {
+    border-collapse: collapse !important;
+  }
+  
+  table td, table th {
+    border: 1px solid #000 !important;
+  }
+}/* General packing slip styles */
+.packing-slip-container {
+  padding: 20px;
+}
+
+.packing-slip-actions {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.packing-slip-content {
+  background: white;
+  padding: 20px;
+  border-radius: 4px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.packing-slip-header {
+  margin-bottom: 20px;
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.address-section {
+  margin: 15px 0;
+}
+
+.address-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.from-section, .to-section {
+  width: 48%;
+}
+
+.items-table {
+  width: 100%;
+  margin: 15px 0;
+  border-collapse: collapse;
+}
+
+.items-table th, .items-table td {
+  padding: 8px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+.items-table th {
+  background-color: #f5f5f5;
+}
+
+.totals-section {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.totals-row {
+  margin-bottom: 8px;
+}
+
+.grand-total {
+  font-weight: bold;
+  font-size: 1.1em;
+}
+
+.header-divider, .section-divider, .footer-divider {
+  border: 0;
+  border-top: 1px solid #ddd;
+  margin: 15px 0;
+}
+
+.product-code {
+  color: #666;
+  font-size: 0.9em;
+}
+// Add this to your packing-slip.component.scss file
+
+// Alternative: Global print styles (add to styles.scss)
+@media print {
+  // Hide common layout elements globally
+  app-header,
+  app-sidebar,
+  app-navigation,
+  .header,
+  .sidebar,
+  .navbar,
+  .nav,
+  .menu,
+  .toolbar,
+  .breadcrumb,
+  .action-bar {
+    display: none !important;
+  }
+  
+  // Ensure main content takes full space
+  .main-content,
+  .content-wrapper,
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}
+
+// Component-specific print styles
+
+// Print-specific styles
+@media print {
+  // Hide all elements by default
+  * {
+    visibility: hidden;
+  }
+  
+  // Show only the printable content
+  #packing-slip-printable,
+  #packing-slip-printable * {
+    visibility: visible;
+  }
+  
+  // Position the printable content to fill the page
+  #packing-slip-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  
+  // Hide header/sidebar elements specifically
+  .header,
+  .navbar,
+  .sidebar,
+  .navigation,
+  .menu,
+  app-header,
+  app-sidebar,
+  app-navigation,
+  .packing-slip-actions {
+    display: none !important;
+  }
+  
+  // Ensure the packing slip content takes full width
+  .packing-slip-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .packing-slip-content {
+    width: 100%;
+    margin: 0;
+    padding: 20px;
+  }
+  
+  // Remove any shadows or borders that might interfere
+  .packing-slip {
+    box-shadow: none;
+    border: none;
+  }
+  
+  // Optimize table printing
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    
+    th, td {
+      border: 1px solid #000;
+      padding: 8px;
+      font-size: 12px;
+    }
+  }
+  
+  // Ensure page breaks work correctly
+  .packing-slip-header,
+  .address-section,
+  .invoice-meta-section {
+    page-break-inside: avoid;
+  }
+  
+  // Remove background colors for better printing
+  * {
+    background: transparent !important;
+    color: black !important;
+  }
+}

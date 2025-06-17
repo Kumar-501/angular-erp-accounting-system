@@ -1,0 +1,160 @@
+<!-- Toolbar with Add, Filter and Export Options -->
+<div class="toolbar">
+  <div class="main-buttons">
+    <button class="btn btn-primary" (click)="openPopup()">Add Leave Type +</button>
+    <button class="btn btn-info" (click)="toggleFilterSidebar()">
+      <i class="fas fa-filter"></i> Filter
+    </button>
+  </div>
+  
+  <div class="export-buttons">
+    <button class="btn btn-outline-secondary" (click)="exportToCsv()">
+      <i class="fas fa-file-csv"></i> Export CSV
+    </button>
+    <button class="btn btn-outline-secondary" (click)="exportToExcel()">
+      <i class="fas fa-file-excel"></i> Export Excel
+    </button>
+    <button class="btn btn-outline-secondary" (click)="print()">
+      <i class="fas fa-print"></i> Print
+    </button>
+    <button class="btn btn-outline-secondary" (click)="toggleColumnVisibility()">
+      <i class="fas fa-columns"></i> Column visibility
+    </button>
+    <button class="btn btn-outline-secondary" (click)="exportToPdf()">
+      <i class="fas fa-file-pdf"></i> Export PDF
+    </button>
+  </div>
+</div>
+
+<!-- Column Visibility Dropdown -->
+<div *ngIf="showColumnVisibility" class="column-visibility-dropdown">
+  <div class="dropdown-header">
+    <h4>Toggle Columns</h4>
+    <button class="close-btn" (click)="toggleColumnVisibility()">&times;</button>
+  </div>
+  <div class="dropdown-content">
+    <div *ngFor="let column of columns" class="column-option">
+      <label>
+        <input type="checkbox" [(ngModel)]="column.visible"> {{ column.name }}
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Sidebar -->
+<div class="filter-sidebar" [class.active]="showFilterSidebar">
+  <div class="sidebar-header">
+    <h3>Filter Options</h3>
+    <button class="close-btn" (click)="toggleFilterSidebar()">&times;</button>
+  </div>
+  
+  <div class="sidebar-content">
+    <!-- Search by Leave Type -->
+    <div class="form-group">
+      <label>Search Leave Type</label>
+      <input 
+        type="text" 
+        [(ngModel)]="searchTerm" 
+        (input)="applyFilters()" 
+        placeholder="Search leave types..."
+      />
+    </div>
+    
+    <!-- Filter by Interval -->
+    <div class="form-group">
+      <label>Filter by Interval</label>
+      <select 
+        class="form-control" 
+        [(ngModel)]="selectedInterval" 
+        (change)="applyFilters()"
+      >
+        <option value="">All Intervals</option>
+        <option value="current_month">Current Month</option>
+        <option value="current_financial_year">Current Financial Year</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    
+    <!-- Reset Filters -->
+    <button class="btn btn-secondary" (click)="resetFilters()">
+      Reset Filters
+    </button>
+  </div>
+</div>
+
+<!-- Popup Form -->
+<div *ngIf="showPopup" class="popup-overlay">
+  <div class="popup-content">
+    <div class="popup-header">
+      <h3>{{ isEditMode ? 'Edit' : 'Add' }} Leave Type</h3>
+      <button class="close-btn" (click)="closePopup()">&times;</button>
+    </div>
+    
+    <form [formGroup]="leaveForm" (ngSubmit)="saveLeaveType()">
+      <div class="form-group">
+        <label for="leaveType">Leave Type</label>
+        <input 
+          type="text" 
+          id="leaveType" 
+          formControlName="leaveType" 
+          class="form-control"
+          [ngClass]="{'is-invalid': leaveForm.get('leaveType')?.invalid && leaveForm.get('leaveType')?.touched}"
+        />
+        <div *ngIf="leaveForm.get('leaveType')?.invalid && leaveForm.get('leaveType')?.touched" class="invalid-feedback">
+          Leave type is required
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label for="maxLeaveCount">Max Leave Count</label>
+        <input 
+          type="number" 
+          id="maxLeaveCount" 
+          formControlName="maxLeaveCount" 
+          class="form-control"
+        />
+      </div>
+      
+      <div class="form-group">
+        <label for="interval">Interval</label>
+        <select id="interval" formControlName="interval" class="form-control">
+          <option value="current_month">Current Month</option>
+          <option value="current_financial_year">Current Financial Year</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      
+      <div class="form-buttons">
+        <button type="button" class="btn btn-secondary" (click)="closePopup()">Cancel</button>
+        <button type="submit" class="btn btn-primary" [disabled]="leaveForm.invalid">
+          {{ isEditMode ? 'Update' : 'Save' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Leave Types Table -->
+<div class="table-container">
+  <table class="leave-table" id="leaveTypeTable">
+    <thead>
+      <tr>
+        <th *ngIf="columns[0].visible">Leave Type</th>
+        <th *ngIf="columns[1].visible">Max Leave Count</th>
+        <th *ngIf="columns[2].visible">Interval</th>
+        <th *ngIf="columns[3].visible">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let leave of filteredLeaveTypes">
+        <td *ngIf="columns[0].visible">{{ leave.leaveType }}</td>
+        <td *ngIf="columns[1].visible">{{ leave.maxLeaveCount }}</td>
+        <td *ngIf="columns[2].visible">{{ leave.interval }}</td>
+        <td *ngIf="columns[3].visible">
+          <button class="btn btn-sm btn-warning" (click)="editLeaveType(leave)">Edit</button>
+          <button class="btn btn-sm btn-danger" (click)="deleteLeaveType(leave.id)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

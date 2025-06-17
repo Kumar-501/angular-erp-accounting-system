@@ -1,0 +1,37 @@
+<header class="header">
+  <div class="header-left">
+    <button class="icon-btn toggle-btn" (click)="onToggleSidebar()" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="logo">
+      <img src="assets/stellar-logo-c-copy-WHITE[2].png" alt="Stellar Logo" class="logo-image">
+    </div>
+  </div>
+  
+  <div class="header-right">
+ 
+    
+    <div class="date-display">
+      <span>{{ currentDate | date:'MM/dd/yyyy' }}</span>
+    </div>
+    
+    <div class="user-profile" *ngIf="userEmail">
+      <div class="profile-container" (click)="toggleUserMenu()">
+        <span class="username">{{ userName }}</span>
+        <div class="avatar">
+          <i class="fas fa-user-circle"></i>
+        </div>
+      </div>
+      
+      <!-- User dropdown menu -->
+      <div class="user-dropdown" *ngIf="showUserMenu">
+        <div class="menu-item">
+        </div>
+        <div class="menu-item logout-btn" (click)="logout()">
+          <i class="fas fa-sign-out-alt"></i>
+          <span>Logout</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>

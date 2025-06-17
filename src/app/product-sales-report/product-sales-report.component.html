@@ -1,0 +1,191 @@
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <h3>Product Sales Report</h3>
+    </div>
+    <div class="card-body">
+      <!-- Filters -->
+      <form [formGroup]="filterForm" class="mb-4">
+        <div class="row">
+          <div class="col-md-3">
+            <label class="form-label">Start Date</label>
+            <input type="date" class="form-control" formControlName="startDate">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">End Date</label>
+            <input type="date" class="form-control" formControlName="endDate">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Department</label>
+            <select class="form-select" formControlName="department">
+              <option value="">All Departments</option>
+              <option *ngFor="let dept of salesByDepartment" [value]="dept.department">
+                {{ dept.department }}
+              </option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Export Format</label>
+            <div class="btn-group w-100">
+              <button type="button" class="btn btn-outline-secondary" (click)="exportReport('csv')">CSV</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="exportReport('excel')">Excel</button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      <!-- Loading/Error -->
+      <div *ngIf="isLoading" class="text-center my-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+      <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+
+      <!-- Summary Cards -->
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <div class="card text-white bg-primary">
+            <div class="card-body">
+              <h5 class="card-title">Total Sales</h5>
+              <p class="card-text display-6">
+                {{ totalSales | currency }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-white bg-success">
+            <div class="card-body">
+              <h5 class="card-title">Total Transactions</h5>
+              <p class="card-text display-6">{{ totalTransactions }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card text-white bg-info">
+            <div class="card-body">
+              <h5 class="card-title">Avg. Sale Value</h5>
+              <p class="card-text display-6">
+                {{ averageSaleValue | currency }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5>Daily Sales</h5>
+            </div>
+            <div class="card-body">
+              <canvas id="salesChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5>Sales by User</h5>
+            </div>
+            <div class="card-body">
+              <canvas id="userSalesChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row mb-4">
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5>Sales by Department</h5>
+            </div>
+            <div class="card-body">
+              <canvas id="departmentSalesChart"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h5>Top Selling Products</h5>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Quantity</th>
+                      <th>Total Sales</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let product of topSellingProducts">
+                      <td>{{ product.productName }}</td>
+                      <td>{{ product.quantity }}</td>
+                      <td>{{ product.totalSales | currency }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detailed Sales Table -->
+      <div class="card">
+        <div class="card-header">
+          <h5>Sales Details</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Invoice No.</th>
+                  <th>Customer</th>
+                  <th>User</th>
+                  <th>Department</th>
+                  <th>Products</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let sale of filteredSales">
+                  <td>{{ sale.saleDate | date:'shortDate' }}</td>
+                  <td>{{ sale.invoiceNo }}</td>
+                  <td>{{ sale.customer }}</td>
+                  <td>{{ sale.addedByName || 'N/A' }}</td>
+                  <td>{{ sale.department || 'N/A' }}</td>
+                  <td>
+                    <span *ngFor="let product of sale.products" class="badge bg-secondary me-1">
+                      {{ product.productName || product.name }} ({{ product.quantity }})
+                    </span>
+                  </td>
+                  <td>{{ sale.total | currency }}</td>
+                  <td>
+                    <span class="badge" [ngClass]="{
+                      'bg-success': sale.status === 'Completed',
+                      'bg-warning': sale.status === 'Pending',
+                      'bg-danger': sale.status === 'Cancelled'
+                    }">
+                      {{ sale.status }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

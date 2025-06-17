@@ -1,0 +1,179 @@
+<div class="view-entry-container">
+    <div class="view-entry-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h1 class="m-0">
+          <span [ngClass]="{
+            'badge bg-info': entryType === 'expense',
+            'badge bg-primary': entryType === 'sale',
+            'badge bg-warning': entryType === 'shipment'
+          }">
+            {{ getEntryTypeDisplay() }}
+          </span>
+          Details
+        </h1>
+        <div class="action-buttons">
+          <button class="btn btn-outline-secondary me-2" (click)="goBack()">
+            <i class="fa fa-arrow-left"></i> Back
+          </button>
+          <button class="btn btn-primary" (click)="printEntry()">
+            <i class="fa fa-print"></i> Print
+          </button>
+        </div>
+      </div>
+  
+      <div class="card-body" id="printable-area">
+        <div *ngIf="isLoading" class="text-center py-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+  
+        <div *ngIf="!isLoading && entryData">
+          <div class="entry-header">
+            <div class="row mb-4">
+              <div class="col-md-12">
+                <h2 class="mb-1">
+                  {{ getEntryTypeDisplay() }} #{{ entryData.referenceNo || entryData.invoiceNo || entryId }}
+                </h2>
+                <p class="text-muted">Date: {{ entryData.formattedDate || 'N/A' }}</p>
+              </div>
+            </div>
+          </div>
+  
+          <div class="section">
+            <h3 class="section-title">Basic Information</h3>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <table class="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <th>Reference No.</th>
+                      <td>{{ entryData.referenceNo || entryData.invoiceNo || '-' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Business Location</th>
+                      <td>{{ getLocationName() }}</td>
+                    </tr>
+                    <tr *ngIf="entryType === 'expense'">
+                      <th>Category</th>
+                      <td>{{ getCategoryName() }}</td>
+                    </tr>
+                    <tr *ngIf="entryType === 'sale' || entryType === 'shipment'">
+                      <th>Customer</th>
+                      <td>{{ entryData.customer || '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="col-md-6">
+                <table class="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <th>Payment Status</th>
+                      <td>{{ getPaymentStatusDisplay() }}</td>
+                    </tr>
+                    <tr>
+                      <th>Payment Method</th>
+                      <td>{{ entryData.paymentMethod || '-' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Total Amount</th>
+                      <td>₹ {{ entryData.totalAmount || entryData.paymentAmount || '0.00' }}</td>
+                    </tr>
+                    <tr *ngIf="entryType === 'sale' || entryType === 'shipment'">
+                      <th>Balance Due</th>
+                      <td>₹ {{ entryData.balance || '0.00' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+  
+          <div class="section" *ngIf="(entryType === 'sale' || entryType === 'shipment') && entryData.products">
+            <h3 class="section-title">Products</h3>
+            <div class="table-responsive">
+              <table class="table table-bordered table-striped">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Product Name</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let product of entryData.products; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.quantity }}</td>
+                    <td>₹ {{ product.unitPrice }}</td>
+                    <td>₹ {{ product.subtotal }}</td>
+                  </tr>
+                  <tr *ngIf="!entryData.products || entryData.products.length === 0">
+                    <td colspan="5" class="text-center">No products found</td>
+                  </tr>
+                </tbody>
+                <tfoot *ngIf="entryType === 'sale' || entryType === 'shipment'">
+                  <tr>
+                    <th colspan="4" class="text-end">Subtotal:</th>
+                    <td>₹ {{ entryData.subtotal || '0.00' }}</td>
+                  </tr>
+                  <tr *ngIf="entryData.orderTax">
+                    <th colspan="4" class="text-end">Tax ({{ entryData.taxRate || '0' }}%):</th>
+                    <td>₹ {{ entryData.orderTax || '0.00' }}</td>
+                  </tr>
+                  <tr *ngIf="entryData.shippingCharges">
+                    <th colspan="4" class="text-end">Shipping Charges:</th>
+                    <td>₹ {{ entryData.shippingCharges || '0.00' }}</td>
+                  </tr>
+                  <tr>
+                    <th colspan="4" class="text-end">Total:</th>
+                    <td>₹ {{ entryData.totalAmount || entryData.paymentAmount || '0.00' }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+  
+          <div class="section" *ngIf="entryData.additionalNotes">
+            <h3 class="section-title">Additional Information</h3>
+            <div class="card">
+              <div class="card-body">
+                <p>{{ entryData.additionalNotes }}</p>
+              </div>
+            </div>
+          </div>
+  
+          <div class="section" *ngIf="entryType === 'shipment'">
+            <h3 class="section-title">Shipping Information</h3>
+            <div class="row">
+              <div class="col-md-12">
+                <table class="table table-bordered">
+                  <tbody>
+                    <tr>
+                      <th>Shipping Status</th>
+                      <td>{{ entryData.shippingStatus || '-' }}</td>
+                    </tr>
+                    <tr *ngIf="entryData.shippingAddress">
+                      <th>Shipping Address</th>
+                      <td>{{ entryData.shippingAddress || '-' }}</td>
+                    </tr>
+                    <tr *ngIf="entryData.trackingNo">
+                      <th>Tracking Number</th>
+                      <td>{{ entryData.trackingNo || '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+  
+        <div *ngIf="!isLoading && !entryData" class="alert alert-danger">
+          Entry not found or has been deleted.
+        </div>
+      </div>
+    </div>
+  </div>

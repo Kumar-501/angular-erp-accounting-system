@@ -1,0 +1,225 @@
+<div class="container">
+  <div class="header">
+    <h3>Users</h3>
+    <span class="manage-link">Manage users</span>
+  </div>
+    
+  <div class="users-panel">
+    <h2>All users</h2>
+        
+    <div class="action-bar">
+      <div class="entries-section">
+        <span>Show</span>
+        <select [(ngModel)]="entries" (change)="updatePagination()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+            
+      <div class="export-buttons">
+        <button class="btn btn-outline" (click)="exportCSV()">
+          <i class="fas fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-outline" (click)="print()">
+          <i class="fas fa-print"></i> Print
+        </button>
+      
+        <button class="btn btn-outline" (click)="toggleColumnVisibilityDropdown()">
+          <i class="fas fa-columns"></i> Columns
+        </button>
+        
+      </div>
+            
+      <div class="search-container">
+        <input type="text" placeholder="Search..." (input)="search($event)" />
+      </div>
+            
+  
+      <button class="btn btn-filter" (click)="toggleFilterSidebar()">
+        <i class="fas fa-filter"></i> Filters
+      </button>
+    </div>
+    <div class="column-visibility-dropdown" [class.open]="isColumnVisibilityOpen">
+      <div class="dropdown-header">
+        <h5>Show/Hide Columns</h5>
+      </div>
+      <div class="dropdown-body">
+        <div *ngFor="let column of columns" class="form-check">
+          <input 
+            class="form-check-input" 
+            type="checkbox" 
+            [id]="'col-' + column.name"
+            [checked]="column.visible"
+            (change)="toggleColumnVisibility(column.name)"
+          >
+          <label class="form-check-label" [for]="'col-' + column.name">
+            {{column.display}}
+          </label>
+        </div>
+      </div>
+      <div class="dropdown-footer">
+        <button class="btn btn-sm btn-primary" (click)="applyColumnVisibility()">
+          Apply
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" (click)="resetColumnVisibility()">
+          Reset All
+        </button>
+      </div>
+    </div>
+  </div>
+    <div class="table-responsive">
+      <table class="user-table">
+        <thead>
+          <tr>
+            <th *ngIf="isColumnVisible('actions')">Actions</th>
+
+            <th *ngIf="isColumnVisible('employeeId')" (click)="sortUsers('employeeId')">
+              Employee ID <i [class]="getSortIconClass('employeeId')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('username')" (click)="sortUsers('username')">
+              Username <i [class]="getSortIconClass('username')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('role')" (click)="sortUsers('role')">
+              Role <i [class]="getSortIconClass('role')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('department')" (click)="sortUsers('department')">
+              Department <i [class]="getSortIconClass('department')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('designation')" (click)="sortUsers('designation')">
+              Designation <i [class]="getSortIconClass('designation')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('email')" (click)="sortUsers('email')">
+              Email <i [class]="getSortIconClass('email')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('password')" class="password-column" (click)="sortUsers('password')">
+              Password <i [class]="getSortIconClass('password')"></i>
+            </th>
+            <th *ngIf="isColumnVisible('status')">Status</th>
+          </tr>
+        </thead>
+      
+        <tbody>
+          <tr *ngFor="let user of getPaginatedUsers()">
+            <td *ngIf="isColumnVisible('actions')" class="action-buttons">
+              <div class="dropdown">
+                <button class="btn btn-action dropdown-toggle" type="button" id="actionMenu" data-bs-toggle="dropdown" aria-expanded="false" title="Actions">
+                  Actions
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="actionMenu">
+                  <li><a class="dropdown-item" (click)="editUser(user.id)"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                  <li><a class="dropdown-item" (click)="deleteUser(user.id)"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                </ul>
+              </div>
+            </td>
+            <td *ngIf="isColumnVisible('employeeId')">{{ user.employeeId || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('username')">{{ user.username }}</td>
+            <td *ngIf="isColumnVisible('role')">{{ user.role || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('department')">{{ user.department || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('designation')">{{ user.designation || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('email')">{{ user.email }}</td>
+            <td *ngIf="isColumnVisible('password')" class="password-column">{{ user.password }}</td>
+            <td *ngIf="isColumnVisible('status')">
+              <span class="status-badge" [class.active]="user.isActive">
+                {{ user.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </td>
+          
+          </tr>
+          <tr *ngIf="filteredUsers.length === 0">
+            <td [attr.colspan]="getVisibleColumnsCount()" class="no-data">No users found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+        
+    <div class="pagination">
+      <div class="showing-info">
+        <ng-container *ngIf="totalEntries > 0">
+          Showing {{ (currentPage - 1) * entries + 1 }} to 
+          {{ currentPage * entries > totalEntries ? totalEntries : currentPage * entries }}
+          of {{ totalEntries }} entries
+        </ng-container>
+        <ng-container *ngIf="totalEntries === 0">
+          Showing 0 to 0 of 0 entries
+        </ng-container>
+      </div>
+      <div class="page-buttons">
+        <button [disabled]="currentPage === 1" (click)="previousPage()" class="btn pagination-btn">
+          Previous
+        </button>
+        <span class="page-number">{{ currentPage }} of {{ totalPages || 1 }}</span>
+        <button [disabled]="currentPage === totalPages || totalPages === 0" (click)="nextPage()" class="btn pagination-btn">
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-sidebar" [class.open]="isFilterSidebarOpen">
+    <div class="sidebar-header">
+      <h4>Filters</h4>
+      <button class="btn btn-close" (click)="toggleFilterSidebar()"></button>
+    </div>
+    
+    <div class="sidebar-body">
+      <!-- Status Filter (Checkbox) -->
+      <div class="filter-section">
+        <h5>Status</h5>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showActive" [(ngModel)]="showActive">
+          <label class="form-check-label" for="showActive">Active</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="showInactive" [(ngModel)]="showInactive">
+          <label class="form-check-label" for="showInactive">Inactive</label>
+        </div>
+      </div>
+  
+      <!-- Role Filter (Dropdown) -->
+      <div class="filter-section">
+        <h5>Role</h5>
+        <select class="form-select" [(ngModel)]="selectedRole" (change)="onFilterChange()">
+          <option value="">All Roles</option>
+          <option *ngFor="let role of roles" [value]="role">{{role}}</option>
+        </select>
+      </div>
+  
+      <!-- Department Filter (Dropdown) -->
+      <div class="filter-section">
+        <h5>Department</h5>
+        <select class="form-select" [(ngModel)]="selectedDepartment" (change)="onFilterChange()">
+          <option value="">All Departments</option>
+          <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+        </select>
+      </div>
+  
+      <!-- Designation Filter (Dropdown) -->
+      <div class="filter-section">
+        <h5>Designation</h5>
+        <select class="form-select" [(ngModel)]="selectedDesignation" (change)="onFilterChange()">
+          <option value="">All Designations</option>
+          <option *ngFor="let designation of designations" [value]="designation">{{designation}}</option>
+        </select>
+      </div>
+  
+      <!-- Branch Filter (Dropdown) -->
+      <div class="filter-section">
+        <h5>Branch</h5>
+        <select class="form-select" [(ngModel)]="selectedBranch" (change)="onFilterChange()">
+          <option value="">All Branches</option>
+          <option *ngFor="let branch of branches" [value]="branch">{{branch}}</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="sidebar-footer">
+      <button class="btn btn-primary" (click)="applyFilters()">Apply Filters</button>
+      <button class="btn btn-outline-secondary" (click)="resetFilters()">Reset All</button>
+    </div>
+  </div>

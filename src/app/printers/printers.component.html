@@ -1,0 +1,17 @@
+<!-- src/app/printers/printers.component.html -->
+<div>
+    <h1>Printers</h1>
+    <button (click)="addPrinter()">Add+</button>
+  </div>
+  
+  <!-- Display printers list -->
+  <div *ngIf="printers.length === 0">
+    <p>No printers available</p>
+  </div>
+  
+  <ul *ngIf="printers.length > 0">
+    <li *ngFor="let printer of printers">
+      <p><strong>{{ printer.printerName }}</strong></p>
+      <p>{{ printer.connectionType }} - {{ printer.ipAddress }}:{{ printer.port }}</p>
+    </li>
+  </ul>

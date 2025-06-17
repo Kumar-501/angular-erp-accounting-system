@@ -1,0 +1,121 @@
+<div class="container-fluid mt-3">
+  <div class="card">
+    <div class="card-header bg-light">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Purchase Ledger</h4>
+        <div class="btn-group" role="group">
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'purchases', 'btn-outline-primary': viewMode !== 'purchases'}"
+                  (click)="viewMode = 'purchases'">
+            Purchases
+          </button>
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'ledger', 'btn-outline-primary': viewMode !== 'ledger'}"
+                  (click)="viewMode = 'ledger'">
+            Ledger View
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <!-- Purchases View -->
+      <div *ngIf="viewMode === 'purchases'" class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Reference No</th>
+              <th>Supplier</th>
+              <th>Total Amount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="6" class="text-center">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+            
+            <tr *ngFor="let purchase of purchases" (click)="viewPurchaseDetails(purchase)" style="cursor: pointer;">
+              <td>{{ (purchase.purchaseDate | date) || 'N/A' }}</td>
+              <td>{{ purchase.referenceNo || 'N/A' }}</td>
+              <td>{{ purchase.supplier || 'N/A' }}</td>
+              <td>₹ {{ (purchase.grandTotal || purchase.purchaseTotal || 0)?.toFixed(2) }}</td>
+              <td>
+                <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">
+                  {{ purchase.purchaseStatus || 'N/A' }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" (click)="viewPurchaseDetails(purchase); $event.stopPropagation()">
+                  View
+                </button>
+              </td>
+            </tr>
+            
+            <tr *ngIf="!isLoading && purchases.length === 0">
+              <td colspan="6" class="text-center">No purchases found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Ledger View -->
+      <div *ngIf="viewMode === 'ledger'" class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Reference No</th>
+              <th>Supplier</th>
+              <th>Description</th>
+              <th>Debit (₹)</th>
+              <th>Credit (₹)</th>
+              <th>Balance (₹)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="8" class="text-center">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+            
+            <ng-container *ngFor="let entry of ledgerEntries; let i = index">
+              <tr (click)="viewPurchaseDetails(entry.purchase)" style="cursor: pointer;">
+                <td>{{ (entry.date | date) || 'N/A' }}</td>
+                <td>{{ entry.referenceNo || 'N/A' }}</td>
+                <td>{{ entry.supplier || 'N/A' }}</td>
+                <td>{{ entry.description || 'N/A' }}</td>
+                <td class="text-danger">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+                <td class="text-success">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+                <td [ngClass]="{'text-danger': entry.balance < 0, 'text-success': entry.balance >= 0}">
+                  {{ entry.balance | currency:'INR':'symbol':'1.2-2' }}
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusClass(entry.status)">
+                    {{ entry.status || 'N/A' }}
+                  </span>
+                </td>
+              </tr>
+            </ng-container>
+            
+            <tr *ngIf="!isLoading && ledgerEntries.length === 0">
+              <td colspan="8" class="text-center">No ledger entries found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

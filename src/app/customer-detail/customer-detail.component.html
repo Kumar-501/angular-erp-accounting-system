@@ -1,0 +1,193 @@
+<div class="customer-container">
+    <div class="customer-list-section">
+      <h2>Customers</h2>
+      <div *ngIf="loading" class="loading">Loading customers...</div>
+      <div *ngIf="!loading && customers.length === 0" class="no-data">No customers found.</div>
+      
+      <div class="customer-list">
+        <div *ngFor="let customer of customers" 
+             class="customer-item" 
+             [class.selected]="selectedCustomer && selectedCustomer.id === customer.id"
+             (click)="customer.id && selectCustomer(customer)">
+          <div class="customer-name">
+            {{ customer.prefix }} {{ customer.firstName }} {{ customer.middleName }} {{ customer.lastName }}
+          </div>
+          <div class="customer-business" *ngIf="customer.businessName">{{ customer.businessName }}</div>
+          <div class="customer-contact">
+            <span *ngIf="customer.mobile">{{ customer.mobile }}</span>
+            <span *ngIf="customer.email">&nbsp;|&nbsp;{{ customer.email }}</span>
+          </div>
+          <div class="customer-status" [class.active]="customer.status === 'Active'">
+            {{ customer.status || 'Unknown' }}
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <div class="customer-detail-section" *ngIf="selectedCustomer">
+      <div class="detail-header">
+        <h2>Customer Details</h2>
+        <div class="customer-id" *ngIf="selectedCustomer.contactId">ID: {{ selectedCustomer.contactId }}</div>
+      </div>
+      
+      <div class="detail-content">
+        <div class="detail-row">
+          <span class="label">Name:</span>
+          <span>{{ selectedCustomer.prefix }} {{ selectedCustomer.firstName }} {{ selectedCustomer.middleName }} {{ selectedCustomer.lastName }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.businessName">
+          <span class="label">Business:</span>
+          <span>{{ selectedCustomer.businessName }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.email">
+          <span class="label">Email:</span>
+          <span>{{ selectedCustomer.email }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.mobile || selectedCustomer.landline || selectedCustomer.alternateContact">
+          <span class="label">Contact:</span>
+          <span>
+            <div *ngIf="selectedCustomer.mobile">Mobile: {{ selectedCustomer.mobile }}</div>
+            <div *ngIf="selectedCustomer.landline">Landline: {{ selectedCustomer.landline }}</div>
+            <div *ngIf="selectedCustomer.alternateContact">Alternate: {{ selectedCustomer.alternateContact }}</div>
+          </span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.addressLine1 || selectedCustomer.city || selectedCustomer.state">
+          <span class="label">Address:</span>
+          <span>
+            {{ selectedCustomer.addressLine1 }}<br *ngIf="selectedCustomer.addressLine1 && selectedCustomer.addressLine2">
+            {{ selectedCustomer.addressLine2 }}<br *ngIf="selectedCustomer.addressLine2">
+            {{ selectedCustomer.city }}<span *ngIf="selectedCustomer.city && selectedCustomer.state">,</span> {{ selectedCustomer.state }}
+            <span *ngIf="selectedCustomer.country">, {{ selectedCustomer.country }}</span>
+            <span *ngIf="selectedCustomer.zipCode"> - {{ selectedCustomer.zipCode }}</span>
+          </span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.taxNumber">
+          <span class="label">Tax Number:</span>
+          <span>{{ selectedCustomer.taxNumber }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.openingBalance !== undefined">
+          <span class="label">Opening Balance:</span>
+          <span>{{ selectedCustomer.openingBalance | currency }}</span>
+        </div>
+        
+        <div class="detail-row" *ngIf="selectedCustomer.assignedTo">
+          <span class="label">Assigned To:</span>
+          <span>{{ selectedCustomer.assignedTo }}</span>
+        </div>
+      </div>
+      
+      <div class="call-logs-section">
+        <div class="call-logs-header">
+          <h3>Call Logs</h3>
+          <button class="add-log-btn" (click)="toggleAddCallLogForm()">
+            {{ showAddCallLogForm ? 'Cancel' : 'Add Call Log' }}
+          </button>
+        </div>
+        
+        <div class="add-call-log-form" *ngIf="showAddCallLogForm">
+          <form [formGroup]="callLogForm" (ngSubmit)="addCallLog()">
+            <div class="form-row">
+              <div class="form-field">
+                <label for="subject">Subject *</label>
+                <input type="text" id="subject" formControlName="subject">
+                <div class="error" *ngIf="callLogForm.get('subject')?.invalid && callLogForm.get('subject')?.touched">
+                  Subject is required
+                </div>
+              </div>
+              
+              <div class="form-field">
+                <label for="callType">Call Type</label>
+                <select id="callType" formControlName="callType">
+                  <option value="Inbound">Inbound</option>
+                  <option value="Outbound">Outbound</option>
+                  <option value="Missed">Missed</option>
+                  <option value="Follow-up">Follow-up</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-field">
+              <label for="description">Description *</label>
+              <textarea id="description" formControlName="description" rows="3"></textarea>
+              <div class="error" *ngIf="callLogForm.get('description')?.invalid && callLogForm.get('description')?.touched">
+                Description is required
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-field">
+                <label for="callOutcome">Call Outcome</label>
+                <select id="callOutcome" formControlName="callOutcome">
+                  <option value="">Select outcome</option>
+                  <option value="Successful">Successful</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="Busy">Busy</option>
+                  <option value="Left Message">Left Message</option>
+                  <option value="Wrong Number">Wrong Number</option>
+                </select>
+              </div>
+              
+              <div class="form-field">
+                <label for="callDuration">Duration (seconds)</label>
+                <input type="number" id="callDuration" formControlName="callDuration" min="0">
+              </div>
+            </div>
+            
+            <div class="form-row follow-up">
+              <div class="form-field checkbox-field">
+                <input type="checkbox" id="followUpRequired" formControlName="followUpRequired" (change)="toggleFollowUp($event)">
+                <label for="followUpRequired">Follow-up Required</label>
+              </div>
+              
+              <div class="form-field" *ngIf="callLogForm.get('followUpRequired')?.value">
+                <label for="followUpDate">Follow-up Date</label>
+                <input type="date" id="followUpDate" formControlName="followUpDate">
+              </div>
+            </div>
+            
+            <div class="form-actions">
+              <button type="submit" [disabled]="callLogForm.invalid || loading">
+                {{ loading ? 'Saving...' : 'Save Call Log' }}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        <div *ngIf="loadingCallLogs" class="loading">Loading call logs...</div>
+        <div *ngIf="!loadingCallLogs && callLogs.length === 0" class="no-data">No call logs found for this customer.</div>
+        
+        <div class="call-logs-list">
+          <div *ngFor="let log of callLogs" class="call-log-item">
+            <div class="log-header">
+              <div class="log-subject">{{ log.subject }}</div>
+              <div class="log-meta">
+                <span class="log-type" *ngIf="log.callType">{{ log.callType }}</span>
+                <span class="log-date">{{ formatDate(log.createdAt) }}</span>
+              </div>
+            </div>
+            <div class="log-description">{{ log.description }}</div>
+            <div class="log-footer">
+              <div class="log-creator">Added by: {{ log.createdBy }}</div>
+              <div class="log-actions">
+                <button class="delete-btn" (click)="log.id && deleteCallLog(log.id)">Delete</button>
+              </div>
+            </div>
+            <div class="follow-up-info" *ngIf="log.followUpRequired">
+              <div class="follow-up-badge">Follow-up required</div>
+              <div *ngIf="log.followUpDate">Date: {{ formatDate(log.followUpDate) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="empty-state" *ngIf="!selectedCustomer">
+      <p>Select a customer to view details and call logs</p>
+    </div>
+  </div>

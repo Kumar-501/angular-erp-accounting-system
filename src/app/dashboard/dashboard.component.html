@@ -1,0 +1,114 @@
+<div class="dashboard-header">
+  <h1>Welcome {{userName}}, 👋</h1>
+
+  </div>
+
+<div class="dashboard-container">
+  <h1 class="dashboard-title">Dashboard</h1>
+  
+  <div class="dashboard-grid">
+    <div class="card-row">
+      <div class="dashboard-card" *ngFor="let card of cards.slice(0, 4)" [ngClass]="'card-' + card.color">
+        <div class="card-header">
+          <h3 class="card-title">{{ card.title }}</h3>
+          <div class="card-icon">
+            <i class="icon-{{ card.icon }}"></i>
+          </div>
+        </div>
+        <div class="card-value">{{ card.value }}</div>
+        <div class="card-footer">
+          <span [ngClass]="getTrendClass(card.trend)">
+            {{ getTrendIcon(card.trend) }} {{ Math.abs(card.trend) }}%
+          </span>
+          <span class="trend-period">from last month</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card-row">
+      <div class="dashboard-card" *ngFor="let card of cards.slice(4, 8)" [ngClass]="'card-' + card.color">
+        <div class="card-header">
+          <h3 class="card-title">{{ card.title }}</h3>
+          <div class="card-icon">
+            <i class="icon-{{ card.icon }}"></i>
+          </div>
+        </div>
+        <div class="card-value">{{ card.value }}</div>
+        <div class="card-footer">
+          <span [ngClass]="getTrendClass(card.trend)">
+            {{ getTrendIcon(card.trend) }} {{ Math.abs(card.trend) }}%
+          </span>
+          <span class="trend-period">from last month</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- New container with two equal-sized cards -->
+  <div class="quick-actions-container">
+    <div class="quick-actions-row">
+      <!-- Sales Card -->
+      <div class="quick-actions-card">
+        <div class="card-header">
+          <h3 class="card-title">Quick Sale</h3>
+        </div>
+        <div class="card-content">
+          <app-sales></app-sales>
+        </div>
+      </div>
+      
+      <!-- Purchase Order Card -->
+      <div class="quick-actions-card">
+        <div class="card-header">
+          <h3 class="card-title">Purchase Order</h3>
+        </div>
+        <div class="card-content">
+          <app-purchase-order></app-purchase-order>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Added new rows with one card each -->
+  <div class="quick-actions-container">
+    <div class="quick-actions-row">
+      <!-- Purchase Requisition Card -->
+      <div class="quick-actions-card">
+        <div class="card-header">
+          <h3 class="card-title">Purchase Requisition</h3>
+        </div>
+        <div class="card-content">
+          <app-purchase-requisition></app-purchase-requisition>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="quick-actions-container">
+    <div class="quick-actions-row">
+      <!-- Purchase Return Card -->
+      <div class="quick-actions-card">
+        <div class="card-header">
+          <h3 class="card-title">Purchase Return</h3>
+        </div>
+        <div class="card-content">
+          <app-purchase-return></app-purchase-return>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="quick-actions-container">
+    <div class="quick-actions-row">
+      <!-- Shipments Card -->
+      <div class="quick-actions-card">
+        <div class="card-header">
+          <h3 class="card-title">Shipments</h3>
+        </div>
+        <div class="card-content">
+          <app-shipments></app-shipments>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

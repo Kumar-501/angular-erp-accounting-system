@@ -1,0 +1,23 @@
+.prescription-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.prescription-item {
+  background-color: #f8f9fa;
+}
+
+.medicine-item {
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.table-responsive {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.form-control[readonly] {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+}

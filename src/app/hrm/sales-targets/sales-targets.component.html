@@ -1,0 +1,125 @@
+<!-- sales-targets.component.html -->
+<div class="container mt-4 bg-light p-4 rounded shadow-sm">
+  <h2 class="fw-bold">Sales Targets</h2>
+  
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+    <div>
+      Show
+      <select class="form-select d-inline-block w-auto ms-2">
+        <option>25</option>
+        <option>50</option>
+        <option>100</option>
+      </select>
+      entries
+    </div>
+    
+   
+    
+    <input type="text" class="form-control w-auto mt-2 mt-md-0" placeholder="Search ..." />
+  </div>
+  
+  <div *ngIf="isLoading" class="text-center p-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-2">Loading users and targets...</p>
+  </div>
+  
+  <table *ngIf="!isLoading" class="table table-bordered table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>User</th>
+        <th class="text-center">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let user of users">
+        <td>{{ user.username || user.name || user.email || user.id }}</td>
+        
+        <td class="text-center">
+          <button class="btn btn-primary btn-sm rounded-pill" (click)="openTargetModal(user)">
+            <i class="bi bi-bullseye"></i> Set Sales Target
+          </button>
+        </td>
+      </tr>
+      <tr *ngIf="users.length === 0">
+        <td colspan="3" class="text-center">No users found</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <div *ngIf="!isLoading" class="d-flex justify-content-between align-items-center mt-2">
+    <div>Showing 1 to {{ users.length }} of {{ users.length }} entries</div>
+    <div>
+      <button class="btn btn-outline-secondary btn-sm me-1" [disabled]="users.length <= 25">Previous</button>
+      <button class="btn btn-primary btn-sm">1</button>
+      <button class="btn btn-outline-secondary btn-sm ms-1" [disabled]="users.length <= 25">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sales Target Modal -->
+<div class="modal" tabindex="-1" [class.d-block]="showTargetModal" [class.show]="showTargetModal">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Set Sales Target for {{ selectedUser?.username || selectedUser?.name || selectedUser?.email || selectedUser?.id }}</h5>
+        <button type="button" class="btn-close" (click)="closeTargetModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngFor="let range of targetRanges; let i = index" class="mb-3">
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col">
+              <label class="form-label small mb-1">Total sales amount from</label>
+              <input 
+                type="number" 
+                class="form-control" 
+                [(ngModel)]="range.fromAmount" 
+                placeholder="0"
+              >
+            </div>
+            <div class="col">
+              <label class="form-label small mb-1">Total sale amount to</label>
+              <input 
+                type="number" 
+                class="form-control" 
+                [(ngModel)]="range.toAmount" 
+                placeholder="0"
+              >
+            </div>
+            <div class="col">
+              <label class="form-label small mb-1">Commission Percent</label>
+              <input 
+                type="number" 
+                class="form-control" 
+                [(ngModel)]="range.commissionPercent" 
+                placeholder="0"
+              >
+            </div>
+            <div class="col-auto d-flex align-items-end">
+              <button 
+                *ngIf="i === targetRanges.length - 1" 
+                class="btn btn-primary ms-2" 
+                (click)="addTargetRange()"
+              >
+                <i class="bi bi-plus"></i>
+              </button>
+              <button 
+                *ngIf="targetRanges.length > 1" 
+                class="btn btn-danger ms-2" 
+                (click)="removeTargetRange(i)"
+              >
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeTargetModal()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="saveTargetRanges()">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show" *ngIf="showTargetModal"></div>

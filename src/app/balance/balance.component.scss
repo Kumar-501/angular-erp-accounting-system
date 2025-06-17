@@ -1,0 +1,100 @@
+// balance.component.scss
+.totals-section {
+  margin: 20px 0;
+}
+
+.totals-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  
+  h3 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+  }
+}
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 8px 0;
+  border-bottom: 1px dashed #eee;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.total-label {
+  font-weight: 500;
+}
+.transaction-details {
+  margin-top: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.transaction-details table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transaction-details th, 
+.transaction-details td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.transaction-details th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+}
+
+.debit-amount {
+  color: #dc3545;
+  font-weight: 500;
+}
+
+.credit-amount {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.balance-amount {
+  font-weight: 600;
+}
+
+.balance-amount.positive {
+  color: #28a745;
+}
+
+.balance-amount.negative {
+  color: #dc3545;
+}
+.total-value {
+  font-weight: 600;
+  
+  &.debit {
+    color: #e74c3c;
+  }
+  
+  &.credit {
+    color: #2ecc71;
+  }
+  
+  &.positive {
+    color: #2ecc71;
+  }
+  
+  &.negative {
+    color: #e74c3c;
+  }
+}

@@ -1,0 +1,122 @@
+<!-- crm-dashboard.component.html -->
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>CRM Dashboard</h1>
+    <button class="refresh-btn" (click)="refreshData()">
+      <i class="fas fa-sync-alt"></i> Refresh
+    </button>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading dashboard data...</p>
+  </div>
+
+  <div *ngIf="hasError" class="error-container">
+    <p>Error loading dashboard data. Please try again.</p>
+    <button (click)="refreshData()" class="retry-btn">Retry</button>
+  </div>
+
+  <div *ngIf="!isLoading && !hasError" class="dashboard-content">
+    <!-- Summary Section -->
+    <div class="summary-section">
+      <div class="summary-card total">
+        <div class="card-icon">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="card-content">
+          <h3>Total Leads</h3>
+          <div class="card-value">{{ totalLeads }}</div>
+          <div class="card-subtitle">All leads in system</div>
+        </div>
+      </div>
+
+      <div class="summary-card today">
+        <div class="card-icon">
+          <i class="fas fa-calendar-day"></i>
+        </div>
+        <div class="card-content">
+          <h3>Today's Leads</h3>
+          <div class="card-value">{{ todaysLeads }}</div>
+          <div class="card-subtitle">New leads today</div>
+        </div>
+      </div>
+
+      <div class="summary-card customers">
+        <div class="card-icon">
+          <i class="fas fa-user-check"></i>
+        </div>
+        <div class="card-content">
+          <h3>Total Customers</h3>
+          <div class="card-value">{{ totalCustomers }}</div>
+          <div class="card-subtitle">Converted leads</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deal Status Section -->
+    <div class="metrics-section">
+      <h2><i class="fas fa-handshake"></i> Deal Status</h2>
+      <div class="metrics-grid">
+        <div class="metric-card open">
+          <div class="metric-value">{{ dealStatusCounts.open }}</div>
+          <div class="metric-label">Open</div>
+        </div>
+        <div class="metric-card closed">
+          <div class="metric-value">{{ dealStatusCounts.closed }}</div>
+          <div class="metric-label">Closed</div>
+        </div>
+        <div class="metric-card lost">
+          <div class="metric-value">{{ dealStatusCounts.lost }}</div>
+          <div class="metric-label">Lost</div>
+        </div>
+        <div class="metric-card won">
+          <div class="metric-value">{{ dealStatusCounts.won }}</div>
+          <div class="metric-label">Won</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority Section -->
+    <div class="metrics-section">
+      <h2><i class="fas fa-exclamation-circle"></i> Priority</h2>
+      <div class="metrics-grid">
+        <div class="metric-card new">
+          <div class="metric-value">{{ priorityCounts.new }}</div>
+          <div class="metric-label">New</div>
+        </div>
+        <div class="metric-card allotted">
+          <div class="metric-value">{{ priorityCounts.allotted }}</div>
+          <div class="metric-label">Allotted</div>
+        </div>
+        <div class="metric-card lost">
+          <div class="metric-value">{{ priorityCounts.lost }}</div>
+          <div class="metric-label">Lost</div>
+        </div>
+        <div class="metric-card urgent">
+          <div class="metric-value">{{ priorityCounts.urgent }}</div>
+          <div class="metric-label">Urgent</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lead Status Section -->
+    <!-- <div class="metrics-section">
+      <h2><i class="fas fa-chart-line"></i> Lead Status</h2>
+      <div class="metrics-grid">
+        <div class="metric-card new-leads">
+          <div class="metric-value">{{ newLeads }}</div>
+          <div class="metric-label">New</div>
+        </div>
+        <div class="metric-card contacted">
+          <div class="metric-value">{{ contactedLeads }}</div>
+          <div class="metric-label">Contacted</div>
+        </div>
+        <div class="metric-card qualified">
+          <div class="metric-value">{{ qualifiedLeads }}</div>
+          <div class="metric-label">Qualified</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> -->

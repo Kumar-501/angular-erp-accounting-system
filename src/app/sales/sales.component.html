@@ -1,0 +1,867 @@
+
+<!-- Add this modal to your template -->
+<div class="modal fade" id="printInvoiceModal" tabindex="-1" aria-labelledby="printInvoiceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="printInvoiceModalLabel">Print Invoice #{{ selectedSale?.invoiceNo }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="printInvoiceContent">
+        <!-- Invoice Header -->
+        <div class="text-center mb-4">
+          <h3>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h3>
+          <p>1st Floor, Chirackal Tower, Ayroor P.O, Emakulam, Kerala, 683579, India</p>
+          <p>Mobile: 00917034110999 | GST: 32AAGCH3136H12X</p>
+        </div>
+
+        <!-- Invoice Details -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <p><strong>Invoice No:</strong> {{ selectedSale?.invoiceNo || 'N/A' }}</p>
+            <p><strong>Date:</strong> {{ (selectedSale?.saleDate | date:'mediumDate') || 'N/A' }}</p>
+            <p><strong>Order No:</strong> {{ selectedSale?.orderNo || 'N/A' }}</p>
+          </div>
+          <div class="col-md-6 text-end">
+            <p><strong>Customer:</strong> {{ selectedSale?.customer || 'N/A' }}</p>
+            <p>{{ selectedSale?.billingAddress || selectedSale?.shippingAddress || 'N/A' }}</p>
+            <p>Mobile: {{ selectedSale?.customerPhone || 'N/A' }}</p>
+          </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="table-responsive mb-4">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit Price (₹)</th>
+                <th>Discount</th>
+                <th>Taxable Value (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>Subtotal (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let product of selectedSale?.products; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ product.name || product.productName || 'Product' }}</td>
+                <td>{{ product.quantity }} Nos.</td>
+                <td class="text-end">{{ product.unitPrice || product.price | number:'1.2-2' }}</td>
+                <td class="text-end">
+                  {{ product.discount | number:'1.2-2' }}
+                  <span *ngIf="product.discount > 0">({{ (product.discount / (product.unitPrice * product.quantity) * 100) | number:'1.2-2' }}%)</span>
+                </td>
+                <td class="text-end">{{ ((product.unitPrice * product.quantity) - product.discount) | number:'1.2-2' }}</td>
+                <td class="text-end">{{ (product.cgstAmount || ((product.unitPrice * product.quantity - product.discount) * 0.09)) | number:'1.2-2' }} (9%)</td>
+                <td class="text-end">{{ (product.sgstAmount || ((product.unitPrice * product.quantity - product.discount) * 0.09)) | number:'1.2-2' }} (9%)</td>
+                <td class="text-end">{{ product.subtotal | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Shipping Row -->
+        <div class="row mb-3">
+          <div class="col-8">
+            <p>Shipping Charges</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ (selectedSale?.shippingCharges || 0) | number:'1.2-2' }}</p>
+          </div>
+          <div class="col-8">
+            <p>Shipping Tax (18%)</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ ((selectedSale?.shippingCharges || 0) * 0.18) | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Totals -->
+        <div class="row mb-4">
+          <div class="col-4 text-end">
+            <p><strong>Total Taxable Value: </strong> <strong>₹{{ getTotalTaxableValueForPrint() | number:'1.2-2' }}</strong></p>
+            <p><strong>Total CGST (9%): </strong><strong>₹{{ getTotalCGSTForPrint() | number:'1.2-2' }}</strong></p>
+            <p><strong>Total SGST (9%): </strong><strong>₹{{ getTotalSGSTForPrint() | number:'1.2-2' }}</strong></p>
+            <p><strong>Grand Total: </strong><strong>₹{{ getGrandTotalForPrint() | number:'1.2-2' }}</strong></p>
+          </div>
+          <!-- <div class="col-2">
+            <p></p>
+            <p></p>
+            <p></p>
+            <p></p>
+          </div> -->
+        </div>
+
+        <!-- Payment Info -->
+        <div class="row">
+          <div class="col-12">
+            <p><strong>Payment Method:</strong> {{ selectedSale?.paymentMethod || 'N/A' }}</p>
+            <p><strong>Amount Paid:</strong> ₹{{ selectedSale?.paymentAmount | number:'1.2-2' }}</p>
+            <p><strong>Balance Due:</strong> ₹{{ selectedSale?.balance | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-4">
+          <p>Thank you for your business!</p>
+          <small class="text-muted">This is a computer generated invoice and does not require signature</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" (click)="printInvoiceNow()">
+          <i class="fa fa-print"></i> Print Invoice
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<h2>Sales</h2>
+<div class="container">
+ 
+  <!-- Existing filter, export, and search sections remain the same -->
+    <!-- Improved Filter, Export, and Search sections -->
+   
+      <div class="row align-items-center">
+  <div class="col-12">
+    <h5 class="card-title mb-3">Sales Management</h5>
+    
+    <!-- Main row with search on left and buttons on right -->
+   
+<!-- Main row with search on left and buttons on right -->
+<div class="row align-items-center mb-3">
+  <!-- Search section - Left side -->
+  <div class="col-md-6">
+    <div class="input-group">
+      <span class="input-group-text"><i class="fa fa-search"></i></span>
+    <input type="text" class="form-control" placeholder="Search by customer, invoice, products..."
+       [(ngModel)]="searchTerm" (keyup)="applyFilters()">
+    </div>
+  </div>
+         
+  <!-- Buttons section - Right side -->
+  <div class="col-md-6">
+    <div class="d-flex justify-content-end gap-2">
+      <button class="btn btn-light" type="button" (click)="toggleColumnMenu()">
+        <i class="fa fa-columns"></i> Columns
+      </button>
+                     
+      <button class="btn btn-info" (click)="toggleFilterSidebar()">
+        <i class="fa fa-filter"></i> Filters
+      </button>
+      <button class="btn btn-primary" routerLink="/add-sale">
+        <i class="fa fa-plus"></i> Add Sales Order
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Column Menu Dropdown - Centered Modal -->
+<div class="column-menu-overlay" *ngIf="showColumnMenu" (click)="toggleColumnMenu()">
+  <div class="column-menu-modal" (click)="$event.stopPropagation()">
+    <div class="column-menu-header">
+      <h6>Column Visibility</h6>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" (click)="resetColumnVisibility()">Reset</button>
+        <button class="btn btn-sm btn-outline-danger" (click)="toggleColumnMenu()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="column-options">
+      <div *ngFor="let column of columns" class="form-check">
+        <input class="form-check-input" type="checkbox"
+               id="col-{{column.field}}"
+               [(ngModel)]="column.visible"
+               (change)="updateColumnVisibility()">
+        <label class="form-check-label" for="col-{{column.field}}">
+          {{column.header}}
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+    <!-- Export Dropdown Menu -->
+    <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+      <li><a class="dropdown-item" (click)="exportCSV()"><i class="fa fa-file-csv"></i> CSV</a></li>
+      <li><a class="dropdown-item" (click)="exportExcel()"><i class="fa fa-file-excel"></i> Excel</a></li>
+      <li><a class="dropdown-item" (click)="printData()"><i class="fa fa-print"></i> Print</a></li>
+    </ul>
+  </div>
+</div>
+    </div>
+    <!-- Inside the card-body div, after the export section -->
+
+<!-- Filter Sidebar -->
+<!-- Filter Sidebar -->
+<!-- Enhanced Filter Sidebar with Quick Date Filters -->
+<div class="filter-sidebar" [class.show]="showFilterSidebar">
+  <div class="sidebar-header">
+    <h5>Filters</h5>
+    <button class="btn btn-close" (click)="toggleFilterSidebar()"></button>
+  </div>
+  <div class="sidebar-body">
+    <!-- Quick Date Filters -->
+    <div class="mb-3">
+      <label class="form-label">Quick Date Filters</label>
+      <select class="form-select" [(ngModel)]="quickDateFilter" (change)="applyQuickDateFilter()">
+        <option value="">Custom Date Range</option>
+        <option value="today">Today</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="tomorrow">Tomorrow</option>
+        <option value="thisWeek">This Week</option>
+        <option value="lastWeek">Last Week</option>
+        <option value="nextWeek">Next Week</option>
+        <option value="thisMonth">This Month</option>
+        <option value="lastMonth">Last Month</option>
+        <option value="thisQuarter">This Quarter</option>
+        <option value="lastQuarter">Last Quarter</option>
+        <option value="thisYear">This Year</option>
+        <option value="lastYear">Last Year</option>
+        <option value="thisFinancialYear">This Financial Year</option>
+        <option value="lastFinancialYear">Last Financial Year</option>
+        <option value="last7Days">Last 7 Days</option>
+        <option value="last30Days">Last 30 Days</option>
+        <option value="last90Days">Last 90 Days</option>
+      </select>
+    </div>
+
+    <!-- Custom Date Range Filters (shown when "Custom Date Range" is selected) -->
+    <div class="mb-3" *ngIf="quickDateFilter === '' || quickDateFilter === null">
+      <label class="form-label">Custom Date Range</label>
+      <div class="row">
+        <div class="col-6">
+          <input type="date" class="form-control" placeholder="From Date" 
+                [(ngModel)]="startDate" (change)="applyFilters()">
+        </div>
+        <div class="col-6">
+          <input type="date" class="form-control" placeholder="To Date" 
+                [(ngModel)]="endDate" (change)="applyFilters()">
+        </div>
+      </div>
+    </div>
+    
+
+    <!-- Display selected date range info -->
+    <div class="mb-3" *ngIf="quickDateFilter && getDateRangeDisplay()">
+      <div class="alert alert-info py-2">
+        <small><i class="fa fa-calendar"></i> {{ getDateRangeDisplay() }}</small>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Status</label>
+      <select class="form-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="Completed">Completed</option>
+        <option value="Pending">Pending</option>
+        <option value="Cancelled">Cancelled</option>
+      </select>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label">Payment Method</label>
+      <select class="form-select" [(ngModel)]="paymentMethodFilter" (change)="applyFilters()">
+        <option value="">All Methods</option>
+        <option value="Cash">Cash</option>
+        <option value="Card">Card</option>
+        <option value="Bank Transfer">Bank Transfer</option>
+        <option value="Cheque">Cheque</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Incentive User</label>
+      <select class="form-select" [(ngModel)]="addedByFilter" (change)="applyFilters()">
+        <option value="">All Users</option>
+        <option *ngFor="let user of getUniqueAddedByUsers()" [value]="user">
+          {{ user }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Location</label>
+      <select class="form-select" [(ngModel)]="locationFilter" (change)="applyFilters()">
+        <option value="">All Locations</option>
+        <option *ngFor="let location of getUniqueLocations()" [value]="location">
+          {{ location }}
+        </option>
+      </select>
+    </div>
+<div *ngIf="userAllowedLocations.length > 0" class="location-badge">
+  <i class="fa fa-map-marker"></i> 
+  Viewing data for: 
+  <span *ngFor="let loc of userAllowedLocations; let last = last">
+    {{ loc }}{{ !last ? ', ' : '' }}
+  </span>
+</div>
+
+    <div class="mb-3">
+      <label class="form-label">Shipping Status</label>
+      <select class="form-select" [(ngModel)]="shippingStatusFilter" (change)="applyFilters()">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Delivered">Delivered</option>
+        <option value="Returned">Processing</option>
+                <option value="Returned">Packed</option>
+                        <option value="Returned">cancelled</option>
+                                <option value="Returned">Print</option>
+                                        <option value="Returned">Return</option>
+                                          <option value="Returned">Ordered</option>
+              
+
+
+
+      </select>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label">Commission Range</label>
+      <div class="row">
+        <div class="col-6">
+          <input type="number" class="form-control" placeholder="Min" 
+                [(ngModel)]="minCommission" (change)="applyFilters()">
+        </div>
+        <div class="col-6">
+          <input type="number" class="form-control" placeholder="Max" 
+                [(ngModel)]="maxCommission" (change)="applyFilters()">
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn btn-outline-secondary w-100 mt-2" (click)="resetSidebarFilters()">
+      <i class="fa fa-sync"></i> Reset Filters
+    </button>
+  </div>
+</div>
+
+<!-- <div class="mb-3">
+      <label class="form-label">Location</label>
+      <select class="form-select" [(ngModel)]="locationFilter" (change)="applyFilters()">
+        <option value="">All Locations</option>
+        <option *ngFor="let location of getUniqueLocations()" [value]="location">
+          {{ location }}
+        </option>
+      </select>
+    </div>
+<div *ngIf="userAllowedLocations.length > 0" class="location-badge">
+  <i class="fa fa-map-marker"></i> 
+  Viewing data for: 
+  <span *ngFor="let loc of userAllowedLocations; let last = last">
+    {{ loc }}{{ !last ? ', ' : '' }}
+  </span>
+</div> -->
+  <!-- Table section -->
+
+
+
+  <div *ngIf="userAllowedLocations.length > 0" class="location-badge">
+  <i class="fa fa-map-marker"></i> 
+  Viewing data for: 
+  <span *ngFor="let loc of userAllowedLocations; let last = last">
+    {{ loc }}{{ !last ? ', ' : '' }}
+  </span>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-hover no-vertical-lines">
+      <thead>
+        <tr>
+          <th>S.No</th>
+          <th>Actions</th>
+          <th *ngIf="isColumnVisible('customer')" (click)="sortData('customer')">
+            Customer <i class="fa" [ngClass]="getSortIconClass('customer')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('saleDate')" (click)="sortData('saleDate')">
+            Sale Date <i class="fa" [ngClass]="getSortIconClass('saleDate')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('invoiceNo')" (click)="sortData('invoiceNo')">
+            Invoice No <i class="fa" [ngClass]="getSortIconClass('invoiceNo')"></i>
+          </th>
+          <th class="text-start" [hidden]="!isColumnVisible('customerPhone')">
+  Contact Number
+  <i class="fa" [ngClass]="getSortIconClass('customerPhone')"></i>
+</th>
+<th class="text-start" [hidden]="!isColumnVisible('alternateContact')">
+  Alternate Contact
+</th>
+          <th *ngIf="isColumnVisible('products')" (click)="sortData('products')">
+            Products <i class="fa" [ngClass]="getSortIconClass('products')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('location')" (click)="sortData('location')">
+            Location <i class="fa" [ngClass]="getSortIconClass('location')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('billingAddress')" (click)="sortData('billingAddress')">
+            Billing Address <i class="fa" [ngClass]="getSortIconClass('billingAddress')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('addedBy')" (click)="sortData('addedBy')">
+            Added By <i class="fa" [ngClass]="getSortIconClass('addedBy')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('status')" (click)="sortData('status')">
+            Status <i class="fa" [ngClass]="getSortIconClass('status')"></i>
+          </th>
+ 
+       
+          <th *ngIf="isColumnVisible('shippingDetails')" (click)="sortData('shippingDetails')">
+            Shipping Details <i class="fa" [ngClass]="getSortIconClass('shippingDetails')"></i>
+          </th>
+             <th *ngIf="isColumnVisible('paymentMethod')" (click)="sortData('paymentMethod')">
+            Payment Method <i class="fa" [ngClass]="getSortIconClass('paymentMethod')"></i>
+          </th>
+               <th class="text-start" [hidden]="!isColumnVisible('paymentAccount')" (click)="sortData('paymentAccount')">
+  Payment Account
+  <i class="fa" [ngClass]="getSortIconClass('paymentAccount')"></i>
+</th>
+          <th *ngIf="isColumnVisible('shippingStatus')" (click)="sortData('shippingStatus')">
+            Shipping Status <i class="fa" [ngClass]="getSortIconClass('shippingStatus')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('shippingCharge')">Shipping Charge</th>
+          <th class="text-end" [hidden]="!isColumnVisible('totalPayable')" (click)="sortData('totalPayable')">
+  Total Payable
+  <i class="fa" [ngClass]="getSortIconClass('totalPayable')"></i>
+</th>
+          <th *ngIf="isColumnVisible('paymentAmount')" (click)="sortData('paymentAmount')">
+            Payment Amount <i class="fa" [ngClass]="getSortIconClass('paymentAmount')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('balance')" (click)="sortData('balance')">
+            Balance <i class="fa" [ngClass]="getSortIconClass('balance')"></i>
+          </th>
+          <th *ngIf="isColumnVisible('typeOfService')" (click)="sortData('typeOfService')">
+            Type of Service <i class="fa" [ngClass]="getSortIconClass('typeOfService')"></i>
+          </th>
+          <th class="text-center" *ngIf="isColumnVisible('paymentDue')" (click)="sortData('paymentDue')">
+  Payment Due <i class="fa" [ngClass]="getSortIconClass('paymentDue')"></i>
+</th>
+
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let sale of filteredSales | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage; let i = index">
+          <tr>
+            <td>{{ (currentPage-1)*entriesPerPage + i + 1 }}</td> <!-- Added S.No column -->
+            <td class="action-buttons">
+              <div class="dropdown">
+                <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="actionMenu{{i}}" data-bs-toggle="dropdown" aria-expanded="false">
+                  Actions
+                </button>
+                <ul class="dropdown-menu" [attr.aria-labelledby]="'actionMenu' + i">
+                  <!-- <li>
+                    <a class="dropdown-item" href="javascript:void(0)" (click)="viewSale(sale)">
+                      <i class="fa fa-eye me-2"></i> View
+                    </a>
+                  </li> -->
+                  <li>
+                    <a class="dropdown-item" href="javascript:void(0)" (click)="generateInvoice(sale)">
+                      <i class="fa fa-file-text me-2"></i> Generate Invoice
+                    </a>
+                  </li>
+                  <li>
+                    <a class="dropdown-item" href="javascript:void(0)" (click)="initiateReturn(sale)">
+                      <i class="fa fa-undo me-2"></i> Initiate Return
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li>
+                    <a class="dropdown-item text-danger" href="javascript:void(0)" (click)="deleteSale(sale.id)">
+                      <i class="fa fa-trash me-2"></i> Delete
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </td>
+            <td *ngIf="isColumnVisible('customer')">{{ sale.customer }}</td>
+            <td *ngIf="isColumnVisible('saleDate')">{{ sale.saleDate | date:'M/d/yy' }}</td>
+            <td *ngIf="isColumnVisible('invoiceNo')">{{ sale.invoiceNo }}</td>
+            <td class="text-start" [hidden]="!isColumnVisible('customerPhone')">{{ sale.customerPhone }}</td>
+<td class="text-start" [hidden]="!isColumnVisible('alternateContact')">
+  {{ sale.alternateContact || 'N/A' }}
+</td>
+            <td *ngIf="isColumnVisible('products')">
+              <div class="d-flex align-items-center">
+                <span>{{ getProductsDisplayText(sale.products) }}</span>
+                <button class="btn btn-sm btn-link text-primary ms-2" (click)="toggleProductDetails(sale.id)">
+                </button>
+              </div>
+            </td>
+            <td *ngIf="isColumnVisible('location')">{{ sale.location || sale.businessLocation || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('billingAddress')">{{ sale.billingAddress || 'N/A' }}</td>
+            <td *ngIf="isColumnVisible('addedBy')">{{ sale.addedByDisplayName || sale.addedBy || 'System' }}</td>
+<td *ngIf="isColumnVisible('status')">
+  <span class="badge" [ngClass]="{
+    'bg-success': sale.status === 'Completed',
+    'bg-warning': sale.status === 'Pending',
+    'bg-danger': sale.status === 'Cancelled',
+    'bg-info': sale.status === 'Returned',
+    'bg-primary': sale.status === 'Partial Return'
+  }">
+    {{ sale.status }}
+  </span>
+</td>
+       
+                        <td *ngIf="isColumnVisible('shippingDetails')">{{ sale.shippingDetails || 'N/A' }}</td>
+
+                   <td *ngIf="isColumnVisible('paymentMethod')">
+              <span class="badge" 
+                    [ngClass]="{
+                      'bg-success': sale.paymentMethod === 'Cash',
+                      'bg-primary': sale.paymentMethod === 'Card',
+                      'bg-info': sale.paymentMethod === 'Bank Transfer',
+                      'bg-warning text-dark': sale.paymentMethod === 'Cheque',
+                      'bg-secondary': sale.paymentMethod === 'Other' || !sale.paymentMethod
+                    }">
+                {{ sale.paymentMethod || 'N/A' }}
+              </span>
+            </td>
+                     <td class="text-start" [hidden]="!isColumnVisible('paymentAccount')">
+  {{ sale.paymentAccountName || 'N/A' }}
+</td>
+     
+            <td *ngIf="isColumnVisible('shippingStatus')">{{ sale.shippingStatus }}</td>
+            <td *ngIf="isColumnVisible('shippingCharge')">{{ sale.shippingCharges }}</td>
+            <td class="text-end" [hidden]="!isColumnVisible('totalPayable')">
+  ₹{{ sale.totalPayable | number:'1.2-2' }}
+</td>
+            <td *ngIf="isColumnVisible('paymentAmount')">₹{{ sale.paymentAmount | number:'1.2-2' }}</td>
+            <td *ngIf="isColumnVisible('balance')">₹{{ sale.balance | number:'1.2-2' }}</td>
+            <td *ngIf="isColumnVisible('typeOfService')">
+              {{ sale.typeOfServiceName || sale.typeOfService || 'Standard' }}
+            </td>
+            <td class="text-center" [hidden]="!isColumnVisible('paymentDue')">
+  <span class="badge" 
+        [ngClass]="{
+          'bg-success': sale.paymentStatus === 'Paid',
+          'bg-danger': sale.paymentStatus === 'Due',
+          'bg-warning': sale.paymentStatus === 'Partial'
+        }">
+    {{ sale.paymentStatus || 'Due' }}
+  </span>
+</td>
+
+          </tr>
+        </ng-container>
+      </tbody>
+      <tfoot>
+        <tr>
+         
+        </tr>
+      </tfoot>
+      
+    </table>
+   
+  </div>
+   <!-- Table footer with all totals -->
+<div class="tablefooter mt-3">
+  <div class="row">
+    <!-- Left side - Status counts -->
+    <div class="col-md-6">
+      <!-- Payment Status Summary -->
+      <div *ngIf="isColumnVisible('paymentDue')" class="mb-3">
+        <h6 class="fw-bold">Payment Status Summary</h6>
+        <div class="d-flex flex-wrap gap-2">
+          <span class="badge bg-success">Paid: {{getPaymentStatusCount('Paid')}}</span>
+          <span class="badge bg-danger">Due: {{getPaymentStatusCount('Due')}}</span>
+          <span class="badge bg-warning text-dark">Partial: {{getPaymentStatusCount('Partial')}}</span>
+        </div>
+      </div>
+
+      <!-- Payment Method Summary -->
+      <div *ngIf="isColumnVisible('paymentMethod')" class="mb-3">
+        <h6 class="fw-bold">Payment Methods</h6>
+        <div class="d-flex flex-wrap gap-2">
+          <span *ngFor="let method of getPaymentMethodSummary()" class="badge bg-info text-dark">
+            {{method.method}}: {{method.count}}
+          </span>
+        </div>
+      </div>
+
+      <!-- Type of Service Summary -->
+      <!-- <div *ngIf="isColumnVisible('typeOfService')" class="mb-3">
+        <h6 class="fw-bold">Service Types</h6>
+        <div class="d-flex flex-wrap gap-2">
+          <span *ngFor="let service of getServiceTypeSummary()" class="badge bg-secondary">
+            {{service.type}}: {{service.count}}
+          </span>
+        </div>
+      </div> -->
+    </div>
+<!-- Add this near the top of your sales component template -->
+<div *ngIf="productFilterName" class="product-filter-indicator alert alert-info">
+  <strong>Showing sales for product:</strong> {{ productFilterName }}
+  <button class="btn btn-sm btn-outline-secondary ms-2" (click)="clearProductFilter()">
+    <i class="fas fa-times"></i> Clear filter
+  </button>
+</div>
+    <!-- Right side - Numeric totals -->
+    <div class="col-md-6">
+      <table class="table table-sm table-borderless float-end">
+        <tbody>
+       
+          <tr *ngIf="isColumnVisible('paymentAmount')">
+            <td class="text-end fw-bold">Payment Amount Total:</td>
+            <td class="text-end">₹{{ totalPaymentAmount | number:'1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="isColumnVisible('balance')">
+            <td class="text-end fw-bold">Balance Total:</td>
+            <td class="text-end">₹{{ totalBalance | number:'1.2-2' }}</td>
+          </tr>
+      
+          <tr *ngIf="isColumnVisible('paymentDue')">
+            <td class="text-end fw-bold">Total Due Amount:</td>
+            <td class="text-end">₹{{ totalDueAmount | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+  
+  <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-labelledby="saleDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="saleDetailsModalLabel">Sale Details - Invoice #{{ selectedSale?.invoiceNo }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <h6>Customer Information</h6>
+              <p><strong>Name:</strong> {{ selectedSale?.customer }}</p>
+              <p><strong>Contact:</strong> {{ selectedSale?.customerPhone }}</p>
+              <p><strong>Email:</strong> {{ selectedSale?.customerEmail }}</p>
+            </div>
+            <div class="col-md-6">
+              <h6>Order Information</h6>
+              <p><strong>Date:</strong> {{ selectedSale?.saleDate | date:'mediumDate' }}</p>
+              <p><strong>Added By:</strong> {{ selectedSale?.addedByDisplayName || selectedSale?.addedBy || 'System' }}</p>
+              <p><strong>Status:</strong> 
+                <span class="badge" [ngClass]="{
+                  'bg-success': selectedSale?.status === 'Completed',
+                  'bg-warning': selectedSale?.status === 'Pending',
+                  'bg-danger': selectedSale?.status === 'Cancelled',
+                  'bg-primary': selectedSale?.status === 'Active'  
+                }">
+                  {{ selectedSale?.status }}
+                </span>
+              </p>
+              <p><strong>Commission:</strong> {{ selectedSale?.commissionPercentage || 0 }}%</p>
+              <p><strong>Shipping:</strong> {{ selectedSale?.shippingStatus }}</p>
+            </div>
+          </div>
+          
+          
+          <div class="row mb-3">
+            <div class="col-12">
+              <h6>Items</h6>
+              <table class="table table-sm">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ng-container *ngIf="selectedSale?.products?.length > 0; else showItems">
+                    <tr *ngFor="let product of selectedSale?.products">
+                      <td>{{ product.name }}</td>
+                      <td>{{ product.quantity }}</td>
+                      <td>₹{{ product.unitPrice | number:'1.2-2' }}</td>
+                      <td>₹{{ product.subtotal | number:'1.2-2' }}</td>
+                    </tr>
+                  </ng-container>
+                  <ng-template #showItems>
+                    <tr *ngFor="let item of selectedSale?.items">
+                      <td>{{ item.name }}</td>
+                      <td>{{ item.quantity }}</td>
+                      <td>₹{{ item.price | number:'1.2-2' }}</td>
+                      <td>{{ item.commissionPercent || 0 }}%</td>
+                      <td>₹{{ (item.price * item.quantity) | number:'1.2-2' }}</td>
+                    </tr>
+                  </ng-template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <h6>Shipping Information</h6>
+              <p>{{ selectedSale?.shippingAddress }}</p>
+            </div>
+            <div class="col-md-6 text-end">
+              <div class="totals">
+                <p><strong>Subtotal:</strong> ₹{{ selectedSale?.subtotal | number:'1.2-2' }}</p>
+                <p><strong>Tax:</strong> ₹{{ selectedSale?.tax | number:'1.2-2' }}</p>
+                <p><strong>Shipping:</strong> ₹{{ selectedSale?.shippingCost | number:'1.2-2' }}</p>
+                <p><strong>Total:</strong> ₹{{ selectedSale?.total | number:'1.2-2' }}</p>
+                <p><strong>Paid:</strong> ₹{{ selectedSale?.paymentAmount | number:'1.2-2' }}</p>
+                <p><strong>Balance:</strong>₹{{ selectedSale?.balance | number:'1.2-2' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" (click)="printInvoice()">
+            <i class="fa fa-print"></i> Print Invoice
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+<div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="invoiceModalLabel">Invoice #{{ invoiceData.invoiceNo }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="invoicePrintContent">
+        <!-- Invoice Header -->
+        <div class="text-center mb-4">
+          <h3>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h3>
+          <p>1st Floor, Chirackal Tower, Ayroor P.O, Emakulam, Kerala, 683579, India</p>
+          <p>Mobile: 00917034110999 | GST: 32AAGCH3136H12X</p>
+        </div>
+
+        <!-- Invoice Details -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <p><strong>Invoice No:</strong> {{ invoiceData.invoiceNo }}</p>
+            <p><strong>Date:</strong> {{ invoiceData.date }}</p>
+            <p><strong>Order No:</strong> {{ selectedSale?.orderNo || 'N/A' }}</p>
+          </div>
+          <div class="col-md-6 text-end">
+            <p><strong>Customer:</strong> {{ invoiceData.to.name }}</p>
+            <p>{{ invoiceData.to.address }}</p>
+            <p>Mobile: {{ invoiceData.to.mobile }}</p>
+          </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="table-responsive mb-4">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit Price (₹)</th>
+                <th>Discount</th>
+                <th>Taxable Value (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>Subtotal (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let product of invoiceData.products; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.quantity }} Nos.</td>
+                <td class="text-end">{{ product.unitPrice | number:'1.2-2' }}</td>
+                <td class="text-end">
+                  {{ product.discount | number:'1.2-2' }} 
+                  <span *ngIf="product.discount > 0">({{ product.discountPercent | number:'1.2-2' }}%)</span>
+                </td>
+                <td class="text-end">{{ product.taxableValue | number:'1.2-2' }}</td>
+                <td class="text-end">{{ product.cgstAmount | number:'1.2-2' }} ({{ product.cgstRate | number:'1.2-2' }}%)</td>
+                <td class="text-end">{{ product.sgstAmount | number:'1.2-2' }} ({{ product.sgstRate | number:'1.2-2' }}%)</td>
+                <td class="text-end">{{ product.subtotal | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Shipping Row -->
+        <div class="row mb-3">
+          <div class="col-8">
+            <p>Shipping Charges</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ (invoiceData.shippingCharge - invoiceData.shippingTax) | number:'1.2-2' }}</p>
+          </div>
+          <div class="col-8">
+            <p>Shipping Tax (5%)</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ invoiceData.shippingTax | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Totals -->
+        <div class="row mb-4">
+          <div class="col-8 text-end">
+            <p><strong>Total Taxable Value: </strong> <strong>₹{{ invoiceData.totalTaxableValue | number:'1.2-2' }}</strong></p>
+            <p><strong>Total CGST (2.5%): </strong> <strong>₹{{ getTotalCGST() | number:'1.2-2' }}</strong></p>
+            <p><strong>Total SGST (2.5%): </strong> <strong>₹{{ getTotalSGST() | number:'1.2-2' }}</strong></p>
+            <p><strong>Grand Total: </strong> <strong>₹{{ invoiceData.total | number:'1.2-2' }}</strong></p>
+          </div>
+          <div class="col-4">
+            <!-- <p></p>
+            <p></p>
+            <p><</p>
+            <p></p> -->
+          </div>
+        </div>
+
+        <!-- Payment Info -->
+        <div class="row">
+          <div class="col-12">
+            <p><strong>Payment Method:</strong> {{ selectedSale?.paymentMethod || 'N/A' }}</p>
+            <p><strong>Amount Paid:</strong> ₹{{ selectedSale?.paymentAmount | number:'1.2-2' }}</p>
+            <p><strong>Balance Due:</strong> ₹{{ selectedSale?.balance | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-4">
+          <p>Thank you for your business!</p>
+          <small class="text-muted">This is a computer generated invoice and does not require signature</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" (click)="printGeneratedInvoice()">
+          <i class="fa fa-print"></i> Print Invoice
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+  <!-- Pagination section -->
+  <!-- Enhanced pagination controls -->
+<div class="row mt-3">
+  <div class="col pagination-info">
+    Showing {{ (currentPage-1)*entriesPerPage + 1 }} to 
+    {{ currentPage*entriesPerPage > totalEntries ? totalEntries : currentPage*entriesPerPage }} 
+    of {{ totalEntries }} entries
+  </div>
+  <div class="col pagination-controls">
+    <button class="btn btn-light btn-sm me-2" 
+            [disabled]="currentPage === 1" 
+            (click)="previousPage()">
+      <i class="fa fa-chevron-left"></i> Previous
+    </button>
+    <span class="page-numbers">
+      Page {{ currentPage }} of {{ Math.ceil(totalEntries/entriesPerPage) }}
+    </span>
+    <button class="btn btn-light btn-sm ms-2" 
+            [disabled]="currentPage*entriesPerPage >= totalEntries" 
+            (click)="nextPage()">
+      Next <i class="fa fa-chevron-right"></i>
+    </button>
+  </div>
+</div>

@@ -1,0 +1,24 @@
+<!-- sidebar.component.html -->
+<aside class="sidebar" [class.open]="isOpen" [class.closed]="!isOpen">
+  <div class="sidebar-content">
+    <ul class="main-menu">
+      <li *ngFor="let item of filteredMenuItems" class="menu-item" [class.active]="isActive(item.route) || hasActiveChild(item)">
+        <div class="menu-header" (click)="handleMenuItemClick(item)">
+          <mat-icon class="menu-icon">{{item.icon}}</mat-icon>
+          <span class="menu-text">{{item.name}}</span>
+          <mat-icon class="toggle-icon" *ngIf="item.subItems?.length">
+            {{item.isExpanded ? 'expand_less' : 'expand_more'}}
+          </mat-icon>
+        </div>
+        <ul class="submenu" *ngIf="item.isExpanded && item.subItems?.length">
+          <li *ngFor="let subItem of item.subItems" 
+              class="submenu-item"
+              [class.active]="isActive(subItem.route)"
+              (click)="navigateTo(subItem.route)">
+            {{subItem.name}}
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+</aside>

@@ -1,0 +1,312 @@
+<div class="discount-container">
+  <h2>Discount</h2>
+  
+  <!-- Top Action Bar -->
+  <div class="action-bar">
+    <div class="left-actions">
+      <div class="entries-selector">
+        <span>Show</span>
+        <select [(ngModel)]="entriesPerPage" (change)="updatePagination()">
+         <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+      
+      <button class="btn btn-export" (click)="exportCSV()">
+        <i class="fa fa-file-csv"></i> Export CSV
+      </button>
+      
+      <button class="btn btn-export" (click)="exportExcel()">
+        <i class="fa fa-file-excel"></i> Export Excel
+      </button>
+      
+      <button class="btn btn-print" (click)="printTable()">
+        <i class="fa fa-print"></i> Print
+      </button>
+      
+      <div class="column-visibility-container">
+        <button class="btn btn-columns" (click)="toggleColumnVisibility()">
+          <i class="fa fa-columns"></i> Column visibility
+        </button>
+        
+        <div class="column-dropdown" *ngIf="showColumnVisibility">
+          <div class="column-item" *ngFor="let column of columns">
+            <label>
+              <input type="checkbox" [checked]="column.visible" (change)="toggleColumnState(column)">
+              {{ column.name }}
+            </label>
+          </div>
+        </div>
+      </div>
+  
+    </div>
+    
+    <div class="right-actions">
+      <div class="search-box">
+        <input type="text" placeholder="Search..." [(ngModel)]="searchQuery" (input)="applySearch()">
+      </div>
+      
+      <button class="btn btn-add" (click)="toggleForm()">
+        <i class="fa fa-plus"></i> Add
+      </button>
+    </div>
+  </div>
+  
+  <!-- Discount Table -->
+  <div class="discount-table" id="discount-table">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" (change)="selectAll($event)"></th>
+          <th *ngIf="isColumnVisible('name')" class="sortable" (click)="sortBy('name')">
+            Name 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'name',
+              'fa-sort-up': sortColumn === 'name' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'name' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('startsAt')" class="sortable" (click)="sortBy('startsAt')">
+            Starts At 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'startsAt',
+              'fa-sort-up': sortColumn === 'startsAt' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'startsAt' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('endsAt')" class="sortable" (click)="sortBy('endsAt')">
+            Ends At 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'endsAt',
+              'fa-sort-up': sortColumn === 'endsAt' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'endsAt' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('discountAmount')" class="sortable" (click)="sortBy('discountAmount')">
+            Discount Amount 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'discountAmount',
+              'fa-sort-up': sortColumn === 'discountAmount' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'discountAmount' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('priority')" class="sortable" (click)="sortBy('priority')">
+            Priority 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'priority',
+              'fa-sort-up': sortColumn === 'priority' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'priority' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('brand')" class="sortable" (click)="sortBy('brand')">
+            Brand 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'brand',
+              'fa-sort-up': sortColumn === 'brand' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'brand' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('category')" class="sortable" (click)="sortBy('category')">
+            Category 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'category',
+              'fa-sort-up': sortColumn === 'category' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'category' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('products')">Products</th>
+          <th *ngIf="isColumnVisible('location')" class="sortable" (click)="sortBy('location')">
+            Location 
+            <i class="fa" [ngClass]="{
+              'fa-sort': sortColumn !== 'location',
+              'fa-sort-up': sortColumn === 'location' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'location' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th *ngIf="isColumnVisible('action')">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="filteredDiscounts.length === 0">
+          <td [attr.colspan]="getVisibleColumnCount()" class="no-data">No data available in table</td>
+        </tr>
+        <tr *ngFor="let discount of displayedDiscounts">
+          <td><input type="checkbox" [(ngModel)]="discount.selected"></td>
+          <td *ngIf="isColumnVisible('name')">{{ discount.name }}</td>
+          <td *ngIf="isColumnVisible('startsAt')">{{ discount.startsAt | date:'medium' }}</td>
+          <td *ngIf="isColumnVisible('endsAt')">{{ discount.endsAt | date:'medium' }}</td>
+          <td *ngIf="isColumnVisible('discountAmount')">{{ discount.discountAmount }} {{ discount.discountType === 'percentage' ? '%' : '' }}</td>
+          <td *ngIf="isColumnVisible('priority')">{{ discount.priority || '-' }}</td>
+          <td *ngIf="isColumnVisible('brand')">{{ getBrandName(discount.brand) || '-' }}</td>
+          <td *ngIf="isColumnVisible('category')">{{ getCategoryName(discount.category) || '-' }}</td>
+          <td *ngIf="isColumnVisible('products')">{{ getProductNames(discount.products) }}</td>
+          <td *ngIf="isColumnVisible('location')">{{ getLocationName(discount.location) }}</td>
+          <td class="actions" *ngIf="isColumnVisible('action')">
+            <button class="btn-edit" (click)="editDiscount(discount)">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+<button class="btn-delete" (click)="deleteDiscount(discount)">
+  <i class="fas fa-trash-alt"></i> Delete
+</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Bottom Action Bar -->
+  <div class="bottom-actions">
+    <button class="btn btn-deactivate" [disabled]="!hasSelectedItems()" (click)="deactivateSelected()">
+      Deactivate Selected
+    </button>
+    
+    <div class="pagination-info">
+      Showing {{ startEntry }} to {{ endEntry }} of {{ totalEntries }} entries
+    </div>
+    
+    <div class="pagination">
+      <button class="btn-page" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      <button class="btn-page" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+    </div>
+  </div>
+  
+  <!-- Form Overlay and Wrapper -->
+  <div *ngIf="showForm" class="overlay" (click)="toggleForm()"></div>
+  <div *ngIf="showForm" class="form-wrapper">
+    <form [formGroup]="discountForm" (ngSubmit)="onSubmit()" class="discount-form">
+      <h3>{{ discountForm.get('id')?.value ? 'Edit Discount' : 'Add New Discount' }}</h3>
+      
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label for="name">Name:*</label>
+          <input type="text" id="name" formControlName="name" required />
+          <div class="error-message" *ngIf="discountForm.get('name')?.invalid && discountForm.get('name')?.touched">
+            Name is required
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group full-width">
+        <label for="products">Products:</label>
+        <div class="product-search-container">
+          <input type="text" id="products" 
+                 [(ngModel)]="productSearchQuery"
+                 [ngModelOptions]="{standalone: true}"
+                 (input)="searchProducts()"
+                 (focus)="showProductDropdown = true"
+                 placeholder="Search products...">
+          
+          <div class="product-dropdown" *ngIf="showProductDropdown && filteredProducts.length > 0">
+            <div class="product-item" *ngFor="let product of filteredProducts" 
+                 (click)="selectProduct(product)">
+              {{ product.productName }} ({{ product.sku }})
+            </div>
+          </div>
+          
+          <div class="selected-products" *ngIf="selectedProducts.length > 0">
+            <div class="selected-product-tag" *ngFor="let product of selectedProducts">
+              {{ product.productName }}
+              <span class="remove-tag" (click)="removeProduct(product)">×</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Hidden input to store the actual form value -->
+        <input type="hidden" formControlName="products" [value]="getProductIds()">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="brand">Brand:</label>
+          <select id="brand" formControlName="brand">
+            <option value="">Please Select</option>
+            <option *ngFor="let brand of brands" [value]="brand.id">{{ brand.name }}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="category">Category:</label>
+          <select id="category" formControlName="category">
+            <option value="">Please Select</option>
+            <option *ngFor="let category of categories" [value]="category.id">
+              {{ category.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="location">Location:*</label>
+          <select id="location" formControlName="location" required>
+            <option value="">Please Select</option>
+            <option *ngFor="let location of locations" [value]="location.id">
+              {{ location.name }}
+            </option>
+          </select>
+          <div class="error-message" *ngIf="discountForm.get('location')?.invalid && discountForm.get('location')?.touched">
+            Location is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="priority">Priority:</label>
+          <input type="number" id="priority" formControlName="priority" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="discountType">Discount Type:*</label>
+          <select id="discountType" formControlName="discountType" required>
+            <option value="">Please Select</option>
+            <option value="percentage">Percentage</option>
+            <option value="fixed">Fixed Amount</option>
+          </select>
+          <div class="error-message" *ngIf="discountForm.get('discountType')?.invalid && discountForm.get('discountType')?.touched">
+            Discount type is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="discountAmount">Discount Amount:*</label>
+          <input type="number" id="discountAmount" formControlName="discountAmount" required min="0" />
+          <div class="error-message" *ngIf="discountForm.get('discountAmount')?.invalid && discountForm.get('discountAmount')?.touched">
+            Valid discount amount is required
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="startsAt">Starts At:</label>
+          <input type="datetime-local" id="startsAt" formControlName="startsAt" />
+        </div>
+
+        <div class="form-group">
+          <label for="endsAt">Ends At:</label>
+          <input type="datetime-local" id="endsAt" formControlName="endsAt" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="applyInCustomerGroups" formControlName="applyInCustomerGroups" />
+          <label for="applyInCustomerGroups">Apply in customer groups</label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="isActive" formControlName="isActive" />
+          <label for="isActive">Is active</label>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" [disabled]="discountForm.invalid" class="btn-save">Save</button>
+        <button type="button" (click)="onCancel()" class="btn-cancel">Close</button>
+      </div>
+    </form>
+  </div>
+</div>

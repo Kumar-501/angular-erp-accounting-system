@@ -1,0 +1,78 @@
+<!-- import-contacts.component.html -->
+<div class="container">
+  <h2>Import Contacts</h2>
+
+  <div class="upload-box">
+    <label for="fileUpload"><strong>File To Import:</strong></label>
+    <input type="file" id="fileUpload" (change)="onFileSelected($event)" accept=".xlsx, .xls, .csv" />
+    
+    <div *ngIf="importStatus === 'processing'" class="progress-container">
+      <progress [value]="importProgress" max="100"></progress>
+      <span>{{ importProgress }}%</span>
+    </div>
+
+    <button class="submit-btn" (click)="onSubmit()" [disabled]="!selectedFile || importStatus === 'processing'">
+      Submit
+    </button>
+
+    <br /><br />
+    <button class="template-btn" (click)="downloadTemplate()">
+      <i class="fa fa-download"></i> Download template file
+    </button>
+  </div>
+
+  <div class="instructions-box">
+    <h3>Instructions</h3>
+    <p>
+      <strong>Follow the instructions carefully before importing the file.</strong><br />
+      The columns of the file should be in the following order.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Column Number</th>
+          <th>Column Name</th>
+          <th>Instruction</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>Contact Type <span class="required">(Required)</span></td>
+          <td>1 = Customer, 2 = Supplier, 3 = Both</td>
+        </tr>
+        <tr><td>2</td><td>Prefix <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>3</td><td>First Name <span class="required">(Required)</span></td><td></td></tr>
+        <tr><td>4</td><td>Middle Name <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>5</td><td>Last Name <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>6</td><td>Business Name <span class="required">(Required if contact type is supplier or both)</span></td><td></td></tr>
+        <tr><td>7</td><td>Contact ID <span class="optional">(Optional)</span></td><td>Leave blank to auto-generate</td></tr>
+        <tr><td>8</td><td>Tax Number <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>9</td><td>Opening Balance <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>10</td><td>Pay Term <span class="required">(Required if contact type is supplier or both)</span></td><td></td></tr>
+        <tr><td>11</td><td>Pay Term Period <span class="required">(Required if contact type is supplier or both)</span></td>
+          <td>Available Options: days, months</td>
+        </tr>
+        <tr><td>12</td><td>Credit Limit <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>13</td><td>Email <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>14</td><td>Mobile <span class="required">(Required)</span></td><td></td></tr>
+        <tr><td>15</td><td>Alternate Contact Number <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>16</td><td>Landline <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>17</td><td>City <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>18</td><td>State <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>19</td><td>Country <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>20</td><td>Address Line 1 <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>21</td><td>Address Line 2 <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>22</td><td>Zip Code <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>23</td><td>Date of Birth (DOB) <span class="optional">(Optional)</span></td><td>Format: Y-m-d (e.g., 2025-04-05)</td></tr>
+        <tr><td>24</td><td>Custom Field 1 <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>25</td><td>Custom Field 2 <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>26</td><td>Custom Field 3 <span class="optional">(Optional)</span></td><td></td></tr>
+        <tr><td>27</td><td>Custom Field 4 <span class="optional">(Optional)</span></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer-text">
+  HYBRID CRM - V6.2 | Copyright © 2025 All rights reserved.
+</div>

@@ -1,0 +1,256 @@
+<div class="modal-overlay" *ngIf="show">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h2>Edit Customer Details</h2>
+      <button class="close-btn" (click)="onClose()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form (ngSubmit)="onSave()">
+        <!-- Success Message Toast -->
+        <div *ngIf="showCopySuccessMsg" class="copy-success-toast">
+          <div class="success-message">
+            <i class="fa fa-check-circle"></i> Copied successfully!
+          </div>
+        </div>
+
+        <!-- Contact Type -->
+        <div class="form-group">
+          <label>Contact Type:</label>
+          <select [(ngModel)]="customerData.contactType" name="contactType" class="form-control">
+            <option *ngFor="let type of contactTypes" [value]="type">{{type}}</option>
+          </select>
+        </div>
+
+        <!-- Individual/Business Toggle -->
+        <div class="form-group">
+          <label>Customer Type:</label>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" id="individualRadio" 
+                   [(ngModel)]="isIndividual" [value]="true" name="customerType" (change)="updateDisplayName()">
+            <label class="form-check-label" for="individualRadio">Individual</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" id="businessRadio" 
+                   [(ngModel)]="isIndividual" [value]="false" name="customerType" (change)="updateDisplayName()">
+            <label class="form-check-label" for="businessRadio">Business</label>
+          </div>
+        </div>
+
+        <!-- Contact ID -->
+        <div class="form-group">
+          <label>Contact ID:</label>
+          <input type="text" [(ngModel)]="customerData.contactId" name="contactId" class="form-control" readonly>
+        </div>
+
+        <!-- Name Fields -->
+        <div class="form-group">
+          <label>Name:</label>
+          <div *ngIf="isIndividual" class="row name-fields">
+            <div class="col-md-2">
+              <select [(ngModel)]="customerData.prefix" name="prefix" class="form-control" (change)="updateDisplayName()">
+                <option *ngFor="let prefix of prefixes" [value]="prefix">{{prefix || 'Select'}}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <input type="text" [(ngModel)]="customerData.firstName" name="firstName" 
+                     class="form-control" placeholder="First Name" required
+                     (ngModelChange)="updateDisplayName()">
+            </div>
+            <div class="col-md-3">
+              <input type="text" [(ngModel)]="customerData.middleName" name="middleName" 
+                     class="form-control" placeholder="Middle Name"
+                     (ngModelChange)="updateDisplayName()">
+            </div>
+            <div class="col-md-3">
+              <input type="text" [(ngModel)]="customerData.lastName" name="lastName" 
+                     class="form-control" placeholder="Last Name"
+                     (ngModelChange)="updateDisplayName()">
+            </div>
+          </div>
+          <input *ngIf="!isIndividual" type="text" [(ngModel)]="customerData.businessName" 
+                 name="businessName" class="form-control" placeholder="Business Name" required
+                 (ngModelChange)="updateDisplayName()">
+          
+          <!-- Display Name Field -->
+    
+        </div>
+
+        <!-- Date of Birth -->
+        <div class="form-group" *ngIf="isIndividual">
+          <label>Date of Birth:</label>
+          <input type="date" [(ngModel)]="customerData.dob" name="dob" class="form-control">
+        </div>
+
+        <!-- Contact Info -->
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Mobile:</label>
+              <input type="text" [(ngModel)]="customerData.mobile" name="mobile" 
+                     class="form-control" placeholder="Mobile" required
+                     (input)="validatePhoneNumber($event, 'mobile')">
+              <small class="text-danger" *ngIf="phoneErrors.mobile">{{phoneErrors.mobile}}</small>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Landline:</label>
+              <input type="text" [(ngModel)]="customerData.landline" name="landline" 
+                     class="form-control" placeholder="Landline"
+                     (input)="validatePhoneNumber($event, 'landline')">
+              <small class="text-danger" *ngIf="phoneErrors.landline">{{phoneErrors.landline}}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Alternate Contact:</label>
+              <input type="text" [(ngModel)]="customerData.alternateContact" name="alternateContact" 
+                     class="form-control" placeholder="Alternate Contact"
+                     (input)="validatePhoneNumber($event, 'alternateContact')">
+              <small class="text-danger" *ngIf="phoneErrors.alternateContact">{{phoneErrors.alternateContact}}</small>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <label>Email:</label>
+              <input type="email" [(ngModel)]="customerData.email" name="email" 
+                     class="form-control" placeholder="Email">
+            </div>
+          </div>
+        </div>
+
+        <!-- Adcode and LifeStage -->
+        <div class="row">
+          
+          
+        </div>
+
+        <!-- Assigned To -->
+       
+
+        <!-- More Information Toggle -->
+        <div class="form-group">
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="toggleMoreInfo()">
+            {{ showMoreInfo ? '−' : '+' }} More Information
+          </button>
+        </div>
+
+        <!-- More Information Section -->
+        <div *ngIf="showMoreInfo">
+          <!-- Tax Information -->
+          <div class="form-group">
+            <label>Tax Number:</label>
+            <input type="text" [(ngModel)]="customerData.taxNumber" name="taxNumber" 
+                   class="form-control" placeholder="Tax Number">
+          </div>
+
+          <!-- Financial Information -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Opening Balance:</label>
+                <input type="number" [(ngModel)]="customerData.openingBalance" name="openingBalance" 
+                       class="form-control" placeholder="0">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Pay Term:</label>
+                <select [(ngModel)]="customerData.payTerm" name="payTerm" class="form-control">
+                  <option *ngFor="let term of payTerms" [value]="term.value">{{term.label}}</option>
+                </select>
+              </div>
+            </div>
+          </div>
+<div class="form-group">
+  <label>Address Line 1:</label>
+  <textarea [(ngModel)]="customerData.addressLine1" name="addressLine1" 
+            class="form-control" rows="3" placeholder="Enter address line 1"
+            (ngModelChange)="onAddressFieldChange()"></textarea>
+</div>
+<div class="form-group">
+  <label>Address Line 2:</label>
+  <input type="text" [(ngModel)]="customerData.addressLine2" name="addressLine2" 
+         class="form-control" placeholder="Enter Address Line 2"
+         (ngModelChange)="onAddressFieldChange()">
+</div>
+
+          <!-- City, State, Country, Zip -->
+         <div class="row">
+  <div class="col-md-6">
+  <div class="form-group">
+  <label>City:</label>
+  <input type="text" [(ngModel)]="customerData.city" name="city" 
+         class="form-control" placeholder="Enter City"
+         (ngModelChange)="onAddressFieldChange()">
+</div>
+  </div>
+            <div class="col-md-6">
+                 <div class="form-group">
+  <label>State:</label>
+  <select [(ngModel)]="customerData.state" name="state" class="form-control"
+          (ngModelChange)="onAddressFieldChange()">
+    <option value="">Select State</option>
+    <option *ngFor="let state of states" [value]="state">{{state}}</option>
+  </select>
+</div>
+
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+               <div class="form-group">
+      <label>Country:</label>
+      <input type="text" [(ngModel)]="customerData.country" name="country" 
+             class="form-control" placeholder="Enter Country"
+             (ngModelChange)="updateCombinedAddress()">
+    </div>
+            </div>
+            <div class="col-md-6">
+      <div class="form-group">
+  <label>Zip Code:</label>
+  <input type="text" [(ngModel)]="customerData.zipCode" name="zipCode" 
+         class="form-control" placeholder="Enter Zip Code"
+         (ngModelChange)="onAddressFieldChange()">
+</div>
+            </div>
+          </div>
+
+          <!-- Address Information -->
+<!-- Replace the billing address section with this: -->
+<div class="form-group">
+  <label>Billing Address:</label>
+  <textarea [(ngModel)]="customerData.billingAddress" name="billingAddress" 
+            class="form-control" rows="3" readonly></textarea>
+</div>
+
+<div class="form-group">
+  <label>Shipping Address:</label>
+  <textarea [(ngModel)]="customerData.shippingAddress" name="shippingAddress" 
+            class="form-control" rows="3"></textarea>
+  <div class="form-check mt-2">
+    <input class="form-check-input" type="checkbox" id="sameAsBilling" 
+           [(ngModel)]="sameAsBilling" name="sameAsBilling" 
+           (change)="onSameAsBillingChange()">
+    <label class="form-check-label" for="sameAsBilling">Same as billing address</label>
+  </div>
+</div>
+
+
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" (click)="onClose()" [disabled]="isSaving">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSaving">
+            <span *ngIf="!isSaving">Save Changes</span>
+            <span *ngIf="isSaving">Saving...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

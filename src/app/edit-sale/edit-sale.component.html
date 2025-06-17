@@ -1,0 +1,558 @@
+<div class="container">
+    <h2 class="mb-4">Edit Sale</h2>
+  
+    <!-- Add preservation mode toggle for advanced users -->
+    <div class="alert alert-info mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Edit Mode:</strong> 
+          <span *ngIf="preserveOriginalTotals" class="text-success">
+            <i class="fas fa-lock"></i> Preserving Original Totals (Total Payable: ₹{{ originalTotalPayable | number:'1.2-2' }})
+          </span>
+          <span *ngIf="!preserveOriginalTotals" class="text-warning">
+            <i class="fas fa-unlock"></i> Recalculating Totals
+          </span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="togglePreservationMode()">
+          <i class="fas" [class.fa-lock]="preserveOriginalTotals" [class.fa-unlock]="!preserveOriginalTotals"></i>
+          {{ preserveOriginalTotals ? 'Enable Recalculation' : 'Preserve Original' }}
+        </button>
+      </div>
+    </div>
+
+    <form [formGroup]="saleForm" (ngSubmit)="updateSale()">
+      <!-- Customer Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="customer" class="form-label">Customer:</label>
+                <select id="customer" formControlName="customer" class="form-control" required>
+                  <option value="">Select a customer</option>
+                  <option *ngFor="let customer of customers" [value]="customer.id">
+                    {{ customer.businessName || (customer.firstName + ' ' + (customer.middleName ? customer.middleName + ' ' : '') + customer.lastName) }}
+                  </option>
+                </select>
+                <div *ngIf="saleForm.get('customer')?.invalid && saleForm.get('customer')?.touched" class="text-danger">
+                  Customer is required
+                </div>
+              </div>
+            </div>
+            <!-- Inside the Customer Details card -->
+<div class="row mb-3">
+  <div class="col-md-6">
+    <div class="form-group">
+      <label for="customerAge" class="form-label">Age</label>
+      <input type="number" id="customerAge" formControlName="customerAge" 
+             class="form-control" min="0" max="120">
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="form-group">
+      <label for="customerDob" class="form-label">Date of Birth</label>
+      <input type="date" id="customerDob" formControlName="customerDob" 
+             class="form-control">
+    </div>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-12">
+    <div class="form-group">
+      <label class="form-label">Gender</label>
+      <div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" id="genderMale" 
+                 formControlName="customerGender" value="Male">
+          <label class="form-check-label" for="genderMale">Male</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" id="genderFemale" 
+                 formControlName="customerGender" value="Female">
+          <label class="form-check-label" for="genderFemale">Female</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" id="genderOther" 
+                 formControlName="customerGender" value="Other">
+          <label class="form-check-label" for="genderOther">Other</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="saleDate" class="form-label">Sale Date:</label>
+                <input type="date" id="saleDate" formControlName="saleDate" class="form-control" required />
+                <div *ngIf="saleForm.get('saleDate')?.invalid && saleForm.get('saleDate')?.touched" class="text-danger">
+                  Sale date is required
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="billingAddress" class="form-label">Billing Address:</label>
+                <input type="text" id="billingAddress" formControlName="billingAddress" class="form-control" />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="shippingAddress" class="form-label">Shipping Address:</label>
+                <input type="text" id="shippingAddress" formControlName="shippingAddress" class="form-control" />
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="status" class="form-label">Status:</label>
+                <select id="status" formControlName="status" class="form-control" required>
+                  <option value="">Select Status</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+                <div *ngIf="saleForm.get('status')?.invalid && saleForm.get('status')?.touched" class="text-danger">
+                  Status is required
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Invoice Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="invoiceNo" class="form-label">Invoice No.:</label>
+                <input type="text" id="invoiceNo" formControlName="invoiceNo" class="form-control" readonly />
+                <small class="text-muted">Auto-generated invoice number</small>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="document" class="form-label">Attach Document:</label>
+                <input type="file" id="document" (change)="onFileSelected($event)" class="form-control" />
+                <small *ngIf="saleForm.get('document')?.value" class="text-muted">
+                  Selected: {{ saleForm.get('document')?.value }}
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Product Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <!-- Search Field -->
+          <div class="mb-3">
+            <input type="text" class="form-control" placeholder="Search products (stock validation disabled for editing)" 
+                   [(ngModel)]="productSearchTerm" [ngModelOptions]="{standalone: true}"
+                   (input)="filterProducts()">
+          </div>
+  
+          <!-- Product Table -->
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Tax Rate (%)</th>
+                  <th>Tax Amount</th>
+                  <th>Subtotal</th>
+                  <th *ngIf="products.length > 0">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Only show dynamic rows for added products -->
+                <tr *ngFor="let product of products; let i = index">
+            <td>
+  <select class="form-control" [(ngModel)]="product.name" [ngModelOptions]="{standalone: true}"
+          (change)="onDynamicProductSelect($any($event.target).value, i)">
+    <option value="">Select a product</option>
+    <option *ngFor="let prod of filteredProducts" [value]="prod.productName">
+      {{prod.productName}} 
+      <span *ngIf="prod.currentStock <= 0" class="text-danger">(Out of Stock - Edit Mode: Allowed)</span>
+      <span *ngIf="prod.currentStock > 0" class="text-muted">(Stock: {{prod.currentStock || 0}})</span>
+    </option>
+  </select>
+</td>
+               <td>
+  <input type="number" class="form-control" min="1" placeholder="1"
+        [(ngModel)]="product.quantity" [ngModelOptions]="{standalone: true}"
+        (input)="updateProduct(i)">
+  <small *ngIf="getProductStock(product.name) <= 0" class="text-warning">
+    ⚠ Product is out of stock (allowed in edit mode)
+  </small>
+</td>
+                  <td>
+                    <input type="number" class="form-control" min="0" step="0.01" placeholder="0.00"
+                          [(ngModel)]="product.unitPrice" [ngModelOptions]="{standalone: true}"
+                          (input)="updateProduct(i)">
+                  </td>
+                  <td>
+                    <input type="number" class="form-control" min="0" max="100" step="0.01" placeholder="0.00"
+                          [(ngModel)]="product.taxRate" [ngModelOptions]="{standalone: true}"
+                          (input)="updateProduct(i)">
+                  </td>
+                  <td>
+                    <input type="number" class="form-control" 
+                           [(ngModel)]="product.taxAmount" 
+                           [ngModelOptions]="{standalone: true}"
+                           readonly>
+                  </td>
+                  <td class="text-nowrap">{{ product.subtotal | currency:'INR' }}</td>
+                  <td>
+                    <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <!-- Show message when no products added -->
+                <tr *ngIf="products.length === 0">
+                  <td colspan="6" class="text-center text-muted">No products added yet</td>
+                </tr>
+              </tbody>
+            <tfoot>
+  <tr>
+    <td colspan="5" class="text-end fw-semibold">Total:</td>
+    <td class="fw-bold text-nowrap">{{ itemsTotal | currency:'INR'}}</td>
+    <td *ngIf="products.length > 0"></td>
+  </tr>
+</tfoot>
+            </table>
+          </div>
+  
+          <!-- Add Product Button -->
+          <div class="mt-2">
+            <button type="button" class="btn btn-primary" (click)="addProduct()">
+              <i class="fa fa-plus"></i> Add Product
+            </button>
+            <small class="text-info ms-3">
+              <i class="fas fa-info-circle"></i> 
+              Edit mode: Products with zero stock can be modified without restrictions
+            </small>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Sales Order Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="discountType" class="form-label">Discount Type:</label>
+                <select id="discountType" formControlName="discountType" class="form-control" 
+                        (change)="preserveOriginalTotals ? calculateBalanceOnly() : recalculateAllTotals()">
+                  <option value="Percentage">Percentage</option>
+                  <option value="Amount">Amount</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="discountAmount" class="form-label">Discount Amount:</label>
+                <input type="number" id="discountAmount" formControlName="discountAmount" class="form-control" min="0" 
+                      (change)="preserveOriginalTotals ? calculateBalanceOnly() : recalculateAllTotals()" />
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="orderTax" class="form-label">Order Tax (%):</label>
+                <input type="number" id="orderTax" formControlName="orderTax" class="form-control" min="0" max="100" 
+                      (change)="preserveOriginalTotals ? calculateBalanceOnly() : recalculateAllTotals()" />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="sellNote" class="form-label">Sell Note:</label>
+                <textarea id="sellNote" formControlName="sellNote" class="form-control"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+  
+      <!-- Shipping Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="shippingCharges" class="form-label">Shipping Charges:</label>
+                <input type="number" id="shippingCharges" formControlName="shippingCharges" class="form-control" min="0" 
+                      (change)="preserveOriginalTotals ? calculateBalanceOnly() : recalculateAllTotals()" />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="shippingStatus" class="form-label">Shipping Status:</label>
+                <select id="shippingStatus" formControlName="shippingStatus" class="form-control">
+                  <option value="">Select Status</option>
+                  <option value="Processing">Processing</option>
+  <option value="Packed">Packed</option>
+  <option value="Pending">Pending</option>
+  <option value="Shipped">Shipped</option>
+  <option value="Onhold">Onhold</option>
+  <option value="Ordered">Ordered</option>
+  <option value="Print">Print</option>
+  <option value="Reached hub">Reached hub</option>
+  <option value="Out for delivery">Out for delivery</option>
+  <option value="Returned">Returned</option>
+  <option value="Cancelled">Cancelled</option>
+  <option value="Delivered">Delivered</option>
+
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="deliveryPerson" class="form-label">Delivery Person:</label>
+                <input type="text" id="deliveryPerson" formControlName="deliveryPerson" class="form-control" />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="shippingDocuments" class="form-label">Shipping Documents:</label>
+                <input type="file" id="shippingDocuments" (change)="onShippingDocumentSelected($event)" class="form-control" />
+                <small *ngIf="saleForm.get('shippingDocuments')?.value" class="text-muted">
+                  Selected: {{ saleForm.get('shippingDocuments')?.value }}
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Payment Details -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="totalPayable" class="form-label">Total Payable:</label>
+                <input type="number" id="totalPayable" formControlName="totalPayable" class="form-control" 
+                       [readonly]="preserveOriginalTotals" />
+                <small class="text-muted" *ngIf="preserveOriginalTotals">
+                  <i class="fas fa-lock"></i> Preserved from original sale
+                </small>
+                <small class="text-muted" *ngIf="!preserveOriginalTotals">
+                  Calculated automatically
+                </small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="paymentAmount" class="form-label">Payment Amount:</label>
+                <input type="number" id="paymentAmount" formControlName="paymentAmount" class="form-control" required min="0" 
+                      (change)="calculateBalanceOnly()" />
+                <div *ngIf="saleForm.get('paymentAmount')?.invalid && saleForm.get('paymentAmount')?.touched" class="text-danger">
+                  Payment amount is required
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="paidOn" class="form-label">Paid On:</label>
+                <input type="date" id="paidOn" formControlName="paidOn" class="form-control" />
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="paymentStatus" class="form-label">Payment Status:</label>
+                <select id="paymentStatus" formControlName="paymentStatus" class="form-control" required>
+                  <option value="Paid">Paid</option>
+                  <option value="Partial">Partial</option>
+                  <option value="Due">Due</option>
+                </select>
+                <div *ngIf="saleForm.get('paymentStatus')?.invalid && saleForm.get('paymentStatus')?.touched" class="text-danger">
+                  Payment status is required
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="paymentMethod" class="form-label">Payment Type:</label>
+                <select id="paymentMethod" formControlName="paymentMethod" class="form-control" required>
+                  <option value="">Select type</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Other">Other</option>
+                </select>
+                <div *ngIf="saleForm.get('paymentMethod')?.invalid && saleForm.get('paymentMethod')?.touched" class="text-danger">
+                  Payment method is required
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Account Field -->
+<div class="col-md-6">
+    <div class="form-group mb-3">
+      <label for="paymentAccount" class="form-label">Payment Account:</label>
+      <select id="paymentAccount" formControlName="paymentAccount" class="form-control" required>
+        <option value="">Select Payment Account</option>
+        <option *ngFor="let account of accounts" [value]="account.id">
+          {{account.name}} ({{account.accountNumber}}) - Balance: {{account.openingBalance | currency:'INR'}}
+        </option>
+      </select>
+      <div *ngIf="saleForm.get('paymentAccount')?.invalid && saleForm.get('paymentAccount')?.touched" class="text-danger">
+        Payment account is required
+      </div>
+    </div>
+  </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="transactionId" class="form-label">Transaction ID:</label>
+                <input type="text" id="transactionId" formControlName="transactionId" class="form-control" />
+                <small class="text-muted">Payment gateway transaction reference</small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="paymentNote" class="form-label">Payment Note:</label>
+                <textarea id="paymentNote" formControlName="paymentNote" class="form-control"></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="balance" class="form-label">Balance:</label>
+                <input type="number" id="balance" formControlName="balance" class="form-control" readonly />
+                <small class="text-muted">
+                  <i class="fas fa-info-circle"></i> 
+                  Calculated based on {{ preserveOriginalTotals ? 'original' : 'current' }} total payable
+                </small>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="changeReturn" class="form-label">Change Return:</label>
+                <input type="number" id="changeReturn" formControlName="changeReturn" class="form-control" readonly />
+              </div>
+            </div>
+          </div>
+
+          <!-- Enhanced Tax Information Display -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="productTaxAmount" class="form-label">Product Tax Amount:</label>
+                <input type="number" id="productTaxAmount" formControlName="productTaxAmount" class="form-control" readonly />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="shippingTaxAmount" class="form-label">Shipping Tax Amount:</label>
+                <input type="number" id="shippingTaxAmount" formControlName="shippingTaxAmount" class="form-control" readonly />
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group mb-3">
+                <label for="roundOff" class="form-label">Round Off:</label>
+                <input type="number" id="roundOff" formControlName="roundOff" class="form-control" readonly />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calculation Summary -->
+      <div class="card mb-4">
+        <div class="card-header" 
+             [ngClass]="preserveOriginalTotals ? 'bg-success text-white' : 'bg-light'">
+          <h5 class="mb-0">
+            <i class="fas" [class.fa-lock]="preserveOriginalTotals" [class.fa-calculator]="!preserveOriginalTotals"></i>
+            {{ preserveOriginalTotals ? 'Original' : 'Calculated' }} Summary
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <div class="text-center">
+                <h6>Items Total</h6>
+                <h4 class="text-primary">{{ itemsTotal | currency:'INR' }}</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <h6>Product Tax</h6>
+                <h4 class="text-info">{{ productTaxAmount | currency:'INR' }}</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <h6>Shipping Tax</h6>
+                <h4 class="text-warning">{{ shippingTaxAmount | currency:'INR' }}</h4>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <h6>Total Payable</h6>
+                <h4 [ngClass]="preserveOriginalTotals ? 'text-success' : 'text-secondary'">
+                  {{ (preserveOriginalTotals ? originalTotalPayable : saleForm.get('totalPayable')?.value) | currency:'INR' }}
+                </h4>
+                <small *ngIf="preserveOriginalTotals" class="text-muted">
+                  <i class="fas fa-lock"></i> From Original Sale
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+  
+      <!-- Submit Buttons -->
+      <div class="row mb-4">
+        <div class="col-12 text-center">
+          <button type="submit" class="btn btn-success btn-lg me-2" [disabled]="saleForm.invalid">
+            <i class="fas fa-save"></i> 
+            Update Sale {{ preserveOriginalTotals ? '(Preserve Totals)' : '(Recalculated)' }}
+          </button>
+          <button type="button" class="btn btn-secondary btn-lg" (click)="resetForm()">
+            <i class="fas fa-undo"></i> Reset
+          </button>
+          <button type="button" class="btn btn-danger btn-lg ms-2" (click)="cancelEdit()">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+          <button type="button" class="btn btn-info btn-lg ms-2" (click)="logCalculationDetails()">
+            <i class="fas fa-bug"></i> Debug Calculations
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>

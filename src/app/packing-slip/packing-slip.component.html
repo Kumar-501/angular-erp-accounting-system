@@ -1,0 +1,177 @@
+<!-- packing-slip.component.html -->
+<div class="packing-slip-container">
+  <div class="packing-slip-actions">
+    <button class="btn btn-secondary" (click)="goBack()">
+      <i class="fas fa-arrow-left"></i> Back
+    </button>
+    <!-- <button class="btn btn-primary" (click)="print()">
+      <i class="fas fa-print"></i> Print
+    </button> -->
+  </div>
+
+  <div class="packing-slip-content" id="packing-slip-printable">
+    <div *ngIf="loading" class="text-center py-5">
+      <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-2">Loading packing slip data...</p>
+    </div>
+
+    <div *ngIf="error" class="alert alert-danger">
+      <p>Error loading packing slip data. Please try again later.</p>
+    </div>
+
+    <div *ngIf="!loading && !error && packingSlip" class="packing-slip">
+      <!-- Header Section with Company Info -->
+      <div class="packing-slip-header">
+        <div class="header-top">
+          <div class="company-details">
+            <div class="company-name">{{ packingSlip.fromLocation.name?.toUpperCase() }}</div>
+            <div class="customer-info">Customer/Billing Mobile: {{ packingSlip.customerMobile || 'N/A' }}</div>
+            <div class="contact-info">Contact Person ID: {{ packingSlip.contactPersonId || 'N/A' }}</div>
+            <div class="contract-info">Contract Id: {{ packingSlip.contractId || 'N/A' }}</div>
+          </div>
+          <div class="service-type-section">
+            <div class="service-type">{{ packingSlip.typeOfService?.toUpperCase() }}</div>
+     
+            <div class="invoice-date">Inv. No: {{ packingSlip.invoiceNo }}</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="header-divider">
+
+      <!-- From/To Section -->
+      <div class="address-section">
+        <div class="address-row">
+          <div class="from-section">
+            <div class="address-label">From,</div>
+            <div class="address-details">
+              <div class="company-name">{{ packingSlip.fromLocation.name?.toUpperCase() }}</div>
+              <div>{{ packingSlip.fromLocation.address }}</div>
+              <div>Mobile: {{ packingSlip.fromLocation.mobile }}</div>
+              <div>GST: {{ packingSlip.fromLocation.gst }}</div>
+            </div>
+          </div>
+          
+          <div class="to-section">
+            <div class="address-label">To,</div>
+            <div class="address-details">
+              <div class="customer-name">{{ packingSlip.toLocation.name }}</div>
+              <div>{{ packingSlip.toLocation.address }}</div>
+              <div *ngIf="packingSlip.toLocation.pincode && packingSlip.toLocation.pincode !== 'N/A'">
+                Pin: {{ packingSlip.toLocation.pincode }}
+              </div>
+              <div *ngIf="packingSlip.toLocation.mobile && packingSlip.toLocation.mobile !== 'N/A'">
+                Mobile: {{ packingSlip.toLocation.mobile }}
+              </div>
+              <div class="invoice-details">
+                <div>Invoice No: {{ packingSlip.invoiceNo }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Invoice Details Section -->
+      <div class="invoice-meta-section">
+        <div class="invoice-header">
+          <div class="invoice-title">Invoice</div>
+          <div class="customer-section">
+            <div class="customer-label">CUSTOMER</div>
+            <div class="customer-details">
+              <div>{{ packingSlip.toLocation.name }}</div>
+              <div>{{ packingSlip.toLocation.address }}</div>
+              <div *ngIf="packingSlip.toLocation.mobile && packingSlip.toLocation.mobile !== 'N/A'">
+                Mob: {{ packingSlip.toLocation.mobile }}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="invoice-details-row">
+          <div class="invoice-info">
+            <div>Invoice No: {{ packingSlip.invoiceNo }}</div>
+            <div>Date: {{ formatDate(packingSlip.date) }}</div>
+          </div>
+          <div class="gst-info">
+            <div>GST:</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+ <div class="packing-slip-items">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Price</th>
+              <th>Taxable Value</th>
+              <th>CGST (9%)</th>
+              <th>SGST (9%)</th>
+              <th>Sub Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of packingSlip.products; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>{{ product.name }}<br><span class="product-code">({{ product.code || 'MRP ' + (product.unitPrice | currency:'INR':'symbol':'1.0-0') }})</span></td>
+              <td>{{ product.quantity }} Nos.</td>
+              <td>{{ product.unitPrice | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>{{ (product.quantity * product.unitPrice) | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>{{ (product.quantity * product.unitPrice * 0.09) | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>{{ (product.quantity * product.unitPrice * 0.09) | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td class="text-end">{{ (product.quantity * product.unitPrice * 1.18) | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="packingSlip.products.length === 0">
+              <td colspan="8" class="text-center">No products found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="footer-divider">
+      <!-- Totals Section with GST breakdown -->
+      <div class="totals-section">
+        <div class="totals-row">
+          <span>Total Taxable Value:</span>
+          <span>{{ getTotalTaxableValue() | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="totals-row">
+          <span>Total CGST (9%):</span>
+          <span>{{ getTotalCGST() | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="totals-row">
+          <span>Total SGST (9%):</span>
+          <span>{{ getTotalSGST() | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="totals-row">
+          <span>Shipping Charges:</span>
+          <span>{{ packingSlip.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="totals-row">
+          <span>Shipping GST (18%):</span>
+          <span>{{ (packingSlip.shippingCharge * 0.18) | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+        <div class="totals-row grand-total">
+          <span>GRAND TOTAL:</span>
+          <span>{{ getGrandTotal() | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <!-- Footer Section -->
+      <div class="packing-slip-footer">
+        <div class="footer-info">
+          <div class="website-info">{{ packingSlip.website || 'https://one.stellarhr.in/sales' }}</div>
+          <div class="page-info">1/2</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

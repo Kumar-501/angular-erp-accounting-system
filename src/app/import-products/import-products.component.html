@@ -1,0 +1,200 @@
+<div class="import-container">
+  <h2 class="import-header">Import Products</h2>
+  
+  <div class="import-card">
+    <!-- File Selection Section -->
+    <div class="file-selection-section">
+      <div class="file-input-container">
+        <input type="file" id="fileInput" (change)="onFileSelected($event)" 
+               accept=".xlsx,.xls" class="file-input" hidden>
+        <label for="fileInput" class="file-label">
+          <div class="file-upload-box">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h4>Choose Excel File</h4>
+            <p>Drag & drop your file here or click to browse</p>
+            <small>Supports .xlsx and .xls files</small>
+          </div>
+        </label>
+        <div *ngIf="selectedFileName" class="selected-file">
+          <i class="fas fa-file-excel"></i>
+          <span>{{ selectedFileName }}</span>
+        </div>
+      </div>
+      
+      <div class="action-buttons">
+        <button (click)="downloadTemplate()" class="btn-download-template">
+          <i class="fas fa-download"></i> Download Template
+        </button>
+        <button (click)="importProducts()" [disabled]="!selectedFile || isImporting" class="btn-import">
+          <span *ngIf="!isImporting">Import Products</span>
+          <span *ngIf="isImporting">
+            <i class="fas fa-spinner fa-spin"></i> Importing...
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Preview Section -->
+    <div *ngIf="showPreview" class="preview-section">
+      <h3 class="preview-header">
+        <i class="fas fa-eye"></i> File Preview (First 5 Rows)
+      </h3>
+      
+      <div class="table-responsive">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              <th *ngFor="let key of getPreviewHeaders()">{{ key }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of previewData | slice:0:5">
+              <td *ngFor="let key of getPreviewHeaders()">{{ row[key] }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="preview-note">
+        <i class="fas fa-info-circle"></i> Showing first 5 rows for preview. 
+        Total rows detected: {{ previewData.length }}
+      </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div *ngIf="isImporting" class="progress-section">
+      <h3 class="progress-header">
+        <i class="fas fa-sync-alt fa-spin"></i> Importing Products
+      </h3>
+      
+      <div class="progress-container">
+        <div class="progress-bar" [style.width.%]="progressValue"></div>
+        <span class="progress-text">{{ progressValue }}% Complete</span>
+      </div>
+      
+      <div class="progress-stats">
+        <div class="stat-item">
+          <span class="stat-label">Total:</span>
+          <span class="stat-value">{{ importSummary.total }}</span>
+        </div>
+        <div class="stat-item success">
+          <span class="stat-label">Success:</span>
+          <span class="stat-value">{{ importSummary.success }}</span>
+        </div>
+        <div class="stat-item error">
+          <span class="stat-label">Errors:</span>
+          <span class="stat-value">{{ importSummary.errors }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Section -->
+    <div *ngIf="!isImporting && importSummary.total > 0" class="results-section">
+      <h3 class="results-header">
+        <i class="fas fa-clipboard-check"></i> Import Results
+      </h3>
+      
+      <div class="summary-cards">
+        <div class="summary-card total">
+          <div class="card-icon">
+            <i class="fas fa-boxes"></i>
+          </div>
+          <div class="card-content">
+            <div class="card-value">{{ importSummary.total }}</div>
+            <div class="card-label">Total Processed</div>
+          </div>
+        </div>
+        
+        <div class="summary-card success">
+          <div class="card-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="card-content">
+            <div class="card-value">{{ importSummary.success }}</div>
+            <div class="card-label">Successfully Added</div>
+          </div>
+        </div>
+        
+        <div class="summary-card error">
+          <div class="card-icon">
+            <i class="fas fa-exclamation-circle"></i>
+          </div>
+          <div class="card-content">
+            <div class="card-value">{{ importSummary.errors }}</div>
+            <div class="card-label">Errors</div>
+          </div>
+        </div>
+      </div>
+      
+      <div *ngIf="importSummary.errors > 0" class="error-actions">
+        <button (click)="downloadErrorReport()" class="btn-error-report">
+          <i class="fas fa-download"></i> Download Error Report
+        </button>
+      </div>
+    </div>
+
+    <!-- Instructions Section -->
+    <div class="instructions-section">
+      <h3 class="instructions-header">
+        <i class="fas fa-info-circle"></i> Import Instructions
+      </h3>
+      
+      <div class="instructions-content">
+        <div class="instructions-note">
+          <strong>Follow the instructions carefully before importing the file.</strong>
+          <p>The columns of the file should be in the following order:</p>
+        </div>
+        
+        <div class="table-responsive">
+          <table class="instructions-table">
+            <thead>
+              <tr>
+                <th>Column Number</th>
+                <th>Column Name</th>
+                <th>Instruction</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let col of columnInstructions">
+                <td>{{ col.num }}</td>
+                <td>{{ col.name }}</td>
+                <td [innerHTML]="col.instruction"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="instructions-steps">
+          <h4>Steps to Import:</h4>
+          <ol>
+            <li>
+              <strong>Download the template</strong> - Use the provided Excel template to ensure proper formatting
+            </li>
+            <li>
+              <strong>Fill product data</strong> - Enter your product information following the column guidelines
+            </li>
+            <li>
+              <strong>Required fields</strong> - Product Name, Unit, Manage Stock, Selling Price Tax Type, and Product Type are mandatory
+            </li>
+            <li>
+              <strong>Save the file</strong> - Keep the Excel format (.xlsx or .xls)
+            </li>
+            <li>
+              <strong>Upload your file</strong> - Select the file and click "Import Products"
+            </li>
+          </ol>
+        </div>
+        
+        <div class="important-notes">
+          <h4><i class="fas fa-exclamation-triangle"></i> Important Notes:</h4>
+          <ul>
+            <li>Do not change the column headers in the template</li>
+            <li>For variable products, fill all required variation fields</li>
+            <li>SKU will be auto-generated if not provided</li>
+            <li>Tax percentage will be calculated based on the tax rate</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

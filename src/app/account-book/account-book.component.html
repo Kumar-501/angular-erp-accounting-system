@@ -1,0 +1,364 @@
+<div class="account-book-container">
+  <div class="page-header">
+    <div class="account-info">
+      <h2>{{accountDetails.name}}</h2>
+      <p>Account Type: {{accountDetails.type}}</p>
+      <p *ngIf="accountDetails.number">Account Number: {{accountDetails.number}}</p>
+      <p>Opening Balance: ₹{{accountDetails.balance | number:'1.2-2'}}</p>
+    </div>
+    
+    <div class="action-buttons">
+      <!-- New Download Button -->
+     <button class="btn btn-success" (click)="downloadTransactionData()">
+    <i class="fa fa-download"></i> Download
+  </button>
+  
+      <!-- Other action buttons as needed -->
+    </div>
+  </div>
+  
+  <div class="filters-section">
+    <div class="date-filter">
+      <label>From:</label>
+      <input type="date" [ngModel]="dateRange.from | date:'yyyy-MM-dd'" 
+             (ngModelChange)="dateRange.from = $event; onDateRangeChange()">
+      
+      <label>To:</label>
+      <input type="date" [ngModel]="dateRange.to | date:'yyyy-MM-dd'" 
+             (ngModelChange)="dateRange.to = $event; onDateRangeChange()">
+    </div>
+    
+    <div class="transaction-type-filter">
+      <label>Type:</label>
+      <select [(ngModel)]="transactionType" (change)="onTransactionTypeChange()">
+        <option value="All">All</option>
+        <option value="Debit">Debit</option>
+        <option value="Credit">Credit</option>
+        <option value="Transfer">Transfer</option>
+      </select>
+    </div>
+    
+    <div class="search-filter">
+      <input type="text" [(ngModel)]="searchQuery" placeholder="Search..." 
+             (input)="onSearchChange()">
+    </div>
+    
+    <div class="view-toggle">
+      <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">
+        <i class="fa fa-table"></i> Table
+      </button>
+      <button [class.active]="viewMode === 'card'" (click)="viewMode = 'card'">
+        <i class="fa fa-th-large"></i> Card
+      </button>
+    </div>
+  </div>
+  
+  <div class="entries-per-page">
+    <label>Show</label>
+    <select [(ngModel)]="entriesPerPage" (change)="updatePagedTransactions()">
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select>
+    <label>entries</label>
+  </div>
+  
+  <div class="loading-spinner" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading transactions...</p>
+  </div>
+  
+  <div class="no-data-message" *ngIf="!loading && isEmpty">
+    <p>No transactions found for this account.</p>
+  </div>
+  
+<!-- Table View -->   
+<div class="transactions-table" *ngIf="viewMode === 'table' && !loading && !isEmpty">     
+  <table class="table">       
+    <thead>         
+      <tr>           
+        <th>Date</th>           
+        <th>Type</th>           
+        <th>Description</th>           
+        <th>Payment Method</th>           
+        <th>Payment Details</th>           
+        <th>Note</th>           
+        <th>Debit</th>           
+        <th>Credit</th>           
+        <th>Balance</th>           
+        <th>Action</th>         
+      </tr>       
+    </thead>       
+    <tbody>         
+      <tr *ngFor="let transaction of pagedTransactions">           
+        <!-- Consistent date formatting with MM/dd/yyyy HH:mm format --> 
+        <td>{{(transaction.date | date:'MM/dd/yyyy') || 'N/A'}}</td>           
+        <td>             
+          <span class="badge" [ngClass]="{               
+            'badge-success': transaction.type === 'income' || transaction.type === 'sale',               
+            'badge-danger': transaction.type === 'expense' || transaction.type === 'purchase',               
+            'badge-info': transaction.type === 'transfer' || transaction.type === 'transfer_in' || transaction.type === 'transfer_out',               
+            'badge-warning': transaction.type === 'deposit'             
+          }">               
+            {{getTransactionTypeDisplay(transaction.type)}}             
+          </span>           
+        </td>           
+        <td>             
+          <span *ngIf="transaction.source === 'sale'">               
+            <a [routerLink]="['/sales', transaction.saleId]"                   
+               class="sale-link"                   
+               title="View Sale Details">                 
+              {{transaction.invoiceNo}}               
+            </a>             
+          </span>             
+          <span *ngIf="transaction.source === 'purchase'">               
+            <a [routerLink]="['/purchases', transaction.purchaseId]"                   
+               class="purchase-link"                   
+               title="View Purchase Details">                 
+              {{transaction.referenceNo}}               
+            </a>             
+          </span>             
+          <span *ngIf="transaction.source !== 'sale' && transaction.source !== 'purchase'">               
+            {{transaction.description}}             
+          </span>           
+        </td>                 
+        <td>{{transaction.paymentMethod}}</td>           
+        <td>{{transaction.paymentDetails}}</td>           
+        <td>{{transaction.note}}</td>           
+        
+        <!-- FIXED: Debit column should show debit values -->
+        <td class="text-right">             
+          <span *ngIf="transaction.debit && transaction.debit > 0" class="debit-amount">
+            ₹{{transaction.debit | number:'1.2-2'}}
+          </span>
+          <span *ngIf="!transaction.debit || transaction.debit <= 0">-</span>           
+        </td>           
+        
+        <!-- FIXED: Credit column should show credit values -->
+        <td class="text-right">             
+          <span *ngIf="transaction.credit && transaction.credit > 0" class="credit-amount">
+            ₹{{transaction.credit | number:'1.2-2'}}
+          </span>
+          <span *ngIf="!transaction.credit || transaction.credit <= 0">-</span>           
+        </td>           
+        
+        <td class="text-right" [ngClass]="{'negative-balance': transaction.balance < 0}">
+          ₹{{transaction.balance | number:'1.2-2'}}
+        </td>           
+        <td>             
+          <button class="btn btn-sm btn-edit" (click)="editTransaction(transaction)">Edit</button>             
+          <button class="btn btn-sm btn-delete" (click)="deleteTransaction(transaction.id)">Delete</button>                   
+        </td>         
+      </tr>       
+    </tbody> 
+    
+    <tfoot>   
+      <tr>     
+        <td colspan="6" class="text-right"><strong>Total:</strong></td>     
+        <td class="text-right"><strong>₹{{totalDebit | number:'1.2-2'}}</strong></td>     
+        <td class="text-right"><strong>₹{{totalCredit | number:'1.2-2'}}</strong></td>     
+        <td colspan="2"></td>   
+      </tr> 
+    </tfoot>     
+  </table>   
+</div>
+  
+  <!-- Card View -->
+  <div class="transactions-cards" *ngIf="viewMode === 'card' && !loading && !isEmpty">
+    <div class="card" *ngFor="let transaction of pagedTransactions">
+      <div class="card-header">
+        <!-- Consistent date formatting with MM/dd/yyyy HH:mm format -->
+<div class="transaction-date">{{(transaction.date | date:'MM/dd/yyyy HH:mm') || 'N/A'}}</div>
+        <div class="transaction-type" 
+             [ngClass]="{'debit': transaction.debit > 0, 'credit': transaction.credit > 0}">
+          {{transaction.debit > 0 ? 'Debit' : 'Credit'}}
+        </div>
+      </div>
+      <div class="card-body">
+        <h4 class="card-title">
+          <span *ngIf="transaction.source === 'sale'">
+            <a [routerLink]="['/sales', transaction.saleId]" 
+               class="sale-link" 
+               title="View Sale Details">
+              {{transaction.invoiceNo}}
+            </a>
+          </span>
+          <span *ngIf="transaction.source === 'purchase'">
+            <a [routerLink]="['/purchases', transaction.purchaseId]" 
+               class="purchase-link" 
+               title="View Purchase Details">
+              {{transaction.referenceNo}}
+            </a>
+          </span>
+          <span *ngIf="transaction.source !== 'sale' && transaction.source !== 'purchase'">
+            {{transaction.description}}
+          </span>
+        </h4>
+        <div class="card-details">
+          <p *ngIf="transaction.source === 'sale'"><strong>Customer:</strong> {{transaction.customerName || 'N/A'}}</p>
+          <p *ngIf="transaction.source === 'purchase'"><strong>Supplier:</strong> {{transaction.supplier || 'N/A'}}</p>
+          <p><strong>Payment Method:</strong> {{transaction.paymentMethod}}</p>
+          <p *ngIf="transaction.paymentDetails"><strong>Payment Details:</strong> {{transaction.paymentDetails}}</p>
+          <p *ngIf="transaction.note"><strong>Note:</strong> {{transaction.note}}</p>
+          <p class="card-amount debit" *ngIf="transaction.debit > 0">
+            <strong>Debit:</strong> ₹{{transaction.debit | number:'1.2-2'}}
+          </p>
+          <p class="card-amount credit" *ngIf="transaction.credit > 0">
+            <strong>Credit:</strong> ₹{{transaction.credit | number:'1.2-2'}}
+          </p>
+          <p class="card-balance"><strong>Balance:</strong> ₹{{transaction.balance | number:'1.2-2'}}</p>
+        </div>
+      </div>
+      <div class="card-footer">
+        <button class="btn btn-sm btn-edit" (click)="editTransaction(transaction)">Edit</button>
+        <button class="btn btn-sm btn-delete" (click)="deleteTransaction(transaction.id)">Delete</button>
+        <button *ngIf="transaction.hasDocument" class="btn btn-sm btn-download" 
+                (click)="downloadDocument(transaction.attachmentUrl)">
+          Download
+        </button>
+      </div>
+    </div>
+    
+    <div class="totals-card">
+      <div class="totals-header">Totals</div>
+      <div class="totals-body">
+        <p><strong>Total Debit:</strong> ₹{{totalDebit | number:'1.2-2'}}</p>
+        <p><strong>Total Credit:</strong> ₹{{totalCredit | number:'1.2-2'}}</p>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pagination Controls -->
+  <div class="pagination-controls" *ngIf="!loading && !isEmpty">
+    <div class="showing-entries">
+      Showing {{(currentPage - 1) * entriesPerPage + 1}} to 
+      {{getMinValue(currentPage * entriesPerPage, filteredTransactions.length)}} of 
+      {{filteredTransactions.length}} entries
+    </div>
+    <div class="pagination-buttons">
+      <button [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      <span class="page-number">{{currentPage}}</span>
+      <button [disabled]="currentPage * entriesPerPage >= filteredTransactions.length" 
+              (click)="nextPage()">Next</button>
+    </div>
+  </div>
+  
+  <!-- Edit Transaction Modal -->
+  <div *ngIf="showEditModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Edit Transaction</h3>
+        <button class="close-btn-icon" (click)="cancelEdit()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Date</label>
+          <!-- Consistent datetime-local input for editing -->
+          <input type="datetime-local" [(ngModel)]="editingTransaction.dateString" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" [(ngModel)]="editingTransaction.description" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Payment Method</label>
+          <input type="text" [(ngModel)]="editingTransaction.paymentMethod" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Payment Details</label>
+          <input type="text" [(ngModel)]="editingTransaction.paymentDetails" class="form-control">
+        </div>
+        <div class="form-group">
+          <label>Note</label>
+          <textarea [(ngModel)]="editingTransaction.note" class="form-control"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-6">
+            <label>Debit</label>
+            <input type="number" [(ngModel)]="editingTransaction.debit" class="form-control">
+          </div>
+          <div class="form-group col-6">
+            <label>Credit</label>
+            <input type="number" [(ngModel)]="editingTransaction.credit" class="form-control">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="saveTransaction()">Save</button>
+        <button class="btn btn-secondary" (click)="cancelEdit()">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Fund Transfer Modal -->
+  <div *ngIf="showFundTransferModal" class="modal-overlay">
+    <div class="modal-box fund-transfer-modal">
+      <div class="modal-header">
+        <h3>Fund Transfer</h3>
+        <button class="close-btn-icon" (click)="closeFundTransferForm()">×</button>
+      </div>
+      
+      <form [formGroup]="fundTransferForm" (ngSubmit)="submitFundTransfer()" class="modal-form">
+        <div class="form-group">
+          <label>Transfer from:*</label>
+          <select formControlName="fromAccount" class="form-control">
+            <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('toAccount')?.value">
+              {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+            </option>
+          </select>
+          <div *ngIf="fundTransferForm.get('fromAccount')?.invalid && fundTransferForm.get('fromAccount')?.touched" class="error-message">
+            Transfer from account is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Transfer To:*</label>
+          <select formControlName="toAccount" class="form-control">
+            <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('fromAccount')?.value">
+              {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+            </option>
+          </select>
+          <div *ngIf="fundTransferForm.get('toAccount')?.invalid && fundTransferForm.get('toAccount')?.touched" class="error-message">
+            Transfer to account is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Amount:*</label>
+          <input type="number" formControlName="amount" class="form-control" placeholder="0">
+          <div *ngIf="fundTransferForm.get('amount')?.invalid && fundTransferForm.get('amount')?.touched" class="error-message">
+            Valid amount is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Date:*</label>
+          <input type="date" formControlName="date" class="form-control">
+          <div *ngIf="fundTransferForm.get('date')?.invalid && fundTransferForm.get('date')?.touched" class="error-message">
+            Date is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Note:</label>
+          <textarea formControlName="note" class="form-control" rows="3"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Attach Document:</label>
+          <input type="file" (change)="onFileSelected($event)" class="form-control">
+          <div class="file-info">
+            <small>Max File size: 5MB</small><br>
+            <small>Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="submit-btn" [disabled]="fundTransferForm.invalid">Submit</button>
+          <button type="button" class="close-btn" (click)="closeFundTransferForm()">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

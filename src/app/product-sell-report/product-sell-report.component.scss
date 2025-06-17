@@ -1,0 +1,62 @@
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+  }
+  
+  .card-title {
+    margin-bottom: 0;
+    color: #495057;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th {
+    background-color: #f8f9fa;
+    cursor: pointer;
+    position: relative;
+    padding-right: 20px !important;
+  }
+  
+  tbody tr:hover {
+    background-color: #f1f8ff;
+  }
+  
+  .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    color: #0d6efd;
+  }
+  
+  .table-active {
+    background-color: #f2f2f2;
+  }
+  
+  /* Make sure the footer totals are always visible */
+  tfoot {
+    position: sticky;
+    bottom: 0;
+    background-color: white;
+    border-top: 2px solid #dee2e6;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .btn-group {
+      margin-top: 10px;
+      width: 100%;
+    }
+    
+    .col-md-4.d-flex {
+      margin-top: 15px;
+      justify-content: flex-start !important;
+}
+  }
+  

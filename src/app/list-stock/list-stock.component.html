@@ -1,0 +1,235 @@
+<div class="stock-transfers-container">
+  <h1>Stock Transfers</h1>
+  
+  <div class="content-panel">
+    <h2>All Stock Transfers</h2>
+    
+    <div class="action-bar">
+      <div class="entries-selector">
+        <label for="entries-select">Show</label>
+        <select id="entries-select" [(ngModel)]="entriesPerPage" (change)="updatePagination()">
+          <option [value]="25">25</option>
+          <option [value]="50">50</option>
+          <option [value]="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+      
+      <div class="export-actions">
+        <button class="btn btn-outline" (click)="exportData('csv')">
+          <i class="fas fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportData('excel')">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-outline" (click)="printData()">
+          <i class="fas fa-print"></i> Print
+        </button>
+      <!-- Replace the existing column visibility modal with this card dropdown -->
+<div class="column-visibility-dropdown" [class.open]="showColumnDropdown">
+<button class="btn btn-outline dropdown-toggle" (click)="toggleColumnDropdown()">
+  <i class="fas fa-columns"></i> Column visibility
+</button>
+
+<div class="dropdown-card" *ngIf="showColumnDropdown">
+  <div class="card-header">
+  
+  </div>
+  <div class="card-body">
+    <div class="column-options">
+      <div class="column-option" *ngFor="let col of columns">
+        <label>
+          <input type="checkbox" 
+                 [checked]="col.visible" 
+                 (change)="toggleColumn(col.field)">
+          {{ col.title }}
+        </label>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+     
+      </div>
+      
+      <div class="search-box">
+        <input 
+          type="text" 
+          [formControl]="searchControl" 
+          placeholder="Search..." 
+          aria-label="Search stock transfers"
+        >
+      </div>
+      
+      <button class="add-stock-btn" (click)="addNewStock()">
+        <i class="fas fa-plus"></i> Add Stock
+      </button>
+      
+    </div>
+    
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th (click)="sortBy('date')">
+              Date 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'date' && sortDirection === 'asc', 'fa-sort-down': sortField === 'date' && sortDirection === 'desc', 'fa-sort': sortField !== 'date'}"></i>
+            </th>
+            <th (click)="sortBy('referenceNo')">
+              Reference No 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'referenceNo' && sortDirection === 'asc', 'fa-sort-down': sortField === 'referenceNo' && sortDirection === 'desc', 'fa-sort': sortField !== 'referenceNo'}"></i>
+            </th>
+            <th (click)="sortBy('products')">
+              Products 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'products' && sortDirection === 'asc', 'fa-sort-down': sortField === 'products' && sortDirection === 'desc', 'fa-sort': sortField !== 'products'}"></i>
+            </th>
+            <th (click)="sortBy('locationFrom')">
+              Location (From) 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'locationFrom' && sortDirection === 'asc', 'fa-sort-down': sortField === 'locationFrom' && sortDirection === 'desc', 'fa-sort': sortField !== 'locationFrom'}"></i>
+            </th>
+            <th (click)="sortBy('locationTo')">
+              Location (To) 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'locationTo' && sortDirection === 'asc', 'fa-sort-down': sortField === 'locationTo' && sortDirection === 'desc', 'fa-sort': sortField !== 'locationTo'}"></i>
+            </th>
+            <th (click)="sortBy('status')">
+              Status 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'status' && sortDirection === 'asc', 'fa-sort-down': sortField === 'status' && sortDirection === 'desc', 'fa-sort': sortField !== 'status'}"></i>
+            </th>
+       
+            <th (click)="sortBy('totalAmount')">
+              Total Amount 
+              <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc', 'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc', 'fa-sort': sortField !== 'totalAmount'}"></i>
+            </th>
+            <th>Additional Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="paginatedStocks.length === 0">
+            <td colspan="9" class="no-data">No data available in table</td>
+          </tr>
+          <tr *ngFor="let stock of paginatedStocks" [ngClass]="{'highlighted': stock.id === highlightedRowId}">
+            <td>{{ stock.date | date: 'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ stock.referenceNo }}</td>
+            <td>{{ getProductNames(stock) }}</td>
+
+            <td>{{ getLocationName(stock.locationFrom) }}</td>
+            <td>{{ getLocationName(stock.locationTo) }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getStatusClass(stock.status)">
+                {{ stock.status }}
+              </span>
+            </td>
+            <td>{{ stock.totalAmount | currency:'INR'}}</td>
+            <td>{{ stock.additionalNotes || '-' }}</td>
+            <td class="actions-column">
+             <!-- Update just the actions cell in the table -->
+             <td class="actions-column">
+              <div class="action-buttons">
+                <button class="btn btn-icon" title="Edit" (click)="editStock(stock)">
+                  <i class="fas fa-edit"></i>
+                  <span>Edit</span>
+                </button>
+                <button class="btn btn-danger" (click)="confirmDelete(stock)">
+                  <i class="fas fa-trash"></i>
+                  <span>Delete</span>
+                </button>
+              </div>
+            </td>
+
+<!-- No changes needed to delete confirmation modal, for reference: -->
+<!-- Delete Confirmation Modal -->
+<div class="modal" *ngIf="showDeleteModal">
+<div class="modal-content">
+  <div class="modal-header">
+    <h3>Confirm Delete</h3>
+    <button class="close-btn" (click)="cancelDelete()">&times;</button>
+  </div>
+  <div class="modal-body">
+    <p>Are you sure you want to delete the stock transfer with reference 
+      <strong>{{ stockToDelete?.referenceNo }}</strong>?</p>
+    <p class="warning">This action cannot be undone.</p>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline" (click)="cancelDelete()">Cancel</button>
+    <button class="btn btn-danger" (click)="deleteStock()" [disabled]="isDeleting">
+      <span *ngIf="!isDeleting">Delete</span>
+      <span *ngIf="isDeleting">
+        <i class="fas fa-spinner fa-spin"></i> Deleting...
+      </span>
+    </button>
+  </div>
+</div>
+</div>
+      </table>
+    </div>
+    
+    <div class="table-footer">
+      <div class="entries-info">
+        Showing {{ paginatedStocks.length > 0 ? (currentPage - 1) * entriesPerPage + 1 : 0 }} 
+        to {{ Math.min(currentPage * entriesPerPage, filteredStocks.length) }} 
+        of {{ filteredStocks.length }} entries
+      </div>
+      <div class="pagination">
+        <button class="btn btn-outline" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">
+          Previous
+        </button>
+        <ng-container *ngFor="let page of getPageNumbers()">
+          <button 
+            class="btn btn-page" 
+            [class.active]="page === currentPage" 
+            (click)="goToPage(page)">
+            {{ page }}
+          </button>
+        </ng-container>
+        <button class="btn btn-outline" [disabled]="currentPage === totalPages" (click)="goToPage(currentPage + 1)">
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal" *ngIf="showDeleteModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Confirm Delete</h3>
+      <button class="close-btn" (click)="cancelDelete()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to delete the stock transfer with reference 
+        <strong>{{ stockToDelete?.referenceNo }}</strong>?</p>
+      <p class="warning">This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="cancelDelete()">Cancel</button>
+      <button class="btn btn-danger" (click)="deleteStock()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Column Visibility Modal -->
+<div class="modal" *ngIf="showColumnModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Column Visibility</h3>
+      <button class="close-btn" (click)="showColumnModal = false">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="column-options">
+        <div class="column-option" *ngFor="let col of columns">
+          <label>
+            <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)">
+            {{ col.title }}
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="resetColumns()">Reset</button>
+      <button class="btn btn-primary" (click)="applyColumnChanges()">Apply</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,254 @@
+.goods-received-container {
+    font-family: Arial, sans-serif;
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  }
+  
+  .header {
+    h2 {
+      font-size: 20px;
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 15px;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #ccc;
+      margin-bottom: 20px;
+    }
+  }
+  
+  .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+    gap: 15px;
+  }
+  
+  .form-group {
+    flex: 1;
+    min-width: 200px;
+    
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+      color: #555;
+      
+      .required {
+        color: red;
+      }
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      
+      &:focus {
+        outline: none;
+        border-color: #5c9ce6;
+        box-shadow: 0 0 0 2px rgba(92, 156, 230, 0.2);
+      }
+    }
+  }
+  
+  .input-with-icon {
+    position: relative;
+    
+    .info-icon {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #3498db;
+      cursor: pointer;
+      font-size: 16px;
+    }
+  }
+  
+  .file-upload {
+    display: flex;
+    
+    input[type="file"] {
+      display: none;
+    }
+    
+    .browse-btn {
+      background-color: #4285f4;
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      
+      &:hover {
+        background-color: #3367d6;
+      }
+    }
+  }
+  
+  .file-info {
+    display: flex;
+    flex-direction: column;
+    margin-top: 5px;
+    
+    small {
+      font-size: 11px;
+      color: #777;
+    }
+  }
+  
+  .address-group {
+    width: 100%;
+    
+    .address-display {
+      min-height: 30px;
+      padding: 5px 10px;
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  }
+  
+  .purchase-order-group {
+    width: 100%;
+  }
+  
+  .products-section {
+    margin: 20px 0;
+    
+    .products-table {
+      width: 100%;
+      border-collapse: collapse;
+      
+      th, td {
+        padding: 10px;
+        text-align: left;
+        border: 1px solid #ddd;
+        font-size: 14px;
+      }
+      
+      th {
+        background-color: #4caf50;
+        color: white;
+        font-weight: 500;
+      }
+      
+      .add-btn {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 16px;
+        
+        &:hover {
+          background-color: #45a049;
+        }
+      }
+      
+      .remove-btn {
+        background-color: #f44336;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 16px;
+        
+        &:hover {
+          background-color: #d32f2f;
+        }
+      }
+      
+      .no-products {
+        text-align: center;
+        padding: 20px;
+        color: #777;
+        font-style: italic;
+      }
+    }
+    
+    .totals-section {
+      margin-top: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        width: 250px;
+        padding: 5px 0;
+        
+        span:first-child {
+          font-weight: 500;
+          color: #555;
+        }
+        
+        span:last-child {
+          font-weight: 500;
+        }
+      }
+    }
+  }
+  
+  .notes-section {
+    margin-bottom: 20px;
+    
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+  }
+  
+  .form-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 15px;
+    border-top: 1px solid #ddd;
+    
+    .purchase-total {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
+    .save-btn {
+      background-color: #4285f4;
+      color: white;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      
+      &:hover {
+        background-color: #3367d6;
+  }
+  }
+  }
+  .purchase-order-group {
+  select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    
+    option {
+      padding: 8px;
+      
+      &:hover {
+        background-color: #f5f5f5;
+      }
+    }
+  }
+}

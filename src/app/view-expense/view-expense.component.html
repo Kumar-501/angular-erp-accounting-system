@@ -1,0 +1,19 @@
+<!-- view-expense.component.html -->
+<div class="view-expense-container" *ngIf="expense">
+    <h2>Expense Details</h2>
+  
+    <div><strong>Date:</strong> {{ expense.date | date }}</div>
+    <div><strong>Reference No:</strong> {{ expense.referenceNo }}</div>
+    <div><strong>Category:</strong> {{ expense.expenseCategory }}</div>
+    <div><strong>Location:</strong> {{ expense.businessLocation }}</div>
+    <div><strong>Payment Method:</strong> {{ expense.paymentMethod }}</div>
+    <div><strong>Total Amount:</strong> ₹ {{ expense.totalAmount }}</div>
+    
+    <!-- Add more fields as necessary -->
+  
+    <!-- Go Back Button -->
+    <div style="text-align: center; margin-top: 20px;">
+      <button (click)="goBack()">Go Back</button>
+    </div>
+  </div>
+  

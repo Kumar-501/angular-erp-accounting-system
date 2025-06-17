@@ -1,0 +1,454 @@
+<div class="container">
+  <h2>{{ isEditing ? 'Edit Product' : 'Add Product' }}</h2>
+
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <form (ngSubmit)="updateProduct()" #productForm="ngForm">
+    <!-- Basic Information Section -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Product Name:</label>
+          <input type="text" placeholder="Product Name"
+                 [(ngModel)]="product.productName" name="productName"
+                 (input)="onProductNameChange()" required>
+        </div>
+        <div class="form-group">
+          <label>SKU: <span class="info-icon" title="Stock Keeping Unit">i</span></label>
+          <input type="text" placeholder="SKU"
+                 [(ngModel)]="product.sku" name="sku"
+                 [readonly]="isGeneratingSku" required>
+          <span *ngIf="isGeneratingSku" class="generating-sku">Generating SKU...</span>
+        </div>
+           <div class="form-group">
+        <label class="required">Barcode Type:</label>
+        <select [(ngModel)]="product.barcodeType" name="barcodeType" required>
+          <option>Code 128 (C128)</option>
+          <option>Code 39</option>
+          <option>EAN-13</option>
+          <option>UPC-A</option>
+        </select>
+      </div>
+
+      </div>
+
+   
+      <!-- Add this after the Barcode Type field -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Business Location:</label>
+          <select [(ngModel)]="product.location" name="location">
+            <option value="">Please Select</option>
+            <option *ngFor="let location of locations" [value]="location.id">
+              {{ location.name }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>HSN Code:</label>
+          <input type="text" placeholder="HSN Code" 
+                 [(ngModel)]="product.hsnCode" name="hsnCode">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Unit:</label>
+          <div class="unit-select-container">
+            <select [(ngModel)]="product.unit" name="unit" required>
+              <option value="">Please Select</option>
+              <option *ngFor="let unit of units" [value]="unit.name">
+                {{ unit.name }} ({{ unit.shortName }})
+              </option>
+            </select>
+            <button type="button" class="btn-add" (click)="navigateToUnitsPage()">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Brand:</label>
+          <div class="brand-select-container">
+            <select [(ngModel)]="product.brand" name="brand">
+              <option value="">Please Select</option>
+              <option *ngFor="let brand of brands" [value]="brand.name">
+                {{ brand.name }}
+              </option>
+            </select>
+            <button type="button" class="btn-add" (click)="navigateToBrandsPage()">+</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Category:</label>
+          <select [(ngModel)]="product.category" name="category" (change)="onCategoryChange()">
+            <option value="">Please Select</option>
+            <option *ngFor="let category of categories" [value]="category.name">
+              {{ category.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group" *ngIf="filteredSubCategories.length > 0">
+        <label>Sub Category:</label>
+        <select [(ngModel)]="product.subCategory" name="subCategory">
+          <option value="">Please Select</option>
+          <option *ngFor="let subCat of filteredSubCategories" [value]="subCat.name">
+            {{ subCat.name }}
+          </option>
+        </select>
+      </div>
+
+      <!-- Inventory Management Section -->
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="manageStock" [(ngModel)]="product.manageStock" name="manageStock">
+            <label for="manageStock">Manage Stock? <span class="info-icon" title="Enable stock management">i</span></label>
+          </div>
+          <div class="hint-text">Enable stock management at product level</div>
+        </div>
+        <div class="form-group" *ngIf="product.manageStock">
+          <label>Alert quantity: <span class="info-icon" title="Low stock alert level">i</span></label>
+          <input type="number" placeholder="Alert quantity"
+                 [(ngModel)]="product.alertQuantity" name="alertQuantity">
+        </div>
+      </div>
+      <!-- In edit-product.component.html -->
+<div class="form-row" *ngIf="product.manageStock">
+  <div class="form-group">
+    <label>Total Quantity:</label>
+    <input type="number" placeholder="Total quantity"
+           [(ngModel)]="product.totalQuantity" name="totalQuantity" min="0">
+  </div>
+  <div class="form-group">
+    <label>Lot Number:</label>
+    <input type="text" placeholder="Enter last number or code"
+           [(ngModel)]="product.lastNumber" name="lastNumber">
+    <div class="hint-text">Can be number or text identifier</div>
+  </div>
+</div>
+<!-- Add this in the Basic Information Section -->
+<div class="form-row">
+  <div class="form-group">
+    <label>Expiry Date:</label>
+    <input type="date" [(ngModel)]="product.expiryDate" name="expiryDate">
+    <div class="hint-text">Leave empty if product doesn't expire</div>
+  </div>
+</div>
+      <!-- Product Description -->
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>Product Description:</label>
+          <textarea [(ngModel)]="product.productDescription" name="productDescription"></textarea>
+        </div>
+      </div>
+
+      <!-- File Uploads -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Product image:</label>
+          <div class="file-upload">
+            <input type="file" id="productImage" (change)="onFileSelected($event, 'image')" accept="image/*">
+            <label for="productImage" class="btn btn-primary">Browse...</label>
+            <div class="file-info">{{ product.productImage?.name || 'No file chosen' }}</div>
+          </div>
+          <div class="file-requirements">
+            Max File size: 5MB<br> Aspect ratio should be 1:1
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Product brochure:</label>
+          <div class="file-upload">
+            <input type="file" id="productBrochure" (change)="onFileSelected($event, 'brochure')"
+                   accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png">
+            <label for="productBrochure" class="btn btn-secondary">Choose File</label>
+            <div class="file-info">{{ product.productBrochure?.name || 'No file chosen' }}</div>
+          </div>
+          <div class="file-requirements">
+            Max File size: 5MB<br> Allowed: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional Information -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enableDescription" [(ngModel)]="product.enableProductDescription" name="enableProductDescription">
+            <label for="enableDescription">Enable Product description, IMEI or Serial Number <span class="info-icon">i</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="notForSelling" [(ngModel)]="product.notForSelling" name="notForSelling">
+            <label for="notForSelling">Not for selling <span class="info-icon">i</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Weight (kg):</label>
+          <input type="number" step="0.01" placeholder="Weight"
+                 [(ngModel)]="product.weight" name="weight">
+        </div>
+        <div class="form-group">
+          <label>Preparation time (minutes):</label>
+          <input type="number" placeholder="Preparation time"
+                 [(ngModel)]="product.preparationTime" name="preparationTime">
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Type Section -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Applicable Tax:</label>
+          <select [(ngModel)]="product.applicableTax" name="applicableTax" (change)="onTaxChange()">
+            <option [ngValue]="'None'">None</option>
+            <option *ngFor="let tax of taxRates" [ngValue]="tax">
+              {{ tax.name }} ({{ tax.percentage }}%)
+            </option>
+          </select>
+          <div *ngIf="product.taxPercentage > 0" class="tax-info">
+            Current tax rate: {{ product.taxPercentage }}%
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="required">Selling Price Tax Type:</label>
+          <select [(ngModel)]="product.sellingPriceTaxType" name="sellingPriceTaxType" required (change)="calculateTax()">
+            <option>Exclusive</option>
+            <option>Inclusive</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Define Product:</label>
+          <select [(ngModel)]="product.defineProduct" name="defineProduct" required>
+            <option value="Regular">Regular Product</option>
+            <option value="Asset">Asset</option>
+            <option value="Expense">Expense</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Product Type:</label>
+          <select [(ngModel)]="product.productType" name="productType" required (change)="onProductTypeChange()">
+            <option>Single</option>
+            <option>Variant</option>
+            <option>Combination</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Added By Field -->
+      <div class="form-group">
+        <label>Added By:</label>
+        <select [(ngModel)]="selectedUser" name="addedBy" (change)="onUserSelect(selectedUser)">
+          <option value="">Select User</option>
+          <option *ngFor="let user of users" [ngValue]="user">
+            {{ user.name || user.email }}
+          </option>
+        </select>
+      </div>
+      <br>
+
+      <!-- Variant Selection (for Variant type) -->
+      <div class="variant-section" *ngIf="product.productType === 'Variant'">
+        <h3>Select Variations</h3>
+        <div class="variation-options">
+          <div *ngFor="let variation of availableVariations" class="variation-option">
+            <label>
+              <input type="checkbox"
+                     [checked]="isVariationSelected(variation.id)"
+                     (change)="toggleVariationSelection(variation)">
+              {{ variation.name }}
+            </label>
+            <div *ngIf="isVariationSelected(variation.id)" class="variation-values">
+              <div *ngFor="let value of variation.values" class="value-option">
+                <label>
+                  <input type="checkbox"
+                         [checked]="isValueSelected(variation.id, value)"
+                         (change)="toggleValueSelection(variation.id, value)">
+                  {{ value }}
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+       
+        <div *ngIf="selectedVariations.length > 0" class="variant-combinations">
+          <h4>Variant Combinations</h4>
+          <table class="variant-table">
+            <thead>
+              <tr>
+                <th *ngFor="let variation of selectedVariations">{{ variation.name }}</th>
+                <th>SKU</th>
+                <th>Price</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let combination of variantCombinations; let i = index">
+                <td *ngFor="let value of combination.values">{{ value }}</td>
+                <td>
+                  <input type="text" [(ngModel)]="combination.sku"
+                         [name]="'variantSku_' + i" placeholder="Auto-generated">
+                </td>
+                <td>
+                  <input type="number" step="0.01" [(ngModel)]="combination.price"
+                         [name]="'variantPrice_' + i" placeholder="0.00">
+                </td>
+                <td>
+                  <input type="number" [(ngModel)]="combination.quantity"
+                         [name]="'variantQuantity_' + i" placeholder="0">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Combination Product Section (for Combination type) -->
+      <div class="combination-section" *ngIf="product.productType === 'Combination'">
+        <h3>Product Components</h3>
+        <div class="component-list">
+          <div class="component-item" *ngFor="let component of product.components; let i = index">
+            <div class="component-details">
+              <select [(ngModel)]="component.productId" [name]="'componentProduct_' + i"
+                      class="product-select" (change)="onComponentProductChange(i)">
+                <option value="">Select Product</option>
+                <option *ngFor="let prod of availableProducts" [value]="prod.id">
+                  {{ prod.productName }} ({{ prod.sku }})
+                </option>
+              </select>
+              <input type="number" [(ngModel)]="component.quantity" [name]="'componentQuantity_' + i"
+                     class="quantity-input" placeholder="Qty" min="1">
+              <button type="button" class="btn-remove" (click)="removeComponent(i)">×</button>
+            </div>
+            <div class="component-info" *ngIf="getComponentProduct(i)">
+              <span>Price: {{ getComponentProduct(i).defaultSellingPriceExcTax | currency:'INR'}}</span>
+              <span>Stock: {{ getComponentProduct(i).currentStock || 0 }}</span>
+            </div>
+          </div>
+          <button type="button" class="btn-add-component" (click)="addComponent()">
+            + Add Component
+          </button>
+        </div>
+       
+        <div class="combination-summary" *ngIf="product.components.length > 0">
+          <h4>Combination Summary</h4>
+          <div class="summary-row">
+            <span>Total Components:</span>
+            <span>{{ product.components.length }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Estimated Cost:</span>
+            <span>{{ calculateCombinationCost() | currency:'INR' }}</span>
+          </div>
+          <div class="summary-row">
+            <span>Recommended Selling Price ({{ product.marginPercentage }}% margin):</span>
+            <span>{{ calculateRecommendedPrice() | currency:'INR' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pricing Section (for Single and Combination types) -->
+      <div *ngIf="product.productType !== 'Variant'" class="pricing-section">
+        <table class="pricing-table">
+          <thead>
+            <tr>
+              <th>Default Purchase Price</th>
+              <th>Margin (%)</th>
+              <th>Default Selling Price</th>
+              <th>Product image</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <label class="required">Exc. tax:</label>
+                <input type="number" step="0.01" placeholder="Exc. tax"
+                       [(ngModel)]="product.defaultPurchasePriceExcTax"
+                       name="defaultPurchasePriceExcTax"
+                       (change)="calculateAllPrices()" required>
+              </td>
+              <td>
+                <input type="number" step="0.01" placeholder="25.00"
+                       [(ngModel)]="product.marginPercentage"
+                       name="marginPercentage"
+                       (change)="calculateAllPrices()">
+              </td>
+              <td>
+                <label>Exc. Tax:</label>
+                <input type="number" step="0.01" placeholder="Exc. tax"
+                       [(ngModel)]="product.defaultSellingPriceExcTax"
+                       name="defaultSellingPriceExcTax" readonly>
+              </td>
+              <td rowspan="3">
+                <label>Product image:</label>
+                <div class="file-upload">
+                  <input type="file" id="pricingImage" (change)="onFileSelected($event, 'image')" accept="image/*">
+                  <label for="pricingImage" class="btn btn-secondary">Choose Files</label>
+                  <div class="file-info">{{ product.productImage?.name || 'No file chosen' }}</div>
+                </div>
+                <div class="file-requirements">
+                  Max File size: 5MB<br> Aspect ratio should be 1:1
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <label>Inc. tax:</label>
+                <input type="number" step="0.01" placeholder="Inc. tax"
+                       [(ngModel)]="product.defaultPurchasePriceIncTax"
+                       name="defaultPurchasePriceIncTax"
+                       (change)="calculatePurchasePriceExcTax()">
+              </td>
+              <td></td>
+              <td>
+                <label>Inc. Tax:</label>
+                <input type="number" step="0.01" placeholder="Inc. tax"
+                       [(ngModel)]="product.defaultSellingPriceIncTax"
+                       name="defaultSellingPriceIncTax" readonly>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="3">
+                <div *ngIf="product.taxPercentage > 0">
+                  <strong>Tax Amount ({{ product.taxPercentage }}%):</strong> {{ calculateTaxAmount() | currency:'INR' }}
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-save" [disabled]="isLoading">
+          Update Product
+        </button>
+        <button type="button" class="btn btn-secondary" [disabled]="isLoading" (click)="cancelEdit()">
+          Cancel
+        </button>
+        <button type="button" class="btn btn-danger" [disabled]="isLoading" (click)="deleteProduct()">
+          Delete Product
+        </button>
+      </div>
+
+      <div class="footer">
+        HYBRID CRM - v6.2 | Copyright © 2025 All rights reserved.
+      </div>
+    </div>
+  </form>
+</div>

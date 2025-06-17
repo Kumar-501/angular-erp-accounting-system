@@ -1,0 +1,175 @@
+<div *ngIf="sale$ | async as sale; else loading">
+  <div class="container-fluid">
+    <div class="row mb-3">
+      <div class="col-12 d-flex justify-content-between align-items-center">
+        <h3>Sale Details: {{ sale.invoiceNo || sale.orderNo }}</h3>
+        <button class="btn btn-secondary" routerLink="/sales-order">
+          <i class="fa fa-arrow-left"></i> Back to List
+        </button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Order Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>Order Number:</strong> {{ sale.orderNo }}</p>
+                <p><strong>Invoice Number:</strong> {{ sale.invoiceNo || 'N/A' }}</p>
+
+                <p><strong>Date:</strong> {{ sale.saleDate | date: 'mediumDate' }}</p>
+                <p><strong>Status:</strong> 
+                  <span class="badge" [ngClass]="{
+                    'bg-success': sale.status === 'Completed' || sale.status === 'active',
+                    'bg-warning': sale.status === 'Pending' || sale.status === 'pending',
+                    'bg-danger': sale.status === 'Cancelled' || sale.status === 'inactive'
+                  }">
+                    {{ sale.status }}
+                  </span>
+                </p>
+              </div>
+              <div class="col-md-6">
+                <p><strong>Type of Service:</strong> {{ sale.typeOfServiceName }}</p>
+                <p><strong>Shipping Status:</strong> 
+                  <span class="badge" [ngClass]="{
+                    'bg-success': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered',
+                    'bg-warning': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending',
+                    'bg-info': sale.shippingStatus === 'Shipped' || sale.shippingStatus === 'shipped',
+                    'bg-secondary': sale.shippingStatus === 'Returned' || sale.shippingStatus === 'returned'
+                  }">
+                    {{ sale.shippingStatus }}
+                  </span>
+                </p>
+                <p><strong>Transaction ID:</strong> {{ sale.transactionId || 'N/A' }}</p>
+                <p><strong>Location:</strong> {{ sale.location || sale.businessLocation }}</p>
+                <p><strong>Added By:</strong> {{ sale.addedByDisplayName }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Customer Information</h5>
+          </div>
+          <div class="card-body">
+            <p><strong>Customer Name:</strong> {{ sale.customer }}</p>
+            <p><strong>Contact Number:</strong> {{ sale.customerPhone || 'N/A' }}</p>
+            <p><strong>Shipping Address:</strong> {{ sale.shippingAddress }}</p>
+            <p><strong>Billing Address:</strong> {{ sale.billingAddress || sale.shippingAddress }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card mb-4">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Payment Information</h5>
+          </div>
+          <div class="card-body">
+            <p><strong>Payment Method:</strong> 
+              <span class="badge" [ngClass]="{
+                'bg-success': sale.paymentMethod === 'Cash',
+                'bg-primary': sale.paymentMethod === 'Card',
+                'bg-info': sale.paymentMethod === 'Bank Transfer',
+                'bg-warning': sale.paymentMethod === 'Cheque',
+                'bg-secondary': !sale.paymentMethod || sale.paymentMethod === 'Other'
+              }">
+                {{ sale.paymentMethod || 'N/A' }}
+              </span>
+            </p>
+            <p><strong>Payment Amount:</strong> {{ sale.paymentAmount | currency:'INR' }}</p>
+            <p><strong>Balance:</strong> {{ sale.balance |currency:'INR' }}</p>
+            <p><strong>Change Return:</strong> {{ sale.changeReturn | currency:'INR' }}</p>
+            <p><strong>Paid On:</strong> {{ sale.paidOn | date: 'medium' }}</p>
+            <p><strong>Payment Note:</strong> {{ sale.paymentNote || 'N/A' }}</p>
+          </div>
+        </div>
+
+    <!-- In sales-detail.component.html, update the Order Summary section -->
+<div class="card mb-4">
+  <div class="card-header bg-primary text-white">
+    <h5 class="mb-0">Order Summary</h5>
+  </div>
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Price</th>
+            <th class="text-end">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let product of sale.products">
+            <td>{{ product.name }}</td>
+            <td class="text-end">{{ product.quantity }}</td>
+            <td class="text-end">{{ product.unitPrice | currency:'INR'}}</td>
+            <td class="text-end">{{ product.unitPrice * product.quantity | currency:'INR' }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="3" class="text-end">Subtotal:</th>
+            <th class="text-end">{{ calculateSubtotal(sale.products) | currency:'INR'}}</th>
+          </tr>
+          <tr *ngIf="sale.discountAmount > 0">
+            <th colspan="3" class="text-end">Discount ({{ sale.discountType === 'Percentage' ? sale.discountAmount + '%' : 'Fixed' }}):</th>
+            <th class="text-end">-{{ calculateDiscountAmount(sale) | currency:'INR'}}</th>
+          </tr>
+          <tr *ngIf="sale.shippingCharges > 0">
+            <th colspan="3" class="text-end">Shipping Charges:</th>
+            <th class="text-end">{{ sale.shippingCharges | currency:'INR' }}</th>
+          </tr>
+          <tr *ngIf="sale.orderTax > 0">
+            <th colspan="3" class="text-end">Tax ({{ sale.orderTax }}% on Shipping):</th>
+            <th class="text-end">{{ calculateTaxAmount(sale) | currency:'INR'}}</th>
+          </tr>
+          <tr class="table-active">
+            <th colspan="3" class="text-end">Total:</th>
+            <th class="text-end">{{ sale.totalPayable | currency:'INR'}}</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+      </div>
+    </div>
+
+    <div class="row" *ngIf="sale.sellNote || sale.deliveryPerson">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Additional Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6" *ngIf="sale.sellNote">
+                <p><strong>Notes:</strong> {{ sale.sellNote }}</p>
+              </div>
+              <div class="col-md-6" *ngIf="sale.deliveryPerson">
+                <p><strong>Delivery Person:</strong> {{ sale.deliveryPerson }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ng-template #loading>
+  <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <span class="ms-3">Loading sale details...</span>
+  </div>
+</ng-template>

@@ -1,0 +1,106 @@
+<div class="customer-summary-container">
+  <div class="header">
+    <div class="header-content">
+      <div class="title-section">
+        <h2><i class="fa fa-users"></i> Customer Assignment Summary</h2>
+        <p>View customer assignments and call statistics by user</p>
+      </div>
+      <div class="header-stats" *ngIf="!isLoading && userSummaries.length > 0">
+        <div class="stat-card">
+          <span class="stat-number">{{ getTotalUsers() }}</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">{{ getTotalCustomers() }}</span>
+          <span class="stat-label">Total Customers</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">{{ getTotalCalls() }}</span>
+          <span class="stat-label">Total Calls</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="controls-left">
+      <button class="btn btn-refresh" (click)="loadCustomerSummary()" [disabled]="isLoading">
+        <i class="fa fa-refresh" [class.fa-spin]="isLoading"></i> 
+        {{ isLoading ? 'Loading...' : 'Refresh' }}
+      </button>
+    </div>
+    <div class="controls-right">
+      <button class="btn btn-export" (click)="exportToExcel()" [disabled]="isLoading || userSummaries.length === 0">
+        <i class="fa fa-file-excel-o"></i> Export to Excel
+      </button>
+    </div>
+  </div>
+
+  <div class="summary-content" *ngIf="!isLoading; else loading">
+    <div class="summary-table" *ngIf="userSummaries.length > 0; else noData">
+      <table>
+        <thead>
+          <tr>
+            <th class="user-col">
+              <i class="fa fa-user"></i> User
+            </th>
+            <th class="number-col">
+              <i class="fa fa-users"></i> Customers Assigned
+            </th>
+            <th class="number-col">
+              <i class="fa fa-phone"></i> Total Calls
+            </th>
+           
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let summary of userSummaries; trackBy: trackByUserId" 
+              [class.no-assignments]="summary.customerCount === 0">
+            <td class="user-name">
+              <div class="user-info">
+                <div class="user-avatar">
+                  {{ getInitials(summary.name) }}
+                </div>
+                <span>{{ summary.name }}</span>
+              </div>
+            </td>
+            <td class="number-cell">
+              <span class="number-badge" [class.zero]="summary.customerCount === 0">
+                {{ summary.customerCount }}
+              </span>
+            </td>
+            <td class="number-cell">
+              <span class="number-badge" [class.zero]="summary.totalCallCount === 0">
+                {{ summary.totalCallCount }}
+              </span>
+            </td>
+           
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #noData>
+      <div class="no-data-container">
+        <div class="no-data-icon">
+          <i class="fa fa-database"></i>
+        </div>
+        <h3>No Data Available</h3>
+        <p>No user assignment data found. Click refresh to reload the data.</p>
+        <button class="btn btn-primary" (click)="loadCustomerSummary()">
+          <i class="fa fa-refresh"></i> Refresh Data
+        </button>
+      </div>
+    </ng-template>
+  </div>
+
+  <ng-template #loading>
+    <div class="loading-container">
+      <div class="loading-spinner">
+        <i class="fa fa-spinner fa-spin"></i>
+      </div>
+      <h3>Loading Summary Data</h3>
+      <p>Please wait while we gather the customer assignment information...</p>
+    </div>
+  </ng-template>
+</div>

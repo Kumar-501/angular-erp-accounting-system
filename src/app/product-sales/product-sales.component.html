@@ -1,0 +1,251 @@
+<div class="product-sales-container">
+  <!-- Header Section -->
+  <div class="header-section">
+    <h2 class="page-title">Product Sales Management</h2>
+    <div class="header-actions">
+      <button class="btn btn-primary" (click)="loadSales()">
+        <i class="fas fa-refresh"></i> Refresh
+      </button>
+      <div class="export-dropdown">
+        <button class="btn btn-secondary dropdown-toggle">
+          <i class="fas fa-download"></i> Export
+        </button>
+        <div class="dropdown-menu">
+          <a class="dropdown-item" (click)="exportSales('csv')">Export as CSV</a>
+          <a class="dropdown-item" (click)="exportSales('excel')">Export as Excel</a>
+          <a class="dropdown-item" (click)="exportSales('pdf')">Export as PDF</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <div class="stat-value">{{ totalSales }}</div>
+      <div class="stat-label">Total Sales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ formatCurrency(totalRevenue) }}</div>
+      <div class="stat-label">Total Revenue</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ completedSales }}</div>
+      <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{ pendingSales }}</div>
+      <div class="stat-label">Pending</div>
+    </div>
+  </div>
+
+<div *ngIf="productFilterName" class="product-filter-indicator alert alert-info">
+  <strong>Showing sales for product:</strong> {{ productFilterName }}
+  <button class="btn btn-sm btn-outline-secondary ms-2" (click)="clearProductFilter()">
+    <i class="fas fa-times"></i> Clear filter
+  </button>
+</div>
+
+  <!-- Sales Table -->
+  <div *ngIf="!loading && !error" class="table-section">
+    <div class="table-header">
+      <div class="table-info">
+        <span>Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+          {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} sales</span>
+      </div>
+      <div class="items-per-page">
+        <label>Items per page:</label>
+        <select [(ngModel)]="itemsPerPage" (change)="applyFiltersAndSort()" class="form-control">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="sales-table">
+        <thead>
+          <tr>
+            <th (click)="sortBy('invoiceNo')" class="sortable">
+              Invoice No.
+              <i class="fas fa-sort" [class.fa-sort-up]="sortField === 'invoiceNo' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortField === 'invoiceNo' && sortDirection === 'desc'"></i>
+            </th>
+            <th (click)="sortBy('saleDate')" class="sortable">
+              Date
+              <i class="fas fa-sort" [class.fa-sort-up]="sortField === 'saleDate' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortField === 'saleDate' && sortDirection === 'desc'"></i>
+            </th>
+            <th (click)="sortBy('customer')" class="sortable">
+              Customer
+              <i class="fas fa-sort" [class.fa-sort-up]="sortField === 'customer' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortField === 'customer' && sortDirection === 'desc'"></i>
+            </th>
+            <th>Products</th>
+            <th (click)="sortBy('totalAmount')" class="sortable">
+              Total Amount
+              <i class="fas fa-sort" [class.fa-sort-up]="sortField === 'totalAmount' && sortDirection === 'asc'"
+                 [class.fa-sort-down]="sortField === 'totalAmount' && sortDirection === 'desc'"></i>
+            </th>
+           
+            <th>Payment</th>
+            <th>Shipping</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let sale of getPaginatedSales(); trackBy: trackBySaleId" class="sale-row">
+            <!-- Invoice Number -->
+            <td class="invoice-cell">
+              <div class="invoice-info">
+                <span class="invoice-no">{{ sale.invoiceNo || 'N/A' }}</span>
+                <span class="transaction-id" *ngIf="sale.transactionId">{{ sale.transactionId }}</span>
+              </div>
+            </td>
+
+            <!-- Date -->
+            <td class="date-cell">
+              <div class="date-info">
+                <span class="sale-date">{{ formatDate(sale.saleDate) }}</span>
+                <span class="created-at" *ngIf="sale.createdAt">
+                  Created: {{ formatDate(sale.createdAt) }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Customer -->
+            <td class="customer-cell">
+              <div class="customer-info">
+                <span class="customer-name">{{ sale.customer || 'Walk-in Customer' }}</span>
+                <span class="customer-phone" *ngIf="sale.customerPhone">{{ sale.customerPhone }}</span>
+                <span class="customer-email" *ngIf="sale.customerEmail">{{ sale.customerEmail }}</span>
+              </div>
+            </td>
+
+            <!-- Products -->
+            <td class="products-cell">
+              <div class="products-info">
+                <div class="product-summary">
+                  <span class="product-count">{{ getUniqueProductCount(sale) }} items</span>
+                  <span class="total-quantity">({{ getTotalProductQuantity(sale) }} qty)</span>
+                </div>
+                <div class="product-list" *ngIf="sale.products && sale.products.length > 0">
+                  <div class="product-item" *ngFor="let product of sale.products; let i = index">
+                    <span class="product-name">{{ product.name || product.productName }}</span>
+                    <span class="product-quantity">x{{ product.quantity }}</span>
+                    <span class="product-price">{{ formatCurrency(product.unitPrice) }}</span>
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            <!-- Total Amount -->
+            <td class="amount-cell">
+              <div class="amount-info">
+                <span class="total-amount">{{ formatCurrency(sale.totalAmount) }}</span>
+                <div class="amount-breakdown">
+                  <span *ngIf="sale.subtotal">Subtotal: {{ formatCurrency(sale.subtotal) }}</span>
+                  <span *ngIf="sale.tax">Tax: {{ formatCurrency(sale.tax) }}</span>
+                  <span *ngIf="sale.discountAmount">Discount: {{ formatCurrency(sale.discountAmount) }}</span>
+                  <span *ngIf="sale.shippingCharges">Shipping: {{ formatCurrency(sale.shippingCharges) }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Status -->
+         
+
+            <!-- Payment -->
+            <td class="payment-cell">
+              <div class="payment-info">
+                <span class="payment-status" [class]="getPaymentStatusClass(sale.paymentStatus)">
+                  {{ sale.paymentStatus || 'Unknown' }}
+                </span>
+                <span class="payment-amount">{{ formatCurrency(sale.paymentAmount) }}</span>
+                <span class="balance" *ngIf="sale.balance > 0">
+                  Balance: {{ formatCurrency(sale.balance) }}
+                </span>
+                <span class="payment-method" *ngIf="sale.paymentMethod">
+                  {{ sale.paymentMethod }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Shipping -->
+            <td class="shipping-cell">
+              <div class="shipping-info">
+                <span class="shipping-status">{{ sale.shippingStatus || 'N/A' }}</span>
+                <span class="delivery-person" *ngIf="sale.deliveryPerson">
+                  By: {{ sale.deliveryPerson }}
+                </span>
+                <span class="shipping-address" *ngIf="sale.shippingAddress">
+                  {{ sale.shippingAddress }}
+                </span>
+              </div>
+            </td>
+
+            <!-- Location -->
+            <td class="location-cell">
+              <span class="business-location">{{ sale.businessLocation || 'Default' }}</span>
+            </td>
+
+        
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- No Data Message -->
+    <div *ngIf="filteredSales.length === 0" class="no-data">
+      <div class="no-data-icon">
+        <i class="fas fa-shopping-cart"></i>
+      </div>
+      <h3>No Sales Found</h3>
+      <p>No sales match your current filters. Try adjusting your search criteria.</p>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="getTotalPages() > 1" class="pagination-section">
+    <div class="pagination-info">
+      <span>Page {{ currentPage }} of {{ getTotalPages() }}</span>
+    </div>
+    <div class="pagination-controls">
+      <button 
+        class="btn btn-pagination" 
+        [disabled]="currentPage === 1" 
+        (click)="goToPage(1)">
+        First
+      </button>
+      <button 
+        class="btn btn-pagination" 
+        [disabled]="currentPage === 1" 
+        (click)="goToPage(currentPage - 1)">
+        Previous
+      </button>
+      
+      <button 
+        *ngFor="let page of getPageNumbers()" 
+        class="btn btn-pagination" 
+        [class.active]="page === currentPage"
+        (click)="goToPage(page)">
+        {{ page }}
+      </button>
+      
+      <button 
+        class="btn btn-pagination" 
+        [disabled]="currentPage === getTotalPages()" 
+        (click)="goToPage(currentPage + 1)">
+        Next
+      </button>
+      <button 
+        class="btn btn-pagination" 
+        [disabled]="currentPage === getTotalPages()" 
+        (click)="goToPage(getTotalPages())">
+        Last
+      </button>
+    </div>
+  </div>
+</div>

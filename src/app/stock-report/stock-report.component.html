@@ -1,0 +1,186 @@
+<!-- Update the header in stock-report.component.html -->
+<div class="report-header">
+  <h2>Stock Report</h2>
+  <div class="date-range-info">
+    <div>Business Day: {{getOpeningStockTime()}} to {{getClosingStockTime()}}</div>
+    <div class="date-filter">
+      <button (click)="setDateFilter('today')" [class.active]="selectedDateFilter === 'today'">Today</button>
+      <button (click)="setDateFilter('yesterday')" [class.active]="selectedDateFilter === 'yesterday'">Yesterday</button>
+      <button (click)="setDateFilter('week')" [class.active]="selectedDateFilter === 'week'">This Week</button>
+      <button (click)="setDateFilter('all')" [class.active]="selectedDateFilter === 'all'">All Time</button>
+    </div>
+  </div>
+</div>
+<div class="stock-report-container">
+  <h2>Stock Report</h2>
+  
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+<!-- Add to your stock-report.component.html -->
+
+<div class="eod-controls">
+
+  <button (click)="processEndOfDay()" class="eod-button">
+
+    Process End of Day
+
+  </button>
+
+  <div *ngIf="eodProcessing" class="eod-status">
+
+    Processing end of day...
+
+  </div>
+
+  <div *ngIf="eodError" class="eod-error">
+
+    Error processing end of day: {{eodError}}
+
+  </div>
+
+  <div *ngIf="eodSuccess" class="eod-success">
+
+    End of day processed successfully!
+
+  </div>
+
+</div><div class="report-controls">
+  <div class="search-box">
+    <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" placeholder="Search products...">
+    <button class="search-icon" (click)="applyFilter()">🔍</button>
+  </div>
+  
+  <!-- NEW: Location Filter Dropdown -->
+  <div class="location-filter">
+    <select [(ngModel)]="selectedLocationId" (ngModelChange)="applyFilter()" class="location-select">
+      <option value="">All Locations</option>
+      <option *ngFor="let location of locations" [value]="location.id">
+        {{location.name}}
+      </option>
+    </select>
+  </div>
+  
+  <div class="pagination-controls">
+    <button (click)="changePage(currentPage - 1)" [disabled]="currentPage === 1">Previous</button>
+    <span>Page {{currentPage}} of {{totalPages}}</span>
+    <button (click)="changePage(currentPage + 1)" [disabled]="currentPage === totalPages">Next</button>
+  </div>
+</div>
+  
+  <div class="table-responsive">
+    <table class="stock-report-table">
+ <!-- Updated table headers section only -->
+<!-- Updated table headers section with new timing -->
+<thead>
+  <tr>
+    <th (click)="sortData('productName')">
+      Product Name
+      <span *ngIf="sortColumn === 'productName'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('sku')">
+      SKU
+      <span *ngIf="sortColumn === 'sku'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('category')">
+      Category
+      <span *ngIf="sortColumn === 'category'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('brand')">
+      Brand
+      <span *ngIf="sortColumn === 'brand'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('locationName')">
+      Location
+      <span *ngIf="sortColumn === 'locationName'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <!-- Updated opening/closing stock headers with new timing -->
+    <th (click)="sortData('openingStock')">
+      Opening Stock (12:01 AM)
+      <span *ngIf="sortColumn === 'openingStock'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('currentStock')">
+      Current Stock
+      <span *ngIf="sortColumn === 'currentStock'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('closingStock')">
+      Closing Stock (11:59 PM)
+      <span *ngIf="sortColumn === 'closingStock'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('unit')">
+      Unit
+      <span *ngIf="sortColumn === 'unit'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('purchasePrice')">
+      Purchase Price
+      <span *ngIf="sortColumn === 'purchasePrice'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('sellingPrice')">
+      Selling Price
+      <span *ngIf="sortColumn === 'sellingPrice'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('margin')">
+      Margin (%)
+      <span *ngIf="sortColumn === 'margin'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('taxPercentage')">
+      Tax (%)
+      <span *ngIf="sortColumn === 'taxPercentage'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('lastUpdated')">
+      Last Updated
+      <span *ngIf="sortColumn === 'lastUpdated'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+    </th>
+    <th (click)="sortData('totalSold')">
+  Total Sold
+  <span *ngIf="sortColumn === 'totalSold'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+</th>
+<th class="sortable-header">Actions
+</th>
+  </tr>
+</thead>
+    <!-- Updated table body section only -->
+<tbody>
+  <tr *ngFor="let item of paginatedData" [class.low-stock]="item.currentStock <= item.alertQuantity">
+    <td>{{item.productName}}</td>
+    <td>{{item.sku}}</td>
+    <td>{{item.category || '-'}}</td>
+    <td>{{item.brand || '-'}}</td>
+<td>{{item.locationName || '-'}}</td>
+    <td>{{item.openingStock}}</td>
+    <td [class.stock-alert]="item.currentStock <= item.alertQuantity">
+      {{item.currentStock}}
+      <span *ngIf="item.currentStock <= item.alertQuantity" class="alert-icon">⚠</span>
+    </td>
+    <td>{{item.closingStock}}</td>
+    <td>{{item.unit}}</td>
+    <td>{{item.purchasePrice | currency:'INR':'symbol'}}</td>
+    <td>{{item.sellingPrice | currency:'INR':'symbol'}}</td>
+    <td>{{item.margin}}%</td>
+    <td>{{item.taxPercentage}}%</td>
+    <td>{{item.lastUpdated | date:'mediumDate'}}</td>
+    <td>{{item.totalSold}} {{item.unit}}</td>
+
+    <!-- Add this new cell to your tr element in tbody -->
+<td class="action-cell">
+  <button class="view-btn" (click)="viewStockDetails(item.id)">View</button>
+</td>
+  </tr>
+  <tr *ngIf="filteredData.length === 0">
+    <td colspan="13" class="no-data">No products found</td>
+  </tr>
+</tbody>
+    </table>
+  </div>
+  <tfoot>
+  <tr class="summary-row">
+    <td colspan="8" class="text-right">Totals:</td>
+    <td>{{totalPurchasePrice | currency:'INR':'symbol'}}</td>
+    <td>{{totalSellingPrice | currency:'INR':'symbol'}}</td>
+    <td colspan="3"></td>
+  </tr>
+</tfoot>
+  <div class="footer">
+    HYBRID CRM - v6.2 | Copyright © {{currentYear}} All rights reserved.
+  </div>
+</div>

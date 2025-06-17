@@ -1,0 +1,97 @@
+/* CRM Wrapper and Container Styles */
+.crm-wrapper {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.crm-content {
+  background-color:white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Main Title and Navigation Styles */
+.main-title {
+  background-color: white; /* Green background color matching the image */
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: black;
+  border-radius: 5px;
+}
+
+.main-title nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0 15px;
+}
+
+.main-title nav a {
+  color: rgb(22, 22, 22);
+  text-decoration: none;
+  padding: 12px 15px;
+  font-size: 14px;
+  transition: background-color 0.3s;
+  position: relative;
+  font-weight: 500;
+}
+
+.main-title nav a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-title nav a.active-tab {
+  background-color: rgb(194, 190, 190);
+  font-weight: 600;
+  border-radius: 5px;
+  height: 6vh;
+}
+
+.main-title nav a.active-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: #fff;
+}
+
+/* Router Outlet Container */
+.router-outlet-container {
+  padding: 20px;
+    background-color: #ffffff; height: 850px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+  .main-title nav {
+    justify-content: flex-start;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 5px;
+  }
+  
+  .main-title nav a {
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-title nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .main-title nav a {
+    width: 100%;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .main-title nav a:last-child {
+    border-bottom: none;
+  }
+}

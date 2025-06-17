@@ -1,0 +1,226 @@
+<form [formGroup]="stockForm" (ngSubmit)="onSubmit()">
+  <!-- First Container: Stock Info -->
+  <div class="container-fluid p-4">
+    <div class="card mb-4">
+      <!-- Add this near the product table in your template -->
+<div *ngIf="stockValidationErrors[i]" class="alert alert-danger mt-2">
+  {{ stockValidationErrors[i] }}
+</div>
+      <div class="card-header">
+        <h2>Add Stock Transfer</h2>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label for="date" class="form-label">Date:*</label>
+            <div class="input-group">
+              <span class="input-group-text"><i class="fas fa-calendar"></i></span>
+              <input type="datetime-local" id="date" class="form-control" formControlName="date" required />
+            </div>
+            <div *ngIf="stockForm.get('date')?.invalid && stockForm.get('date')?.touched" class="text-danger small">
+              Date is required
+            </div>
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <label for="referenceNo" class="form-label">Reference No:</label>
+            <input type="text" id="referenceNo" class="form-control" formControlName="referenceNo" />
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <label for="status" class="form-label">Status:* <i class="fas fa-info-circle text-info"></i></label>
+            <select id="status" class="form-select" formControlName="status" required>
+              <option value="" disabled>Please Select</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+            </select>
+            <div *ngIf="stockForm.get('status')?.invalid && stockForm.get('status')?.touched" class="text-danger small">
+              Status is required
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Location Transfers Container -->
+    <div formArrayName="locationTransfers">
+      <div *ngFor="let transfer of locationTransfers.controls; let i = index" [formGroupName]="i" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5>Transfer #{{i + 1}}</h5>
+          <button *ngIf="i > 0" type="button" class="btn btn-sm btn-danger" (click)="removeLocationTransfer(i)">
+            <i class="fas fa-trash"></i> Remove
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label [for]="'locationFrom_' + i" class="form-label">Location (From):*</label>
+              <select [id]="'locationFrom_' + i" class="form-select" formControlName="locationFrom" required>
+                <option value="" disabled>Select location</option>
+                <option *ngFor="let location of getFilteredFromLocations(i)" [value]="location.id">
+                  {{ location.name }}
+                </option>
+              </select>
+              <div *ngIf="transfer.get('locationFrom')?.invalid && transfer.get('locationFrom')?.touched" class="text-danger small">
+                Location is required
+              </div>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label [for]="'locationTo_' + i" class="form-label">Location (To):*</label>
+              <select [id]="'locationTo_' + i" class="form-select" formControlName="locationTo" required>
+                <option value="" disabled>Select location</option>
+                <option *ngFor="let location of getFilteredToLocations(i)" [value]="location.id">
+                  {{ location.name }}
+                </option>
+              </select>
+              <div *ngIf="transfer.get('locationTo')?.invalid && transfer.get('locationTo')?.touched" class="text-danger small">
+                Location is required
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Table for this location transfer -->
+       <!-- Replace the existing product search and table with this -->
+<div class="mb-4">
+  <div class="mb-3 position-relative">
+    <div class="input-group">
+      <span class="input-group-text"><i class="fas fa-search"></i></span>
+      <input type="text" 
+             class="form-control" 
+             placeholder="Enter Product name / SKU / Scan bar code"
+             [(ngModel)]="searchTerm"
+             [ngModelOptions]="{standalone: true}"
+             (keyup)="onSearchInput($event)"
+             (keydown)="handleKeyDown($event)"
+             (focus)="onSearchFocus()"
+             (blur)="onSearchBlur()"/>
+    </div>
+    <div *ngIf="showSearchResults" class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm" 
+         style="top: 100%; z-index: 1050; max-height: 300px; overflow-y: auto;">
+      <div class="list-group">
+        <button type="button" 
+        class="list-group-item list-group-item-action text-start"
+        *ngFor="let product of searchResults"
+        (mousedown)="addProductFromSearch(0, product); $event.preventDefault()"
+        (keydown.enter)="addProductFromSearch(0, product); $event.preventDefault()"
+        tabindex="0">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong [innerHTML]="highlightMatch(product.productName, searchTerm)"></strong>
+              <small *ngIf="product.sku" class="text-muted ms-2">
+                SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
+              </small>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-primary me-1">Stock: {{ product.currentStock || 0 }}</span>
+              <span class="badge bg-success">₹{{ product.defaultPurchasePrice || 0 | number:'1.2-2'}}</span>
+            </div>
+          </div>
+          <small *ngIf="product.barcode" class="text-muted d-block">
+            Barcode: {{ product.barcode }}
+          </small>
+        </button>
+        <div *ngIf="searchResults.length === 0" class="list-group-item text-muted">
+          No products found matching "{{ searchTerm }}"
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="table-responsive">
+    <table class="table table-bordered">
+      <thead class="table-light">
+        <tr>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Unit Price</th>
+          <th>Subtotal</th>
+          <th style="width: 50px;"></th>
+        </tr>
+      </thead>
+      <tbody formArrayName="products">
+        <tr *ngFor="let product of getProductsArray(transfer).controls; let j = index" [formGroupName]="j">
+          <td>
+            <div class="d-flex align-items-center">
+              <span>{{ product.get('productName')?.value }}</span>
+              <input type="hidden" formControlName="product" />
+            </div>
+          </td>
+          <td>
+            <input type="number" class="form-control" formControlName="quantity" 
+                   (input)="calculateSubtotal(i, j)" placeholder="Quantity" min="1" />
+            <div *ngIf="getProductsArray(transfer).at(j).get('quantity')?.invalid && 
+                        getProductsArray(transfer).at(j).get('quantity')?.touched" 
+                 class="text-danger small">
+              Valid quantity is required
+            </div>
+          </td>
+          <td>
+            <input type="number" class="form-control" formControlName="unitPrice" 
+                   (input)="calculateSubtotal(i, j)" placeholder="Unit Price" min="0.01" step="0.01" />
+            <div *ngIf="getProductsArray(transfer).at(j).get('unitPrice')?.invalid && 
+                        getProductsArray(transfer).at(j).get('unitPrice')?.touched" 
+                 class="text-danger small">
+              Valid price is required
+            </div>
+          </td>
+          <td>{{ getSubtotal(i, j) | currency:'INR' }}</td>
+          <td>
+            <button type="button" (click)="removeProduct(i, j)" class="btn btn-sm btn-outline-danger border-1" 
+                    style="background: transparent;">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Another Location Button -->
+    <div class="row mb-4">
+      <div class="col-12 text-center">
+        <button type="button" (click)="addLocationTransfer()" class="btn btn-success">
+          <i class="fas fa-plus"></i> Add Another Location Transfer
+        </button>
+      </div>
+    </div>
+
+    <!-- Notes and Submit -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-12 mb-3">
+            <label for="additionalNotes" class="form-label">Additional Notes:</label>
+            <textarea id="additionalNotes" class="form-control" formControlName="additionalNotes" rows="3"></textarea>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-12 text-end">
+            <h5>Grand Total: <span class="fw-bold">{{ grandTotal |  currency:'INR'}}</span></h5>
+          </div>
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-12 text-center">
+            <button type="submit" [disabled]="isSubmitting" class="btn btn-lg btn-primary px-5">
+              <span *ngIf="!isSubmitting">Save All Transfers</span>
+              <span *ngIf="isSubmitting">
+                <i class="fas fa-spinner fa-spin"></i> Saving...
+              </span>
+            </button>
+          </div>
+        </div>
+        
+        <div *ngIf="submitError" class="alert alert-danger mt-3">
+          {{ submitError }}
+        </div>
+      </div>
+    </div>
+  </div>
+</form>

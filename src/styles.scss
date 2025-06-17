@@ -1,0 +1,293 @@
+// Custom Theming for Angular Material
+// For more information: https://material.angular.io/guide/theming
+@use '@angular/material' as mat;
+// Plus imports for other components in your app.
+
+// Include the common styles for Angular Material. We include this here so that you only
+// have to load a single css file for Angular Material in your app.
+// Be sure that you only ever include this mixin once!
+@include mat.core();
+/* styles.css */
+@import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+
+// Define the theme object.
+$project-theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$azure-palette,
+    tertiary: mat.$blue-palette,
+  ),
+  density: (
+    scale: 0,
+  )
+));
+
+@media print {
+  @page {
+    size: auto;
+    margin: 5mm;
+  }
+  
+  html, body {
+    width: 210mm;
+    height: 297mm;
+  }
+}
+// Include theme styles for core and each component used in your app.
+// Alternatively, you can import and @include the theme mixins for each component
+// that you are using.
+:root {
+  @include mat.all-component-themes($project-theme);
+}
+
+// Comment out the line below if you want to use the pre-defined typography utility classes.
+// For more information: https://material.angular.io/guide/typography#using-typography-styles-in-your-application.
+// @include mat.typography-hierarchy($project-theme);
+
+// Comment out the line below if you want to use the deprecated color inputs.
+// @include mat.color-variants-backwards-compatibility($project-theme);
+/* You can add global styles to this file, and also import other style files */
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+/* =============== GLOBAL RESPONSIVE MASTER FILE =============== */
+/* 1. BASE RESETS & VARIABLES */
+:root {
+  // Fluid typography
+  --min-screen: 320px;
+  --max-screen: 1920px;
+  --min-font: 14px;
+  --max-font: 16px;
+  
+  // Spacing
+  --space-unit: 0.5rem;
+  --space-xxs: calc(0.25 * var(--space-unit));
+  --space-xs: calc(0.5 * var(--space-unit));
+  --space-sm: calc(0.75 * var(--space-unit));
+  --space-md: calc(1 * var(--space-unit));
+  --space-lg: calc(1.5 * var(--space-unit));
+  --space-xl: calc(2 * var(--space-unit));
+  
+  // Colors
+  --primary: #4285f4;
+  --secondary: #f1f1f1;
+}
+
+/* 2. HTML/BODY RESETS */
+html {
+  box-sizing: border-box;
+  font-size: var(--min-font);
+  overflow-x: hidden;
+  width: 100vw;
+  
+  // Fluid typography
+  @media (min-width: var(--min-screen)) {
+    font-size: calc(
+      var(--min-font) + (var(--max-font) - var(--min-font)) * 
+      ((100vw - var(--min-screen)) / (var(--max-screen) - var(--min-screen)))
+    );
+  }
+  
+  @media (min-width: var(--max-screen)) {
+    font-size: var(--max-font);
+  }
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+@font-face {
+  font-family: 'Roboto';
+  src: url('/assets/fonts/roboto/roboto-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+#viewSaleModal .modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+#viewSaleModal .table {
+  margin-bottom: 0;
+}
+/* 3. UNIVERSAL LAYOUT CLASSES */
+.container {
+  width: 100%;
+  padding: 0 var(--space-md);
+  margin: 0 auto;
+  
+  @media (min-width: 768px) { max-width: 720px; }
+  @media (min-width: 992px) { max-width: 960px; }
+  @media (min-width: 1200px) { max-width: 1140px; }
+  @media (min-width: 1400px) { max-width: 1320px; }
+}
+
+.flex {
+  display: flex;
+  
+  &-wrap { flex-wrap: wrap; }
+  &-col { flex-direction: column; }
+  &-center { justify-content: center; align-items: center; }
+  &-between { justify-content: space-between; }
+  &-gap { gap: var(--space-md); }
+}
+
+.grid {
+  display: grid;
+  
+  &-2 { grid-template-columns: repeat(2, 1fr); }
+  &-3 { grid-template-columns: repeat(3, 1fr); }
+  &-responsive { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+}
+
+/* 4. SPACING UTILITIES */
+@each $size in ('xxs', 'xs', 'sm', 'md', 'lg', 'xl') {
+  .p-#{$size} { padding: var(--space-#{$size}); }
+  .px-#{$size} { padding-left: var(--space-#{$size}); padding-right: var(--space-#{$size}); }
+  .py-#{$size} { padding-top: var(--space-#{$size}); padding-bottom: var(--space-#{$size}); }
+  .m-#{$size} { margin: var(--space-#{$size}); }
+  .mx-#{$size} { margin-left: var(--space-#{$size}); margin-right: var(--space-#{$size}); }
+  .my-#{$size} { margin-top: var(--space-#{$size}); margin-bottom: var(--space-#{$size}); }
+}
+
+/* 5. TYPOGRAPHY */
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 0;
+  margin-bottom: var(--space-md);
+  line-height: 1.2;
+}
+
+h1 { font-size: 2rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.5rem; }
+
+.text {
+  &-center { text-align: center; }
+  &-right { text-align: right; }
+  &-muted { color: #666; }
+}
+
+/* 6. COMPONENT STYLES */
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  
+  table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+    
+    th, td {
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    
+    th {
+      background: #f8f9fa;
+      font-weight: 600;
+    }
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  
+  &-primary {
+    background: var(--primary);
+    color: white;
+    
+    &:hover { background: darken(#4285f4, 10%); }
+  }
+  
+  &-secondary {
+    background: var(--secondary);
+    color: #333;
+  }
+  
+  &-icon {
+    margin-right: var(--space-xs);
+  }
+}
+
+/* 7. FORM ELEMENTS */
+.input {
+  padding: var(--space-sm);
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 100%;
+  
+  &:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+}
+
+/* 8. MEDIA QUERIES */
+@media (max-width: 768px) {
+  .mobile {
+    &-flex-col { flex-direction: column; }
+    &-hidden { display: none !important; }
+    &-full { width: 100% !important; }
+  }
+  
+  .table-wrapper {
+    table {
+      th, td {
+        padding: var(--space-xs) var(--space-sm);
+      }
+    }
+  }
+}
+
+/* 9. ZOOM ADJUSTMENTS */
+@media (max-resolution: 110dpi) {
+  html {
+    font-size: calc(var(--min-font) * 0.9);
+  }
+  
+  .card {
+    padding: var(--space-md);
+  }
+}
+
+/* 10. UTILITY CLASSES */
+.hidden { display: none !important; }
+.full-width { width: 100%; }
+.auto-margin { margin: 0 auto; }
+.text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,65 @@
+.container {
+  padding: 20px;
+  background-color: #f2f6fb;
+  margin-top: 5%;
+}
+
+h2 {
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.upload-box {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+.submit-btn {
+  background-color: #4d00ff;
+  color: white;
+  border: none;
+  padding: 8px 20px;
+  margin-left: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.template-btn {
+  background-color: #1abc9c;
+  color: white;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.instructions-box {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+
+th, td {
+  border: 1px solid #f0f0f0;
+  padding: 12px;
+  text-align: left;
+}
+
+.required {
+  color:gray;
+  font-size: 0.85rem;
+}
+
+.optional {
+  color: gray;
+  font-size:0.85rem;
+}

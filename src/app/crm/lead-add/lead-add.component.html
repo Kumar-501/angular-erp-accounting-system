@@ -1,0 +1,489 @@
+<style>
+.validation-popup {
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+}
+
+
+.validation-popup.success {
+  background-color: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.popup-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popup-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+</style>
+<h5>{{ editingLeadId ? 'Edit Lead' : 'Add a new Lead' }}</h5><br>
+<label for="productintersted">Product Interested</label>
+<div class="search-container">
+  <input 
+    type="text" 
+    [(ngModel)]="searchQuery" 
+    (input)="onSearchInput()" 
+    (focus)="onSearchFocus()" 
+    (blur)="onSearchBlur()" 
+    placeholder="Search products..." 
+    class="search-input"
+  >
+  <div *ngIf="showSearchDropdown" class="search-dropdown">
+    <div 
+      *ngFor="let product of searchResults" 
+      (mousedown)="toggleProductSelection(product)" 
+      class="dropdown-item" 
+      [class.selected]="isProductSelected(product)"
+    >
+      {{ product.productName }} ({{ product.sku }})
+      <span *ngIf="isProductSelected(product)" class="selected-checkmark">✓</span>
+    </div>
+  </div>
+</div>
+
+<div class="selected-products-container" *ngIf="selectedProducts.length > 0">
+  <div class="selected-product-tag" *ngFor="let product of selectedProducts">
+    {{ product.productName || product.name }}
+    <span class="remove-product" (click)="removeSelectedProduct(product)">×</span>
+  </div>
+</div>
+<div *ngIf="showSuccessPopup" class="success-popup">
+  <span>Lead added successfully!</span>
+  <button class="popup-close" (click)="closeSuccessPopup()">&times;</button>
+</div>
+
+<div class="form-leads-container">
+  <!-- <div *ngIf="showForm" class="form-leads-container"> -->
+    <!-- Lead Form (60%) -->
+
+  <div class="lead-form-section">
+ 
+      <div class="modal-content">
+      
+<form [formGroup]="leadForm" (ngSubmit)="saveLead()">
+       <div *ngIf="validationMessage" 
+     class="validation-popup" 
+     [ngClass]="{
+       'error': validationMessage.type === 'error', 
+       'success': validationMessage.type === 'success'
+     }">
+  <div class="popup-content">
+    <span class="popup-message">{{ validationMessage.text }}</span>
+    <button class="popup-close" (click)="closeValidationPopup()">&times;</button>
+  </div>
+</div>
+<div *ngIf="showDuplicateWarning" class="duplicate-warning-popup">
+  <div class="popup-content">
+    <h4>Duplicate Lead Detected</h4>
+    <p>This mobile number already exists in another lead:</p>
+    <!-- <div class="duplicate-details">
+      <p><strong>Contact ID:</strong> {{ duplicateLeadData.contactId }}</p>
+      <p><strong>Name:</strong> {{ duplicateLeadData.businessName || (duplicateLeadData.firstName + ' ' + (duplicateLeadData.lastName || '')) }}</p>
+      <p><strong>Created On:</strong> {{ duplicateLeadData.createdAt | date:'medium' }}</p>
+    </div> -->
+    <p>Are you sure you want to continue?</p>
+    <div class="popup-actions">
+      <button class="btn btn-secondary" (click)="handleDuplicateResponse(false)">Cancel</button>
+      <button class="btn btn-primary" (click)="handleDuplicateResponse(true)">Continue Anyway</button>
+    </div>
+  </div>
+</div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="contactId">Contact ID</label>
+              <input type="text" id="contactId" class="form-control" [value]="leadForm.get('contactId')?.value" readonly>
+            </div>
+
+         <div class="form-group">
+      <label for="contactType">Contact type<span class="required-asterisk">*</span></label>
+      <div class="input-container">
+        <span class="icon-container">
+          <i class="user-icon"></i>
+        </span>
+        <select formControlName="contactType" id="contactType" class="form-control">
+          <option value="Lead">Lead</option>
+          <option value="Customer">Customer</option>
+          <option value="Supplier">Supplier</option>
+        </select>
+      </div>
+    </div>
+            
+  <div class="form-group radio-group">
+  <div class="radio-options">
+    <label>
+      <input type="radio" formControlName="isIndividual" [value]="true" (change)="onContactTypeChange(true)"> Individual
+    </label>
+    <label>
+      <input type="radio" formControlName="isIndividual" [value]="false" (change)="onContactTypeChange(false)"> Business
+    </label>
+  </div>
+</div>
+            <div class="form-group">
+              <!-- Empty slot for 4th field or can add another field if needed -->
+            </div>
+          </div>
+<div *ngIf="isIndividualType" class="form-row">
+  <div class="form-group">
+    <label for="prefix">Prefix</label>
+    <select formControlName="prefix" id="prefix" class="form-control">
+      <option value="">Select Prefix</option>
+      <option *ngFor="let prefix of prefixes" [value]="prefix">{{prefix}}</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="firstName">First Name<span class="required-asterisk">*</span></label>
+    <input type="text" formControlName="firstName" id="firstName" placeholder="First Name" class="form-control" 
+           [ngClass]="{'invalid': isIndividualType && f['firstName'].touched && f['firstName'].invalid}">
+    <small class="error-text" *ngIf="isIndividualType && f['firstName'].touched && f['firstName'].errors?.['required']">
+      First name is required
+    </small>
+  </div>
+
+<div class="form-group">
+    <label for="middleName">Middle Name</label>
+    <input type="text" formControlName="middleName" id="middleName" placeholder="Middle Name" class="form-control">
+  </div>
+  <div class="form-group">
+    <label for="lastName">Last Name</label>
+    <input type="text" formControlName="lastName" id="lastName" placeholder="Last Name" class="form-control">
+  </div>
+</div>
+
+<!-- Business Name (shown when isIndividual is false) -->
+<div *ngIf="!isIndividualType" class="form-group full-width">
+  <label for="businessName">Business Name<span class="required-asterisk">*</span></label>
+  <input type="text" formControlName="businessName" id="businessName" placeholder="Enter Business Name" 
+         class="form-control" [ngClass]="{'invalid': !isIndividualType && f['businessName'].touched && f['businessName'].invalid}">
+  <small class="error-text" *ngIf="!isIndividualType && f['businessName'].touched && f['businessName'].errors?.['required']">
+    Business name is required
+  </small>
+</div>
+
+<!-- Individual-specific fields (shown when isIndividual is true) -->
+<div *ngIf="isIndividualType" class="form-row">
+  <div class="form-group">
+    <label for="age">Age</label>
+    <input type="number" formControlName="age" id="age" placeholder="Age" class="form-control">
+  </div>
+
+  <div class="form-group">
+    <label for="gender">Gender</label>
+    <select formControlName="gender" id="gender" class="form-control">
+      <option value="">Select Gender</option>
+      <option *ngFor="let gender of genders" [value]="gender">{{gender}}</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="dateOfBirth">Date of Birth</label>
+    <input type="date" formControlName="dateOfBirth" id="dateOfBirth" class="form-control">
+  </div>
+</div>
+
+
+       <!-- Mobile field -->
+  <div class="form-group">
+    <label for="mobile">Mobile<span class="required-asterisk">*</span></label>
+    <div class="input-container">
+      <span class="icon-container">
+        <i class="mobile-icon"></i>
+      </span>
+      <input type="text" formControlName="mobile" id="mobile" 
+             placeholder="Mobile" class="form-control" 
+             [ngClass]="{'invalid': f['mobile'].touched && f['mobile'].invalid}"
+             (input)="validateMobileNumber()"
+             (blur)="validateMobileNumber()"
+             maxlength="10">
+    </div>
+    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['required']">
+      Mobile number is required
+    </small>
+    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['pattern']">
+      Mobile number must be exactly 10 digits
+    </small>
+  </div>
+
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="landline">Landline</label>
+              <input type="text" formControlName="landline" id="landline" 
+                     placeholder="Landline" class="form-control"
+                     (input)="validateLandline()"
+                     (blur)="validateLandline()"
+                     maxlength="10">
+              <small class="error-text" *ngIf="landlineValidationMessage">
+                {{ landlineValidationMessage }}
+              </small>
+            </div>
+<div class="form-group">
+  <label for="alternateContact">Alternate Contact</label>
+  <div class="input-container">
+    <input type="text" formControlName="alternateContact" id="alternateContact" 
+           placeholder="Alternate Contact" class="form-control"
+           (input)="validateAlternateContact()"
+           (blur)="validateAlternateContact()"
+           maxlength="10">
+  </div>
+  <small class="error-text" *ngIf="f['alternateContact'].touched && f['alternateContact'].errors?.['pattern']">
+    Alternate contact must be exactly 10 digits
+  </small>
+</div>
+
+
+
+  <div class="form-group">
+    <label for="email">Email<span class="required-asterisk"></span></label>
+    <div class="input-container">
+      <span class="icon-container">
+        <i class="email-icon"></i>
+      </span>
+      <input type="email" formControlName="email" id="email" placeholder="Email" 
+             class="form-control" [ngClass]="{'invalid': f['email'].touched && f['email'].invalid}">
+    </div>
+    <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['required']">
+      Email is required
+    </small>
+    <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['email']">
+      Please enter a valid email
+    </small>
+  </div>
+
+          </div>
+
+
+
+          <div class="form-row">
+            
+            
+            <div class="form-group">
+              <label for="leadCategory">Lead Category</label>
+              <select formControlName="leadCategory" id="leadCategory" class="form-control">
+                <option value="">Select Category</option>
+                <option *ngFor="let category of leadCategories" [value]="category">{{category}}</option>
+              </select>
+              <i class="fas fa-chevron-down dropdown-icon"></i>
+            </div>
+          </div>
+
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="dealStatus">Deal Status</label>
+              <select formControlName="dealStatus" id="dealStatus" class="form-control">
+                <option value="">Select Status</option>
+                <option *ngFor="let status of dealStatuses" [value]="status">{{status}}</option>
+                      <span class="dropdown-icon">&#9660;</span> <!-- Unicode down arrow -->
+
+
+              </select>
+              <i class="fas fa-chevron-down dropdown-icon"></i>
+
+            </div>
+            
+            <div class="form-group">
+              <label for="priority">Priority</label>
+              <select formControlName="priority" id="priority" class="form-control">
+                <option value="">Select Priority</option>
+                <option *ngFor="let priority of priorities" [value]="priority">{{priority}}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="estimatedValue">Estimated Value</label>
+              <input type="number" formControlName="estimatedValue" id="estimatedValue" placeholder="Estimated Value" class="form-control">
+            </div>
+          
+<div class="form-group">
+  <label for="leadStatus">Ad Code</label>
+  <select formControlName="leadStatus" id="leadStatus" class="form-control">
+    <option value="">Select Status</option>
+    <ng-container *ngIf="leadStatuses && leadStatuses.length > 0; else noStatuses">
+      <option *ngFor="let status of leadStatuses" [value]="status.leadStatus">
+        {{status.leadStatus}}
+      </option>
+    </ng-container>
+    <ng-template #noStatuses>
+      <option value="" disabled>No statuses available</option>
+    </ng-template>
+  </select>
+  <i class="fas fa-chevron-down dropdown-icon"></i>
+</div>
+          </div>
+
+
+
+
+          <div class="form-row">
+<!-- Inside your lead form -->
+  <div class="form-group">
+    <label for="source">Source<span class="required-asterisk">*</span></label>
+    <select formControlName="source" id="source" class="form-control" required>
+      <option value="">Select Source</option>
+      <option *ngFor="let source of sources" [value]="source.name">{{source.name}}</option>
+    </select>
+    <small class="error-text" *ngIf="f['source'].touched && f['source'].errors?.['required']">
+      Source is required
+    </small>
+  </div>
+            
+             <div class="form-group">
+    <label for="lifeStage">Life Stage<span class="required-asterisk">*</span></label>
+    <select formControlName="lifeStage" id="lifeStage" class="form-control">
+      <option *ngFor="let stage of lifeStages" [value]="stage.name">{{stage.name}}</option>
+    </select>
+    <small class="error-text" *ngIf="f['lifeStage'].touched && f['lifeStage'].errors?.['required']">
+      Life stage is required
+    </small>
+  </div>
+          </div>
+
+ 
+
+
+<!-- Add this after the source field in your form -->
+<div class="form-row">
+  <div class="form-group">
+    <label for="department">Department</label>
+    <select formControlName="department" id="department" class="form-control" 
+            (change)="onDepartmentChange($event)">
+      <option value="">Select Department</option>
+      <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+    </select>
+  </div>
+  
+ <div class="form-group">
+    <label for="assignedTo">Assigned To</label>
+    <select formControlName="assignedTo" id="assignedTo" class="form-control">
+      <option value="">Select a user</option>
+      <option *ngFor="let user of filteredUsers" [value]="user.id">
+        {{user.name}} ({{user.username || 'No username'}})
+      </option>
+    </select>
+  </div>
+</div>
+
+
+         
+          <div class="form-group">
+            <label for="leadStatusNote">Lead Status Note</label>
+            <textarea formControlName="leadStatusNote" id="leadStatusNote" placeholder="Notes about lead status" class="form-control" rows="2"></textarea>
+          </div>
+
+          <button type="button" class="more-info-btn" (click)="toggleMoreInfo()">
+            More Information <i class="down-icon"></i>
+          </button>
+
+          <div *ngIf="showMoreInfo" class="more-info-fields">
+            <div class="form-group">
+              <label for="notes">Notes:</label>
+              <textarea formControlName="notes" id="notes" placeholder="Any additional notes about the lead" class="form-control" rows="3"></textarea>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="addressLine1">Address line 1:</label>
+                <input type="text" formControlName="addressLine1" id="addressLine1" placeholder="Address line 1" class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="addressLine2">Address line 2:</label>
+                <input type="text" formControlName="addressLine2" id="addressLine2" placeholder="Address line 2" class="form-control">
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="state">State:</label>
+                <select formControlName="state" id="state" class="form-control" (change)="onStateChange()">
+                  <option value="">Select State</option>
+                  <option *ngFor="let state of states" [value]="state">{{state}}</option>
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="city">District:</label>
+                <select formControlName="city" id="city" class="form-control" [disabled]="!leadForm.get('state')?.value">
+                  <option value="">Select District</option>
+                  <option *ngFor="let district of availableDistricts" [value]="district">{{district}}</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="country">Country:</label>
+                <input type="text" formControlName="country" id="country" placeholder="Country" class="form-control">
+              </div>
+              
+              <div class="form-group">
+                <label for="zipCode">Zip Code:</label>
+                <input type="text" formControlName="zipCode" id="zipCode" placeholder="Zip/Postal Code" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" (click)="toggleForm()" class="close-btn">Close</button>
+            <button type="submit" class="save-btn">Save</button>
+          </div>
+        </form>
+   
+  <!-- Recent Leads Section (40%) -->
+  
+</div>
+
+</div>
+
+<div class="recent-leads-section">
+  <div class="recent-leads-container">
+    <h5>Last 10 Leads Added by You</h5>
+    
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Contact ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Phone</th>
+            <th>Added On</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let lead of recentLeads">
+            <td>{{ lead.contactId }}</td>
+            <td>
+              {{ lead.businessName || (lead.firstName + ' ' + (lead.lastName || '')) }}
+            </td>
+            <td>
+              <span [ngClass]="getStatusClass(lead.leadStatus || 'New')">
+                {{ lead.leadStatus || 'New' }}
+              </span>
+            </td>
+            <td>{{ lead.mobile }}</td>
+            <td>{{ lead.createdAt | date:'short' }}</td>
+          </tr>
+          
+          <tr *ngIf="recentLeads.length === 0">
+            <td colspan="5" class="text-center">No recent leads found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>

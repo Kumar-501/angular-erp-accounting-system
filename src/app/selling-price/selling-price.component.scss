@@ -1,0 +1,418 @@
+.selling-price-container {
+  font-family: Arial, sans-serif;
+  width: 90%;
+  
+  .header {
+    background-color: white;
+    color: rgb(19, 18, 18);
+    padding: 10px 20px;
+    margin-top: 5%;
+    
+    h1 {
+      margin: 0;
+      font-size: 24px;
+   
+    }
+  }
+  .export-controls {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+  }
+  
+  .btn-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .btn-export:hover {
+    background-color: #e8e8e8;
+    border-color: #ccc;
+  }
+  
+  .btn-export:active {
+    background-color: #ddd;
+    transform: translateY(1px);
+  }
+  
+  /* Optional: Customize icon colors */
+  .btn-export:nth-child(1) i {
+    color: #0c0c0c; /* Green for CSV */
+  }
+  
+  .btn-export:nth-child(2) i {
+    color: #0c0c0c; /* Green for Excel */
+  }
+  
+  .btn-export:nth-child(3) i {
+    color: #0c0c0c; /* Red for PDF */
+  }
+  .content-card {
+    background-color: #fbfdff;
+    margin: 0;
+    padding: 20px;
+    border-radius:18px;
+    margin-top: 2%;
+    
+    .title-section {
+      margin-bottom: 20px;
+      position: relative;
+      
+      h2 {
+        margin: 0 0 10px 0;
+        font-size: 18px;
+        font-weight: 500;
+        color: #32325d;
+      }
+      
+      .instruction {
+        margin: 0 0 15px 0;
+        font-size: 14px;
+        color: #666;
+      }
+      
+      .top-controls {
+        position: absolute;
+        top: 0;
+        right: 0;
+        
+        .add-button {
+          background: linear-gradient(to right, #224abe, #7a9bfd);
+          color: white;
+          border: none;
+          border-radius: 25px;
+          padding: 10px 25px;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          margin-top: -15%;
+          
+          .plus-icon {
+            margin-right: 5px;
+            font-size: 18px;
+          }
+          
+          &:hover {
+            background-color: #3a4ae0;
+          }
+        }
+      }
+    }
+    
+    .table-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      
+      .entries-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        
+        select {
+          padding: 5px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+      }
+      
+      .export-controls {
+        display: flex;
+        gap: 5px;
+        
+        .export-btn {
+          display: flex;
+          align-items: center;
+          padding: 6px 12px;
+          background-color: #f8f9fa;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          font-size: 12px;
+          cursor: pointer;
+          
+          i {
+            margin-right: 5px;
+          }
+          
+          &:hover {
+            background-color: #e9ecef;
+          }
+        }
+      }
+      
+      .search-control {
+        input {
+          padding: 6px 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          width: 200px;
+          
+          &::placeholder {
+            color: #aaa;
+          }
+        }
+      }
+    }
+    
+    .table-container {
+      overflow-x: auto;
+      background-color: white;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        
+        th, td {
+          padding: 12px 15px;
+          text-align: left;
+          border-bottom: 1px solid #eee;
+          
+          &.sortable {
+            cursor: pointer;
+            position: relative;
+            
+            .sort-icon {
+              margin-left: 5px;
+            }
+          }
+        }
+        
+        thead th {
+          background-color: #f8f9fa;
+          font-weight: 600;
+          color: #333;
+        }
+        
+        .no-data {
+          text-align: center;
+          padding: 20px;
+          color: #666;
+        }
+        
+        .actions {
+          display: flex;
+          gap: 8px;
+          
+          button {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            
+            i {
+              font-size: 14px;
+            }
+          }
+          
+          .btn-edit {
+            background-color: white;
+            color: rgb(37, 34, 241);
+border-color: #3a4ae0;            
+            &:hover {
+              background-color: #aec0fc;
+            }
+          }
+          
+          .btn-delete {
+            background-color: white;
+            color:red;
+            border-color: red;
+            
+            &:hover {
+              background-color: #f5b5b3;
+            }
+          }
+        }
+      }
+    }
+    
+    .table-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 15px;
+      font-size: 14px;
+      
+      .pagination {
+        display: flex;
+        gap: 10px;
+        
+        button {
+          padding: 6px 12px;
+          border: 1px solid #ddd;
+          background-color: white;
+          border-radius: 4px;
+          cursor: pointer;
+          
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          
+          &:not(:disabled):hover {
+            background-color: #f1f1f1;
+          }
+        }
+      }
+    }
+  }
+  .popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    
+    .popup-content {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      width: 500px;
+      max-width: 90%;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      position: relative;
+      
+      .popup-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        
+        h2 {
+          margin: 0;
+          font-size: 18px;
+        }
+        
+        .close-btn {
+          background: none;
+          border: none;
+          font-size: 20px;
+          cursor: pointer;
+          color: #666;
+          padding: 5px;
+          margin-left: 15px;
+          
+          &:hover {
+            color: #333;
+          }
+        }
+      }
+      
+      .form-group {
+        margin-bottom: 15px;
+        
+        label {
+          display: block;
+          margin-bottom: 5px;
+          font-weight: 500;
+        }
+        
+        input, textarea {
+          width: 100%;
+          padding: 8px 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          
+          &:focus {
+            outline: none;
+            border-color: #4d5efa;
+          }
+        }
+        
+        textarea {
+          min-height: 100px;
+          resize: vertical;
+        }
+      }
+      
+      .button-group {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 20px;
+        
+        button {
+          padding: 12px 20px;
+          border: none;
+          border-radius: 15px;
+          cursor: pointer;
+          
+          &.save-btn {
+            background-color: #4d5efa;
+            color: white;
+          
+          }
+          
+          &.cancel-btn {
+            background-color: #161515;
+            color: white;
+            
+          
+          }
+        }
+      }
+    }
+  }
+}/* Add these styles to your component's SCSS file */
+
+.sortable {
+  cursor: pointer;
+  position: relative;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+}
+
+.sort-icon {
+  margin-left: 5px;
+  font-size: 12px;
+}
+
+.fa-sort-up, .fa-sort-down {
+  color: #007bff;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+  }
+  
+  tr:hover {
+    background-color: #f5f5f5;
+  }
+}
+

@@ -1,0 +1,669 @@
+<div class="customers-container">
+  <div class="customers-header">
+    <h3>Customers</h3>
+  </div>
+<!-- Add this section right below your table-controls div -->
+<div class="filter-section">
+  <div class="filter-header">
+    <button class="btn-add" (click)="toggleForm()">
+      <i class="fa fa-plus"></i> Add
+    </button>
+    <button class="btn-filter" (click)="toggleFilterSidebar()">
+      <i class="fa fa-filter"></i> Filter
+    </button>
+  <!-- Add this to your table-controls div, near your other buttons -->
+<div class="bulk-actions" *ngIf="selectedCustomers.length > 0">
+  <button class="btn-delete" (click)="deleteSelectedCustomers()">
+    <i class="fa fa-trash"></i> Delete Selected ({{selectedCustomers.length}})
+  </button>
+</div>
+  </div>
+  
+ <!-- Filter Sidebar -->
+<div class="filter-sidebar" [class.active]="showFilterSidebar">
+  <div class="sidebar-header">
+    <h3>Filters</h3>
+    <button class="btn-close" (click)="toggleFilterSidebar()">
+      <i class="fa fa-times"></i>
+    </button>
+  </div>
+  
+  <div class="filter-options">
+    <!-- Status Filter -->
+    <div class="filter-group">
+      <label>Status:</label>
+      <select [(ngModel)]="filterOptions.status" (change)="applyFilters()">
+        <option value="">None</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </div>
+    
+    <!-- Assigned To Filter -->
+    <div class="filter-group">
+      <label>Assigned To:</label>
+      <select [(ngModel)]="filterOptions.assignedTo" (change)="applyFilters()">
+        <option value="">None</option>
+        <option *ngFor="let user of assignedUsers" [value]="user.username">
+          {{ user.username }}
+        </option>
+      </select>
+    </div>
+    
+    <!-- State Filter -->
+    <div class="filter-group">
+      <label>State:</label>
+      <select [(ngModel)]="filterOptions.state" (change)="applyFilters()">
+        <option value="">None</option>
+        <option *ngFor="let state of states" [value]="state">
+          {{ state }}
+        </option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Ad Code:</label>
+      <select [(ngModel)]="filterOptions.adcode" (change)="applyFilters()">
+        <option value="">None</option>
+        <option *ngFor="let status of leadStatuses" [value]="status.id">
+          {{ status.leadStatus }} ({{ status.id }})
+        </option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label>Life Stage:</label>
+      <select [(ngModel)]="filterOptions.lifestage" (change)="applyFilters()">
+        <option value="">None</option>
+        <option *ngFor="let stage of lifeStages" [value]="stage.name">
+          {{ stage.name }}
+        </option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-apply" (click)="applyFilters()">
+        Apply Filters
+      </button>
+      <button class="btn-clear" (click)="clearFilters()">
+        Clear All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay for sidebar -->
+<div class="sidebar-overlay" 
+     [class.active]="showFilterSidebar" 
+     (click)="toggleFilterSidebar()"></div>
+</div>
+  <!-- Main Content Section -->
+  <div class="main-content">
+    <div class="content-header">
+      <h2>All your Customers</h2>
+    
+    </div>
+    
+    <!-- Table Controls -->
+    <div class="table-controls">
+      <div class="entries-control">
+        Show 
+        <select [(ngModel)]="entriesPerPage" (change)="loadCustomers()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select> 
+        entries
+      </div>
+      
+      <div class="export-controls">
+        <button class="btn-export" (click)="exportCSV()">
+          <i class="fa fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn-export" (click)="exportExcel()">
+          <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn-columns" (click)="toggleColumnVisibilityMenu()">
+          <i class="fa fa-columns"></i> Columns
+        </button>
+      </div>
+      
+      <div class="search-control">
+        <input type="text" [(ngModel)]="searchTerm" placeholder="Search..." (keyup)="applyFilters()">
+        <button class="btn-clear" (click)="clearSearch()" *ngIf="searchTerm">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+    </div>
+    <div class="column-visibility-controls">
+    
+      <div class="column-visibility-menu" *ngIf="showColumnVisibilityMenu">
+        <div *ngFor="let column of allColumns" class="column-option">
+          <label>
+            <input type="checkbox" [(ngModel)]="column.visible" (change)="updateVisibleColumns()">
+            {{ column.displayName }}
+          </label>
+        </div>
+      </div>
+    </div>
+    
+<!-- Main Content Section -->
+<div class="table-responsive">
+  <table class="customers-table">
+    <thead>
+      <tr>
+        <th [class.hidden]="!isColumnVisible('Select')">
+  <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
+</th>
+        <th [class.hidden]="!isColumnVisible('Action')">Action</th>
+        <th [class.hidden]="!isColumnVisible('Contact ID')" (click)="sortBy('contactId')">Contact ID</th>
+        <th [class.hidden]="!isColumnVisible('Prefix')" (click)="sortBy('prefix')">Prefix</th>
+        <th [class.hidden]="!isColumnVisible('First Name')" (click)="sortBy('firstName')">First Name</th>
+        <th [class.hidden]="!isColumnVisible('Middle Name')" (click)="sortBy('middleName')">Middle Name</th>
+        <th [class.hidden]="!isColumnVisible('Last Name')" (click)="sortBy('lastName')">Last Name</th>
+        <th [class.hidden]="!isColumnVisible('Business Name')" (click)="sortBy('businessName')">Business Name</th>
+        <th [class.hidden]="!isColumnVisible('Department')" (click)="sortBy('department')">Department</th>
+        <th [class.hidden]="!isColumnVisible('Email')" (click)="sortBy('email')">Email</th>
+        <th [class.hidden]="!isColumnVisible('Mobile')" (click)="sortBy('mobile')">Mobile</th>
+        <th [class.hidden]="!isColumnVisible('Landline')" (click)="sortBy('landline')">Landline</th>
+        <th [class.hidden]="!isColumnVisible('Alternate Contact')" (click)="sortBy('alternateContact')">Alternate Contact</th>
+        <th [class.hidden]="!isColumnVisible('Date of Birth')" (click)="sortBy('dob')">Date of Birth</th>
+        <th [class.hidden]="!isColumnVisible('Address Line 1')" (click)="sortBy('addressLine1')">Address Line 1</th>
+        <th [class.hidden]="!isColumnVisible('Address Line 2')" (click)="sortBy('addressLine2')">Address Line 2</th>
+        <th [class.hidden]="!isColumnVisible('City')" (click)="sortBy('city')">City</th>
+        <th [class.hidden]="!isColumnVisible('State')" (click)="sortBy('state')">State</th>
+        <th [class.hidden]="!isColumnVisible('Country')" (click)="sortBy('country')">Country</th>
+        <th [class.hidden]="!isColumnVisible('Zip Code')" (click)="sortBy('zipCode')">Zip Code</th>
+        <th [class.hidden]="!isColumnVisible('Tax Number')" (click)="sortBy('taxNumber')">Tax Number</th>
+        <th [class.hidden]="!isColumnVisible('Pay Term')" (click)="sortBy('payTerm')">Pay Term</th>
+        <th [class.hidden]="!isColumnVisible('Opening Balance')" (click)="sortBy('openingBalance')">Opening Balance</th>
+        <th [class.hidden]="!isColumnVisible('Assigned To')" (click)="sortBy('assignedTo')">Assigned To</th>
+<th [class.hidden]="!isColumnVisible('Gender')" (click)="sortBy('gender')">Gender</th>
+<th [class.hidden]="!isColumnVisible('Age')" (click)="sortBy('age')">Age</th><th [class.hidden]="!isColumnVisible('Life Stage')" (click)="sortBy('lifestage')">Life Stage</th>
+<th [class.hidden]="!isColumnVisible('Ad Code')" (click)="sortBy('adcode')">Ad Code</th>
+        <th [class.hidden]="!isColumnVisible('Contact Type')" (click)="sortBy('contactType')">Contact Type</th>
+       
+
+
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let customer of paginatedCustomers">
+        <td [class.hidden]="!isColumnVisible('Select')">
+  <input type="checkbox" 
+         [checked]="isCustomerSelected(customer.id || '')" 
+         (change)="toggleCustomerSelection(customer.id || '')">
+</td>
+        <td [class.hidden]="!isColumnVisible('Action')">
+          <div class="dropdown">
+            <button class="btn-dropdown">Actions</button>
+            <div class="dropdown-content">
+              <a (click)="editCustomer(customer)">Edit</a>
+              <a (click)="deleteCustomer(customer.id)">Delete</a>
+            </div>
+          </div>
+        </td>
+        <td [class.hidden]="!isColumnVisible('Contact ID')">{{ customer.contactId }}</td>
+        <td [class.hidden]="!isColumnVisible('Prefix')">{{ customer.prefix }}</td>
+        <td [class.hidden]="!isColumnVisible('First Name')">{{ customer.firstName }}</td>
+        <td [class.hidden]="!isColumnVisible('Middle Name')">{{ customer.middleName }}</td>
+        <td [class.hidden]="!isColumnVisible('Last Name')">{{ customer.lastName }}</td>
+        <td [class.hidden]="!isColumnVisible('Business Name')">{{ !customer.isIndividual ? customer.businessName : '' }}</td>
+        <td [class.hidden]="!isColumnVisible('Department')">{{ customer.department }}</td>
+        <td [class.hidden]="!isColumnVisible('Email')">{{ customer.email }}</td>
+        <td [class.hidden]="!isColumnVisible('Mobile')">{{ customer.mobile }}</td>
+        <td [class.hidden]="!isColumnVisible('Landline')">{{ customer.landline }}</td>
+        <td [class.hidden]="!isColumnVisible('Alternate Contact')">{{ customer.alternateContact }}</td>
+        <td [class.hidden]="!isColumnVisible('Date of Birth')">{{ customer.dob | date }}</td>
+        <td [class.hidden]="!isColumnVisible('Address Line 1')">{{ customer.addressLine1 }}</td>
+        <td [class.hidden]="!isColumnVisible('Address Line 2')">{{ customer.addressLine2 }}</td>
+        <td [class.hidden]="!isColumnVisible('City')">{{ customer.city }}</td>
+        <td [class.hidden]="!isColumnVisible('State')">{{ customer.state }}</td>
+        <td [class.hidden]="!isColumnVisible('Country')">{{ customer.country }}</td>
+        <td [class.hidden]="!isColumnVisible('Zip Code')">{{ customer.zipCode }}</td>
+        <td [class.hidden]="!isColumnVisible('Tax Number')">{{ customer.taxNumber }}</td>
+        <td [class.hidden]="!isColumnVisible('Pay Term')">{{ customer.payTerm }} {{ customer.payTerm ? 'Days' : '' }}</td>
+        <td [class.hidden]="!isColumnVisible('Opening Balance')">₹ {{ customer.openingBalance || '0.00' }}</td>
+        <td [class.hidden]="!isColumnVisible('Assigned To')">{{ customer.assignedTo }}</td>
+<td [class.hidden]="!isColumnVisible('Gender')">{{ customer.gender }}</td>
+<td [class.hidden]="!isColumnVisible('Age')">{{ customer.age }}</td><td [class.hidden]="!isColumnVisible('Life Stage')">{{ customer.lifestage }}</td>
+<td [class.hidden]="!isColumnVisible('Ad Code')">{{ getAdCodeName(customer.adcode) }}</td>
+        <td [class.hidden]="!isColumnVisible('Contact Type')">{{ customer.contactType }}</td>
+      </tr>
+      <tr *ngIf="filteredCustomers.length === 0">
+        <td [attr.colspan]="visibleColumns.length + 1" class="no-data">No customers found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+   <!-- Pagination -->
+<div class="pagination-controls">
+  <button class="page-btn" (click)="prevPage()" [disabled]="currentPage === 1">
+    <i class="fa fa-chevron-left"></i>
+  </button>
+  
+  <div class="page-numbers">
+    <!-- First page button -->
+    <button 
+      class="page-num" 
+      [class.active]="currentPage === 1" 
+      (click)="currentPage = 1">
+      1
+    </button>
+    
+    <!-- Show ellipsis if needed -->
+    <span *ngIf="currentPage > 3" class="ellipsis">...</span>
+    
+    <!-- Page numbers around current page -->
+    <ng-container *ngFor="let page of getPaginationRange()">
+      <button 
+        *ngIf="page !== 1 && page !== totalPages" 
+        class="page-num" 
+        [class.active]="currentPage === page" 
+        (click)="currentPage = page">
+        {{ page }}
+      </button>
+    </ng-container>
+    
+    <!-- Show ellipsis if needed -->
+    <span *ngIf="currentPage < totalPages - 2" class="ellipsis">...</span>
+    
+    <!-- Last page button -->
+    <button 
+      *ngIf="totalPages > 1"
+      class="page-num" 
+      [class.active]="currentPage === totalPages" 
+      (click)="currentPage = totalPages">
+      {{ totalPages }}
+    </button>
+  </div>
+  
+  <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+    <i class="fa fa-chevron-right"></i>
+  </button>
+  
+  <div class="page-info">
+    <span>{{ (currentPage - 1) * entriesPerPage + 1 }} - {{ Math.min(currentPage * entriesPerPage, filteredCustomers.length) }} of {{ filteredCustomers.length }} items</span>
+  </div>
+</div>
+  
+  <!-- Customer Form Modal -->
+  <div class="modal" [class.show]="showForm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>{{ editingCustomerId ? 'Edit Customer' : 'Add Customer' }}</h2>
+        <span class="close" (click)="toggleForm()">&times;</span>
+      </div>
+      
+      <div class="modal-body">
+        <form (ngSubmit)="saveCustomer()">
+          <!-- Contact Type Dropdown -->
+          <div class="form-group">
+            <label for="contactType">Contact Type:</label>
+            <select [(ngModel)]="customerData.contactType" name="contactType" id="contactType" (change)="onContactTypeChange()">
+              <option value="Customer">Customer</option>
+              <option value="Supplier">Supplier</option>
+              <option value="Both">Both Supplier and Customer</option>
+            </select>
+          </div>
+          
+          <!-- Individual or Business Toggle -->
+          <div class="form-group toggle-group">
+            <label>Contact is:</label>
+            <div class="toggle-buttons">
+              <label class="toggle-btn" [class.active]="isIndividual">
+                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [value]="true"> 
+                Individual
+              </label>
+              <label class="toggle-btn" [class.active]="!isIndividual">
+                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [value]="false"> 
+                Business
+              </label>
+            </div>
+          </div>
+          
+          <!-- Common Fields -->
+          <div class="form-group">
+            <label for="contactId">Contact ID:</label>
+            <input 
+              type="text" 
+              [(ngModel)]="customerData.contactId" 
+              name="contactId" 
+              id="contactId" 
+              placeholder="Auto-generated" 
+              readonly>
+          </div>
+          
+          <!-- Individual Specific Fields -->
+          <div *ngIf="isIndividual" class="individual-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="prefix">Prefix:</label>
+                <select [(ngModel)]="customerData.prefix" name="prefix" id="prefix">
+                  <option value="">Select</option>
+                  <option value="Mr">Mr</option>
+                  <option value="Mrs">Mrs</option>
+                  <option value="Ms">Ms</option>
+                  <option value="Dr">Dr</option>
+                </select>
+              </div>
+              
+              <div class="form-group required">
+                <label for="firstName">First Name:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.firstName" 
+                  name="firstName" 
+                  id="firstName" 
+                  required 
+                  placeholder="Enter First Name" />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label for="middleName">Middle Name:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.middleName" 
+                  name="middleName" 
+                  id="middleName" 
+                  placeholder="Enter Middle Name (Optional)" />
+              </div>
+              
+              <div class="form-group">
+                <label for="lastName">Last Name:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.lastName" 
+                  name="lastName" 
+                  id="lastName" 
+                  placeholder="Enter Last Name" />
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="dob">Date of Birth:</label>
+              <input 
+                type="date" 
+                [(ngModel)]="customerData.dob" 
+                name="dob" 
+                id="dob" />
+            </div>
+          </div>
+
+          
+          <!-- Add this after the Date of Birth field -->
+<div class="form-row">
+  <div class="form-group">
+    <label for="gender">Gender:</label>
+    <select [(ngModel)]="customerData.gender" name="gender" id="gender">
+      <option value="">Select Gender</option>
+      <option value="Male">Male</option>
+      <option value="Female">Female</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="age">Age:</label>
+    <input 
+      type="number" 
+      [(ngModel)]="customerData.age" 
+      name="age" 
+      id="age" 
+      min="0"
+      max="120"
+      placeholder="Enter Age" />
+  </div>
+</div>
+          <!-- Business Specific Fields -->
+          <div *ngIf="!isIndividual" class="business-fields">
+            <div class="form-group required">
+              <label for="businessName">Business Name:</label>
+              <input 
+                type="text" 
+                [(ngModel)]="customerData.businessName" 
+                name="businessName" 
+                id="businessName" 
+                required
+                placeholder="Enter Business Name" />
+            </div>
+          </div>
+          <!-- Add this after the contact information section -->
+<div class="form-group">
+  <label for="department">Department:</label>
+  <select [(ngModel)]="customerData.department" name="department" id="department">
+    <option value="">Select Department</option>
+    <option value="PC1">PC1</option>
+    <option value="PC2">PC2</option>
+    <option value="PC3">PC3</option>
+    <option value="PC4">PC4</option>
+    <option value="PC5">PC5</option>
+    <option value="PC6">PC6</option>
+    <option value="PC7">PC7</option>
+    <option value="PC8">PC8</option>
+  </select>
+</div>
+          
+          <!-- Contact Information -->
+          <h3>Contact Information</h3>
+          <div class="form-row">
+            <div class="form-group required">
+              <label for="mobile">Mobile:</label>
+              <input 
+                type="text" 
+                [(ngModel)]="customerData.mobile" 
+                name="mobile" 
+                id="mobile" 
+                required 
+                placeholder="Enter Mobile Number" 
+                (input)="validatePhoneNumber($event, 'mobile')"
+                maxlength="10"
+                pattern="[0-9]{10}" />
+              <div *ngIf="phoneErrors.mobile" class="error-message">
+                {{ phoneErrors.mobile }}
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="landline">Landline:</label>
+              <input 
+                type="text" 
+                [(ngModel)]="customerData.landline" 
+                name="landline" 
+                id="landline" 
+                placeholder="Enter Landline Number" 
+                (input)="validatePhoneNumber($event, 'landline')"
+                maxlength="10"
+                pattern="[0-9]{10}" />
+              <div *ngIf="phoneErrors.landline" class="error-message">
+                {{ phoneErrors.landline }}
+              </div>
+            </div>
+          </div>
+<!-- Add this below the assignedTo field -->
+<div class="form-row">
+  <!-- Adcode Dropdown -->
+  <div class="form-group">
+    <label for="adcode">Ad Code:</label>
+    <select [(ngModel)]="customerData.adcode" name="adcode" id="adcode" class="form-control">
+      <option value="">Select Ad Code</option>
+      <option *ngFor="let status of leadStatuses" [value]="status.id">
+        {{ status.leadStatus }} ({{ status.id }})
+      </option>
+    </select>
+  </div>
+  <!-- LifeStage Dropdown -->
+  <div class="form-group">
+    <label for="lifestage">Life Stage:</label>
+    <select [(ngModel)]="customerData.lifestage" name="lifestage" id="lifestage" class="form-control">
+      <option value="">Select Life Stage</option>
+      <option *ngFor="let stage of lifeStages" [value]="stage.name">
+        {{ stage.name }}
+      </option>
+    </select>
+  </div>
+</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="alternateContact">Alternate Contact:</label>
+              <input 
+                type="text" 
+                [(ngModel)]="customerData.alternateContact" 
+                name="alternateContact" 
+                id="alternateContact" 
+                placeholder="Enter Alternate Contact Number" 
+                (input)="validatePhoneNumber($event, 'alternateContact')"
+                maxlength="10"
+                pattern="[0-9]{10}" />
+              <div *ngIf="phoneErrors.alternateContact" class="error-message">
+                {{ phoneErrors.alternateContact }}
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="email">Email:</label>
+              <input 
+                type="email" 
+                [(ngModel)]="customerData.email" 
+                name="email" 
+                id="email" 
+                placeholder="Enter Email Address" />
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="assignedTo">Assigned To:</label>
+            <select [(ngModel)]="customerData.assignedTo" name="assignedTo" id="assignedTo">
+              <option value="">Select User</option>
+              <option *ngFor="let user of assignedUsers" [value]="user.username">
+                {{ user.username }}
+              </option>
+            </select>
+          </div>
+          
+          <!-- More Information Accordion -->
+          <div class="accordion">
+            <div class="accordion-header" (click)="toggleMoreInfo()">
+              <h3>More Information</h3>
+              <span class="accordion-icon">{{ showMoreInfo ? '−' : '+' }}</span>
+            </div>
+            
+            <div class="accordion-content" [class.show]="showMoreInfo">
+              <!-- Tax Information -->
+              <h4>Tax Information</h4>
+              <div class="form-group">
+                <label for="taxNumber">Tax Number:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.taxNumber" 
+                  name="taxNumber" 
+                  id="taxNumber" 
+                  placeholder="Enter Tax Number" />
+              </div>
+              
+              <!-- Financial Information -->
+              <h4>Financial Details</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="openingBalance">Opening Balance:</label>
+                  <input 
+                    type="number" 
+                    [(ngModel)]="customerData.openingBalance" 
+                    name="openingBalance" 
+                    id="openingBalance" 
+                    placeholder="0" />
+                </div>
+                
+                <div class="form-group">
+                  <label for="payTerm">Pay Term:</label>
+                  <select [(ngModel)]="customerData.payTerm" name="payTerm" id="payTerm">
+                    <option value="0">Immediate</option>
+                    <option value="15">15 Days</option>
+                    <option value="30">30 Days</option>
+                    <option value="45">45 Days</option>
+                    <option value="60">60 Days</option>
+                    <option value="90">90 Days</option>
+                  </select>
+                </div>
+              </div>
+              
+              <!-- Address Information -->
+              <h4>Address</h4>
+              <div class="form-group">
+                <label for="addressLine1">Address Line 1:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.addressLine1" 
+                  name="addressLine1" 
+                  id="addressLine1" 
+                  placeholder="Enter Address Line 1" />
+              </div>
+              
+              <div class="form-group">
+                <label for="addressLine2">Address Line 2:</label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="customerData.addressLine2" 
+                  name="addressLine2" 
+                  id="addressLine2" 
+                  placeholder="Enter Address Line 2" />
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="city">City:</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="customerData.city" 
+                    name="city" 
+                    id="city" 
+                    placeholder="Enter City" />
+                </div>
+                
+                <div class="form-group">
+                  <label for="state">State:</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="customerData.state" 
+                    name="state" 
+                    id="state" 
+                    placeholder="Enter State" />
+                </div>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="country">Country:</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="customerData.country" 
+                    name="country" 
+                    id="country" 
+                    placeholder="Enter Country" />
+                </div>
+                
+                <div class="form-group">
+                  <label for="zipCode">Zip Code:</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="customerData.zipCode" 
+                    name="zipCode" 
+                    id="zipCode" 
+                    placeholder="Enter Zip Code" />
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" (click)="toggleForm()">Cancel</button>
+            <button type="submit" class="btn-save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

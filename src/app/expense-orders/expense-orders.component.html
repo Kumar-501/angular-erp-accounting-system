@@ -1,0 +1,93 @@
+<div class="expense-orders-container">
+  <h2>Expense Report</h2>
+  
+  <div class="controls">
+    <div class="entries-control">
+      <span>Show</span>
+      <select [(ngModel)]="entriesPerPage" (change)="currentPage = 1">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <span>entries</span>
+    </div>
+    
+    <div class="search-control">
+      <input type="text" [(ngModel)]="searchTerm" (input)="onSearch()" placeholder="Search...">
+    </div>
+  </div>
+  
+  <div class="table-responsive">
+    <table class="expense-orders-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference No</th>
+          <th>Type</th>
+          <th>Total Amount</th>
+          <th>Tax Amount</th>
+          <th>CGST</th>
+          <th>SGST</th>
+          <th>IGST</th>
+          <th>Payment Method</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="isLoading">
+          <td colspan="12" class="loading">Loading data...</td>
+        </tr>
+        
+        <tr *ngFor="let expense of paginatedExpenses">
+          <td>{{ expense.date | date:'shortDate' }}</td>
+          <td>{{ expense.referenceNo || '-' }}</td>
+          <td>{{ getEntryTypeDisplay(expense.entryType) }}</td>
+      
+          <td>₹{{ expense.totalAmount | number:'1.2-2' }}</td>
+          <td>₹{{ expense.taxAmount | number:'1.2-2' }}</td>
+          <td>₹{{ expense.cgstAmount | number:'1.2-2' }}</td>
+          <td>₹{{ expense.sgstAmount | number:'1.2-2' }}</td>
+          <td>₹{{ expense.igstAmount | number:'1.2-2' }}</td>
+          <td>{{ expense.paymentMethod || '-' }}</td>
+          
+        </tr>
+        
+        <tr *ngIf="!isLoading && filteredExpenses.length === 0">
+          <td colspan="12" class="no-data">No expense orders found</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="5">Total:</td>
+          <td>₹ {{ getTotalAmount() | number:'1.2-2' }}</td>
+          <td>₹ {{ getTotalTaxAmount() | number:'1.2-2' }}</td>
+          <td>₹ {{ getTotalCgstAmount() | number:'1.2-2' }}</td>
+          <td>₹ {{ getTotalSgstAmount() | number:'1.2-2' }}</td>
+          <td>₹ {{ getTotalIgstAmount() | number:'1.2-2' }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  
+  <div class="pagination" *ngIf="!isLoading && filteredExpenses.length > 0">
+    <div class="info">
+      Showing {{ startEntryNumber }} to {{ maxEntryNumber }} of {{ filteredExpenses.length }} entries
+    </div>
+    
+    <div class="page-controls">
+      <button (click)="changePage(1)" [disabled]="currentPage === 1">First</button>
+      <button (click)="changePage(currentPage - 1)" [disabled]="currentPage === 1">Previous</button>
+      
+      <span *ngFor="let page of getPageNumbers()" 
+            [class.active]="page === currentPage"
+            (click)="changePage(page)"
+            class="page-number">
+        {{ page }}
+      </span>
+      
+      <button (click)="changePage(currentPage + 1)" [disabled]="currentPage === totalPages">Next</button>
+      <button (click)="changePage(totalPages)" [disabled]="currentPage === totalPages">Last</button>
+    </div>
+  </div>
+</div>

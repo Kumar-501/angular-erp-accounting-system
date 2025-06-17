@@ -1,0 +1,95 @@
+<div class="container">
+  <div class="header">
+    <h2>Supplier Payment Details</h2>
+    <div class="actions">
+      <button class="btn btn-primary" (click)="clearFilters()">
+        <i class="fa fa-filter"></i> Clear Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filters">
+    <div class="search-filter">
+      <input type="text" [(ngModel)]="searchTerm" placeholder="Search payments..." 
+             (keyup)="applyFilters()" class="form-control">
+    </div>
+    
+    <div class="filter-group">
+      <label>Status:</label>
+      <select [(ngModel)]="statusFilter" (change)="applyFilters()" class="form-control">
+        <option value="all">All Statuses</option>
+        <option value="completed">Completed</option>
+        <option value="pending">Pending</option>
+        <option value="failed">Failed</option>
+      </select>
+    </div>
+    
+    <div class="filter-group">
+      <label>Date Range:</label>
+      <div class="date-range">
+        <input type="date" [(ngModel)]="dateRange.start" (change)="applyFilters()" class="form-control">
+        <span>to</span>
+        <input type="date" [(ngModel)]="dateRange.end" (change)="applyFilters()" class="form-control">
+      </div>
+    </div>
+  </div>
+
+  <!-- Payments Table -->
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference No</th>
+          <th>Supplier</th>
+          <th>Amount</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th>Account</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let payment of paginatedPayments">
+          <td>{{ formatDate(payment.paymentDate) }}</td>
+          <td>{{ payment.referenceNo }}</td>
+          <td>{{ payment.supplierName }}</td>
+          <td>{{ formatCurrency(payment.amount) }}</td>
+          <td>{{ payment.paymentMethod }}</td>
+          <td>
+            <span class="badge" [ngClass]="{
+              'badge-success': payment.status === 'completed',
+              'badge-warning': payment.status === 'pending',
+              'badge-danger': payment.status === 'failed'
+            }">
+              {{ payment.status || 'completed' | titlecase }}
+            </span>
+          </td>
+          <td>{{ payment.paymentAccount || 'N/A' }}</td>
+          <td>{{ payment.notes || '-' }}</td>
+        </tr>
+        <tr *ngIf="filteredPayments.length === 0">
+          <td colspan="8" class="text-center">No payments found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination" *ngIf="filteredPayments.length > 0">
+    <button class="btn btn-outline-primary" 
+            [disabled]="currentPage === 1" 
+            (click)="onPageChange(currentPage - 1)">
+      Previous
+    </button>
+    
+    <span>Page {{ currentPage }} of {{ Math.ceil(totalItems / itemsPerPage) }}</span>
+    
+    <button class="btn btn-outline-primary" 
+            [disabled]="currentPage * itemsPerPage >= totalItems" 
+            (click)="onPageChange(currentPage + 1)">
+      Next
+    </button>
+  </div>
+</div>

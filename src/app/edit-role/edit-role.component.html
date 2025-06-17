@@ -1,0 +1,73 @@
+<div class="edit-roles-container">
+  <div class="header">
+    <h1>Edit Role</h1>
+    <p class="subtitle">Modify role information and permissions</p>
+  </div>
+  
+  <div class="content-card" *ngIf="currentRole; else loading">
+    <form [formGroup]="roleForm" (ngSubmit)="onSubmit()">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="roleName">Role Name <span class="required">*</span></label>
+          <input
+            type="text"
+            id="roleName"
+            formControlName="name"
+            placeholder="Enter role name (e.g., Admin, Manager)"
+            class="form-control"
+          >
+          <div *ngIf="roleForm.get('name')?.invalid && (roleForm.get('name')?.dirty || roleForm.get('name')?.touched)"
+               class="error-message">
+            <div *ngIf="roleForm.get('name')?.errors?.['required']">
+              Role name is required
+            </div>
+            <div *ngIf="roleForm.get('name')?.errors?.['minlength']">
+              Role name must be at least 3 characters long
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea
+            id="description"
+            formControlName="description"
+            placeholder="Enter role description"
+            class="form-control"
+            rows="4"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="info-notice">
+        <i class="material-icons">info</i>
+        <span>This role will have access to all system features by default.</span>
+      </div>
+      <div class="form-actions">
+        <!-- Cancel button - goes back to roles table without saving -->
+        <button type="button" class="btn btn-cancel" 
+                (click)="onClose()" 
+                [disabled]="isLoading">
+          Cancel
+        </button>
+      
+  <!-- Change the Save Role button to call onSubmit() -->
+<button type="submit" class="btn btn-save" 
+        [disabled]="roleForm.invalid || isLoading">
+  <span>Save Role</span>
+</button>
+      </div>
+    </form>
+  </div>
+  
+  <ng-template #loading>
+    <div class="loading-container">
+      <div class="loading-spinner">
+        <i class="material-icons rotating">sync</i>
+        <span>Loading role data...</span>
+      </div>
+    </div>
+  </ng-template>
+  </div>

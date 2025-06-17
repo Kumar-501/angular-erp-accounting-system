@@ -1,0 +1,207 @@
+// stock-report.component.scss
+.stock-report-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  
+  h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    margin-top: 5%;
+  }
+  
+  .report-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    
+    .search-box {
+      position: relative;
+      
+      input {
+        padding: 8px 30px 8px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        width: 300px;
+      }
+      
+      .search-icon {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+    }
+    
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      
+      button {
+        padding: 5px 10px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        
+        &:disabled {
+          background-color: #bdc3c7;
+          cursor: not-allowed;
+        }
+      }
+    }
+  }
+  
+  .stock-report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      color: #2c3e50;
+      cursor: pointer;
+      
+      &:hover {
+        background-color: #e9ecef;
+      }
+    }
+    
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+    
+    .low-stock {
+      background-color: #faf9f7;
+    }
+    
+    .stock-alert {
+      color: #dc3545;
+      font-weight: bold;
+    }
+    
+    .alert-icon {
+      margin-left: 5px;
+    }
+    
+    .no-data {
+      text-align: center;
+      padding: 20px;
+      color: #6c757d;
+    }
+  }
+  
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #3498db;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+    }
+  }
+  
+  .footer {
+    margin-top: 30px;
+    text-align: center;
+    color: #7f8c8d;
+    font-size: 12px;
+    padding: 10px;
+    border-top: 1px solid #eee;
+  }
+}
+/* Add to your component's SCSS */
+.eod-controls {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  
+  .eod-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    
+    &:hover {
+      background-color: #45a049;
+    }
+    
+    &:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+  }
+  
+  .eod-status {
+    margin-top: 10px;
+    color: #2196F3;
+  }
+  
+  .eod-error {
+    margin-top: 10px;
+    color: #f44336;
+  }
+  
+  .eod-success {
+    margin-top: 10px;
+    color: #4CAF50;
+  }
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg);
+  }}
+.stock-increase {
+  color: green;
+  font-weight: bold;
+}
+
+.stock-decrease {
+  color: red;
+  font-weight: bold;
+}
+
+.opening-stock {
+  background-color: #f0f8ff; // Light blue for opening
+}
+
+.closing-stock {
+  background-color: #fff0f5; // Light pink for closing
+}tfoot {
+  tr.summary-row {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    
+    td {
+      padding: 12px 8px;
+      border-top: 2px solid #ddd;
+    }
+  }
+}

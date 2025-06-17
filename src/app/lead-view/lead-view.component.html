@@ -1,0 +1,113 @@
+<div class="lead-view-container">
+  <div class="header">
+    <button class="back-button" (click)="goBack()">
+      <i class="arrow-icon">←</i> Back to Leads
+    </button>
+    <h2>Lead Details</h2>
+  </div>
+
+  <div *ngIf="loading" class="loading-spinner">
+    Loading lead details...
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    {{ error }}
+  </div>
+
+  <div *ngIf="lead && !loading" class="lead-details">
+    <div class="detail-section">
+      <h3>Basic Information</h3>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Contact ID:</span>
+          <span class="detail-value">{{ lead.contactId || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Name:</span>
+          <span class="detail-value">
+            {{ lead.businessName || (lead.firstName + ' ' + (lead.lastName || '')) || 'N/A' }}
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Contact Type:</span>
+          <span class="detail-value">{{ lead.contactType || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Mobile:</span>
+          <span class="detail-value">{{ lead.mobile || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Email:</span>
+          <span class="detail-value">{{ lead.email || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Alternate Contact:</span>
+          <span class="detail-value">{{ lead.alternateContact || 'N/A' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Lead Information</h3>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Source:</span>
+          <span class="detail-value">{{ lead.source || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Life Stage:</span>
+          <span class="detail-value">{{ lead.lifeStage || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Ad Code:</span>
+          <span class="detail-value">{{ lead.leadStatus || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Deal Status:</span>
+          <span class="detail-value">{{ lead.dealStatus || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Priority:</span>
+          <span class="detail-value">{{ lead.priority || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Product Interested:</span>
+          <span class="detail-value">{{ getProductNames(lead.productInterested) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Assignment</h3>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Assigned To:</span>
+          <span class="detail-value">{{ lead.assignedTo || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Department:</span>
+          <span class="detail-value">{{ lead.department || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Added By:</span>
+          <span class="detail-value">
+            {{ lead.addedBy?.userName || lead.addedBy || 'N/A' }}
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Created At:</span>
+          <span class="detail-value">
+            {{ lead.createdAt | date:'medium' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-section" *ngIf="lead.notes">
+      <h3>Notes</h3>
+      <div class="notes-content">
+        {{ lead.notes }}
+      </div>
+    </div>
+  </div>
+</div>

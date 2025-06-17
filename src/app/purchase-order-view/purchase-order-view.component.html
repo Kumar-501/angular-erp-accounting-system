@@ -1,0 +1,138 @@
+<div class="order-view-container">
+  <div class="header">
+    <h2>Purchase Order Details</h2>
+    <button routerLink="/purchase-order" class="back-button">Back to List</button>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">Loading order details...</div>
+  
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <div *ngIf="order && !isLoading" class="order-details">
+    <div class="detail-section">
+      <h3>Basic Information</h3>
+      <div class="detail-row">
+        <span class="detail-label">Reference No:</span>
+        <span class="detail-value">{{ order.referenceNo || 'N/A' }}</span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Date:</span>
+        <span class="detail-value">{{ (order.createdAt?.toDate() | date) || order.date || 'N/A' }}</span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Business Location:</span>
+        <span class="detail-value">{{ order.businessLocation || order.locationName || 'N/A' }}</span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Supplier:</span>
+        <span class="detail-value">{{ order.supplierName || order.supplier || 'N/A' }}</span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Status:</span>
+        <span class="detail-value status-badge" [ngClass]="{
+          'status-pending': order.status === 'Pending',
+          'status-shipped': order.status === 'Shipped',
+          'status-delivered': order.status === 'Delivered'
+        }">
+          {{ order.status || 'N/A' }}
+        </span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Required By Date:</span>
+        <span class="detail-value">{{ order.requiredByDate || order.requiredDate || order.required_date || 'N/A' }}</span>
+      </div>
+      
+      <div class="detail-row">
+        <span class="detail-label">Added By:</span>
+        <span class="detail-value">{{ order.addedBy || 'N/A' }}</span>
+      </div>
+
+      <!-- Additional fields that might be useful -->
+      <div class="detail-row" *ngIf="order.brand">
+        <span class="detail-label">Brand:</span>
+        <span class="detail-value">{{ order.brand }}</span>
+      </div>
+
+      <div class="detail-row" *ngIf="order.category">
+        <span class="detail-label">Category:</span>
+        <span class="detail-value">{{ order.category }}</span>
+      </div>
+
+      <div class="detail-row" *ngIf="order.shippingStatus">
+        <span class="detail-label">Shipping Status:</span>
+        <span class="detail-value">{{ order.shippingStatus }}</span>
+      </div>
+    </div>
+
+    <div class="detail-section" *ngIf="(order.products && order.products.length > 0) || (order.items && order.items.length > 0)">
+      <h3>Products</h3>
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Quantity</th>
+            <th>Unit Cost</th>
+            <th>Discount %</th>
+            <th>Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Handle both products and items arrays -->
+          <tr *ngFor="let product of (order.products || order.items || [])">
+            <td>{{ product.productName || 'N/A' }}</td>
+            <td>{{ product.quantity || product.requiredQuantity || 0 }}</td>
+            <td>{{ (product.unitCost || product.unitPurchasePrice || 0) | currency:'INR' }}</td>
+            <td>{{ product.discountPercent || 0 }}%</td>
+            <td>{{ calculateLineTotal(product) | currency:'INR' }}</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="4" class="text-right">Total:</td>
+            <td>{{ getTotalAmount() | currency:'INR' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="detail-section" *ngIf="order.shippingDetails">
+      <h3>Shipping Information</h3>
+      <div class="detail-row">
+        <span class="detail-label">Shipping Address:</span>
+        <span class="detail-value">{{ order.shippingDetails.shippingAddress || 'N/A' }}</span>
+      </div>
+   
+      <div class="detail-row">
+        <span class="detail-label">Shipping Charges:</span>
+        <span class="detail-value">{{ (order.shippingDetails.shippingCharges || order.shippingCharges || 0) | currency:'INR' }}</span>
+      </div>
+
+      <div class="detail-row">
+        <span class="detail-label">Delivered To:</span>
+        <span class="detail-value">{{ order.shippingDetails.deliveredTo || 'N/A' }}</span>
+      </div>
+
+      <div class="detail-row" *ngIf="order.shippingDetails.deliveryPerson">
+        <span class="detail-label">Delivery Person:</span>
+        <span class="detail-value">{{ order.shippingDetails.deliveryPerson }}</span>
+      </div>
+
+      <div class="detail-row" *ngIf="order.shippingDate">
+        <span class="detail-label">Shipping Date:</span>
+        <span class="detail-value">{{ order.shippingDate }}</span>
+      </div>
+    </div>
+
+    <div class="detail-section" *ngIf="order.additionalNotes || order.shippingDetails?.note">
+      <h3>Additional Notes</h3>
+      <div class="notes-content">
+        {{ order.additionalNotes || order.shippingDetails?.note || 'No additional notes' }}
+      </div>
+    </div>
+
+    
+  </div>
+</div>

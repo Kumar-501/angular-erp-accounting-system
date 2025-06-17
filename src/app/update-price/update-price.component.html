@@ -1,0 +1,48 @@
+<div class="update-price-container">
+  <h1 class="page-title">Update Price</h1>
+
+  <div class="price-card">
+    <h5 class="card-title">Import Export Product Price</h5>
+    
+    <div class="content-container">
+      <div class="export-section">
+        <button (click)="exportToExcel()" class="export-btn">
+          <span *ngIf="!exporting">Export product prices</span>
+          <span *ngIf="exporting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span *ngIf="exporting"> Exporting...</span>
+        </button>
+      </div>
+      
+      <div class="import-section">
+        <div class="file-input-container">
+          <span class="file-label">File To Import:</span>
+          <input type="file" (change)="onFileSelected($event)" class="file-input" accept=".xlsx, .xls">
+          <span class="file-name">{{selectedFileName || 'No file chosen'}}</span>
+        </div>
+        
+        <button (click)="importUpdatedPrices()" class="submit-btn" [disabled]="!selectedFile || importing">
+          <span *ngIf="!importing">Submit</span>
+          <span *ngIf="importing" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          <span *ngIf="importing"> Updating...</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="instructions">
+      <h5>Instructions:</h5>
+      <ol>
+        <li>Click "Export product prices" to download current prices</li>
+        <li>Open the Excel file and modify the SellingPrice and DefaultPurchasePrice columns</li>
+        <li>Do NOT change product names or SKUs</li>
+        <li>Save the Excel file</li>
+        <li>Click "Choose File" to select your modified Excel file</li>
+        <li>Click "Submit" to update prices in the system</li>
+      </ol>
+    </div>
+
+    <!-- Status messages -->
+    <div *ngIf="statusMessage" class="status-message" [class.success]="isSuccess" [class.error]="!isSuccess">
+      {{statusMessage}}
+    </div>
+  </div>
+</div>

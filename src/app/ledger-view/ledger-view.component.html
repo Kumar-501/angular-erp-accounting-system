@@ -1,0 +1,190 @@
+<!-- Supplier Ledger View Component HTML -->
+<div class="supplier-ledger-container" *ngIf="supplier">
+  <!-- Header with actions -->
+  <div class="header">
+    <div class="header-content">
+      <h1>{{ getSupplierName() }}</h1>
+      <div class="supplier-id">ID: {{ supplier.contactId }}</div>
+    </div>
+   
+  </div>
+
+  <!-- Main content grid -->
+  <div class="content-grid">
+    <!-- Supplier info card -->
+    <div class="card info-card">
+      <div class="card-header">
+        <h2>Contact Information</h2>
+      </div>
+      <div class="card-body">
+        <div class="info-row">
+          <div class="info-label">Business Name:</div>
+          <div class="info-value">{{ supplier.businessName || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Contact Person:</div>
+          <div class="info-value">{{ supplier.contactName || getSupplierName() || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Contact Email:</div>
+          <div class="info-value">{{ supplier.email || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Address:</div>
+          <div class="info-value">{{ getSupplierAddress() || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Mobile:</div>
+          <div class="info-value">{{ supplier.mobile || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Alternative Contact:</div>
+          <div class="info-value">{{ supplier.alternateNumber || 'N/A' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-label">Tax Number:</div>
+          <div class="info-value">{{ supplier.taxNumber || 'N/A' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary card -->
+    <div class="card summary-card">
+      <div class="card-header">
+        <h2>Account Summary</h2>
+        <div class="date-range">{{ fromDate | date:'dd/MM/yyyy' }} - {{ toDate | date:'dd/MM/yyyy' }}</div>
+      </div>
+      <div class="card-body">
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-label">Opening Balance</div>
+            <div class="summary-value">₹ {{ accountSummary.openingBalance | number:'1.2-2' }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Total Purchase</div>
+            <div class="summary-value">₹ {{ accountSummary.totalPurchase | number:'1.2-2' }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Total Paid</div>
+            <div class="summary-value">₹ {{ accountSummary.totalPaid | number:'1.2-2' }}</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Advance Balance</div>
+            <div class="summary-value">₹ {{ accountSummary.advanceBalance | number:'1.2-2' }}</div>
+          </div>
+          <div class="summary-item highlight">
+            <div class="summary-label">Balance Due</div>
+            <div class="summary-value" [ngClass]="{'negative': accountSummary.balanceDue > 0}">
+              ₹ {{ accountSummary.balanceDue | number:'1.2-2' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter section -->
+  <div class="filter-section">
+    <div class="card filter-card">
+      <div class="card-header">
+        <h2>Filter Transactions</h2>
+      </div>
+      <div class="card-body">
+        <div class="filter-form">
+          <div class="filter-group">
+            <label>Date Range</label>
+            <div class="date-inputs">
+              <div class="date-field">
+                <span>From</span>
+                <input type="date" [(ngModel)]="fromDate" (change)="onDateRangeChange()">
+              </div>
+              <div class="date-field">
+                <span>To</span>
+                <input type="date" [(ngModel)]="toDate" (change)="onDateRangeChange()">
+              </div>
+            </div>
+          </div>
+          <div class="filter-group">
+            <label>Location</label>
+            <select [(ngModel)]="selectedLocation" (change)="onLocationChange()">
+              <option *ngFor="let location of getLocations()">{{ location }}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="card transactions-card">
+    <div class="card-header">
+      <h2>Transactions History</h2>
+      
+    </div>
+    <div class="card-body">
+      <div class="table-wrapper">
+        <table class="transactions-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference No.</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Debit (₹)</th>
+              <th>Credit (₹)</th>
+              <th>Balance (₹)</th>
+              <th>Payment Method</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of filteredTransactions">
+              <td>{{ t.date | date:'dd/MM/yyyy' }}</td>
+              <td><a href="javascript:void(0)">{{ t.reference }}</a></td>
+              <td>
+                <span class="badge" [ngClass]="{'purchase': t.type === 'Purchase', 'payment': t.type === 'Payment'}">
+                  {{ t.type }}
+                </span>
+              </td>
+              <td>{{ t.location }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="{'completed': t.paymentStatus === 'Completed', 'pending': t.paymentStatus === 'Pending'}">
+                  {{ t.paymentStatus }}
+                </span>
+              </td>
+              <td>{{ t.debit | number:'1.2-2' }}</td>
+              <td>{{ t.credit | number:'1.2-2' }}</td>
+              <td>{{ t.balance | number:'1.2-2' }}</td>
+              <td>{{ t.paymentMethod || 'N/A' }}</td>
+              <td>{{ t.others || 'N/A' }}</td>
+            </tr>
+            <tr *ngIf="filteredTransactions.length === 0 && !loading">
+              <td colspan="10" class="no-data">No transactions found for the selected period</td>
+            </tr>
+            <tr *ngIf="loading">
+              <td colspan="10" class="loading">
+                <div class="loader"></div>
+                Loading transactions...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="!supplier && !loading" class="no-data-container">
+  <div class="no-data-message">
+    <i class="icon-user-not-found"></i>
+    <h2>Supplier Not Found</h2>
+    <p>The requested supplier information could not be located. Please check the supplier ID and try again.</p>
+    <button class="btn-primary" routerLink="/suppliers">Return to Suppliers List</button>
+  </div>
+</div>
+
+<div *ngIf="!supplier && loading" class="loading-container">
+  <div class="loader"></div>
+  <p>Loading supplier information...</p>
+</div>

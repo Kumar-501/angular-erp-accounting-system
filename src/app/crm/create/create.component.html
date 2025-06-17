@@ -1,0 +1,142 @@
+<div class="followup-container">
+    <h2>Add Follow Up</h2>
+    
+    <form [formGroup]="followUpForm" (ngSubmit)="onSubmit()">
+      <!-- Container 1: Followup Category -->
+      <div class="form-container">
+        <h3>Followup Category:</h3>
+        
+        <div class="form-group">
+          <select formControlName="category" class="form-control">
+            <option *ngFor="let category of followUpCategories" [value]="category">{{category}}</option>
+          </select>
+        </div>
+      
+        <!-- Customers Selection (shown only when category is Customers) -->
+        <div *ngIf="showCustomerSelection" class="form-group">
+          <h4>Customers:</h4>
+          <div class="selection-actions">
+            <button type="button" (click)="toggleSelectAllCustomers(true)">Select all</button>
+            <button type="button" (click)="toggleSelectAllCustomers(false)">Deselect all</button>
+          </div>
+          <div class="customer-list">
+            <div *ngFor="let customer of customerOptions" 
+                 class="customer-item"
+                 [class.selected]="isCustomerSelected(customer)"
+                 (click)="toggleCustomerSelection(customer)">
+              <input type="checkbox" 
+                     [id]="'customer-' + customer.id"
+                     [checked]="isCustomerSelected(customer)"
+                     (change)="toggleCustomerSelection(customer)">
+              <label [for]="'customer-' + customer.id">{{customer.name}} ({{customer.type}})</label>
+            </div>
+          </div>
+        </div>
+      
+        <!-- Invoices Selection (shown only when category is Invoices) -->
+        <div *ngIf="showInvoiceSelection" class="form-group">
+          <h4>Invoices:</h4>
+          <div class="selection-actions">
+            <button type="button" (click)="toggleSelectAllInvoices(true)">Select all</button>
+            <button type="button" (click)="toggleSelectAllInvoices(false)">Deselect all</button>
+          </div>
+          <div class="invoice-list">
+            <div *ngFor="let invoice of invoiceOptions" 
+                 class="invoice-item"
+                 [class.selected]="isInvoiceSelected(invoice)"
+                 (click)="toggleInvoiceSelection(invoice)">
+              <input type="checkbox" 
+                     [id]="'invoice-' + invoice.id"
+                     [checked]="isInvoiceSelected(invoice)"
+                     (change)="toggleInvoiceSelection(invoice)">
+              <label [for]="'invoice-' + invoice.id">
+                {{invoice.number}} - ${{invoice.amount}} ({{invoice.date}})
+              </label>
+            </div>
+          </div>
+        </div>
+      
+        <!-- Follow up by section -->
+        <div class="form-group">
+          <h4>Follow up by:</h4>
+          <select formControlName="orders" class="form-control">
+            <option *ngFor="let order of orderOptions" [value]="order">{{order}}</option>
+          </select>
+          
+          <div *ngIf="followUpForm.get('orders')?.value === 'Has transactions'">
+            <label>In days:</label>
+            <input type="number" formControlName="days" class="form-control">
+          </div>
+        </div>
+      
+        <!-- Customer Assignment -->
+        <div class="form-group">
+          <h4>Assign To:</h4>
+          <select formControlName="assignTo" class="form-control">
+            <option *ngFor="let assignee of assigneeOptions" [value]="assignee">{{assignee}}</option>
+          </select>
+        </div>
+      
+        <div class="form-group">
+          <h4>Payment Status:</h4>
+          <select formControlName="paymentStatus" class="form-control">
+            <option *ngFor="let status of paymentStatusOptions" [value]="status">{{status}}</option>
+          </select>
+        </div>
+      <!-- Container 3: Followup Details -->
+      <div class="form-container">
+        <div class="form-group">
+          <label>Title*</label>
+          <input type="text" formControlName="title" class="form-control" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Followup:</label>
+          <div class="tags">
+            Available Tags: (customer_business_name), (customer_name)
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Status</label>
+          <select formControlName="status" class="form-control">
+            <option *ngFor="let status of statusOptions" [value]="status">{{status}}</option>
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Datetime*</label>
+            <input type="datetime-local" formControlName="startDatetime" class="form-control" required>
+          </div>
+          
+          <div class="form-group">
+            <label>End Datetime*</label>
+            <input type="datetime-local" formControlName="endDatetime" class="form-control" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Description</label>
+          <textarea formControlName="description" class="form-control" rows="4"></textarea>
+        </div>
+        
+        <div class="form-group">
+          <label>Follow Up Type*</label>
+          <select formControlName="followUpType" class="form-control" required>
+            <option *ngFor="let type of followUpTypeOptions" [value]="type">{{type}}</option>
+          </select>
+        </div>
+        
+        <div class="form-group checkbox">
+          <label>
+            <input type="checkbox" formControlName="sendNotification"> Send Notification
+          </label>
+        </div>
+      </div>
+      
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" [disabled]="!followUpForm.valid">Save</button>
+      </div>
+ 
+  </div>

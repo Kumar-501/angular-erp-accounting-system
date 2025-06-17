@@ -1,0 +1,129 @@
+/* Shipment Details Page */
+.shipment-details-page {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #333;
+    margin-top: 5%;
+  }
+  
+  /* Header section */
+  .shipment-details-page .d-flex.justify-content-between {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+  }
+  
+  .shipment-details-page h2 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+  }
+  
+  /* Buttons */
+  .shipment-details-page .btn {
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  .shipment-details-page .btn-outline-secondary {
+    border-color: #6c757d;
+    color: #6c757d;
+  }
+  
+  .shipment-details-page .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+  }
+  
+  .shipment-details-page .btn-outline-primary {
+    border-color: #3498db;
+    color: #3498db;
+  }
+  
+  .shipment-details-page .btn-outline-primary:hover {
+    background-color: #3498db;
+    color: white;
+  }
+  
+  /* Back button icon */
+  .shipment-details-page .back-btn i {
+    margin-right: 5px;
+  }
+  
+  /* Details section */
+  .shipment-details-page .row.mb-3 {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    margin-bottom: 25px !important;
+  }
+  
+  .shipment-details-page p {
+    margin-bottom: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  
+  .shipment-details-page strong {
+    font-weight: 600;
+    color: #2c3e50;
+    display: inline-block;
+    width: 130px;
+  }
+  
+  /* Table styling */
+  .shipment-details-page .table-responsive {
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .shipment-details-page .table {
+    width: 100%;
+    margin-bottom: 20px;
+    background-color: white;
+  }
+  
+  .shipment-details-page .table thead th {
+    background-color: #3498db;
+    color: white;
+    font-weight: 500;
+    padding: 12px 15px;
+    text-align: left;
+  }
+  
+  .shipment-details-page .table tbody td {
+    padding: 12px 15px;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+  }
+  
+  .shipment-details-page .table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;
+  }
+  
+  .shipment-details-page .table tbody tr:hover {
+    background-color: #f1f8fe;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .shipment-details-page .row.mb-3 {
+      padding: 15px;
+    }
+    
+    .shipment-details-page strong {
+      width: 110px;
+    }
+    
+    .shipment-details-page .table thead th,
+    .shipment-details-page .table tbody td {
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+  }

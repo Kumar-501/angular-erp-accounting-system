@@ -1,0 +1,151 @@
+<div class="container">
+  <div class="header">
+    <h3>Sales Commission Agents</h3>
+  </div>
+  
+  <div class="users-panel">
+    
+    <div class="action-bar">
+      <div class="entries-section">
+        <span>Show</span>
+        <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
+          <option value="4">4</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+      
+      <div class="export-buttons">
+      
+        <button class="btn btn-outline" (click)="exportExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-outline" (click)="printTable()">
+          <i class="fas fa-print"></i> Print
+        </button>
+     
+     
+      </div>
+      
+      <div class="search-container">
+        <input type="text" placeholder="Search..." (input)="onSearch($event)" />
+      </div>
+      
+      <button class="btn btn-primary add-button" (click)="openModal()">
+        <i class="fas fa-plus"></i> Add
+      </button>
+    </div>
+    
+    <table class="user-table">
+      <thead>
+        <tr>
+          <th (click)="sortTable('userName')">
+            User Name 
+            <i class="fas" [ngClass]="{
+              'fa-sort': sortColumn !== 'userName',
+              'fa-sort-up': sortColumn === 'userName' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'userName' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th (click)="sortTable('commissionPercentage')">
+            Commission Percentage (%) 
+            <i class="fas" [ngClass]="{
+              'fa-sort': sortColumn !== 'commissionPercentage',
+              'fa-sort-up': sortColumn === 'commissionPercentage' && sortDirection === 'asc',
+              'fa-sort-down': sortColumn === 'commissionPercentage' && sortDirection === 'desc'
+            }"></i>
+          </th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngIf="paginatedAgents.length > 0; else noData">
+          <tr *ngFor="let agent of paginatedAgents">
+            <td>{{ agent.userName }}</td>
+            <td>{{ agent.commissionPercentage }}%</td>
+            <td class="action-buttons">
+              <button class="btn btn-edit" (click)="openModal(true, agent)">
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn btn-delete" (click)="deleteAgent(agent.id)">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            </td>
+          </tr>
+        </ng-container>
+        <ng-template #noData>
+          <tr>
+            <td colspan="3" class="no-data">No data available in table</td>
+          </tr>
+        </ng-template>
+      </tbody>
+    </table>
+    
+    <div class="pagination">
+      <div class="showing-info">
+        Showing {{ (paginatedAgents.length > 0) ? ((currentPage - 1) * entriesPerPage + 1) : 0 }} to 
+        {{ (currentPage * entriesPerPage > totalEntries) ? totalEntries : (currentPage * entriesPerPage) }} 
+        of {{ totalEntries }} entries
+      </div>
+      <div class="page-buttons">
+        <button [disabled]="currentPage === 1" (click)="previousPage()" class="pagination-btn">
+          Previous
+        </button>
+        <span class="page-number">{{ currentPage }} of {{ totalPages }}</span>
+        <button [disabled]="currentPage === totalPages" (click)="nextPage()" class="pagination-btn">
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for adding/editing agents -->
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ isEditMode ? 'Edit Sales Commission Agent' : 'Add Sales Commission Agent' }}</h5>
+        <button type="button" class="close" (click)="closeModal()">
+          <span>&times;</span>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <form [formGroup]="agentForm" (ngSubmit)="saveAgent()">
+          <div class="form-group">
+            <label for="userId">User Name*</label>
+            <select id="userId" formControlName="userId" class="form-control">
+              <option value="">Select User</option>
+              <option *ngFor="let user of users" [value]="user.id">
+                {{ user.firstName }} {{ user.lastName }}
+              </option>
+            </select>
+            <div class="error-message" *ngIf="agentForm.get('userId')?.invalid && agentForm.get('userId')?.touched">
+              User name is required
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="commissionPercentage">Commission Percentage (%)*</label>
+            <input type="number" id="commissionPercentage" formControlName="commissionPercentage" 
+                   class="form-control" placeholder="Enter commission percentage">
+            <div class="error-message" *ngIf="agentForm.get('commissionPercentage')?.invalid && agentForm.get('commissionPercentage')?.touched">
+              Valid commission percentage is required
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
+            <button type="submit" class="btn btn-primary" [disabled]="agentForm.invalid">
+              {{ isEditMode ? 'Update' : 'Save' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,383 @@
+/* list-quotations.component.scss */
+.quotation-container {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  
+    h1 {
+      font-size: 24px;
+      color: #333;
+      margin: 0;
+      margin-top: 5%;
+    }
+  }
+  
+  .add-btn {
+    padding: 8px 16px;
+    background-color: #4e73df;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
+    margin-top: 2%;
+  
+    i {
+      margin-right: 8px;
+    }
+  
+    &:hover {
+      background-color: #3d5ec9;
+    }
+  
+    &:active {
+      background-color: #2a4ab3;
+    }
+  }
+  
+  .action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .left-actions {
+    display: flex;
+    align-items: center;
+  }
+  
+  .show-entries {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  
+    span {
+      font-size: 14px;
+      color: #555;
+    }
+  
+    select {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+  }
+  
+  .right-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .action-btn {
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: all 0.2s;
+  
+    i {
+      margin-right: 6px;
+    }
+  
+    &:hover {
+      background-color: #e9ecef;
+    }
+  }
+  
+  .search-box {
+    position: relative;
+  
+    input {
+      padding: 8px 12px 8px 32px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      width: 200px;
+    }
+  
+    i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #999;
+    }
+  }
+  
+  .table-container {
+    overflow-x: auto;
+    margin-bottom: 20px;
+  }
+  
+  .quotation-table {
+    width: 100%;
+    border-collapse: collapse;
+  
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+  
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      color: #333;
+    }
+  
+    tr:hover {
+      background-color: #f5f5f5;
+    }
+  }
+  
+  .status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  
+    &.shipped {
+      background-color: #d4edff;
+      color: #0062cc;
+    }
+  
+    &.pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+  
+    &.delivered {
+      background-color: #d4edda;
+      color: #155724;
+    }
+  }
+  
+  .action-cell {
+    display: flex;
+    gap: 8px;
+  
+    button {
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+  
+    .view-btn {
+      background-color: #e9ecef;
+      border: 1px solid #ced4da;
+      color: #495057;
+  
+      &:hover {
+        background-color: #dee2e6;
+      }
+    }
+  
+    .delete-btn {
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+  
+      &:hover {
+        background-color: #f5c6cb;
+      }
+    }
+  }
+  
+  .pagination {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 15px;
+  
+    .page-btn {
+      padding: 8px 16px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+  
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+  
+      &:hover:not(:disabled) {
+        background-color: #f8f9fa;
+      }
+    }
+  
+    .page-number {
+      font-size: 14px;
+      color: #555;
+    }
+  }
+  /* Add these styles to your list-quotations.component.scss file */
+
+.column-visibility-container {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .column-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    min-width: 200px;
+    padding: 10px;
+    margin-top: 5px;
+  }
+  
+  .column-item {
+    padding: 8px 12px;
+    
+    &:hover {
+      background-color: #f5f5f5;
+    }
+    
+    label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      
+      input {
+        margin-right: 8px;
+      }
+    }
+  }
+  
+  /* Ensure the button stays highlighted when dropdown is open */
+  .action-btn.active {
+    background-color: #0056b3;
+    color: white;
+  }
+  
+  /* This will make the dropdown close when clicking outside */
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+  }
+  
+  /* Adjust the action buttons to have consistent styling */
+  .right-actions {
+    display: flex;
+    align-items: center;
+    
+    .action-btn {
+      margin: 0 5px;
+      position: relative;
+    }
+    
+    .search-box {
+      margin-left: 10px;
+    }
+  }
+  /* list-quotations.component.scss */
+.column-visibility-card {
+    position: absolute;
+    top: 120px;
+    background: rgb(26, 7, 197);
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    width: 250px;
+    padding: 15px;
+    margin-top: 5%;
+    margin-left: 40%;
+    color: white;
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+      
+      h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+      
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #666;
+        
+        &:hover {
+          color: #333;
+        }
+      }
+    }
+    
+    .card-body {
+      .visibility-option {
+        margin-bottom: 10px;
+        
+        label {
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          
+          input {
+            margin-right: 10px;
+          }
+        }
+      }
+    }
+  }
+  
+  .status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+  }
+  
+  .shipped {
+    background-color: #FFD700; /* Gold for shipped */
+    color: #000;
+  }
+  
+  .pending {
+    background-color: #FF6347; /* Tomato for pending */
+    color: #FFF;
+  }
+  
+  .delivered {
+    background-color: #3CB371; /* Medium sea green for delivered */
+    color: #FFF;
+  }

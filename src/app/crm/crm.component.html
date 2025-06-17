@@ -1,0 +1,41 @@
+<!-- crm.component.html -->
+<div class="crm-wrapper">
+    <div class="crm-content">
+        <!-- Main Title and Navigation -->
+        <div class="main-title">
+            <nav>
+                <a routerLink="/crm/dashboard" routerLinkActive="active-tab">Dashboard</a>
+                <a routerLink="leads" routerLinkActive="active-tab">Leads</a>
+                <a routerLink="follows-up" routerLinkActive="active-tab">Follow ups</a>
+                
+                <!-- Hidden for executives -->
+                <a *ngIf="canViewRestrictedItems()" 
+                   routerLink="sources" 
+                   routerLinkActive="active-tab">Sources</a>
+                
+                <a *ngIf="canViewRestrictedItems()" 
+                   routerLink="life-stage" 
+                   routerLinkActive="active-tab">Life Stage</a>
+                
+                <a *ngIf="canViewRestrictedItems()" 
+                   routerLink="followup-category" 
+                   routerLinkActive="active-tab">Follow Up category</a>
+                
+                <a *ngIf="canViewRestrictedItems()" 
+                   routerLink="crm-settings" 
+                   routerLinkActive="active-tab">Crm Settings</a>
+                
+                <a *ngIf="canViewRestrictedItems()" 
+                   routerLink="sales-call" 
+                   routerLinkActive="active-tab">Sales-call</a>
+                
+                <a routerLink="sales-customers" routerLinkActive="active-tab">Customers</a>
+            </nav>
+        </div>
+    </div>
+    
+    <!-- Router outlet below menu -->
+    <div class="router-outlet-container">
+        <router-outlet></router-outlet>
+    </div>
+</div>

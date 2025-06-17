@@ -1,0 +1,48 @@
+/* sales-targets.component.scss */
+
+// Modal backdrop styling
+.modal-backdrop {
+  opacity: 0.5;
+}
+
+// Custom styling for the rounded pill buttons
+.btn-primary.rounded-pill {
+  background-color: #6200ee;
+  border-color: #6200ee;
+
+  &:hover {
+    background-color: #5000ca;
+    border-color: #5000ca;
+  }
+}
+
+// Add some spacing for form controls
+.form-control {
+  margin-bottom: 0;
+}
+
+// Make sure modals appear over other content
+.modal {
+  z-index: 1050;
+}
+
+.modal-backdrop {
+  z-index: 1040;
+}
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .row {
+    flex-direction: column;
+    
+    .col {
+      margin-bottom: 10px;
+    }
+    
+    .col-auto {
+      margin-top: 10px;
+      justify-content: flex-end;
+      display: flex;
+    }
+  }
+}

@@ -1,0 +1,52 @@
+<button class="add-btn" (click)="openPopup()">Add +</button>
+
+<!-- Popup -->
+<div *ngIf="showPopup" class="popup-overlay">
+  <div class="popup-box">
+    <h2>{{ isEditMode ? 'Edit Department' : 'Add Department' }}</h2>
+    <form [formGroup]="departmentForm" (ngSubmit)="saveDepartment()">
+      <div class="form-group">
+        <label>Department Name *</label>
+        <input formControlName="department" placeholder="Enter department name" />
+      </div>
+
+      <div class="form-group">
+        <label>Department ID</label>
+        <input formControlName="departmentId" readonly />
+      </div>
+
+      <div class="form-group">
+        <label>Description</label>
+        <textarea formControlName="description" rows="3" placeholder="Enter description"></textarea>
+      </div>
+
+      <div class="popup-actions">
+        <button type="submit" class="save-btn">{{ isEditMode ? 'Update' : 'Save' }}</button>
+        <button type="button" class="cancel-btn" (click)="closePopup()">Close</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Table -->
+<table class="styled-table">
+  <thead>
+    <tr>
+      <th>Department</th>
+      <th>Department ID</th>
+      <th>Description</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let dept of departments">
+      <td>{{ dept.department }}</td>
+      <td>{{ dept.departmentId }}</td>
+      <td>{{ dept.description }}</td>
+      <td>
+        <button class="edit-btn" (click)="editDepartment(dept)">Edit</button>
+        <button class="delete-btn" (click)="deleteDepartment(dept.id)">Delete</button>
+      </td>
+    </tr>
+  </tbody>
+</table>

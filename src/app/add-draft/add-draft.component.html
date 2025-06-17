@@ -1,0 +1,251 @@
+<!-- add-draft.component.html -->
+<h2>Add Draft</h2>
+
+<form [formGroup]="draftForm" (ngSubmit)="onSubmit()" class="p-4 border rounded shadow-sm bg-light" style="border-color: #e1eaea !important;">
+  <!-- Container 1: Customer Information -->
+  <div class="border p-3 mb-4 rounded bg-white" style="border-color: #e1eaea !important;">
+    <h4>Select types of service</h4>
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="form-group mb-3">
+          <label for="customer" class="form-label">Customer*:</label>
+          <select id="customer" formControlName="customer" class="form-control" required>
+            <option value="">Select a customer</option>
+            <option *ngFor="let customer of customers" [value]="customer.id">
+              {{ customer.businessName || (customer.firstName + ' ' + (customer.middleName ? customer.middleName + ' ' : '') + customer.lastName) }}
+            </option>
+          </select>
+          <div *ngIf="draftForm.get('customer')?.invalid && draftForm.get('customer')?.touched" class="text-danger">
+            Customer is required
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Billing Address:</label>
+          <input type="text" formControlName="billingAddress" class="form-control" readonly>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label">Shipping Address:</label>
+          <input type="text" formControlName="shippingAddress" class="form-control" readonly>
+        </div>
+        
+        <div class="mb-3">
+          <label for="payTerm" class="form-label">Pay Term:</label>
+          <select id="payTerm" formControlName="payTerm" class="form-select">
+            <option value="">Please Select</option>
+            <option value="7">7 Days</option>
+            <option value="15">15 Days</option>
+            <option value="30">30 Days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Container 2: Order Information -->
+  <div class="border p-3 mb-4 rounded bg-white" style="border-color: #e1eaea !important;">
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="saleDate" class="form-label">Sale Date*:</label>
+        <input type="date" id="saleDate" formControlName="saleDate" class="form-control" required>
+      </div>
+      
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Invoice scheme:</label>
+        <select formControlName="invoiceScheme" class="form-select">
+          <option value="default">Default</option>
+        </select>
+        
+        <label for="invoiceNo" class="form-label mt-2">Invoice No.:</label>
+        <input type="text" id="invoiceNo" formControlName="invoiceNo" placeholder="Keep blank to auto generate" class="form-control">
+      </div>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label">Attach Document:</label>
+      <input type="file" class="form-control" (change)="onFileSelected($event)">
+      <small class="form-text text-muted">Max File size: 5MB, Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+    </div>
+  </div>
+
+  <!-- Container 3: Product Information -->
+  <div class="border p-3 mb-4 rounded bg-white" style="border-color: #e1eaea !important;">
+    <h4>Product</h4>
+    
+    <div class="table-responsive">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Discount</th>
+            <th>Subtotal</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody formArrayName="products">
+          <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
+            <td>
+              <input type="text" class="form-control" placeholder="Product Name" 
+                    [(ngModel)]="defaultProduct.name" [ngModelOptions]="{standalone: true}"
+                    (input)="updateDefaultProduct()"
+                    list="productList">
+              <datalist id="productList">
+                <option *ngFor="let product of allProducts" [value]="product.productName" 
+                        (click)="onProductSelect(product)">
+                  {{product.productName}} (Stock: {{product.currentStock || 0}})
+                </option>
+              </datalist>
+            </td>
+            <td>
+              <input type="number" formControlName="quantity" class="form-control" 
+                     (change)="calculateSubtotal(i)" min="0" step="1" required>
+            </td>
+            <td>
+              <input type="number" formControlName="unitPrice" class="form-control" 
+                     (change)="calculateSubtotal(i)" min="0" step="0.01" required>
+            </td>
+            <td>
+              <input type="number" formControlName="discount" class="form-control" 
+                     (change)="calculateSubtotal(i)" min="0" step="0.01" value="0">
+            </td>
+            <td>
+              <input type="number" formControlName="subtotal" class="form-control" readonly>
+            </td>
+            <td>
+              <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)" *ngIf="i > 0">
+                Remove
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="row mt-3">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label">Discount Type:*</label>
+          <select formControlName="discountType" class="form-select">
+            <option value="percentage">Percentage</option>
+            <option value="fixed">Fixed Amount</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label">Discount Amount:*</label>
+          <input type="number" formControlName="discountAmount" class="form-control" value="0.00">
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label">Order Tax:*</label>
+          <select formControlName="orderTax" class="form-select">
+            <option value="0">None</option>
+            <option value="5">5%</option>
+            <option value="10">10%</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label">Sell note:</label>
+          <textarea formControlName="sellNote" class="form-control" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    
+    <button type="button" class="btn btn-primary btn-sm mt-2" (click)="addProduct()">
+      + Add Product
+    </button>
+  </div>
+
+  <!-- Container 4: Shipping Details -->
+  <div class="border p-3 mb-4 rounded bg-white" style="border-color: #e1eaea !important;">
+    <h4>Shipping Details</h4>
+    
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Shipping Status:</label>
+        <select formControlName="shippingStatus" class="form-select">
+          <option value="">Please Select</option>
+          <option value="pending">Pending</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+        </select>
+      </div>
+      
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Shipping Charges:</label>
+        <input type="number" formControlName="shippingCharges" class="form-control" value="0.00">
+      </div>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label">Shipping Address:</label>
+      <textarea formControlName="shippingAddressDetails" class="form-control" rows="2"></textarea>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Delivered To:</label>
+        <input type="text" formControlName="deliveredTo" class="form-control">
+      </div>
+      
+      <div class="col-md-6 mb-3">
+        <label class="form-label">Delivery Person:</label>
+        <select formControlName="deliveryPerson" class="form-select">
+          <option value="">Please Select</option>
+          <option *ngFor="let person of deliveryPersons" [value]="person.id">{{ person.name }}</option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="mb-3">
+      <label class="form-label">Shipping Documents:</label>
+      <input type="file" class="form-control" (change)="onShippingDocSelected($event)">
+      <small class="form-text text-muted">Max File size: 5MB, Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+    </div>
+    
+    <button type="button" class="btn btn-link p-0 mb-2" (click)="toggleAdditionalExpenses()">
+      + Add additional expenses
+    </button>
+    
+    <div *ngIf="showAdditionalExpenses" class="border p-3 rounded">
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Expense Name:</label>
+          <input type="text" formControlName="expenseName" class="form-control">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">Amount:</label>
+          <input type="number" formControlName="expenseAmount" class="form-control">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Total Payable -->
+  <div class="my-4 p-3 border rounded bg-white" style="border-color: #e1eaea !important;">
+    <h3 class="text-center">Total Payable: <span class="text-success">{{ totalPayable | currency }}</span></h3>
+  </div>
+
+  <!-- Submit Buttons -->
+  <div class="text-center">
+    <button type="submit" [disabled]="draftForm.invalid" class="btn btn-primary me-2">
+      Save
+    </button>
+    <button type="button" [disabled]="draftForm.invalid" class="btn btn-success" (click)="saveAndPrint()">
+      Save and print
+    </button>
+  </div>
+</form>

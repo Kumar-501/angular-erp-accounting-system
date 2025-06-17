@@ -1,0 +1,154 @@
+<div class="container-fluid py-3">
+  <div class="card">
+    <div class="card-header bg-light">
+      <h4 class="mb-0">Payroll Management</h4>
+    </div>
+    <div class="card-body">
+      <div class="tabs-container">
+        <ul class="pill-nav">
+          <li [class.active]="activeTab === 'payrolls'" (click)="activeTab = 'payrolls'">
+            <i class="fas fa-database"></i> All Payrolls
+          </li>
+          <li [class.active]="activeTab === 'groups'" (click)="activeTab = 'groups'">
+            <i class="fas fa-layer-group"></i> All Payroll Groups
+          </li>
+        </ul>
+
+        <!-- Add Button visible only on Payrolls Tab -->
+        <div *ngIf="activeTab === 'payrolls'" class="d-flex justify-content-between align-items-center my-3">
+          <h5>All Payrolls</h5>
+          <div class="btn-group">
+            <button class="btn btn-primary" (click)="openAddPayrollModal(addModal)">+ Add Simple</button>
+            <button class="btn btn-success ms-2" (click)="goToAddDetailedPayroll()">+ Add Detailed</button>
+          </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+          <div *ngIf="activeTab === 'payrolls'">
+            <div *ngIf="payrolls.length > 0; else noPayrolls">
+              <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                  <thead class="table-light">
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Location</th>
+                      <th>Status</th>
+                      <th>Month/Year</th>
+                      <th>Employees</th>
+                      <th>Total Amount</th>
+                      <th>Created At</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let payroll of payrolls; let i = index">
+                      <td>{{ i + 1 }}</td>
+                      <td>{{ payroll.name }}</td>
+                      <td>{{ payroll.location }}</td>
+                      <td>
+                        <span [class.badge]="true" 
+                              [class.badge-success]="payroll.status === 'Final'"
+                              [class.badge-warning]="payroll.status === 'Draft'">
+                          {{ payroll.status }}
+                        </span>
+                      </td>
+                      <td>{{ payroll.monthYear | date:'MMM yyyy' }}</td>
+                      <td>
+                        <span *ngIf="payroll.employeeDetails && payroll.employeeDetails.length > 0" 
+                              [title]="getFormattedEmployeeNames(payroll.employeeDetails)">
+                          {{ getFormattedEmployeeNames(payroll.employeeDetails) | truncate:20 }}
+                          <small class="d-block text-muted">({{ payroll.employeeDetails.length }})</small>
+                        </span>
+                        <span *ngIf="!payroll.employeeDetails || payroll.employeeDetails.length === 0">
+                          No employees
+                        </span>
+                      </td>
+                      <td>${{ payroll.totalGross | number:'1.2-2' }}</td>
+                      <td>{{ payroll.createdAt?.toDate() | date:'mediumDate' }}</td>
+                      <td>
+                        <button class="btn btn-sm btn-warning me-2" 
+                                (click)="openEditPayrollModal(addModal, payroll)">
+                          Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" 
+                                (click)="deletePayroll(payroll.id)"
+                                [disabled]="payroll.status === 'Final'">
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <ng-template #noPayrolls>
+              <div class="alert alert-info">
+                No payrolls found. Click "Add Payroll" to create one.
+              </div>
+            </ng-template>
+          </div>
+
+          <div *ngIf="activeTab === 'groups'">
+            <p>Content for All Payroll Groups</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<ng-template #addModal let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">{{ isEditing ? 'Edit' : 'Add' }} Payroll</h5>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  </div>
+  <div class="modal-body">
+    <form #payrollForm="ngForm">
+      <div class="mb-3">
+        <label for="location" class="form-label"><strong>Location:*</strong></label>
+        <select class="form-select" [(ngModel)]="payrollData.location" name="location" required>
+          <option value="">Select Location</option>
+          <option *ngFor="let loc of locations" [value]="loc.name">{{ loc.name }}</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label for="monthYear" class="form-label"><strong>Month/Year:*</strong></label>
+        <input type="month" class="form-control" [(ngModel)]="payrollData.monthYear" name="monthYear" required>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label"><strong>Select Employee:</strong></label>
+        <select class="form-select" [(ngModel)]="payrollData.selectedEmployeeId" name="employee">
+          <option value="">-- Select Employee --</option>
+          <option *ngFor="let user of users" [value]="user.id">{{ user.username || user.name }}</option>
+        </select>
+      </div>
+
+      <div *ngIf="isEditing && payrollData.employees?.length > 0" class="mb-3">
+        <label class="form-label"><strong>Current Employees:</strong></label>
+        <div class="form-control" style="min-height: 60px; max-height: 120px; overflow-y: auto;">
+          <div *ngFor="let empId of payrollData.employees" class="d-flex justify-content-between align-items-center mb-1">
+            <span>{{ getEmployeeName(empId) }}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeEmployee(empId)">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-info" *ngIf="payrollData.selectedEmployeeId">
+        <i class="fas fa-info-circle"></i> Proceeding will take you to the detailed payroll form with this employee pre-selected.
+      </div>
+    </form>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-primary" (click)="submitPayroll()" [disabled]="!payrollForm.valid">
+      {{ isEditing ? 'Update' : 'Proceed' }}
+    </button>
+    <button class="btn btn-secondary" (click)="modal.close('Close click')">Close</button>
+  </div>
+</ng-template>

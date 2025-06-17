@@ -1,0 +1,194 @@
+<div class="variations-container">
+  <div class="header">
+    <h1>Variations</h1>
+    <p class="subtitle">Manage product variations</p>
+  </div>
+
+  <!-- Alert Messages -->
+  <div *ngIf="errorMessage" class="alert alert-danger">
+    {{ errorMessage }}
+    <button type="button" class="close-btn" (click)="dismissAlert()" aria-label="Close alert">×</button>
+  </div>
+
+  <div *ngIf="successMessage" class="alert alert-success">
+    {{ successMessage }}
+    <button type="button" class="close-btn" (click)="dismissAlert()" aria-label="Close alert">×</button>
+  </div>
+  <!-- Add/Edit Variation Form Modal -->
+  <div *ngIf="showAddForm" class="modal-overlay">
+    <div class="modal-content">
+      <div class="add-form">
+        <h3>{{ isEditing ? 'Edit Variation' : 'Add Variation' }}</h3>
+        <div class="form-group">
+          <div class="form-field">
+            <label for="variationName">Variation Name<span class="required">*</span></label>
+            <input
+              type="text"
+              id="variationName"
+              [(ngModel)]="newVariation.name"
+              placeholder="Enter variation name"
+              [disabled]="isLoading"
+              class="form-control"
+              required
+            >
+          </div>
+          <div class="form-field">
+            <label for="variationValues">Variation Values<span class="required">*</span></label>
+            <input
+              type="text"
+              id="variationValues"
+              [(ngModel)]="newVariation.values"
+              placeholder="Enter values separated by commas"
+              [disabled]="isLoading"
+              class="form-control"
+              required
+            >
+          </div>
+          <div class="form-actions">
+            <button
+              class="btn btn-cancel"
+              (click)="toggleAddForm()"
+              [disabled]="isLoading"
+            >
+              Close
+            </button>
+            <button
+              class="btn btn-save"
+              (click)="saveVariation()"
+              [disabled]="!newVariation.name || !newVariation.values || isLoading"
+            >
+              <span *ngIf="!isLoading">Save</span>
+              <span *ngIf="isLoading">Saving...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>All variations</h2>
+      <div class="card-tools">
+        <button class="btn btn-primary add-btn" (click)="toggleAddForm()" aria-label="Add new variation">
+          <span class="icon">+</span> Add
+        </button>
+      </div>
+    </div>
+    
+    <div class="card-body">
+      <div class="table-controls">
+        <div class="entries-selector">
+          <label for="itemsPerPage" class="sr-only">Items per page</label>
+         
+        </div>
+        
+        <div class="export-controls">
+          <button class="btn-export" (click)="exportCSV()">
+            <i class="fa fa-file-csv"></i> Export CSV
+          </button>
+          <button class="btn-export" (click)="exportExcel()">
+            <i class="fa fa-file-excel"></i> Export Excel
+          </button>
+          <button class="btn-export" (click)="exportPDF()">
+            <i class="fa fa-file-pdf"></i> Export PDF
+          </button>
+        </div>
+        
+        <div class="search-box">
+          <label for="searchInput" class="sr-only">Search variations</label>
+          <input 
+          type="text" 
+          id="searchInput"
+          [(ngModel)]="searchQuery"
+          (input)="applySearch(searchQuery)"
+          placeholder="Search..." 
+          class="form-control"
+          [disabled]="isLoading"
+        >
+        </div>
+      </div>
+
+      <!-- Loading Indicator -->
+      <div *ngIf="isLoading" class="loading-container" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading variations...</p>
+      </div>
+
+      <!-- Variations Table -->
+      <div class="table-responsive" *ngIf="!isLoading">
+        <table class="table" aria-describedby="tableDescription">
+          <caption id="tableDescription" class="sr-only">List of product variations with their values</caption>
+          <thead>
+            <tr>
+              <th (click)="sortBy('name')" class="sortable-header">
+                Variations
+                <span class="sort-icon" [class.asc]="sortColumn === 'name' && sortDirection === 'asc'"
+                                  [class.desc]="sortColumn === 'name' && sortDirection === 'desc'">
+                  ↕
+                </span>
+              </th>
+              <th>Values</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="paginatedVariations.length === 0">
+              <td colspan="3" class="text-center">No variations found</td>
+            </tr>
+            <tr *ngFor="let variation of paginatedVariations">
+              <td>{{ variation.name }}</td>
+              <td>
+                <span *ngIf="variation.values.length > 0; else noValues">
+                  {{ variation.values.join(', ') }}
+                </span>
+                <ng-template #noValues>No values</ng-template>
+              </td>
+              <td class="actions">
+                <button (click)="editVariation(variation)" class="btn btn-edit" [disabled]="isLoading" aria-label="Edit variation">
+                  <i class="fas fa-pencil-alt"></i> Edit
+                </button>
+                <button (click)="deleteVariation(variation.id)" class="btn btn-delete" [disabled]="isLoading" aria-label="Delete variation">
+                  <i class="fas fa-trash-alt"></i> Delete
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-footer" *ngIf="totalItems > 0">
+        <div class="entries-info" aria-live="polite">
+          Showing {{ (currentPage - 1) * itemsPerPage + 1 }} 
+          to {{ math.min(currentPage * itemsPerPage, totalItems) }}
+          of {{ totalItems }} entries
+        </div>
+        <div class="pagination">
+          <button class="btn btn-sm btn-outline-secondary" 
+                  (click)="prevPage()" 
+                  [disabled]="currentPage === 1 || isLoading"
+                  aria-label="Previous page">
+            Previous
+          </button>
+          
+          <button *ngFor="let page of getPageNumbers()" 
+                  class="btn btn-sm btn-outline-secondary" 
+                  [class.active]="currentPage === page"
+                  (click)="setPage(page)"
+                  [disabled]="isLoading"
+                  [attr.aria-label]="'Page ' + page"
+                  [attr.aria-current]="currentPage === page ? 'page' : null">
+            {{ page }}
+          </button>
+          
+          <button class="btn btn-sm btn-outline-secondary" 
+                  (click)="nextPage()" 
+                  [disabled]="currentPage === totalPages || isLoading"
+                  aria-label="Next page">
+            Next
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>

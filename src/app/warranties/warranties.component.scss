@@ -1,0 +1,471 @@
+/* warranties.component.scss */
+.container {
+  padding: 25px;
+  font-family: Arial, sans-serif;
+
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #333;
+  margin-top: 3%;
+}
+
+.btn {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  
+  &-primary {
+    background-color: #4CAF50;
+    color: white;
+    
+ 
+  }
+  
+  &-save {
+    background-color: #051ce7;
+    color: white;
+    margin-right: 30px;
+    margin-left: -10%;
+    width: 15%;
+    border-radius: 15px;
+    height: 7vh;
+
+  }
+  
+  &-close {
+    background-color: black;
+    color: white;
+    margin-right: 5%;
+    width: 8%;
+    height: 5vh;
+    border-radius: 15px;
+    
+  
+  }
+  
+  &-edit {
+    background-color: #f5f4f8;
+    color: rgb(24, 9, 236);
+    border-radius: 15px;
+    
+    &:hover {
+      background-color: #beb4f8;
+    }
+  }
+  
+  &-delete {
+    background-color: #fdfaf9;
+    color: rgb(197, 18, 18);
+    border-radius: 15px;
+    
+    &:hover {
+      background-color: #f1c3bf;
+    }
+  }
+}
+
+.modal {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  padding: 20px;
+  border-radius: 5px;
+  width: 580px;
+  
+  h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+  }
+}
+
+.form-group {
+  margin-bottom: 15px;
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: normal;
+  }
+  
+  input, textarea, select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    
+    &::placeholder {
+      color: #999;
+    }
+  }
+  
+  textarea {
+    height: 80px;
+    resize: vertical;
+  }
+}
+
+.duration-container {
+  display: flex;
+  gap: 10px;
+  
+  input {
+    flex: 1;
+    min-width: 60px;
+  }
+  
+  select {
+    flex: 2;
+    min-width: 120px;
+  }
+}
+
+.divider {
+  border-top: 1px solid #eee;
+  margin: 15px 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.footer {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  
+  .no-data {
+    text-align: center;
+    color: #777;
+    padding: 20px;
+  }
+  
+  .actions {
+    display: flex;
+    gap: 5px;
+  }
+}/* warranties.component.scss */
+.container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.all-warranties {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 55px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.all-warranties h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.left-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.left-controls select {
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.search-container input {
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 0px;
+  width: 90%;
+  margin-left: 5%;
+  margin-top: -50%;
+}
+
+.btn {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  
+  &-primary {
+    background: linear-gradient(135deg, #4054b2 0%, #768ef8 50%);
+    color: white;
+    
+    &:hover {
+      background-color: #324191;
+    }
+  }
+  
+  &-export {
+    background-color: #fff;
+    color: #333;
+    border: 1px solid #ddd;
+    
+    &:hover {
+      background-color: #f5f5f5;
+    }
+  }
+  
+  &-pagination {
+    background-color: #fff;
+    color: #333;
+    border: 1px solid #ddd;
+    
+    &:hover:not([disabled]) {
+      background-color: #f5f5f5;
+    }
+    
+    &[disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+  
+  &-save {
+    background-color: #051ce7;
+    color: white;
+    margin-right: 30px;
+    margin-left: -10%;
+    width: 15%;
+    border-radius: 15px;
+    height: 7vh;
+  }
+  
+  &-close {
+    background-color: black;
+    color: white;
+    margin-right: 5%;
+    width: 8%;
+    height: 5vh;
+    border-radius: 15px;
+  }
+  
+  &-edit {
+    background-color: #f5f4f8;
+    color: rgb(24, 9, 236);
+    border-radius: 15px;
+    
+    &:hover {
+      background-color: #beb4f8;
+    }
+  }
+  
+  &-delete {
+    background-color: #fdfaf9;
+    color: rgb(197, 18, 18);
+    border-radius: 15px;
+    
+    &:hover {
+      background-color: #f1c3bf;
+    }
+  }
+}
+
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 50px;
+  padding: 15px 25px;
+ margin-left: -480%;
+ margin-top: -45%;
+ margin-left: 48%;
+ 
+}
+
+.modal {
+  position: fixed;
+  z-index: 1;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: #fefefe;
+  padding: 25px;
+  border-radius: 5px;
+  width: 580px;
+  
+  h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    margin-top: 5%;
+  }
+}
+
+.form-group {
+  margin-bottom: 15px;
+  
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: normal;
+  }
+  
+  input, textarea, select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    
+    &::placeholder {
+      color: #999;
+    }
+  }
+  
+  textarea {
+    height: 80px;
+    resize: vertical;
+  }
+}
+
+.duration-container {
+  display: flex;
+  gap: 10px;
+  
+  input {
+    flex: 1;
+    min-width: 60px;
+  }
+  
+  select {
+    flex: 2;
+    min-width: 120px;
+  }
+}
+
+.divider {
+  border-top: 1px solid #eee;
+  margin: 15px 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.footer {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  
+  th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    cursor: pointer;
+    
+    i {
+      margin-left: 5px;
+      font-size: 12px;
+    }
+  }
+  
+  .no-data {
+    text-align: center;
+    color: #777;
+    padding: 20px;
+  }
+  
+  .actions {
+    display: flex;
+    gap: 5px;
+  }
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 10px;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.showing-entries {
+  color: #666;
+  font-size:14px;
+}

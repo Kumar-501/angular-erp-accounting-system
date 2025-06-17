@@ -1,0 +1,162 @@
+<div class="suppliers-report-container">
+  <div class="report-header">
+    <h2>Suppliers Report</h2>
+    <div class="report-actions">
+      <button class="btn-export" (click)="exportCSV()">
+        <i class="fa fa-file-csv"></i> Export CSV
+      </button>
+      <button class="btn-export" (click)="exportExcel()">
+        <i class="fa fa-file-excel"></i> Export Excel
+      </button>
+  
+    </div>
+  </div>
+
+  <!-- Filters Section -->
+  <div class="filter-section">
+    <button class="btn-filter" (click)="toggleFilters()">
+      <i class="fa fa-filter"></i> Filters
+    </button>
+
+    <div class="filters-panel" [class.show]="isFilterVisible">
+      
+
+      <div class="filter-group">
+        <label>Status:</label>
+        <select [(ngModel)]="filterOptions.status" (change)="applyFilters()">
+          <option value="">All Status</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Assigned To:</label>
+        <select [(ngModel)]="filterOptions.assignedTo" (change)="applyFilters()">
+          <option value="">All Users</option>
+          <option *ngFor="let user of assignedUsers" [value]="user.id">{{user.username}}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>State:</label>
+        <select [(ngModel)]="filterOptions.state" (change)="onStateChange()">
+          <option value="">All States</option>
+          <option *ngFor="let state of statesList" [value]="state">{{state}}</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>District:</label>
+        <select [(ngModel)]="filterOptions.district" (change)="applyFilters()" [disabled]="!filterOptions.state">
+          <option value="">All Districts</option>
+          <option *ngFor="let district of filteredDistricts" [value]="district">{{district}}</option>
+        </select>
+      </div>
+
+      <div class="filter-group checkbox-group">
+        <label>Balance Filters:</label>
+        <div class="checkbox-item">
+          <input type="checkbox" id="purchaseDue" [(ngModel)]="filterOptions.purchaseDue" (change)="applyFilters()">
+          <label for="purchaseDue">Purchase Due</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="advanceBalance" [(ngModel)]="filterOptions.advanceBalance" (change)="applyFilters()">
+          <label for="advanceBalance">Advance Balance</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="openingBalance" [(ngModel)]="filterOptions.openingBalance" (change)="applyFilters()">
+          <label for="openingBalance">Opening Balance</label>
+        </div>
+      </div>
+
+      <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
+    </div>
+  </div>
+
+  <!-- Search and Pagination Controls -->
+  <div class="controls-row">
+    <div class="entries-control">
+      Show 
+      <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select> 
+      entries
+    </div>
+
+    <div class="search-control">
+      <input type="text" [(ngModel)]="searchTerm" placeholder="Search..." (keyup)="applyFilters()">
+      <i class="fa fa-search"></i>
+    </div>
+  </div>
+
+  <!-- Report Table -->
+  <div class="table-responsive">
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th (click)="sortBy('contactId')">Contact ID</th>
+          <th (click)="sortBy('businessName')">Name</th>
+          <th (click)="sortBy('mobile')">Mobile</th>
+          <th (click)="sortBy('email')">Email</th>
+          <th (click)="sortBy('status')">Status</th>
+          <th (click)="sortBy('openingBalance')">Opening Bal</th>
+          <th (click)="sortBy('purchaseDue')">Due</th>
+          <th (click)="sortBy('advanceBalance')">Advance</th>
+          <th (click)="sortBy('state')">State</th>
+          <th (click)="sortBy('district')">District</th>
+          <th (click)="sortBy('assignedTo')">Assigned To</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let supplier of paginatedSuppliers">
+          <td>{{ supplier.contactId }}</td>
+          <td>
+            {{ supplier.isIndividual ? 
+              (supplier.firstName + ' ' + (supplier.lastName || '')) : 
+              supplier.businessName }}
+          </td>
+          <td>{{ supplier.mobile }}</td>
+          <td>{{ supplier.email }}</td>
+          <td>
+            <span class="status-badge" [class.active]="supplier.status === 'Active'">
+              {{ supplier.status || 'Inactive' }}
+            </span>
+          </td>
+          <td class="text-right">{{ supplier.openingBalance | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td class="text-right">{{ supplier.purchaseDue | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td class="text-right">{{ supplier.advanceBalance | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td>{{ supplier.state }}</td>
+          <td>{{ supplier.district }}</td>
+          <td>{{ getAssignedUserName(supplier.assignedTo || '') }}</td>
+        </tr>
+        <tr *ngIf="paginatedSuppliers.length === 0">
+          <td colspan="11" class="no-data">No suppliers found matching your criteria</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" class="text-right">Totals:</td>
+          <td class="text-right">{{ getTotal('openingBalance') | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td class="text-right">{{ getTotal('purchaseDue') | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td class="text-right">{{ getTotal('advanceBalance') | currency:'INR':'symbol':'1.2-2' }}</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-controls">
+    <button class="btn-pagination" [disabled]="currentPage <= 1" (click)="prevPage()">
+      <i class="fa fa-chevron-left"></i> Previous
+    </button>
+    <span>Page {{ currentPage }} of {{ totalPages }}</span>
+    <button class="btn-pagination" [disabled]="currentPage >= totalPages" (click)="nextPage()">
+      Next <i class="fa fa-chevron-right"></i>
+    </button>
+  </div>
+</div>

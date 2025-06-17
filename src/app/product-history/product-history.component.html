@@ -1,0 +1,173 @@
+<div class="container-fluid py-4">
+  <div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+      <h3 class="mb-0">
+        <i class="fas fa-history me-2"></i>
+        Product History - {{product?.productName || 'Loading...'}}
+      </h3>
+    </div>
+
+    <div class="card-body">
+      <!-- Enhanced Product Summary -->
+      <div class="row mb-4" *ngIf="product">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="card-title text-muted">Product Information</h6>
+              <p class="card-text"><strong>Name:</strong> {{product.productName || '-'}}</p>
+              <p class="card-text"><strong>SKU:</strong> {{product.sku || '-'}}</p>
+              <p class="card-text"><strong>HSN:</strong> {{product.hsnCode || '-'}}</p>
+              <p class="card-text"><strong>Type:</strong> {{product.productType || '-'}}</p>
+              <p class="card-text"><strong>Status:</strong> 
+                <span class="badge" [ngClass]="{'bg-success': product.isActive, 'bg-danger': !product.isActive}">
+                  {{product.status}}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="card-title text-muted">Stock & Location</h6>
+              <p class="card-text"><strong>Current Stock:</strong> {{product.currentStock || '0'}} {{product.unit}}</p>
+              <p class="card-text"><strong>Alert Quantity:</strong> {{product.alertQuantity || '-'}}</p>
+              <p class="card-text"><strong>Location:</strong> {{product.locationName || '-'}}</p>
+              <p class="card-text"><strong>Manage Stock:</strong> {{product.manageStock ? 'Yes' : 'No'}}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h6 class="card-title text-muted">Pricing</h6>
+              <p class="card-text"><strong>Purchase Price:</strong> 
+                ₹{{ getPrice(product.unitPurchasePrice, product.defaultPurchasePriceExcTax) | number:'1.2-2' }}
+              </p>
+              <p class="card-text"><strong>Selling Price:</strong> 
+                ₹{{ getPrice(product.unitSellingPrice, product.defaultSellingPriceExcTax) | number:'1.2-2' }}
+              </p>
+              <p class="card-text"><strong>Tax:</strong> {{product.taxPercentage || '0'}}%</p>
+              <p class="card-text"><strong>Margin:</strong> {{product.marginPercentage || '0'}}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Additional Product Details -->
+      <div class="row mb-4" *ngIf="product">
+        <div class="col-12">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <h6 class="card-title text-muted">Additional Details</h6>
+              <div class="row">
+                <div class="col-md-3">
+                  <p><strong>Brand:</strong> {{product.brand || '-'}}</p>
+                  <p><strong>Category:</strong> {{product.category || '-'}}</p>
+                  <p><strong>Sub-Category:</strong> {{product.subCategory || '-'}}</p>
+                </div>
+                <div class="col-md-3">
+                  <p><strong>Created:</strong> {{formatDate(product.createdAt) || '-'}}</p>
+                  <p><strong>Last Updated:</strong> {{formatDate(product.updatedAt) || '-'}}</p>
+                </div>
+                <div class="col-md-6">
+                  <p><strong>Description:</strong> {{product.productDescription || '-'}}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Timeline -->
+      <div class="timeline" *ngIf="historyEntries && historyEntries.length > 0">
+        <div class="timeline-item" *ngFor="let entry of historyEntries">
+          <div class="timeline-badge" [ngClass]="entry.badgeClass">
+            <i [class]="entry.icon"></i>
+          </div>
+          <div class="timeline-panel">
+            <div class="timeline-heading">
+              <h5 class="timeline-title">{{entry.actionLabel}}</h5>
+              <p class="text-muted small">
+                <i class="fas fa-clock me-1"></i>
+                {{entry.formattedDate}}
+                <span *ngIf="entry.user"> by {{entry.user}}</span>
+              </p>
+            </div>
+            <div class="timeline-body">
+              <div *ngIf="entry.oldValue || entry.newValue" class="mb-2">
+                <div *ngIf="entry.oldValue" class="change-detail">
+                  <span class="change-label">From:</span>
+                  <span class="old-value">{{entry.oldValue}}</span>
+                </div>
+                <div *ngIf="entry.newValue" class="change-detail">
+                  <span class="change-label">To:</span>
+                  <span class="new-value">{{entry.newValue}}</span>
+                </div>
+              </div>
+              <div *ngIf="entry.note" class="note">
+                <strong>Note:</strong> {{entry.note}}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="historyEntries && historyEntries.length === 0" class="text-center py-4">
+        <i class="fas fa-info-circle fa-2x text-muted mb-3"></i>
+        <p class="text-muted">No history entries found for this product</p>
+      </div>
+
+      <div *ngIf="isLoading" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- In product-history.component.html -->
+<div class="timeline" *ngIf="combinedHistory && combinedHistory.length > 0">
+  <div class="timeline-item" *ngFor="let entry of combinedHistory">
+    <div class="timeline-badge" [ngClass]="entry.badgeClass">
+      <i [class]="entry.icon"></i>
+    </div>
+    <div class="timeline-panel">
+      <div class="timeline-heading">
+        <h5 class="timeline-title">{{entry.actionLabel}}</h5>
+        <p class="text-muted small">
+          <i class="fas fa-clock me-1"></i>
+          {{entry.formattedDate}}
+          <span *ngIf="entry.by"> by {{entry.by}}</span>
+        </p>
+      </div>
+      <div class="timeline-body">
+        <!-- Display different details based on entry type -->
+        <div *ngIf="entry.action === 'purchase_order'" class="purchase-order-details">
+          <p><strong>Reference:</strong> {{entry.referenceNo}}</p>
+          <p><strong>Supplier:</strong> {{entry.supplier}}</p>
+          <p><strong>Quantity:</strong> {{entry.quantity}}</p>
+          <p><strong>Status:</strong> {{entry.status}}</p>
+        </div>
+        
+        <div *ngIf="entry.action !== 'purchase_order'">
+          <!-- Existing history entry display -->
+          <div *ngIf="entry.oldValue || entry.newValue" class="mb-2">
+            <div *ngIf="entry.oldValue" class="change-detail">
+              <span class="change-label">From:</span>
+              <span class="old-value">{{entry.oldValue}}</span>
+            </div>
+            <div *ngIf="entry.newValue" class="change-detail">
+              <span class="change-label">To:</span>
+              <span class="new-value">{{entry.newValue}}</span>
+            </div>
+          </div>
+          <div *ngIf="entry.note" class="note">
+            <strong>Note:</strong> {{entry.note}}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

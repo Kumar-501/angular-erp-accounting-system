@@ -1,0 +1,221 @@
+<div class="import-container">
+    <h1>Import Sales</h1>
+  
+  
+  
+    <!-- File Upload Section -->
+    <div class="import-card" *ngIf="!showManualEntry">
+      <h2>File To Import:</h2>
+      <div class="import-section">
+        <div class="file-input-container">
+          <label class="file-label" for="file">
+            <span class="file-button">Choose File</span>
+            <span class="file-name">{{ selectedFile?.name || 'No file chosen' }}</span>
+          </label>
+          <input type="file" id="file" class="file-input" (change)="onFileSelect($event)" accept=".xlsx,.xls,.csv">
+        </div>
+        <button class="submit-btn" (click)="onSubmit()">Upload and review</button>
+        <button class="download-btn" (click)="downloadTemplate()">
+          <span class="material-icons">download</span> Download template file
+        </button>
+      </div>
+    </div>
+  
+    <!-- Manual Entry Section -->
+    <div class="manual-entry-card" *ngIf="showManualEntry">
+      <h2>Manual Data Entry</h2>
+      
+      <div class="form-group">
+        <label>Invoice No. *</label>
+        <input type="text" [(ngModel)]="manualData.invoiceNo" required>
+      </div>
+      
+      <div class="form-group">
+        <label>Customer Name *</label>
+        <input type="text" [(ngModel)]="manualData.customerName" required>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>Customer Phone</label>
+          <input type="text" [(ngModel)]="manualData.phone">
+        </div>
+        <div class="form-group">
+          <label>Customer Email</label>
+          <input type="email" [(ngModel)]="manualData.email">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Sale Date (Y-m-d H:i:s) *</label>
+        <input type="datetime-local" [(ngModel)]="manualData.saleDate" required>
+      </div>
+      
+      <h3>Products</h3>
+      <div class="product-list" *ngFor="let product of manualData.products; let i = index">
+        <div class="product-header">
+          <h4>Product #{{i + 1}}</h4>
+          <button *ngIf="manualData.products.length > 1" (click)="removeProduct(i)" class="remove-btn">
+            Remove
+          </button>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Product Name</label>
+            <input type="text" [(ngModel)]="product.productName">
+          </div>
+          <div class="form-group">
+            <label>Product SKU</label>
+            <input type="text" [(ngModel)]="product.sku">
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Quantity *</label>
+            <input type="number" [(ngModel)]="product.quantity" required>
+          </div>
+          <div class="form-group">
+            <label>Unit</label>
+            <select [(ngModel)]="product.unit">
+              <option value="pcs">Pieces</option>
+              <option value="kg">Kilograms</option>
+              <option value="l">Liters</option>
+              <option value="m">Meters</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Unit Price *</label>
+            <input type="number" [(ngModel)]="product.unitPrice" required>
+          </div>
+          <div class="form-group">
+            <label>Tax</label>
+            <input type="number" [(ngModel)]="product.tax">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Description</label>
+          <textarea [(ngModel)]="product.description"></textarea>
+        </div>
+      </div>
+      
+      <button (click)="addProduct()" class="add-product-btn">Add Another Product</button>
+      <button (click)="onSubmit()" class="submit-btn">Submit Data</button>
+    </div>
+  
+    <div class="instructions-card">
+        <h2>Instructions</h2>
+        <ol class="instruction-list">
+          <li>Upload sales data in excel format</li>
+          <li>Choose business location and column by which sell lines will be grouped</li>
+          <li>Choose respective sales fields for each column</li>
+        </ol>
+        
+        <table class="fields-table">
+          <thead>
+            <tr>
+              <th>Importable fields</th>
+              <th>Instructions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="field-name">Invoice No.</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Customer name</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Customer Phone number</td>
+              <td class="instruction-text">Either customer email id or phone number required</td>
+            </tr>
+            <tr>
+              <td class="field-name">Customer Email</td>
+              <td class="instruction-text">Either customer email id or phone number required</td>
+            </tr>
+            <tr>
+              <td class="field-name">Sale Date</td>
+              <td class="instruction-text">Sale date time format should be "Y-m-d H:i:s" (2020-07-15 17:45:32)</td>
+            </tr>
+            <tr>
+              <td class="field-name">Product Name</td>
+              <td class="instruction-text">Either product name (for single and combo only) or product sku required</td>
+            </tr>
+            <tr>
+              <td class="field-name">Product SKU</td>
+              <td class="instruction-text">Either product name (for single and combo only) or product sku required</td>
+            </tr>
+            <tr>
+              <td class="field-name">Quantity</td>
+              <td class="instruction-text required">Required</td>
+            </tr>
+            <tr>
+              <td class="field-name">Product Unit</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Unit Price</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Item Tax</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Item Discount</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Item Description</td>
+              <td class="instruction-text"></td>
+            </tr>
+            <tr>
+              <td class="field-name">Order Total</td>
+              <td class="instruction-text"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    <!-- Submitted Data Preview -->
+    <div class="submitted-data" *ngIf="submittedData">
+      <h2>Submitted Data Preview</h2>
+      <pre>{{ submittedData | json }}</pre>
+      <button (click)="submittedData = null" class="close-btn">Close Preview</button>
+    </div>
+  </div>
+  <div class="import-container">
+    <!-- Previous content remains the same until the products section -->
+   
+    <!-- Imports Table Section -->
+    <div class="imports-table-section">
+      <h3>Imports</h3>
+      
+      <div class="imports-table">
+        <div class="table-header">
+          <div class="table-col">Import batch</div>
+          <div class="table-col">Import time</div>
+          <div class="table-col">Created By</div>
+          <div class="table-col">Invoices</div>
+          <div class="table-col">Action</div>
+        </div>
+        
+        <div class="table-row" *ngFor="let import of imports">
+          <div class="table-col">{{import.batch}}</div>
+          <div class="table-col">{{import.time | date:'medium'}}</div>
+          <div class="table-col">{{import.createdBy}}</div>
+          <div class="table-col">{{import.invoices}}</div>
+          <div class="table-col">
+            <button class="action-btn">View</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    

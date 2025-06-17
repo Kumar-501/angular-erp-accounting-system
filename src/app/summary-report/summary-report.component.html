@@ -1,0 +1,120 @@
+<!-- VAT Card View Component -->
+<div class="vat-card-container mt-4">
+  <!-- Loading Spinner -->
+  <div *ngIf="loading" class="text-center">
+    <div class="spinner-border" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+
+  <div *ngIf="!loading">
+    <!-- Main Summary Card -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">
+        <h3>VAT Summary Table</h3>
+      </div>
+      <div class="card-body">
+        <!-- Net VAT Summary -->
+        <div class="summary-box mb-4">
+          <h4>Net VAT: {{(vatSummary.outputTax - vatSummary.inputTax - vatSummary.expenseTax) | currency:'INR':'symbol':'1.2-2'}}</h4>
+        </div>
+
+        <!-- Consolidated Table View -->
+        <table class="table table-bordered table-striped vat-table">
+          <thead class="thead-dark">
+            <tr>
+              <th rowspan="2">Type</th>
+              <th rowspan="2">Date</th>
+              <th rowspan="2">Reference</th>
+              <th rowspan="2">Amount</th>
+              <th colspan="2">Tax Details</th>
+            </tr>
+            <tr>
+              <th>Rate (%)</th>
+              <th>Tax Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Sales Entries -->
+            <ng-container *ngIf="vatSummary.details?.sales?.length > 0">
+              <tr>
+                <td colspan="6" class="section-header bg-success text-white">
+                  Output Tax (Sales) - Total: {{vatSummary.outputTax | currency:'INR':'symbol':'1.2-2'}}
+                </td>
+              </tr>
+              <tr *ngFor="let sale of vatSummary.details.sales">
+                <td><span class="badge badge-success">SALE</span></td>
+                <td>{{sale.date | date:'shortDate'}}</td>
+                <td>{{sale.document}}</td>
+                <td>{{sale.amount | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{sale.taxRate | number:'1.2-2'}}</td>
+                <td>{{sale.tax | currency:'INR':'symbol':'1.2-2'}}</td>
+              </tr>
+            </ng-container>
+
+            <!-- Purchase Entries -->
+            <ng-container *ngIf="vatSummary.details?.purchases?.length > 0">
+              <tr>
+                <td colspan="6" class="section-header bg-info text-white">
+                  Input Tax (Purchases) - Total: {{vatSummary.inputTax | currency:'INR':'symbol':'1.2-2'}}
+                </td>
+              </tr>
+              <tr *ngFor="let purchase of vatSummary.details.purchases">
+                <td><span class="badge badge-info">PURCHASE</span></td>
+                <td>{{purchase.date | date:'shortDate'}}</td>
+                <td>{{purchase.document}}</td>
+                <td>{{purchase.amount | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{purchase.taxRate | number:'1.2-2'}}</td>
+                <td>{{purchase.tax | currency:'INR':'symbol':'1.2-2'}}</td>
+              </tr>
+            </ng-container>
+
+            <!-- Expense Entries -->
+            <ng-container *ngIf="vatSummary.details?.expenses?.length > 0">
+              <tr>
+                <td colspan="6" class="section-header bg-warning text-dark">
+                  Expense Tax - Total: {{vatSummary.expenseTax | currency:'INR':'symbol':'1.2-2'}}
+                </td>
+              </tr>
+              <tr *ngFor="let expense of vatSummary.details.expenses">
+                <td><span class="badge badge-warning">EXPENSE</span></td>
+                <td>{{expense.date | date:'shortDate'}}</td>
+                <td>{{expense.document}}</td>
+                <td>{{expense.amount | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{expense.taxRate | number:'1.2-2'}}</td>
+                <td>{{expense.tax | currency:'INR':'symbol':'1.2-2'}}</td>
+              </tr>
+            </ng-container>
+          </tbody>
+        </table>
+
+        <!-- Tax Rate Summary Table -->
+        <div class="mt-4">
+          <h4 class="mb-3">Tax Summary by Rate</h4>
+          <table class="table table-bordered tax-rate-table">
+            <thead class="thead-dark">
+              <tr>
+                <th>Tax Rate</th>
+                <th>Output Tax</th>
+                <th>Input Tax</th>
+                <th>Expense Tax</th>
+                <th>Net Tax</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rate of taxRates">
+                <td>{{rate}}%</td>
+                <td>{{calculateTaxByRate(vatSummary.details.sales, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{calculatePurchaseTaxByRate(vatSummary.details.purchases, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{calculateExpenseTaxByRate(vatSummary.details.expenses, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
+                <td>{{(calculateTaxByRate(vatSummary.details.sales, rate) || 0) - 
+                    (calculatePurchaseTaxByRate(vatSummary.details.purchases, rate) || 0) - 
+                    (calculateExpenseTaxByRate(vatSummary.details.expenses, rate) || 0) | currency:'INR':'symbol':'1.2-2'}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

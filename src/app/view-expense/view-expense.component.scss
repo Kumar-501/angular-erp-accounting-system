@@ -1,0 +1,69 @@
+/* Main container styling */
+.view-expense-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-top: 5%;
+  }
+  
+  /* Page title styling */
+  h2 {
+    color: #333;
+    font-size: 24px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: center;
+  }
+  
+  /* Detail rows styling */
+  .view-expense-container div {
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    font-size: 16px;
+  }
+  
+  /* Label styling */
+  .view-expense-container strong {
+    width: 140px;
+    display: inline-block;
+    color: #555;
+  }
+  
+  /* Go back button styling */
+  button {
+    background-color: #4a6fa5;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    margin-top: 20px;
+  }
+  
+  button:hover {
+    background-color: #3a5a80;
+  }
+  
+  /* Add responsive styling */
+  @media (max-width: 600px) {
+    .view-expense-container {
+      padding: 15px;
+      margin: 0 10px;
+    }
+    
+    .view-expense-container div {
+      flex-direction: column;
+    }
+    
+    .view-expense-container strong {
+      width: 100%;
+      margin-bottom: 5px;
+    }
+  }

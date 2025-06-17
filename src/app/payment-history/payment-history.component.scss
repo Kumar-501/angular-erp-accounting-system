@@ -1,0 +1,29 @@
+
+.container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .header {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .table {
+    margin-bottom: 20px;
+    
+    th {
+      font-weight: 500;
+    }
+    
+    .badge {
+      font-size: 0.85em;
+      padding: 0.35em 0.65em;
+    }
+  }
+  
+  .btn {
+    margin-right: 10px;
+  }

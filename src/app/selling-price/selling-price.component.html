@@ -1,0 +1,128 @@
+<div class="selling-price-container">
+  <div class="header">
+    <h1>Selling Price Group</h1>
+  </div>
+
+  <div class="content-card">
+    <div class="title-section">
+      <h2>All Selling Price Group</h2>
+      <p class="instruction">Set multiple price for products. Name different price and then update price from "Update Price" or List Products -> Actions -> Add or edit Group prices</p>
+      
+      <div class="top-controls">
+        <button class="add-button" (click)="openForm()">
+          <span class="plus-icon">+</span> Add
+        </button>
+      </div>
+    </div>
+
+    <div class="table-controls">
+      <div class="entries-control">
+        <span>Show</span>
+        <select [(ngModel)]="entriesPerPage" (change)="updatePagination()">
+          <option value="3">3</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+
+      <div class="export-controls">
+        <button class="btn-export" (click)="exportCSV()">
+          <i class="fa fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn-export" (click)="exportExcel()">
+          <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn-export" (click)="exportPDF()">
+          <i class="fa fa-file-pdf"></i> Export PDF
+        </button>
+      </div>
+
+      <div class="search-control">
+        <input type="text" [(ngModel)]="searchTerm" placeholder="Search..." (input)="filterData()">
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="sortable" (click)="sortData('name')">
+              Name 
+              <i class="sort-icon" [ngClass]="{
+                'fa fa-sort-up': sortColumn === 'name' && sortDirection === 'asc',
+                'fa fa-sort-down': sortColumn === 'name' && sortDirection === 'desc',
+                'fa fa-sort': sortColumn !== 'name'
+              }"></i>
+            </th>
+            <th class="sortable" (click)="sortData('description')">
+              Description 
+              <i class="sort-icon" [ngClass]="{
+                'fa fa-sort-up': sortColumn === 'description' && sortDirection === 'asc',
+                'fa fa-sort-down': sortColumn === 'description' && sortDirection === 'desc',
+                'fa fa-sort': sortColumn !== 'description'
+              }"></i>
+            </th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="filteredGroups.length === 0">
+            <td colspan="3" class="no-data">No data available in table</td>
+          </tr>
+          <tr *ngFor="let group of paginatedGroups">
+            <td>{{ group.name }}</td>
+            <td>{{ group.description }}</td>
+            <td class="actions">
+              <button class="btn-edit" (click)="openForm(true, group)">
+                <i class="fas fa-edit"></i> Edit
+              </button>
+              <button class="btn-delete" (click)="deleteSellingPrice(group.id)">
+                <i class="fas fa-trash-alt"></i> Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      <div class="showing-entries">
+        Showing {{startEntry}} to {{endEntry}} of {{filteredGroups.length}} entries
+      </div>
+      <div class="pagination">
+        <button class="prev-btn" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+        <button class="next-btn" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Popup Form for Adding/Editing Selling Price Group -->
+  <div *ngIf="showForm" class="popup-overlay">
+    <div class="popup-content">
+      <div class="popup-header">
+        <h2>{{ editMode ? 'Edit Selling Price Group' : 'Add Selling Price Group' }}</h2>
+        <button class="close-btn" (click)="closeForm()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="form-group">
+        <label for="name">Name:</label>
+        <input type="text" id="name" [(ngModel)]="sellingPrice.name" required>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea id="description" [(ngModel)]="sellingPrice.description"></textarea>
+      </div>
+
+      <div class="button-group">
+        <button class="save-btn" (click)="saveSellingPrice()">{{ editMode ? 'Update' : 'Save' }}</button>
+        <button class="cancel-btn" (click)="closeForm()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>

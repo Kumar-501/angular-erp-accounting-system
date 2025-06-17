@@ -1,0 +1,139 @@
+<!-- categories.component.html --> 
+<h2>Categories</h2>
+<span class="subtitle">Manage your brands</span>
+
+<div class="container">
+
+  <div class="header-section">
+    <button class="add-btn" (click)="showPopup = true">+ Add</button>
+  </div>
+
+  <div class="table-controls">
+    <div class="left-controls">
+      <span>Show</span>
+      <select class="entries-dropdown" [(ngModel)]="selectedEntries" (change)="changeItemsPerPage(selectedEntries)">
+        <option *ngFor="let entries of displayEntries" [value]="entries">{{ entries }}</option>
+      </select>
+      <span>entries</span>
+    </div>
+    <div class="export-controls">
+      <button class="export-btn csv-btn" (click)="exportToCSV()">
+        <i class="fa fa-file-csv"></i> Export CSV
+      </button>
+      <button class="export-btn excel-btn" (click)="exportToExcel()">
+        <i class="fa fa-file-excel"></i> Export Excel
+      </button>
+      <button class="export-btn print-btn" (click)="print()">
+        <i class="fa fa-print"></i> Print
+      </button>
+      <button class="export-btn pdf-btn" (click)="exportToPDF()">
+        <i class="fa fa-file-pdf"></i> Export PDF
+      </button>
+      
+    </div>
+    <div class="search-box">
+      <input type="text" placeholder="Search..." (input)="search($event)" />
+    </div>
+  </div>
+
+  <!-- Categories Table -->
+  <div class="table-responsive">
+    <table class="modern-table">
+      <thead>
+        <tr>
+          <th class="sortable">Category <i class="fa fa-sort"></i></th>
+          <th class="sortable">Category Code <i class="fa fa-sort"></i></th>
+          <th class="sortable">Description <i class="fa fa-sort"></i></th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of getCurrentPageItems()">
+          <td>{{ item.name }}</td>
+          <td>{{ item.code || '-' }}</td>
+          <td>{{ item.description || '-' }}</td>
+          <td class="action-column">
+            <button class="action-btn edit-btn" (click)="editCategory(item)">
+              <i class="fa fa-edit"></i> Edit
+            </button>
+            <button class="action-btn delete-btn" (click)="deleteCategory(item.id)">
+              <i class="fa fa-trash"></i> Delete
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredCategories.length === 0">
+          <td colspan="4" class="no-data">No categories found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination-controls">
+    <div class="pagination-info">
+      Showing {{ filteredCategories.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1 }} to 
+      {{ math.min(currentPage * itemsPerPage, filteredCategories.length) }} of {{ filteredCategories.length }} entries
+    </div>
+    <div class="pagination-buttons">
+      <button class="pagination-btn" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      
+      <ng-container *ngFor="let page of getPaginationArray()">
+        <button *ngIf="page !== '...'" class="pagination-btn" [class.active]="page === currentPage" (click)="goToPage(+page)">
+          {{ page }}
+        </button>
+        <span *ngIf="page === '...'" class="pagination-ellipsis">...</span>
+      </ng-container>
+      
+      <button class="pagination-btn" [disabled]="currentPage === totalPages || totalPages === 0" (click)="nextPage()">Next</button>
+    </div>
+  </div>
+ <!-- Popup Form -->
+  <div class="popup" *ngIf="showPopup">
+    <div class="popup-content">
+      <div class="popup-header">
+        <h3>{{ isEditing ? 'Edit Category' : 'Add Category' }}</h3>
+        <button class="close-btn" (click)="resetForm()">&times;</button>
+      </div>
+      <form (ngSubmit)="addCategory()">
+        <div class="form-group">
+          <label>Category Name:*</label>
+          <input type="text" [(ngModel)]="category.name" name="name" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Category Code:</label>
+          <input type="text" [(ngModel)]="category.code" name="code">
+          <small class="hint">Category code is same as <strong>HSN code</strong></small>
+        </div>
+        
+        <div class="form-group">
+          <label>Description:*</label>
+          <textarea [(ngModel)]="category.description" name="description" required></textarea>
+        </div>
+        
+      <!-- Checkbox -->
+      <div class="form-group checkbox-group">
+        <label>
+          <input type="checkbox" [(ngModel)]="category.isSubCategory" name="isSubCategory">
+          Sub Category
+        </label>
+      </div>
+
+<!-- Parent Dropdown (ONLY SHOWS IF CHECKED) -->
+<div *ngIf="category.isSubCategory" class="form-group">
+  <label>Select Parent Category:*</label>
+  <select [(ngModel)]="category.parentCategory" name="parentCategory">
+    <option value="">-- Select Parent --</option>
+    <option *ngFor="let cat of categories" [value]="cat.id">
+      {{ cat.name }}
+    </option>
+  </select>
+</div>
+        
+        <div class="btn-group">
+          <button type="submit">{{ isEditing ? 'Update' : 'Save' }}</button>
+          <button type="button" (click)="resetForm()">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

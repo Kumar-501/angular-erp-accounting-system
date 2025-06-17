@@ -1,0 +1,167 @@
+<div class="purchase-data-container">
+  <h2>Purchase Data</h2>
+
+  <!-- Show supplier information if viewing specific supplier -->
+  <div *ngIf="selectedSupplier" class="supplier-info">
+    <h3>
+      <span *ngIf="selectedSupplier.businessName">{{ selectedSupplier.businessName }}</span>
+      <span *ngIf="!selectedSupplier.businessName">
+        {{ selectedSupplier.firstName }} {{ selectedSupplier.lastName || '' }}
+      </span>
+    </h3>
+    <div class="supplier-details">
+      <p *ngIf="selectedSupplier.mobile"><strong>Mobile:</strong> {{ selectedSupplier.mobile }}</p>
+      <p *ngIf="selectedSupplier.email"><strong>Email:</strong> {{ selectedSupplier.email }}</p>
+      <p *ngIf="selectedSupplier.addressLine1 || selectedSupplier.city">
+        <strong>Address:</strong> 
+        {{ selectedSupplier.addressLine1 }} 
+        {{ selectedSupplier.city ? ', ' + selectedSupplier.city : '' }}
+        {{ selectedSupplier.state ? ', ' + selectedSupplier.state : '' }}
+      </p>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-spinner">Loading purchase data...</div>
+  <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
+
+  <div *ngIf="!isLoading && !errorMessage">
+    <div *ngIf="filteredPurchases.length === 0" class="no-data">No purchase data available</div>
+
+    <table *ngIf="filteredPurchases.length > 0" class="purchase-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th *ngIf="!selectedSupplier">Supplier</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Paid</th>
+          <th>Due</th>
+          <th>Payment</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let purchase of filteredPurchases">
+          <td>{{ purchase.purchaseDate | date }}</td>
+          <td *ngIf="!selectedSupplier">{{ purchase.supplierName }}</td>
+          <td>
+            <span [class]="getStatusClass(purchase.purchaseStatus)">
+              {{ purchase.purchaseStatus }}
+            </span>
+          </td>
+          <td>{{ purchase.purchaseTotal | currency:'INR' }}</td>
+          <td>{{ purchase.paymentAmount | currency:'INR' }}</td>
+          <td>{{ purchase.paymentDue | currency:'INR' }}</td>
+          <td>
+            <span [class]="getPaymentStatusClass(purchase.paymentStatus)">
+              {{ purchase.paymentStatus }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Stock Report Table -->
+  <div class="stock-report-section">
+    <h2>Stock Report</h2>
+    
+    <div class="report-controls">
+      <div class="search-box">
+        <input type="text" [(ngModel)]="stockSearchTerm" (ngModelChange)="applyStockFilter()" placeholder="Search products...">
+      </div>
+      
+      <div class="location-filter">
+        <select [(ngModel)]="selectedStockLocationId" (ngModelChange)="applyStockFilter()" class="location-select">
+          <option value="">All Locations</option>
+          <option *ngFor="let location of stockLocations" [value]="location.id">
+            {{location.name}}
+          </option>
+        </select>
+      </div>
+    </div>
+    
+    <div class="table-responsive">
+      <table class="stock-report-table">
+        <thead>
+          <tr>
+            <th (click)="sortStockData('productName')">
+              Product Name
+              <span *ngIf="stockSortColumn === 'productName'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('sku')">
+              SKU
+              <span *ngIf="stockSortColumn === 'sku'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('category')">
+              Category
+              <span *ngIf="stockSortColumn === 'category'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('brand')">
+              Brand
+              <span *ngIf="stockSortColumn === 'brand'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('locationName')">
+              Location
+              <span *ngIf="stockSortColumn === 'locationName'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('openingStock')">
+              Opening Stock
+              <span *ngIf="stockSortColumn === 'openingStock'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('currentStock')">
+              Current Stock
+              <span *ngIf="stockSortColumn === 'currentStock'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('unit')">
+              Unit
+              <span *ngIf="stockSortColumn === 'unit'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('purchasePrice')">
+              Purchase Price
+              <span *ngIf="stockSortColumn === 'purchasePrice'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('sellingPrice')">
+              Selling Price
+              <span *ngIf="stockSortColumn === 'sellingPrice'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('margin')">
+              Margin (%)
+              <span *ngIf="stockSortColumn === 'margin'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('taxPercentage')">
+              Tax (%)
+              <span *ngIf="stockSortColumn === 'taxPercentage'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+            <th (click)="sortStockData('totalSold')">
+              Total Sold
+              <span *ngIf="stockSortColumn === 'totalSold'">{{stockSortDirection === 'asc' ? '↑' : '↓'}}</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of filteredStockData" [class.low-stock]="item.currentStock <= item.alertQuantity">
+            <td>{{item.productName}}</td>
+            <td>{{item.sku}}</td>
+            <td>{{item.category || '-'}}</td>
+            <td>{{item.brand || '-'}}</td>
+            <td>{{item.locationName || '-'}}</td>
+            <td>{{item.openingStock}}</td>
+            <td [class.stock-alert]="item.currentStock <= item.alertQuantity">
+              {{item.currentStock}}
+              <span *ngIf="item.currentStock <= item.alertQuantity" class="alert-icon">⚠</span>
+            </td>
+            <td>{{item.unit}}</td>
+            <td>{{item.purchasePrice | currency:'INR':'symbol'}}</td>
+            <td>{{item.sellingPrice | currency:'INR':'symbol'}}</td>
+            <td>{{item.margin}}%</td>
+            <td>{{item.taxPercentage}}%</td>
+            <td>{{item.totalSold}} {{item.unit}}</td>
+          </tr>
+          <tr *ngIf="filteredStockData.length === 0">
+            <td colspan="13" class="no-data">No products found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

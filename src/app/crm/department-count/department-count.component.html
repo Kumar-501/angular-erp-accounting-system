@@ -1,0 +1,38 @@
+<div class="department-count-container">
+  <div class="header">
+    <h2>CRM Customer Report</h2>
+    <p>View call and customer assignments by department</p>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <i class="fa fa-spinner fa-spin"></i> Loading Crm Report
+  </div>
+
+  <div *ngIf="!isLoading" class="department-cards">
+    <div *ngFor="let dept of departmentStats" class="department-card">
+      <div class="department-header">
+        <h3>{{dept.name}}</h3>
+        <div class="department-totals">
+          <span class="badge customers">{{dept.totalCustomers}} Customers</span>
+          <span class="badge calls">{{dept.totalCalls}} Calls</span>
+        </div>
+      </div>
+
+      <div class="user-list">
+        <div *ngFor="let user of dept.users" class="user-item">
+          <div class="user-info">
+            <div class="user-name">{{user.name}}</div>
+            <div class="user-stats">
+              <span class="stat customers">{{user.customerCount}} Customers</span>
+              <span class="stat calls">{{user.callCount}} Calls</span>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="dept.users.length === 0" class="no-users">
+          No users assigned to this department
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>

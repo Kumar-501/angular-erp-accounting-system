@@ -1,0 +1,130 @@
+/* user-profile.component.scss */
+.user-profile-container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .profile-header {
+    background-color: #f5f5f5;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+    h2 {
+      margin-top: 0;
+      color: #333;
+      font-weight: 500;
+    }
+  
+    .user-details {
+      margin-top: 10px;
+      
+      p {
+        margin: 5px 0;
+        color: #666;
+        
+        strong {
+          color: #333;
+        }
+      }
+    }
+  }
+  
+  .content-section {
+    background-color: white;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
+    h3 {
+      margin-top: 0;
+      color: #333;
+      font-weight: 500;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+  }
+  
+  .loading {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+  }
+  
+  .error-message {
+    padding: 15px;
+    background-color: #fde8e8;
+    border-left: 4px solid #f05252;
+    color: #9b1c1c;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+  
+  .no-data {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    background-color: #f9fafb;
+    border-radius: 4px;
+  }
+  
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    
+    th {
+      background-color: #f9fafb;
+      font-weight: 500;
+      color: #4b5563;
+    }
+    
+    tr:hover {
+      background-color: #f9fafb;
+    }
+  }
+  
+  .account-select {
+    margin-bottom: 20px;
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4b5563;
+      font-weight: 500;
+    }
+    
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      background-color: white;
+      font-size: 14px;
+      
+      &:focus {
+        outline: none;
+        border-color: #93c5fd;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+      }
+    }
+  }
+  
+  .transactions {
+    h4 {
+      margin-top: 0;
+      color: #4b5563;
+      font-weight: 500;
+      margin-bottom: 15px;
+    }
+  }

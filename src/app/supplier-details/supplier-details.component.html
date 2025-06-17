@@ -1,0 +1,33 @@
+<div *ngIf="purchases.length; else noData">
+  <h3>Purchases for Supplier</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice No</th>
+        <th>Reference No</th>
+        <th>Purchase Date</th>
+        <th>Status</th>
+        <th>Total</th>
+        <th>Paid</th>
+        <th>Due</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let purchase of purchases">
+        <td>{{ purchase.invoiceNo || 'N/A' }}</td>
+        <td>{{ purchase.referenceNo }}</td>
+        <td>{{ getFormattedDate(purchase.purchaseDate) }}</td>
+        <td [ngClass]="getStatusClass(purchase.paymentStatus)">
+          {{ purchase.paymentStatus }}
+        </td>
+        <td>{{ purchase.purchaseTotal | currency }}</td>
+        <td>{{ purchase.paymentAmount | currency }}</td>
+        <td>{{ purchase.paymentDue | currency }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<ng-template #noData>
+  <p>No purchases found for this supplier.</p>
+</ng-template>

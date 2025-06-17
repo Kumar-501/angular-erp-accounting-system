@@ -1,0 +1,156 @@
+<div class="stock-transfers-container">
+  <h1>Add Stock Adjustment</h1>
+  
+  <div class="content-panel">
+    <form [formGroup]="adjustmentForm" (ngSubmit)="saveAdjustment()">
+      <!-- Form Header Section -->
+      <div class="form-header-grid">
+        <div class="col-md-6">
+          <div class="form-group">
+            <label>Business Location:</label>
+            <select formControlName="businessLocation" class="form-control" required>
+              <option value="">Select Business Location</option>
+              <option *ngFor="let location of businessLocations" [value]="location.name">
+                {{ location.name }} ({{ location.locationId || 'BL000' + (businessLocations.indexOf(location) + 1) }})
+              </option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="referenceNo">Reference No:</label>
+          <input id="referenceNo" type="text" formControlName="referenceNo" class="form-control">
+        </div>
+        
+        <div class="form-group">
+          <label for="date">Date:<span class="required">*</span></label>
+          <div class="date-input-wrapper">
+            <input id="date" type="datetime-local" formControlName="date" class="form-control">
+            <span class="calendar-icon"><i class="fa fa-calendar"></i></span>
+          </div>
+          <div class="error-message" *ngIf="submitted && f['date'].errors">
+            Date is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="adjustmentType">Adjustment type:<span class="required">*</span>
+            <i class="fa fa-question-circle info-icon" title="Type of adjustment: Addition or Deduction"></i>
+          </label>
+          <select id="adjustmentType" formControlName="adjustmentType" class="form-control">
+            <option value="">Please Select</option>
+            <option value="addition">Addition</option>
+            <option value="deduction">Deduction</option>
+          </select>
+          <div class="error-message" *ngIf="submitted && f['adjustmentType'].errors">
+            Adjustment type is required
+          </div>
+        </div>
+      </div>
+      
+      <!-- Products Section -->
+      <div class="products-section">
+        <div class="search-container">
+          <div class="search-box">
+            <span class="search-icon"><i class="fa fa-search"></i></span>
+            <input 
+              type="text" 
+              placeholder="Search products for stock adjustment" 
+              (keyup)="onProductSearch($event)"
+              [formControl]="productSearchControl">
+          </div>
+          
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Quantity</th>
+                  <th>Unit Price</th>
+                  <th>Subtotal</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody formArrayName="products">
+                <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
+                  <td>
+                    <!-- Product Dropdown -->
+                    <div class="dropdown w-100">
+                      <input type="text" class="form-control" formControlName="name" 
+                             placeholder="Select or search product" 
+                             (click)="onInputClick($event)"
+                             (input)="onProductSearch($event)"
+                             [attr.list]="'productList-' + i">
+                      <datalist [id]="'productList-' + i">
+                        <option *ngFor="let product of filteredProducts" [value]="product.name"></option>
+                      </datalist>
+                      <div class="dropdown-menu w-100" [class.show]="filteredProducts.length > 0">
+                        <button type="button" class="dropdown-item" 
+                                *ngFor="let prod of filteredProducts" 
+                                (click)="selectProduct(prod, i)">
+                          {{ prod.name }} - ₹{{ prod.unitPrice }}
+                        </button>
+                      </div>
+                    </div>
+                    <div *ngIf="submitted && product.get('name')?.errors" class="text-danger">
+                      Product name is required
+                    </div>
+                  </td>
+                  
+                  <td>
+                    <input type="number" formControlName="quantity" (input)="updateSubtotal(i)" min="1" placeholder="0">
+                  </td>
+                  <td>
+                    <input type="number" formControlName="unitPrice" (input)="updateSubtotal(i)" min="0" step="0.01" placeholder="0.00">
+                  </td>
+                  <td>
+                    <input type="text" [value]="product.get('subtotal')?.value | number:'1.2-2'" readonly>
+                  </td>
+                  <td class="actions-column">
+                    <button type="button" class="btn btn-danger" (click)="removeProduct(i)">
+                      <i class="fa fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                <tr *ngIf="products.controls.length === 0">
+                  <td colspan="5" class="no-data">No products added</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="total-section">
+            <div class="total-label">Total Amount:</div>
+            <div class="total-amount">{{ totalAmount | number:'1.2-2' }}</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Additional Details Section -->
+      <div class="additional-details">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="totalAmountRecovered">
+              Total amount recovered:
+              <i class="fa fa-question-circle info-icon" title="Amount recovered for deducted stock"></i>
+            </label>
+            <input id="totalAmountRecovered" type="number" formControlName="totalAmountRecovered" class="form-control">
+          </div>
+          
+          <div class="form-group reason-group">
+            <label for="reason">Reason:</label>
+            <textarea id="reason" formControlName="reason" class="form-control" rows="4"></textarea>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Form Actions -->
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Adjustment</button>
+        <button type="button" class="btn btn-secondary" (click)="router.navigate(['/list-adjustment'])">
+          Go to List
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

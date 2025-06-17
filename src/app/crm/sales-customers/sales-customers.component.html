@@ -1,0 +1,760 @@
+<div class="sales-customers-container">
+  <div class="header">
+    <h2>Sales Call Schedule</h2>
+    <p>View and manage your sales customers</p>
+  </div>
+<div class="filter-button-container">
+  <button class="btn-filter" (click)="toggleFilters()">
+    <i class="fa fa-filter"></i> Filter
+  </button>
+  <button class="btn-excel" (click)="exportToExcel()">
+    <i class="fa fa-file-excel-o"></i> Excel
+  </button>
+  <button class="btn-print" (click)="printTable()">
+    <i class="fa fa-print"></i> Print
+  </button>
+  <button class="btn-columns" (click)="toggleColumnVisibilityPanel()">
+    <i class="fa fa-columns"></i> Columns
+  </button>
+  <button class="btn-bulk-select" (click)="toggleBulkSelect()" *ngIf="!hasRole('executive')">
+    <i class="fa fa-check-square"></i> {{selectedCustomers.length === filteredCustomers.length ? 'Deselect All' : 'Bulk Select Customers'}}
+  </button>
+</div>
+ <!-- Column Visibility Panel -->
+ <div class="column-visibility-panel" [class.active]="showColumnVisibilityPanel">
+  <div class="column-visibility-header">
+    <h3>Column Visibility</h3>
+    <button class="btn-close" (click)="toggleColumnVisibilityPanel()">
+      <i class="fa fa-times"></i>
+    </button>
+  </div>
+  <div class="column-visibility-content">
+    <div class="column-visibility-item" *ngFor="let column of columnDefinitions">
+      <label>
+        <input type="checkbox" [(ngModel)]="column.visible" (change)="updateColumnVisibility()">
+        {{ column.header }}
+      </label>
+    </div>
+  </div>
+  <div class="column-visibility-footer">
+    <button class="btn-reset" (click)="resetColumnVisibility()">
+      Reset to Default
+    </button>
+  </div>
+</div>
+
+
+<!-- Filter Sidebar -->
+<div class="filter-sidebar" [class.active]="showFilters">
+  <div class="filter-sidebar-header">
+    <h3>Filters</h3>
+    <button class="btn-close" (click)="toggleFilters()">
+      <i class="fa fa-times"></i>
+    </button>
+  </div>
+
+  <div class="filter-sidebar-content">
+    <!-- Status Filter -->
+    <div class="filter-group">
+      <label>Status:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterStatus" (change)="applyFilters()">
+          <option value="">All</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+          <option value="Pending">Pending</option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Assign Status Filter -->
+    <div class="filter-group">
+      <label>Assign Status:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterAssignStatus" (change)="applyFilters()">
+          <option value="">All</option>
+          <option value="Assigned">Assigned</option>
+          <option value="Unassigned">Unassigned</option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Current State Filter -->
+    <div class="filter-group">
+      <label>Current State:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterCurrentState" (change)="applyFilters()">
+          <option value="">All</option>
+          <option *ngFor="let state of availableStates" [value]="state">
+            {{ state }}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Customer Life Stage Filter -->
+    <div class="filter-group">
+      <label>Customer Life Stage:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterLifeStage" (change)="applyFilters()">
+          <option value="">All</option>
+          <option *ngFor="let stage of availableLifeStages" [value]="stage">
+            {{ stage }}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Assigned To Filter -->
+    <div class="filter-group">
+      <label>Assigned To:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterAssignedTo" (change)="applyFilters()">
+          <option value="">All</option>
+          <option *ngFor="let user of availableUsers" [value]="user.id">
+            {{ user.name }}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Department Filter -->
+    <div class="filter-group">
+      <label>Department:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterDepartment" (change)="applyFilters()">
+          <option value="">All</option>
+          <option *ngFor="let dept of availableDepartments" [value]="dept">
+            {{ dept }}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Lead Category Filter -->
+    <div class="filter-group">
+      <label>Lead Category:</label>
+      <div class="select-container">
+        <select [(ngModel)]="filterLeadCategory" (change)="applyFilters()">
+          <option value="">All</option>
+          <option *ngFor="let category of availableLeadCategories" [value]="category">
+            {{ category }}
+          </option>
+        </select>
+        <i class="fa fa-chevron-down"></i>
+      </div>
+    </div>
+
+    <!-- Date Range Filter -->
+    <div class="filter-group">
+      <label>Last Call Date Range:</label>
+      <div class="date-range-container">
+        <div class="date-field">
+          <label>From:</label>
+          <input type="date" [(ngModel)]="filterDateFrom" (change)="applyFilters()">
+        </div>
+        <div class="date-field">
+          <label>To:</label>
+          <input type="date" [(ngModel)]="filterDateTo" (change)="applyFilters()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Call Count Range Filter -->
+    <div class="filter-group">
+      <label>Call Count:</label>
+      <div class="range-container">
+        <div class="range-field">
+          <label>Min:</label>
+          <input type="number" [(ngModel)]="filterCallCountMin" min="0" (change)="applyFilters()">
+        </div>
+        <div class="range-field">
+          <label>Max:</label>
+          <input type="number" [(ngModel)]="filterCallCountMax" min="0" (change)="applyFilters()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-sidebar-footer">
+    <button class="btn-apply-filters" (click)="applyFilters()">
+      Apply Filters
+    </button>
+    <button class="btn-reset-filters" (click)="resetFilters()">
+      Reset Filters
+    </button>
+    
+  </div>
+</div>
+
+<!-- Backdrop overlay when filter sidebar is open -->
+<div class="filter-backdrop" [class.active]="showFilters" (click)="toggleFilters()"></div>
+  <div class="controls">
+    <div class="search-control">
+      <input type="text" 
+      [(ngModel)]="searchTerm" 
+      placeholder="Search customers..." 
+      (keyup)="applyFiltersDebounced()">       
+      <button class="btn-clear" (click)="clearSearch()" *ngIf="searchTerm">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="filter-control">
+      <label>Show:</label>
+      <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <span>entries</span>
+    </div>
+
+<div class="bulk-actions" *ngIf="selectedCustomers.length > 0 && !hasRole('executive')">
+  <button class="btn-department" (click)="openBulkDepartmentModal()">
+    <i class="fa fa-building"></i> Assign Department & User
+  </button>
+</div>
+
+
+  </div>
+
+  <div class="table-responsive">
+    <table class="sales-customers-table">
+      <thead>
+        <tr>
+          <th [class.hidden]="!columnDefinitions[0].visible">
+            <input type="checkbox" 
+                   [checked]="selectedCustomers.length === paginatedCustomers.length && paginatedCustomers.length > 0"
+                   (change)="toggleAllCustomers($event)">
+          </th>
+          <th (click)="sortBy('firstName')" [class.hidden]="!columnDefinitions[1].visible">
+            Customer Name
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'firstName' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'firstName' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+              <!-- New Alternate Contact Column -->
+    <th (click)="sortBy('alternateContact')" [class.hidden]="!columnDefinitions[3].visible">
+      Alternate Number
+      <span class="sort-icon">
+        <i class="fa fa-caret-up" [class.active]="sortColumn === 'alternateContact' && sortDirection === 'asc'"></i>
+        <i class="fa fa-caret-down" [class.active]="sortColumn === 'alternateContact' && sortDirection === 'desc'"></i>
+      </span>
+    </th>
+    <!-- New Ad Code Column -->
+    <th (click)="sortBy('adcode')" [class.hidden]="!columnDefinitions[4].visible">
+      Ad Code
+      <span class="sort-icon">
+        <i class="fa fa-caret-up" [class.active]="sortColumn === 'adcode' && sortDirection === 'asc'"></i>
+        <i class="fa fa-caret-down" [class.active]="sortColumn === 'adcode' && sortDirection === 'desc'"></i>
+      </span>
+    </th>
+          <th (click)="sortBy('mobile')" [class.hidden]="!columnDefinitions[2].visible">
+            Mobile Number
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'mobile' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'mobile' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('assignedTo')" [class.hidden]="!columnDefinitions[3].visible">
+            Assigned To
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'assignedTo' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'assignedTo' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('lifeStage')" [class.hidden]="!columnDefinitions[4].visible">
+            Life Stage
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'lifeStage' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'lifeStage' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('department')" [class.hidden]="!columnDefinitions[5].visible">
+            Department
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'department' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'department' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('leadCategory')" [class.hidden]="!columnDefinitions[6].visible">
+            Lead Category
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'leadCategory' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'leadCategory' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('lastCallTime')" [class.hidden]="!columnDefinitions[7].visible">
+            Last Call Time
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'lastCallTime' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'lastCallTime' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('currentState')" [class.hidden]="!columnDefinitions[8].visible">
+            Current State
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'currentState' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'currentState' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortBy('status')" [class.hidden]="!columnDefinitions[9].visible">
+            Status
+            <span class="sort-icon">
+              <i class="fa fa-caret-up" [class.active]="sortColumn === 'status' && sortDirection === 'asc'"></i>
+              <i class="fa fa-caret-down" [class.active]="sortColumn === 'status' && sortDirection === 'desc'"></i>
+            </span>
+          </th>
+         <th (click)="sortBy('callCount')" [class.hidden]="!columnDefinitions[10].visible">
+  Call Count
+  <span class="sort-icon">
+    <i class="fa fa-caret-up" [class.active]="sortColumn === 'callCount' && sortDirection === 'asc'"></i>
+    <i class="fa fa-caret-down" [class.active]="sortColumn === 'callCount' && sortDirection === 'desc'"></i>
+  </span>
+</th>
+
+          <th [class.hidden]="!columnDefinitions[11].visible">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let customer of paginatedCustomers">
+          <td [class.hidden]="!columnDefinitions[0].visible">
+            <input type="checkbox" 
+                   [checked]="selectedCustomers.includes(customer.id || '')"
+                   (change)="toggleCustomerSelection(customer.id || '')">
+          </td>
+          <td [class.hidden]="!columnDefinitions[1].visible">
+            <div class="customer-name">
+              {{ customer.prefix }} {{ customer.firstName }} {{ customer.middleName }} {{ customer.lastName }}
+              <span *ngIf="customer.businessName && customer.isIndividual === false">
+                ({{ customer.businessName }})
+              </span>
+            </div>
+          </td>
+           <td [class.hidden]="!columnDefinitions[3].visible">{{ customer.alternateContact || '-' }}</td>
+    <!-- New Ad Code Column -->
+    <td [class.hidden]="!columnDefinitions[4].visible">{{ customer.adcode || '-' }}</td>
+          <td [class.hidden]="!columnDefinitions[2].visible">{{ customer.mobile }}</td>
+          <td [class.hidden]="!columnDefinitions[3].visible">{{ customer.assignedTo || 'Not assigned' }}</td>
+          <td [class.hidden]="!columnDefinitions[4].visible">
+            <span>{{ customer.lifeStage || '-' }}</span>
+            <button class="btn-edit" (click)="openLifeStageModal(customer)">
+              <i class="fa fa-edit"></i>
+            </button>
+          </td>
+          <td [class.hidden]="!columnDefinitions[5].visible">
+            <span *ngIf="customer.department">{{ customer.department }}</span>
+            <span *ngIf="!customer.department" class="text-muted">Not assigned</span>
+            <button class="btn-edit" (click)="openDepartmentModal(customer)">
+              <i class="fa fa-edit"></i>
+            </button>
+          </td>
+          <td [class.hidden]="!columnDefinitions[6].visible">
+            <span>{{ customer.leadCategory || '-' }}</span>
+            <button class="btn-edit" (click)="openLeadCategoryModal(customer)">
+              <i class="fa fa-edit"></i>
+            </button>
+          </td>
+          <td [class.hidden]="!columnDefinitions[7].visible">{{ customer.lastCallTime ? (customer.lastCallTime | date:'medium') : '-' }}</td>
+          <td [class.hidden]="!columnDefinitions[8].visible">{{ customer.currentState || '-' }}</td>
+          <td [class.hidden]="!columnDefinitions[9].visible">{{ customer.status || '-' }}</td>
+<td [class.hidden]="!columnDefinitions[10].visible">{{ customer.callCount || 0 }}</td>
+        <td [class.hidden]="!columnDefinitions[11].visible">
+  <div class="action-buttons">
+    <button class="btn-view" (click)="viewCustomerDetails(customer)">
+      <i class="fa fa-eye"></i>
+    </button>
+    <button class="btn-edit" (click)="openEditCustomerModal(customer)">
+      <i class="fa fa-edit"></i>
+    </button>
+ <button class="btn-delete" (click)="confirmDeleteCustomer(customer)" *ngIf="!hasRole('executive')">
+      <i class="fa fa-trash"></i>
+    </button>
+  </div>
+</td>
+        </tr>
+        <tr *ngIf="filteredCustomers.length === 0">
+          <td [attr.colspan]="getVisibleColumnsCount()" class="no-data">No customers found</td>        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-controls">
+    <button class="page-btn" (click)="prevPage()" [disabled]="currentPage === 1">
+      <i class="fa fa-chevron-left"></i>
+    </button>
+    
+    <div class="page-numbers">
+      <button 
+        class="page-num" 
+        [class.active]="currentPage === 1" 
+        (click)="currentPage = 1">
+        1
+      </button>
+      
+      <span *ngIf="currentPage > 3" class="ellipsis">...</span>
+      
+      <ng-container *ngFor="let page of getPaginationRange()">
+        <button 
+          *ngIf="page !== 1 && page !== totalPages" 
+          class="page-num" 
+          [class.active]="currentPage === page" 
+          (click)="currentPage = page">
+          {{ page }}
+        </button>
+      </ng-container>
+      
+      <span *ngIf="currentPage < totalPages - 2" class="ellipsis">...</span>
+      
+      <button 
+        *ngIf="totalPages > 1"
+        class="page-num" 
+        [class.active]="currentPage === totalPages" 
+        (click)="currentPage = totalPages">
+        {{ totalPages }}
+      </button>
+    </div>
+    
+    <button class="page-btn" (click)="nextPage()" [disabled]="currentPage === totalPages">
+      <i class="fa fa-chevron-right"></i>
+    </button>
+    
+    <div class="page-info">
+      <span>{{ (currentPage - 1) * entriesPerPage + 1 }} - {{ Math.min(currentPage * entriesPerPage, filteredCustomers.length) }} of {{ filteredCustomers.length }} customers</span>
+    </div>
+  </div>
+</div>
+
+<!-- Assign User Modal -->
+<div class="modal-backdrop" *ngIf="showAssignUserModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">{{ isBulkAssign ? 'Bulk Assign Customers' : 'Assign Customer' }}</h4>
+      <button type="button" class="close" (click)="closeAssignUserModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="userSelect">Select User:</label>
+        <select class="form-control" id="userSelect" [(ngModel)]="selectedUserId">
+          <option value="">-- Select User --</option>
+          <option *ngFor="let user of availableUsers" [value]="user.id">
+            {{ user.name || user.username || 'Unnamed User' }}
+          </option>
+        </select>
+        <div *ngIf="isLoadingUsers" class="loading-text">
+          <i class="fa fa-spinner fa-spin"></i> Loading users...
+        </div>
+        <div *ngIf="!isLoadingUsers && availableUsers.length === 0" class="no-users">
+          No users available
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeAssignUserModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="assignUser()" 
+              [disabled]="!selectedUserId || isLoadingUsers">
+        Assign
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Department Modal -->
+<div class="modal-backdrop" *ngIf="showDepartmentModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">{{ isBulkDepartment ? 'Bulk Assign Department & User' : 'Set Department & User' }}</h4>
+      <button type="button" class="close" (click)="closeDepartmentModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Select Department:</label>
+        <select class="form-control" [(ngModel)]="selectedDepartment" (change)="onDepartmentChange()">
+          <option value="">-- Select Department --</option>
+          <option *ngFor="let dept of availableDepartments" [value]="dept">
+            {{ dept }}
+          </option>
+        </select>
+      </div>
+      
+      <div class="form-group" *ngIf="selectedDepartment">
+        <label>Select User:</label>
+        <select class="form-control" [(ngModel)]="selectedUserId">
+          <option value="">-- Select User --</option>
+          <option *ngFor="let user of departmentUsers" [value]="user.id">
+            {{ user.name }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeDepartmentModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateDepartment()" 
+              [disabled]="!selectedDepartment || !selectedUserId">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Life Stage Modal -->
+<div class="modal-backdrop" *ngIf="showLifeStageModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Set Life Stage</h4>
+      <button type="button" class="close" (click)="closeLifeStageModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Select Life Stage:</label>
+        <select class="form-control" [(ngModel)]="selectedLifeStage">
+          <option value="">-- Select Life Stage --</option>
+          <option *ngFor="let stage of availableLifeStages" [value]="stage">
+            {{ stage }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeLifeStageModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateLifeStage()" 
+              [disabled]="!selectedLifeStage">
+        Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Lead Category Modal -->
+<div class="modal-backdrop" *ngIf="showLeadCategoryModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Set Lead Category</h4>
+      <button type="button" class="close" (click)="closeLeadCategoryModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Select Lead Category:</label>
+        <select class="form-control" [(ngModel)]="selectedLeadCategory">
+          <option value="">-- Select Lead Category --</option>
+          <option *ngFor="let category of availableLeadCategories" [value]="category">
+            {{ category }}
+          </option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" (click)="closeLeadCategoryModal()">Cancel</button>
+      <button type="button" class="btn btn-primary" (click)="updateLeadCategory()" 
+              [disabled]="!selectedLeadCategory">
+        Save
+      </button>
+    </div>
+  </div>
+</div><!-- Edit Customer Modal -->
+<!-- Edit Customer Modal -->
+<div class="modal-backdrop" *ngIf="showEditModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Edit Customer</h4>
+      <button type="button" class="close" (click)="closeEditModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form [formGroup]="editForm" (ngSubmit)="onEditSubmit()">
+        <div class="form-row">
+          <div class="form-group col-md-2">
+            <label>Prefix</label>
+            <select class="form-control" formControlName="prefix">
+              <option value="">None</option>
+              <option value="Mr.">Mr.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Dr.">Dr.</option>
+            </select>
+          </div>
+          
+          <div class="form-group col-md-5">
+            <label>First Name *</label>
+            <input type="text" class="form-control" formControlName="firstName" required>
+          </div>
+          
+          <div class="form-group col-md-5">
+            <label>Last Name *</label>
+            <input type="text" class="form-control" formControlName="lastName" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Middle Name</label>
+          <input type="text" class="form-control" formControlName="middleName">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>Mobile Number *</label>
+            <input type="text" class="form-control" formControlName="mobile" required>
+            <small class="text-danger" *ngIf="editForm.get('mobile')?.errors?.['pattern']">
+              Please enter a valid 10-digit mobile number
+            </small>
+          </div>
+          
+          <div class="form-group col-md-6">
+            <label>Alternate Number</label>
+            <input type="text" class="form-control" formControlName="alternateContact">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Ad Code</label>
+          <input type="text" class="form-control" formControlName="adcode">
+        </div>
+        
+        <div class="form-group">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="isIndividual" formControlName="isIndividual">
+            <label class="form-check-label" for="isIndividual">
+              Is Individual
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-group" *ngIf="!editForm.get('isIndividual')?.value">
+          <label>Business Name</label>
+          <input type="text" class="form-control" formControlName="businessName">
+        </div>
+        
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" formControlName="status">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Pending">Pending</option>
+          </select>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="editForm.invalid || isUpdating">
+            <span *ngIf="isUpdating">
+              <i class="fa fa-spinner fa-spin"></i> Updating...
+            </span>
+            <span *ngIf="!isUpdating">Update Customer</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div><div class="modal-backdrop" *ngIf="showEditModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4 class="modal-title">Edit Customer</h4>
+      <button type="button" class="close" (click)="closeEditModal()">
+        <span>&times;</span>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form [formGroup]="editForm" (ngSubmit)="onEditSubmit()">
+        <div class="form-row">
+          <div class="form-group col-md-2">
+            <label>Prefix</label>
+            <select class="form-control" formControlName="prefix">
+              <option value="">None</option>
+              <option value="Mr.">Mr.</option>
+              <option value="Mrs.">Mrs.</option>
+              <option value="Ms.">Ms.</option>
+              <option value="Dr.">Dr.</option>
+            </select>
+          </div>
+          
+          <div class="form-group col-md-5">
+            <label>First Name *</label>
+            <input type="text" class="form-control" formControlName="firstName" required>
+          </div>
+          
+          <div class="form-group col-md-5">
+            <label>Last Name *</label>
+            <input type="text" class="form-control" formControlName="lastName" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Middle Name</label>
+          <input type="text" class="form-control" formControlName="middleName">
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group col-md-6">
+            <label>Mobile Number *</label>
+            <input type="text" class="form-control" formControlName="mobile" required>
+            <small class="text-danger" *ngIf="editForm.get('mobile')?.errors?.['pattern']">
+              Please enter a valid 10-digit mobile number
+            </small>
+          </div>
+          
+          <div class="form-group col-md-6">
+            <label>Alternate Number</label>
+            <input type="text" class="form-control" formControlName="alternateContact">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Ad Code</label>
+          <input type="text" class="form-control" formControlName="adcode">
+        </div>
+        
+        <div class="form-group">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="isIndividual" formControlName="isIndividual">
+            <label class="form-check-label" for="isIndividual">
+              Is Individual
+            </label>
+          </div>
+        </div>
+        
+        <div class="form-group" *ngIf="!editForm.get('isIndividual')?.value">
+          <label>Business Name</label>
+          <input type="text" class="form-control" formControlName="businessName">
+        </div>
+        
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" formControlName="status">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="Pending">Pending</option>
+          </select>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" [disabled]="editForm.invalid || isUpdating">
+            <span *ngIf="isUpdating">
+              <i class="fa fa-spinner fa-spin"></i> Updating...
+            </span>
+            <span *ngIf="!isUpdating">Update Customer</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

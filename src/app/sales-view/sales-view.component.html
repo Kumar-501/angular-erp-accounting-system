@@ -1,0 +1,282 @@
+<div class="container-fluid">
+    <div class="row mb-3">
+      <div class="col-12">
+        <h3>
+          <button class="btn btn-sm btn-outline-secondary me-2" (click)="goBack()">
+            <i class="fa fa-arrow-left"></i> Back
+          </button>
+          Sales Order Details
+        </h3>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <!-- Loading spinner -->
+            <div *ngIf="loading" class="text-center py-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-2">Loading sale details...</p>
+            </div>
+  
+            <!-- Error message -->
+            <div *ngIf="error && !loading" class="alert alert-danger">
+              {{ error }}
+            </div>
+  
+            <!-- Sale Details when loaded -->
+            <div *ngIf="sale && !loading">
+              <!-- Action Buttons -->
+              <div class="d-flex justify-content-end mb-4">
+                <button class="btn btn-outline-secondary me-2" (click)="printInvoice()">
+                  <i class="fa fa-print"></i> Print Invoice
+                </button>
+                <button class="btn btn-primary" (click)="editSale()">
+                  <i class="fa fa-edit"></i> Edit Sale
+                </button>
+              </div>
+  
+              <!-- Order Information -->
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <div class="card h-100">
+                    <div class="card-header bg-light">
+                      <h5 class="mb-0">Order Information</h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Order Number:</div>
+                        <div class="col-md-8">{{ sale.orderNo || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Invoice Number:</div>
+                        <div class="col-md-8">{{ sale.invoiceNo || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Sale Date:</div>
+                        <div class="col-md-8">{{ sale.saleDate | date: 'medium' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Status:</div>
+                        <div class="col-md-8">
+                          <span class="badge"
+                            [ngClass]="{
+                              'bg-success text-white': sale.status === 'Completed' || sale.status === 'active', 
+                              'bg-warning text-dark': sale.status === 'Pending' || sale.status === 'pending', 
+                              'bg-danger text-white': sale.status === 'Cancelled' || sale.status === 'inactive'
+                            }">
+                            {{ (sale.status === 'active') ? 'Completed' : (sale.status || 'Pending') }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Type of Service:</div>
+                        <div class="col-md-8">{{ sale.typeOfServiceName || sale.typeOfService || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Location:</div>
+                        <div class="col-md-8">{{ sale.location || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Added By:</div>
+                        <div class="col-md-8">{{ sale.addedByDisplayName || 'System' }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+  
+                <div class="col-md-6">
+                  <div class="card h-100">
+                    <div class="card-header bg-light">
+                      <h5 class="mb-0">Customer Information</h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Customer Name:</div>
+                        <div class="col-md-8">{{ sale.customer }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Contact Number:</div>
+                        <div class="col-md-8">{{ sale.customerPhone || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Billing Address:</div>
+                        <div class="col-md-8">{{ sale.billingAddress || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Shipping Address:</div>
+                        <div class="col-md-8">{{ sale.shippingAddress || 'N/A' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Shipping Status:</div>
+                        <div class="col-md-8">
+                          <span class="badge"
+                            [ngClass]="{
+                              'bg-success text-white': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered', 
+                              'bg-warning text-dark': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending', 
+                              'bg-info text-white': sale.shippingStatus === 'Shipped' || sale.shippingStatus === 'shipped',
+                              'bg-secondary text-white': sale.shippingStatus === 'Returned' || sale.shippingStatus === 'returned'
+                            }">
+                            {{ sale.shippingStatus || 'Pending' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="row mb-2" *ngIf="sale.deliveryPerson">
+                        <div class="col-md-4 fw-bold">Delivery Person:</div>
+                        <div class="col-md-8">{{ sale.deliveryPerson }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+  
+              <!-- Products Table -->
+              <div class="card mb-4">
+                <div class="card-header bg-light">
+                  <h5 class="mb-0">Products</h5>
+                </div>
+                <div class="card-body">
+                  <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                      <thead class="table-light">
+                        <tr>
+                          <th>#</th>
+                          <th>Product</th>
+                          <th class="text-center">Quantity</th>
+                          <th class="text-end">Unit Price</th>
+                          <th class="text-end">Discount</th>
+                          <th class="text-end">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let product of sale.products; let i = index">
+                          <td>{{ i + 1 }}</td>
+                          <td>{{ product.name }}</td>
+                          <td class="text-center">{{ product.quantity }}</td>
+                          <td class="text-end">{{ product.unitPrice | currency }}</td>
+                          <td class="text-end">{{ product.discount | currency }}</td>
+                          <td class="text-end">{{ product.subtotal | currency }}</td>
+                        </tr>
+                        <tr *ngIf="!sale.products || sale.products.length === 0">
+                          <td colspan="6" class="text-center">No products available</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+  
+              <!-- Payment Information -->
+              <div class="row mb-4">
+                <div class="col-md-6">
+                  <div class="card h-100">
+                    <div class="card-header bg-light">
+                      <h5 class="mb-0">Payment Information</h5>
+                    </div>
+                    <div class="card-body">
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Payment Method:</div>
+                        <div class="col-md-8">
+                          <span class="badge" 
+                            [ngClass]="{
+                              'bg-success text-white': sale.paymentMethod === 'Cash',
+                              'bg-primary text-white': sale.paymentMethod === 'Card',
+                              'bg-info text-white': sale.paymentMethod === 'Bank Transfer',
+                              'bg-warning text-dark': sale.paymentMethod === 'Cheque',
+                              'bg-secondary text-white': sale.paymentMethod === 'Other' || !sale.paymentMethod
+                            }">
+                            {{ sale.paymentMethod || 'N/A' }}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="row mb-2" *ngIf="sale.paidOn">
+                        <div class="col-md-4 fw-bold">Payment Date:</div>
+                        <div class="col-md-8">{{ sale.paidOn | date: 'medium' }}</div>
+                      </div>
+                      <div class="row mb-2">
+                        <div class="col-md-4 fw-bold">Payment Amount:</div>
+                        <div class="col-md-8">{{ sale.paymentAmount | currency }}</div>
+                      </div>
+                      <div class="row mb-2" *ngIf="sale.balance">
+                        <div class="col-md-4 fw-bold">Balance:</div>
+                        <div class="col-md-8">{{ sale.balance | currency }}</div>
+                      </div>
+                      <div class="row mb-2" *ngIf="sale.changeReturn">
+                        <div class="col-md-4 fw-bold">Change Return:</div>
+                        <div class="col-md-8">{{ sale.changeReturn | currency }}</div>
+                      </div>
+                      <div class="row mb-2" *ngIf="sale.paymentNote">
+                        <div class="col-md-4 fw-bold">Payment Note:</div>
+                        <div class="col-md-8">{{ sale.paymentNote }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+  
+                <div class="col-md-6">
+<!-- In sales-view.component.html -->
+<div class="card h-100">
+  <div class="card-header bg-light">
+    <h5 class="mb-0">Order Summary</h5>
+  </div>
+  <div class="card-body">
+    <div class="row mb-2">
+      <div class="col-md-6 fw-bold">Subtotal:</div>
+      <div class="col-md-6 text-end">{{ calculateSubtotal() | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <div class="row mb-2" *ngIf="sale.discountAmount">
+      <div class="col-md-6 fw-bold">
+        Discount <span *ngIf="sale.discountType">({{ sale.discountType }})</span>:
+      </div>
+      <div class="col-md-6 text-end">-{{ sale.discountAmount | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <div class="row mb-2" *ngIf="sale.orderTax">
+      <div class="col-md-6 fw-bold">Tax ({{ sale.orderTax }}%):</div>
+      <div class="col-md-6 text-end">+{{ (calculateSubtotal() * (sale.orderTax / 100)) | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <div class="row mb-2" *ngIf="sale.shippingCharges">
+      <div class="col-md-6 fw-bold">Shipping Charges:</div>
+      <div class="col-md-6 text-end">+{{ sale.shippingCharges | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <hr>
+    
+    <div class="row">
+      <div class="col-md-6 fw-bold fs-5">Total Amount:</div>
+      <div class="col-md-6 text-end fw-bold fs-5">{{ calculateTotal() | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <div class="row mt-2" *ngIf="sale.paymentAmount">
+      <div class="col-md-6 fw-bold">Amount Paid:</div>
+      <div class="col-md-6 text-end">{{ sale.paymentAmount | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+    
+    <div class="row" *ngIf="sale.balance">
+      <div class="col-md-6 fw-bold">Balance Due:</div>
+      <div class="col-md-6 text-end">{{ sale.balance | currency:'INR':'symbol':'1.2-2' }}</div>
+    </div>
+  </div>
+</div>
+                </div>
+              </div>
+  
+              <!-- Notes Section -->
+              <div class="card mb-4" *ngIf="sale.sellNote">
+                <div class="card-header bg-light">
+                  <h5 class="mb-0">Additional Notes</h5>
+                </div>
+                <div class="card-body">
+                  <p>{{ sale.sellNote }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

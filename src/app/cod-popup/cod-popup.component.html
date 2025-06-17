@@ -1,0 +1,41 @@
+<div class="modal fade show d-block" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">COD Charges</h5>
+        <button type="button" class="close" (click)="onClose()" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="codForm" (ngSubmit)="onSubmit()">
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="packingBeforeTax">Packing Before Tax</label>
+              <input type="number" id="packingBeforeTax" formControlName="packingBeforeTax" 
+                     class="form-control" placeholder="Enter amount">
+            </div>
+            <div class="form-group col-md-4">
+              <label for="taxType">Tax Type</label>
+              <select id="taxType" formControlName="taxType" class="form-control">
+                <option *ngFor="let option of taxOptions" [value]="option.name">
+                  {{ option.name }}
+                </option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="packingCharge">Packing Charge (Final Amount)</label>
+              <input type="number" id="packingCharge" formControlName="packingCharge" 
+                     class="form-control" placeholder="Enter final amount">
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="onClose()">Cancel</button>
+            <button type="submit" class="btn btn-primary" [disabled]="!codForm.valid">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade show"></div>

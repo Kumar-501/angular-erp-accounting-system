@@ -1,0 +1,1423 @@
+import { Component, OnInit } from '@angular/core';
+import { SupplierService } from '../services/supplier.service';
+import { CustomerService } from '../services/customer.service';
+import { UserService } from '../services/user.service';
+import { Purchase, PurchaseService } from '../services/purchase.service'; // Add PurchaseService import
+import { FormGroup, FormBuilder, Validators } from '@angular/forms';
+import { PaymentService } from '../services/payment.service';
+import { getDoc } from 'firebase/firestore';import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import { Router } from '@angular/router';
+import { LocationService } from '../services/location.service';
+import { AccountService } from '../services/account.service';
+import { Subscription } from 'rxjs';
+
+
+interface Supplier {
+  id?: string;
+  
+  paymentAmount?: number; // Add this property
+
+  contactId?: string;
+  businessName?: string;
+  firstName?: string;
+  lastName?: string;
+  isIndividual?: boolean;
+  email?: string;
+  mobile?: string;
+  landline?: string;
+  alternateContact?: string;
+  assignedTo?: string;
+  createdAt?: Date | string;
+  status?: 'Active' | 'Inactive'; // Add this line
+  district?: string;
+  taxNumber?: string;
+  openingBalance?: number;
+  purchaseDue?: number;
+  purchaseReturn?: number;
+  advanceBalance?: number;
+  grandTotal?: number;
+  paymentDue?: number;
+
+  addressLine1?: string;
+  addressLine2?: string;
+    shippingAddress?: {
+    customerName?: string;
+    address1?: string;
+    address2?: string;
+    country?: string;
+    state?: string;
+    district?: string;
+    zipCode?: string;
+  };
+  city?: string;
+  state?: string;
+  country?: string;
+  zipCode?: string;
+  prefix?: string;
+  middleName?: string;
+  dob?: Date;
+  payTerm?: number;
+  contactType?: string;
+  address:string;
+}
+
+@Component({
+  selector: 'app-suppliers',
+  templateUrl: './suppliers.component.html',
+  styleUrls: ['./suppliers.component.scss']
+})
+export class SuppliersComponent implements OnInit {
+// Add these methods to your component
+onPaymentMethodChange(): void {
+  // You can add logic here if needed
+}
+  private suppliersSubscription!: Subscription;
+
+  showForm = false;
+    searchText: string = '';
+  showMoreInfo = false;
+  isIndividual = true;
+searchTimeout: any = null;
+  supplierData: Partial<Supplier> = {};
+  suppliersList: Supplier[] = [];
+  filteredSuppliers: Supplier[] = [];
+  assignedUsers: {id: string, username: string}[] = []; 
+  editingSupplierId: string | null = null;
+  statesList: string[] = []; 
+  paymentAccounts: any[] = [];
+showPaymentForm = false;
+selectedFileName = '';
+selectedFile: File | null = null;
+currentPaymentPurchase: any = null;
+paymentSummary = {
+  totalPurchase: 0,
+  totalPaid: 0,
+  totalPurchaseDue: 0,
+  openingBalance: 0,
+  openingBalanceDue: 0
+};
+
+  // In your component class
+get combinedAddress(): string {
+  const form = this.supplierForm.value;
+  const parts = [];
+  
+  if (form.addressLine1) parts.push(form.addressLine1);
+  if (form.addressLine2) parts.push(form.addressLine2);
+  if (form.city) parts.push(form.city);
+  if (form.district) parts.push(form.district);
+  if (form.state) parts.push(form.state);
+  if (form.country) parts.push(form.country);
+  if (form.zipCode) parts.push(form.zipCode);
+  
+  return parts.join(', ');
+  }
+  
+  filteredShippingDistricts: string[] = [];
+  currentPaymentSupplier: Supplier | null = null;
+  showLedgerView = false;  // Add this property
+  selectedSupplierForLedger: Supplier | null = null;
+  isFilterVisible = false;
+  dateRangeLabel: string = '';
+  isCustomDate: boolean = false;
+    isDrawerOpen = false;
+  selectedRange = '';
+// Add these properties to your component class
+isDateDrawerOpen = false;
+fromDate: string = '';
+toDate: string = '';
+// In your component class
+stateDistricts: { [key: string]: string[] } = {
+  'Kerala': [
+    'Thiruvananthapuram', 'Kollam', 'Pathanamthitta', 'Alappuzha', 
+    'Kottayam', 'Idukki', 'Ernakulam', 'Thrissur', 
+    'Palakkad', 'Malappuram', 'Kozhikode', 'Wayanad', 
+    'Kannur', 'Kasaragod'
+  ],
+  'Tamil Nadu': [
+    'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 
+    'Cuddalore', 'Dharmapuri', 'Dindigul', 'Erode', 
+    'Kallakurichi', 'Kancheepuram', 'Karur', 'Krishnagiri', 
+    'Madurai', 'Mayiladuthurai', 'Nagapattinam', 'Namakkal', 
+    'Perambalur', 'Pudukkottai', 'Ramanathapuram', 'Ranipet', 
+    'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 
+    'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 
+    'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 
+    'Tiruvarur', 'Vellore', 'Viluppuram', 'Virudhunagar'
+  ]
+};
+
+filteredDistricts: string[] = [];
+  supplierForm: FormGroup;
+  validationErrors = {
+    mobile: '',
+    landline: '',
+    alternateContact: ''
+  };
+  
+filterOptions = {
+  purchaseDue: false,
+  purchaseReturn: false,
+  advanceBalance: false,
+  openingBalance: false,
+  assignedTo: '',
+  status: '',
+  state: '',
+      fromDate: '',
+    toDate: '',
+    
+};
+
+  
+  // Moving this declaration to the constructor after fb is initialized
+  paymentForm: FormGroup;
+  // Changed entriesPerPage default value to 4
+  
+  entriesPerPage = 4;
+  currentPage = 1;
+  totalPages = 1;
+  sortColumn = 'businessName';
+  sortDirection = 'asc';
+  searchTerm = '';
+
+  constructor(
+    private supplierService: SupplierService,
+    private accountService: AccountService,
+    private customerService: CustomerService,
+    private userService: UserService,
+    private purchaseService: PurchaseService, // Add PurchaseService
+    private fb: FormBuilder,
+    private paymentService: PaymentService, // Add PaymentService injection
+    private router: Router,
+    private locationService: LocationService
+
+
+
+  ) {
+    this.supplierForm = this.fb.group({
+      contactId: [''],
+      businessName: [''],
+      firstName: [''],
+      lastName: [''],
+      middleName: [''],
+      prefix: [''],
+      dob: [null],
+     mobile: ['', [Validators.required, Validators.pattern('^[0-9]{10}$')]],
+  landline: ['', [Validators.pattern('^[0-9]{12}$')]],
+  alternateContact: ['', [Validators.pattern('^[0-9]{10}$')]],
+      email: ['', [Validators.email]],
+      createdAt: [new Date().toISOString().slice(0, 16), Validators.required],
+      district: [''], // Make sure this is included
+
+      assignedTo: [''],
+      taxNumber: [''],
+      openingBalance: [0],
+      payTerm: [0],
+      addressLine1: [''],
+      addressLine2: [''],
+      city: [''],
+      state: [''],
+      country: [''],
+      zipCode: [''],
+      
+      contactType: ['Supplier']
+    });
+
+    this.paymentForm = this.fb.group({
+      supplierName: ['', Validators.required],
+      businessName: [''],
+      paymentMethod: ['Cash', Validators.required],
+      paymentNote: [''],
+      reference: [''],
+      paidDate: [new Date().toISOString().slice(0, 16), Validators.required],
+      amount: [0, [Validators.required, Validators.min(0.01)]],
+      paymentAccount: ['', Validators.required]
+    });
+  }
+  onShippingStateChange(): void {
+  const selectedState = this.supplierForm.get('shippingState')?.value;
+  this.filteredShippingDistricts = selectedState ? this.stateDistricts[selectedState] : [];
+  // Reset district when state changes
+  this.supplierForm.patchValue({ shippingDistrict: '' });
+  }
+  onAddressChange(): void {
+  // This will trigger change detection and update the combined address display
+  this.supplierForm.updateValueAndValidity();
+  }
+  // Add this method to your SuppliersComponent class
+goToShopping(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/shopping'], {
+      queryParams: { supplierId: supplier.id }
+    });
+  }
+}
+
+get customerFullName(): string {
+  const form = this.supplierForm.value;
+  if (this.isIndividual) {
+    return `${form.prefix || ''} ${form.firstName || ''} ${form.middleName || ''} ${form.lastName || ''}`.trim();
+  } else {
+    return form.businessName || '';
+  }
+}
+  // In your component
+toggleStatus(supplier: Supplier): void {
+  const newStatus = supplier.status === 'Active' ? 'Inactive' : 'Active';
+  
+  this.supplierService.updateSupplier(supplier.id!, { status: newStatus })
+    .then(() => {
+      supplier.status = newStatus;
+      // If contact type is customer or both, update customer status too
+      if (supplier.contactType === 'Customer' || supplier.contactType === 'Both') {
+        this.customerService.updateCustomer(supplier.id!, { status: newStatus });
+      }
+    })
+    .catch(error => {
+      console.error('Error updating status:', error);
+    });
+}
+  toggleDrawer() {
+    this.isDrawerOpen = !this.isDrawerOpen;
+    // Prevent body scrolling when drawer is open
+    document.body.style.overflow = this.isDrawerOpen ? 'hidden' : '';
+  }
+  onStateChange(): void {
+  const selectedState = this.supplierForm.get('state')?.value;
+  this.filteredDistricts = selectedState ? this.stateDistricts[selectedState] : [];
+  // Reset district when state changes
+  this.supplierForm.patchValue({ district: '' });
+}
+  ngOnInit(): void {
+    this.loadSuppliers();
+    this.loadAssignedUsers();
+      this.loadStates(); // Add this line
+ this.paymentForm.valueChanges.subscribe(val => {
+    if (this.currentPaymentSupplier?.id) {
+            this.suppliersSubscription.unsubscribe();
+
+      localStorage.setItem(
+        `paymentInProgress_${this.currentPaymentSupplier.id}`,
+        JSON.stringify(val)
+      );
+    }
+  });
+  }
+  
+toggleDateDrawer(): void {
+  this.isDateDrawerOpen = !this.isDateDrawerOpen;
+}
+
+  loadSuppliers(): void {
+    this.suppliersSubscription = this.supplierService.getSuppliersRealTime().subscribe(
+      (suppliers: Supplier[]) => {
+        this.suppliersList = suppliers.map(supplier => ({
+          ...supplier,
+          createdAt: supplier.createdAt ? new Date(supplier.createdAt) : new Date(),
+          status: supplier.status === 'Active' || supplier.status === 'Inactive' 
+            ? supplier.status 
+            : undefined
+        }));
+        this.applyFilters();
+      },
+      error => {
+        console.error('Error loading suppliers:', error);
+      }
+    );
+  }
+
+viewPurchaseData(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/purchase-data'], { 
+      queryParams: { supplierId: supplier.id } 
+    });
+  }
+}
+
+// Add this method to toggle filter visibility
+toggleFilters(): void {
+  this.isFilterVisible = !this.isFilterVisible;
+}
+
+
+closePaymentForm(): void {
+  this.showPaymentForm = false;
+  this.selectedFileName = '';
+  this.selectedFile = null;
+  this.paymentForm.reset({
+    paymentMethod: 'Cash',
+    paymentAccount: this.paymentAccounts.length > 0 ? this.paymentAccounts[0].id : '',
+    reference: this.generateReferenceNumber(),
+    paidDate: new Date().toISOString().slice(0, 16),
+    amount: 0
+  });
+}
+
+  
+loadStates(): void {
+  this.supplierService.getSuppliers().subscribe(suppliers => {
+    // Get unique states from suppliers and sort them
+    this.statesList = [...new Set(
+      suppliers
+        .map(s => s.state)
+        .filter((state): state is string => !!state && state.trim() !== '')
+    )].sort((a, b) => a.localeCompare(b));
+  });
+}
+
+getAssignedUserName(userId: string): string {
+  if (!userId) return '';
+  
+  const user = this.assignedUsers.find(u => u.id === userId);
+  return user ? user.username : userId; // Fallback to ID if user not found
+}
+loadAssignedUsers(): void {
+  this.userService.getUsers().subscribe((users) => {
+    this.assignedUsers = users.map(user => ({
+      id: user.id,
+      username: user.username || user.displayName || user.email || 'Unknown User'
+    }));
+  }, error => {
+    console.error('Error loading users:', error);
+    this.assignedUsers = [];
+  });
+}
+
+applyFilters(): void {
+  let filtered = [...this.suppliersList];
+  
+  // Existing search term filter
+if (this.searchTerm) {
+    const term = this.searchTerm.toLowerCase();
+    filtered = filtered.filter(supplier => 
+      (supplier.businessName?.toLowerCase().includes(term)) || 
+        (supplier.firstName?.toLowerCase().includes(term)) ||
+        (supplier.lastName?.toLowerCase().includes(term)) ||
+        (supplier.email?.toLowerCase().includes(term)) ||
+        (supplier.mobile?.toLowerCase().includes(term)) ||
+        (supplier.contactId?.toLowerCase().includes(term)) ||
+        (supplier.landline?.toLowerCase().includes(term)) ||
+        (supplier.alternateContact?.toLowerCase().includes(term)) ||
+        (supplier.taxNumber?.toLowerCase().includes(term)) ||
+        (supplier.city?.toLowerCase().includes(term)) ||
+        (supplier.state?.toLowerCase().includes(term)) ||
+        (supplier.country?.toLowerCase().includes(term)) ||
+        (supplier.addressLine1?.toLowerCase().includes(term)) ||
+        (supplier.addressLine2?.toLowerCase().includes(term))
+    );
+  }  filtered.sort((a, b) => {
+    const valA = a[this.sortColumn as keyof Supplier] || '';
+    const valB = b[this.sortColumn as keyof Supplier] || '';
+    
+    if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+  
+  this.filteredSuppliers = filtered;
+  this.totalPages = Math.ceil(this.filteredSuppliers.length / this.entriesPerPage);
+  this.currentPage = Math.min(this.currentPage, this.totalPages);
+
+  
+  // Date range filter
+  if (this.filterOptions.fromDate) {
+    const fromDate = new Date(this.filterOptions.fromDate);
+    filtered = filtered.filter(supplier => {
+      const supplierDate = supplier.createdAt ? new Date(supplier.createdAt) : new Date();
+      return supplierDate >= fromDate;
+    });
+  }
+  
+  if (this.filterOptions.toDate) {
+    const toDate = new Date(this.filterOptions.toDate);
+    toDate.setHours(23, 59, 59, 999); // Include entire day
+    filtered = filtered.filter(supplier => {
+      const supplierDate = supplier.createdAt ? new Date(supplier.createdAt) : new Date();
+      return supplierDate <= toDate;
+    });
+  }
+  
+  // Existing checkbox filters
+  if (this.filterOptions.purchaseDue) {
+    filtered = filtered.filter(supplier => supplier.purchaseDue && supplier.purchaseDue > 0);
+  }
+  
+  if (this.filterOptions.purchaseReturn) {
+    filtered = filtered.filter(supplier => supplier.purchaseReturn && supplier.purchaseReturn > 0);
+  }
+  
+  if (this.filterOptions.advanceBalance) {
+    filtered = filtered.filter(supplier => supplier.advanceBalance && supplier.advanceBalance > 0);
+  }
+  
+  if (this.filterOptions.openingBalance) {
+    filtered = filtered.filter(supplier => supplier.openingBalance && supplier.openingBalance > 0);
+  }
+  
+  // Dropdown filters
+  if (this.filterOptions.assignedTo) {
+    filtered = filtered.filter(supplier => supplier.assignedTo === this.filterOptions.assignedTo);
+  }
+  
+  if (this.filterOptions.status) {
+    filtered = filtered.filter(supplier => supplier.status === this.filterOptions.status);
+  }
+  
+  if (this.filterOptions.state) {
+    filtered = filtered.filter(supplier => supplier.state === this.filterOptions.state);
+  }
+  
+  // Sorting
+  filtered.sort((a, b) => {
+    const valA = a[this.sortColumn as keyof Supplier] || '';
+    const valB = b[this.sortColumn as keyof Supplier] || '';
+    
+    if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
+    if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+  
+  this.filteredSuppliers = filtered;
+  this.totalPages = Math.ceil(this.filteredSuppliers.length / this.entriesPerPage);
+  this.currentPage = Math.min(this.currentPage, this.totalPages);
+}
+
+filterByDate(range: string) {
+  this.selectedRange = range;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+  switch (range) {
+    case 'today':
+      this.filterOptions.fromDate = this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'Today';
+      break;
+    case 'yesterday':
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      this.filterOptions.fromDate = this.filterOptions.toDate = this.formatDate(yesterday);
+      this.dateRangeLabel = 'Yesterday';
+      break;
+    case 'sevenDays':
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      this.filterOptions.fromDate = this.formatDate(sevenDaysAgo);
+      this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'Last 7 Days';
+      break;
+    case 'thirtyDays':
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      this.filterOptions.fromDate = this.formatDate(thirtyDaysAgo);
+      this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'Last 30 Days';
+      break;
+    case 'thisWeek':
+      const firstDayOfWeek = new Date(today);
+      firstDayOfWeek.setDate(firstDayOfWeek.getDate() - firstDayOfWeek.getDay());
+      this.filterOptions.fromDate = this.formatDate(firstDayOfWeek);
+      this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'This Week';
+      break;
+    case 'thisMonth':
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      this.filterOptions.fromDate = this.formatDate(firstDayOfMonth);
+      this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'This Month';
+      break;
+    case 'lastMonth':
+      const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      this.filterOptions.fromDate = this.formatDate(firstDayOfLastMonth);
+      this.filterOptions.toDate = this.formatDate(lastDayOfLastMonth);
+      this.dateRangeLabel = 'Last Month';
+      break;
+    case 'thisYear':
+      const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+      this.filterOptions.fromDate = this.formatDate(firstDayOfYear);
+      this.filterOptions.toDate = this.formatDate(today);
+      this.dateRangeLabel = 'This Year';
+      break;
+    case 'thisFinancialYear':
+      // April to March financial year (adjust if your financial year is different)
+      const currentMonth = today.getMonth();
+      let financialYearStart, financialYearEnd;
+      
+      if (currentMonth >= 3) { // April or later
+        financialYearStart = new Date(today.getFullYear(), 3, 1); // April 1
+        financialYearEnd = new Date(today.getFullYear() + 1, 2, 31); // March 31 next year
+      } else { // January-March
+        financialYearStart = new Date(today.getFullYear() - 1, 3, 1); // April 1 last year
+        financialYearEnd = new Date(today.getFullYear(), 2, 31); // March 31 this year
+      }
+      
+      this.filterOptions.fromDate = this.formatDate(financialYearStart);
+      this.filterOptions.toDate = today > financialYearEnd ? 
+        this.formatDate(financialYearEnd) : 
+        this.formatDate(today);
+      this.dateRangeLabel = 'This Financial Year';
+      break;
+    case 'previousFinancialYear':
+      const currentMonthPrev = today.getMonth();
+      let prevFinancialYearStart, prevFinancialYearEnd;
+      
+      if (currentMonthPrev >= 3) { // April or later
+        prevFinancialYearStart = new Date(today.getFullYear() - 1, 3, 1); // April 1 last year
+        prevFinancialYearEnd = new Date(today.getFullYear(), 2, 31); // March 31 this year
+      } else { // January-March
+        prevFinancialYearStart = new Date(today.getFullYear() - 2, 3, 1); // April 1 year before last
+        prevFinancialYearEnd = new Date(today.getFullYear() - 1, 2, 31); // March 31 last year
+      }
+      
+      this.filterOptions.fromDate = this.formatDate(prevFinancialYearStart);
+      this.filterOptions.toDate = this.formatDate(prevFinancialYearEnd);
+      this.dateRangeLabel = 'Previous Financial Year';
+      break;
+    case 'custom':
+      this.isCustomDate = true;
+      return;
+  }
+
+  this.isCustomDate = false;
+  this.isDateDrawerOpen = false;
+  this.applyFilters();
+}
+
+// Helper function to format date as YYYY-MM-DD
+private formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+
+
+clearFilters(): void {
+  this.filterOptions = {
+    purchaseDue: false,
+    purchaseReturn: false,
+    advanceBalance: false,
+    openingBalance: false,
+    assignedTo: '',
+    status: '',
+    state: '',
+    fromDate: '',
+    toDate: ''
+  };
+  this.fromDate = '';
+  this.toDate = '';
+  this.dateRangeLabel = '';
+  this.isCustomDate = false;
+  this.selectedRange = '';
+  this.applyFilters();
+}
+selectCustomRange(): void {
+  this.selectedRange = 'custom';
+  this.isCustomDate = true;
+}
+
+cancelCustomRange(): void {
+  this.isCustomDate = false;
+  this.selectedRange = '';
+}
+
+  
+applyCustomRange(): void {
+  if (this.fromDate && this.toDate) {
+    // Format dates for display
+    const fromDate = new Date(this.fromDate);
+    const toDate = new Date(this.toDate);
+    this.dateRangeLabel = `${fromDate.toLocaleDateString()} - ${toDate.toLocaleDateString()}`;
+    
+    // Update filter options
+    this.filterOptions = {
+      ...this.filterOptions,
+      fromDate: this.fromDate,
+      toDate: this.toDate
+    };
+    
+    this.applyFilters();
+    this.toggleDateDrawer(); // Close drawer after applying
+  }
+}
+// In your component class
+sortBy(column: string): void {
+  if (this.sortColumn === column) {
+    // Toggle direction if same column clicked again
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    // New column, default to ascending
+    this.sortColumn = column;
+    this.sortDirection = 'asc';
+  }
+  
+  // Apply the sorting
+  this.applyFilters();
+}
+get paginatedSuppliers(): Supplier[] {
+  const start = (this.currentPage - 1) * this.entriesPerPage;
+  const end = start + this.entriesPerPage;
+  return this.filteredSuppliers.slice(start, end);
+}
+
+  prevPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+    }
+  }
+
+  toggleForm(): void {
+    this.showForm = !this.showForm;
+    if (this.showForm && !this.editingSupplierId) {
+      const contactId = this.generateContactId();
+      this.supplierForm.patchValue({ contactId });
+    }
+    if (!this.showForm) {
+      this.resetForm();
+    }
+  }
+
+  resetForm(): void {
+    this.supplierForm.reset({
+      contactType: 'Supplier',
+      openingBalance: 0,
+      payTerm: 0
+    });
+    this.supplierData = {};
+    this.editingSupplierId = null;
+    this.showMoreInfo = false;
+    this.isIndividual = true;
+    this.clearValidationErrors();
+  }
+
+  clearValidationErrors(): void {
+    this.validationErrors = {
+      mobile: '',
+      landline: '',
+      alternateContact: ''
+    };
+  }
+
+  toggleMoreInfo(): void {
+    this.showMoreInfo = !this.showMoreInfo;
+  }
+
+  onContactTypeChange(): void {
+    const contactType = this.supplierForm.get('contactType')?.value;
+    this.supplierForm.reset({
+      contactType,
+      openingBalance: 0,
+      payTerm: 0
+    });
+    const contactId = this.generateContactId();
+    this.supplierForm.patchValue({ contactId });
+  }
+  
+validatePhoneNumber(field: string): boolean {
+  const control = this.supplierForm.get(field);
+  if (!control) return true;
+  
+  if (control.value && control.value.length > 0) {
+    let pattern: RegExp;
+    let errorMessage: string;
+    
+    switch(field) {
+      case 'mobile':
+      case 'alternateContact':
+        pattern = /^[0-9]{10}$/;
+        errorMessage = 'Must be exactly 10 digits';
+        break;
+      case 'landline':
+        pattern = /^[0-9]{12}$/;
+        errorMessage = 'Must be exactly 12 digits';
+        break;
+      default:
+        return true;
+    }
+    
+    if (!pattern.test(control.value)) {
+      this.validationErrors[field as keyof typeof this.validationErrors] = errorMessage;
+      return false;
+    }
+  }
+  
+  this.validationErrors[field as keyof typeof this.validationErrors] = '';
+  return true;
+}
+  saveSupplier(): void {
+    // Validate all phone fields
+  const isMobileValid = this.validatePhoneNumber('mobile');
+  const isLandlineValid = this.validatePhoneNumber('landline');
+  const isAlternateValid = this.validatePhoneNumber('alternateContact');
+    
+    if (!isMobileValid || !isLandlineValid || !isAlternateValid) {
+      return;
+    }
+    
+    if (this.isIndividual && !this.supplierForm.get('firstName')?.value) {
+      alert('First Name is required for individuals');
+      return;
+    }
+    
+    if (!this.isIndividual && !this.supplierForm.get('businessName')?.value) {
+      alert('Business Name is required for businesses');
+      return;
+    }
+    
+    if (!this.supplierForm.get('mobile')?.value) {
+      alert('Mobile number is required');
+      return;
+    }
+    
+    // Update supplierData from form values
+    this.supplierData = {
+      ...this.supplierForm.value,
+      isIndividual: this.isIndividual,
+          createdAt: new Date(this.supplierForm.value.createdAt)
+
+    };
+    
+      this.supplierData = {
+    ...this.supplierForm.value,
+        isIndividual: this.isIndividual,
+        district: this.supplierForm.value.district || null, // Add this line
+
+    createdAt: new Date(this.supplierForm.value.createdAt) // Ensure this is a Date object
+  };
+  
+    if (this.editingSupplierId) {
+      this.updateExistingSupplier();
+    } else {
+      this.addNewSupplier();
+    }
+  }
+
+  addNewSupplier(): void {
+    if (!this.supplierData.contactId) {
+      this.supplierData.contactId = this.generateContactId();
+    }
+    
+    if (this.supplierData.contactType === 'Supplier') {
+      this.supplierService.addSupplier(this.supplierData as Supplier)
+        .then(() => {
+          this.toggleForm();
+          this.loadSuppliers();
+          alert('Supplier added successfully!');
+          
+        })
+        .catch((error) => {
+          console.error('Error adding supplier: ', error);
+          alert('Error adding supplier. Please try again.');
+        });
+    } else if (this.supplierData.contactType === 'Customer') {
+      this.customerService.addCustomer(this.supplierData as any)
+        .then(() => {
+          this.toggleForm();
+          this.loadSuppliers();
+          alert('Customer added successfully!');
+        })
+        .catch((error) => {
+          console.error('Error adding customer: ', error);
+          alert('Error adding customer. Please try again.');
+        });
+    } else if (this.supplierData.contactType === 'Both') {
+      Promise.all([
+        this.supplierService.addSupplier(this.supplierData as Supplier),
+        this.customerService.addCustomer(this.supplierData as any)
+      ])
+      .then(() => {
+        this.toggleForm();
+        this.loadSuppliers();
+        alert('Contact added to both Suppliers and Customers successfully!');
+      })
+      .catch((error) => {
+        console.error('Error adding contact: ', error);
+        alert('Error adding contact. Please try again.');
+      });
+    }
+  }
+
+  updateExistingSupplier(): void {
+    if (this.editingSupplierId) {
+      if (this.supplierData.contactType === 'Supplier') {
+        this.supplierService.updateSupplier(this.editingSupplierId, this.supplierData as Supplier)
+          .then(() => {
+            this.toggleForm();
+            this.loadSuppliers();
+            alert('Supplier updated successfully!');
+          })
+          .catch((error) => {
+            console.error('Error updating supplier: ', error);
+            alert('Error updating supplier. Please try again.');
+          });
+      } else if (this.supplierData.contactType === 'Customer') {
+        this.customerService.updateCustomer(this.editingSupplierId, this.supplierData as any)
+          .then(() => {
+            this.toggleForm();
+            this.loadSuppliers();
+            alert('Customer updated successfully!');
+          })
+          .catch((error) => {
+            console.error('Error updating customer: ', error);
+            alert('Error updating customer. Please try again.');
+          });
+      } else if (this.supplierData.contactType === 'Both') {
+        Promise.all([
+          this.supplierService.updateSupplier(this.editingSupplierId, this.supplierData as Supplier),
+          this.customerService.updateCustomer(this.editingSupplierId, this.supplierData as any)
+        ])
+        .then(() => {
+          this.toggleForm();
+          this.loadSuppliers();
+          alert('Contact updated in both Suppliers and Customers successfully!');
+        })
+        .catch((error) => {
+          console.error('Error updating contact: ', error);
+          alert('Error updating contact. Please try again.');
+        });
+      }
+    }
+  }
+
+editSupplier(supplier: Supplier): void {
+  // Convert createdAt to the correct format for datetime-local input
+  let createdAtFormatted = '';
+  if (supplier.createdAt) {
+    try {
+      // Ensure createdAt is a Date object
+      const date = supplier.createdAt instanceof Date ? 
+        supplier.createdAt : 
+        new Date(supplier.createdAt);
+      
+      // Check if the date is valid
+      if (!isNaN(date.getTime())) {
+        createdAtFormatted = date.toISOString().slice(0, 16);
+      } else {
+        createdAtFormatted = new Date().toISOString().slice(0, 16);
+      }
+    } catch (e) {
+      createdAtFormatted = new Date().toISOString().slice(0, 16);
+    }
+  } else {
+    createdAtFormatted = new Date().toISOString().slice(0, 16);
+  }
+
+  // Reset form first
+  this.supplierForm.reset({
+    contactType: supplier.contactType || 'Supplier',
+    openingBalance: supplier.openingBalance || 0,
+    payTerm: supplier.payTerm || 0
+  });
+
+  // Patch the form with supplier data
+  this.supplierForm.patchValue({
+    ...supplier,
+    createdAt: createdAtFormatted,
+    assignedTo: supplier.assignedTo,
+    district: supplier.district || ''
+  });
+
+  // Set component state
+  this.supplierData = { ...supplier };
+  this.editingSupplierId = supplier.id || null;
+  this.isIndividual = supplier.isIndividual ?? true;
+  this.showForm = true;
+
+  // If state is set, filter districts
+  if (supplier.state) {
+    this.filteredDistricts = this.stateDistricts[supplier.state] || [];
+  }
+
+  // Expand more info section if relevant fields exist
+  if (supplier.taxNumber || supplier.addressLine1 || supplier.openingBalance) {
+    this.showMoreInfo = true;
+  }
+}
+onFileSelected(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  if (input.files && input.files.length > 0) {
+    this.selectedFile = input.files[0];
+    this.selectedFileName = this.selectedFile.name;
+  }
+}
+
+calculateRemainingBalance(amountPaid: number): number {
+  if (!this.currentPaymentPurchase) return 0;
+  
+  const totalOwed = (this.paymentSummary.totalPurchase + this.paymentSummary.openingBalance) || 0;
+  const alreadyPaid = this.paymentSummary.totalPaid || 0;
+  const balanceDue = totalOwed - alreadyPaid;
+  
+  return Math.max(balanceDue - amountPaid, 0);
+}
+  // Add showSnackbar method
+  showSnackbar(message: string, type: 'success' | 'error'): void {
+    const snackbar = document.createElement('div');
+    snackbar.className = `snackbar ${type}`;
+    snackbar.textContent = message;
+    document.body.appendChild(snackbar);
+    
+    // Show the snackbar
+    setTimeout(() => {
+      snackbar.className += ' show';
+    }, 100);
+    
+    // Remove the snackbar after 3 seconds
+    setTimeout(() => {
+      snackbar.className = snackbar.className.replace(' show', '');
+      setTimeout(() => {
+        document.body.removeChild(snackbar);
+      }, 500);
+    }, 3000);
+  }
+  loadPurchases(): void {
+  if (this.currentPaymentSupplier?.id) {
+    this.purchaseService.getPurchasesBySupplier(this.currentPaymentSupplier.id)
+      .subscribe(purchases => {
+        // Handle purchases if needed
+      });
+  }
+}
+async addPayment(supplier: Supplier): Promise<void> {
+  this.currentPaymentSupplier = supplier;
+  
+  // Use callback pattern instead of Observable
+  const unsubscribe = this.accountService.getAccounts((accounts: any[]) => {
+    this.paymentAccounts = accounts;
+    
+    // Calculate payment summary
+    this.paymentSummary = {
+      totalPurchase: 0, // You may need to load purchases to calculate this
+      totalPaid: 0,
+      totalPurchaseDue: 0,
+      openingBalance: supplier?.openingBalance || 0,
+      openingBalanceDue: supplier?.openingBalance || 0
+    };
+    
+    // Initialize form
+    this.paymentForm.patchValue({
+      supplierName: supplier?.businessName || `${supplier?.firstName} ${supplier?.lastName || ''}`.trim(),
+      amount: supplier?.openingBalance || 0,
+      reference: this.generateReferenceNumber()
+    });
+    
+    this.showPaymentForm = true;
+    
+    // Clean up the subscription if needed
+    if (unsubscribe) {
+      unsubscribe();
+    }
+  });
+}
+
+async submitPayment(): Promise<void> {
+  if (this.paymentForm.invalid || !this.currentPaymentSupplier) {
+    return;
+  }
+  
+  try {
+    const supplierId = this.currentPaymentSupplier.id!;
+    const supplierName = this.currentPaymentSupplier.businessName ||
+      `${this.currentPaymentSupplier.firstName} ${this.currentPaymentSupplier.lastName || ''}`.trim();
+    
+    const paymentData = {
+      supplierId,
+      supplierName,
+      amount: this.paymentForm.value.amount,
+      paymentDate: new Date(this.paymentForm.value.paidDate),
+      paymentMethod: this.paymentForm.value.paymentMethod,
+      paymentNote: this.paymentForm.value.paymentNote,
+      reference: this.paymentForm.value.reference,
+      document: this.selectedFileName,
+      paymentAccount: this.paymentForm.value.paymentAccount,
+      type: 'supplier'
+    };
+
+    // 1. Save payment record
+    const paymentId = await this.paymentService.addSupplierPayment(paymentData);
+
+    // 2. Update supplier balance
+     await this.supplierService.updateSupplierBalance(
+      this.currentPaymentPurchase.supplierId, 
+      paymentData.amount, 
+      true, // isPayment
+      false // updateOpeningBalance
+    );
+    // 3. Record the transaction in the account book
+    await this.accountService.recordTransaction(
+      paymentData.paymentAccount,
+      {
+        amount: paymentData.amount,
+        type: 'expense',
+        date: paymentData.paymentDate,
+        description: `Payment to supplier ${supplierName}`,
+        reference: paymentData.reference,
+        category: 'Supplier Payments'
+      }
+    );
+
+    // 4. Update the account balance
+ await this.accountService.updateAccountBalance(
+      paymentData.paymentAccount,
+      -paymentData.amount // Negative amount for debit
+    );
+    this.loadPurchases();
+    this.closePaymentForm();
+
+    // 5. Get all purchases for this supplier that have outstanding balances
+    const purchases = await this.purchaseService.getPurchasesBySupplier(supplierId).toPromise();
+    
+    if (purchases && purchases.length > 0) {
+      let remainingAmount = paymentData.amount;
+      
+      // Sort purchases by date (oldest first) to apply payments chronologically
+      const sortedPurchases = [...purchases].sort((a, b) => {
+        const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+        const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+        return dateA - dateB;
+      });
+
+      // Apply payment to each purchase until payment amount is exhausted
+      for (const purchase of sortedPurchases) {
+        if (remainingAmount <= 0) break;
+        
+        if (!purchase.id) {
+          console.warn('Purchase without ID found, skipping:', purchase);
+          continue;
+        }
+        
+        const paymentDue = purchase.paymentDue || 0;
+        
+        if (paymentDue > 0) {
+          const paymentAmount = Math.min(remainingAmount, paymentDue);
+          
+          // Update purchase with payment
+          await this.purchaseService.updatePurchase(purchase.id, {
+            paymentAmount: (purchase.paymentAmount || 0) + paymentAmount,
+            paymentDue: paymentDue - paymentAmount,
+            paymentStatus: (paymentDue - paymentAmount) <= 0 ? 'Paid' : 'Partial',
+            updatedAt: new Date()
+          });
+          
+          remainingAmount -= paymentAmount;
+        }
+      }
+
+      // If there's remaining amount after paying all purchases, apply to opening balance
+      if (remainingAmount > 0) {
+        await this.supplierService.updateSupplierBalance(
+          supplierId,
+          remainingAmount,
+          true, // isPayment
+          true // updateOpeningBalance
+        );
+      }
+    } else {
+      // No purchases - apply entire amount to opening balance
+      await this.supplierService.updateSupplierBalance(
+        supplierId,
+        paymentData.amount,
+        true, // isPayment
+        true // updateOpeningBalance
+      );
+    }
+
+    // Clean up and refresh
+    localStorage.removeItem(`paymentInProgress_${supplierId}`);
+    this.showSnackbar('Payment processed successfully!', 'success');
+    this.closePaymentForm();
+    this.loadSuppliers(); // Refresh supplier list
+    
+    // Also refresh purchases if we're on the purchases page
+    if (this.router.url.includes('/list-purchase')) {
+this.purchaseService['refreshPurchases']();
+    }
+    
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    this.showSnackbar('Error processing payment', 'error');
+  }
+}
+
+  viewPaymentHistory(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/suppliers', supplier.id, 'payments']);
+  }
+}
+  deleteSupplier(id?: string): void {
+    if (!id) return;
+    
+    if (confirm('Are you sure you want to delete this supplier?')) {
+      this.supplierService.deleteSupplier(id)
+        .then(() => {
+          this.loadSuppliers();
+          alert('Supplier deleted successfully!');
+        })
+        .catch((error) => {
+          console.error('Error deleting supplier: ', error);
+          alert('Error deleting supplier. Please try again.');
+        });
+    }
+  }
+generateReferenceNumber(): string {
+  return 'PAY-' + new Date().getTime().toString().slice(-6);
+}
+
+  generateContactId(): string {
+    const existingIds = this.suppliersList
+      .map(s => s.contactId || '')
+      .filter(id => id.startsWith('SU'))
+      .map(id => parseInt(id.substring(2), 10) || 0);
+    
+    const maxId = Math.max(0, ...existingIds);
+    return `SU${String(maxId + 1).padStart(4, '0')}`;
+  }
+  exportCSV(): void {
+    try {
+      // Prepare data for CSV
+      const csvData = this.filteredSuppliers.map(supplier => ({
+        'Contact ID': supplier.contactId || '',
+        'Name': supplier.isIndividual 
+          ? `${supplier.prefix || ''} ${supplier.firstName || ''} ${supplier.middleName || ''} ${supplier.lastName || ''}`.trim() 
+          : supplier.businessName || '',
+        'Mobile': supplier.mobile || '',
+        'Email': supplier.email || '',
+        'Landline': supplier.landline || '',
+        'Alternate Contact': supplier.alternateContact || '',
+        'Tax Number': supplier.taxNumber || '',
+        'Opening Balance': supplier.openingBalance || 0,
+        'Purchase Due': supplier.purchaseDue || 0,
+        'Purchase Return': supplier.purchaseReturn || 0,
+        'Advance Balance': supplier.advanceBalance || 0,
+        'Status': supplier.status || '',
+        'Assigned To': supplier.assignedTo || '',
+        'Address': `${supplier.addressLine1 || ''} ${supplier.addressLine2 || ''}`.trim(),
+        'City': supplier.city || '',
+        'State': supplier.state || '',
+        'Country': supplier.country || '',
+        'Zip Code': supplier.zipCode || ''
+      }));
+  
+      // Create CSV content
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Add headers
+      const headers = Object.keys(csvData[0]);
+      csvContent += headers.join(",") + "\r\n";
+      
+      // Add rows
+      csvData.forEach(row => {
+        const values = headers.map(header => {
+          const value = row[header as keyof typeof row];
+          // Escape quotes and wrap in quotes if contains commas
+          return typeof value === 'string' && value.includes(',') 
+            ? `"${value.replace(/"/g, '""')}"` 
+            : value;
+        });
+        csvContent += values.join(",") + "\r\n";
+      });
+      
+      // Create download link
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `suppliers_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      
+      // Trigger download
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV. Please try again.');
+    }
+  }
+  
+  exportExcel(): void {
+    try {
+      // Prepare data for Excel
+      const excelData = this.filteredSuppliers.map(supplier => ({
+        'Contact ID': supplier.contactId || '',
+        'Name': supplier.isIndividual 
+          ? `${supplier.prefix || ''} ${supplier.firstName || ''} ${supplier.middleName || ''} ${supplier.lastName || ''}`.trim() 
+          : supplier.businessName || '',
+        'Mobile': supplier.mobile || '',
+        'Email': supplier.email || '',
+        'Landline': supplier.landline || '',
+        'Alternate Contact': supplier.alternateContact || '',
+        'Tax Number': supplier.taxNumber || '',
+        'Opening Balance': supplier.openingBalance || 0,
+        'Purchase Due': supplier.purchaseDue || 0,
+        'Purchase Return': supplier.purchaseReturn || 0,
+        'Advance Balance': supplier.advanceBalance || 0,
+        'Status': supplier.status || '',
+        'Assigned To': supplier.assignedTo || '',
+        'Address Line 1': supplier.addressLine1 || '',
+        'Address Line 2': supplier.addressLine2 || '',
+        'City': supplier.city || '',
+        'State': supplier.state || '',
+        'Country': supplier.country || '',
+        'Zip Code': supplier.zipCode || ''
+      }));
+      
+      // Create worksheet
+      const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(excelData);
+      
+      // Create workbook
+      const wb: XLSX.WorkBook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Suppliers');
+      
+      // Generate file and download
+      XLSX.writeFile(wb, `suppliers_${new Date().toISOString().slice(0,10)}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      alert('Error exporting Excel. Please try again.');
+    }
+  }
+
+
+async payCash(supplier: Supplier): Promise<void> {
+  this.currentPaymentSupplier = supplier;
+  
+  // Check if there's a saved payment in progress for this supplier
+  const savedPayment = localStorage.getItem(`paymentInProgress_${supplier.id}`);
+  
+  // Load payment accounts
+  const unsubscribe = this.accountService.getAccounts((accounts: any[]) => {
+    this.paymentAccounts = accounts.filter((account: { accountHead: { value: string | string[]; }; }) => 
+      account.accountHead?.value?.includes('Asset') ||
+      account.accountHead?.value?.includes('Cash') ||
+      account.accountHead?.value?.includes('Bank')
+    );
+    
+    // Calculate total payment due from all purchases for this supplier
+    this.purchaseService.getPurchasesBySupplier(supplier.id || '').subscribe((purchases: Purchase[]) => {
+      // Calculate total purchase amount and total paid amount
+      const totalPurchase = purchases.reduce((sum, purchase) => sum + (purchase.grandTotal || purchase.purchaseTotal || 0), 0);
+      const totalPaid = purchases.reduce((sum, purchase) => sum + (purchase.paymentAmount || 0), 0);
+      
+      // Calculate opening balance (from supplier record)
+      const openingBalance = supplier.openingBalance || 0;
+      
+      // Calculate total balance due (opening balance + purchases - payments)
+      const totalBalanceDue = openingBalance + totalPurchase - totalPaid;
+      
+      // Generate payment reference
+      const refNumber = 'PAY-' + new Date().getTime().toString().slice(-6);
+      
+      // Initialize form with saved payment data or default values
+      this.paymentForm.reset({
+        supplierName: supplier.isIndividual 
+          ? `${supplier.firstName} ${supplier.lastName || ''}`.trim()
+          : supplier.businessName,
+        businessName: supplier.businessName || '',
+        paymentMethod: savedPayment ? JSON.parse(savedPayment).paymentMethod : 'Cash',
+        paymentAccount: savedPayment ? JSON.parse(savedPayment).paymentAccount : 
+                       this.paymentAccounts.length > 0 ? this.paymentAccounts[0].id : '',
+        reference: refNumber,
+        paidDate: savedPayment ? JSON.parse(savedPayment).paidDate : new Date().toISOString().slice(0, 16),
+        amount: savedPayment ? JSON.parse(savedPayment).amount : 
+                totalBalanceDue > 0 ? totalBalanceDue : 0,
+        paymentNote: savedPayment ? JSON.parse(savedPayment).paymentNote : ''
+      });
+      
+      // Update payment summary for display
+      this.paymentSummary = {
+        totalPurchase: totalPurchase,
+        totalPaid: totalPaid,
+        totalPurchaseDue: totalPurchase - totalPaid,
+        openingBalance: openingBalance,
+        openingBalanceDue: openingBalance
+      };
+      
+      this.showPaymentForm = true;
+    });
+  });
+}
+receiveCash(supplier: Supplier): void {
+  console.log('Receive Cash from supplier:', supplier);
+  // Implement your receive cash logic here
+  alert(`Receive Cash from ${supplier.businessName || supplier.firstName}`);
+}
+
+// In suppliers.component.ts
+viewSupplier(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/supplier-view', supplier.id]);
+  }
+}
+
+printSupplier(supplier: Supplier): void {
+  console.log('Print supplier:', supplier);
+  // Implement your print logic here
+  alert(`Printing details for ${supplier.businessName || supplier.firstName}`);
+}
+
+// This method should be called when clicking "Ledger" in the actions dropdown
+openLedger(supplier: Supplier): void {
+  this.selectedSupplierForLedger = supplier;
+  this.showLedgerView = true;
+  if (supplier.id) {
+    this.router.navigate(['/suppliers', supplier.id, 'ledger']);
+  }
+  // Load payment summary data
+  this.purchaseService.getPurchasesBySupplier(supplier.id || '').subscribe((purchases: any[]) => {
+    const totalPurchase = purchases.reduce((sum: any, purchase: { grandTotal: any; }) => sum + (purchase.grandTotal || 0), 0);
+    const totalPaid = purchases.reduce((sum: any, purchase: { paymentAmount: any; }) => sum + (purchase.paymentAmount || 0), 0);
+    
+    // Update the payment summary
+    this.paymentSummary = {
+      totalPurchase,
+      totalPaid,
+      totalPurchaseDue: totalPurchase - totalPaid,
+      openingBalance: supplier.openingBalance || 0,
+      openingBalanceDue: supplier.openingBalance || 0
+    };
+  });
+}
+
+closeLedgerView(): void {
+  this.showLedgerView = false;
+  this.selectedSupplierForLedger = null;
+}
+
+
+
+
+// In suppliers.component.ts
+viewPurchases(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/suppliers', supplier.id, 'purchases']);
+  }
+}
+viewStockReport(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/suppliers', supplier.id, 'purchases'], { 
+      queryParams: { tab: 'stock-report' } 
+    });
+  }
+}
+
+viewDocuments(supplier: Supplier): void {
+  if (supplier.id) {
+    this.router.navigate(['/suppliers', supplier.id, 'purchases'], { 
+      queryParams: { tab: 'documents' } 
+    });
+  }
+}
+  exportPDF(): void {
+    console.log('Exporting to PDF:', this.filteredSuppliers);
+  }
+
+}

@@ -1,0 +1,75 @@
+<div class="holiday-container">
+    <button class="btn-add" (click)="openPopup()">Add +</button>
+  
+    <div *ngIf="showPopup" class="popup-overlay">
+      <div class="popup">
+        <button class="close-button" (click)="closePopup()">
+          <i class="fas fa-times"></i>
+        </button>
+  
+        <form [formGroup]="holidayForm" (ngSubmit)="saveHoliday()">
+          <h3>Add Holiday</h3>
+  
+          <div class="form-group">
+            <label for="name">Holiday Name:*</label>
+            <input id="name" formControlName="name" placeholder="Enter holiday name" />
+          </div>
+  
+          <div class="form-group">
+            <label for="startDate">Start Date:*</label>
+            <input type="date" id="startDate" formControlName="startDate" />
+          </div>
+  
+          <div class="form-group">
+            <label for="endDate">End Date:*</label>
+            <input type="date" id="endDate" formControlName="endDate" />
+          </div>
+  
+          <div class="form-group">
+            <label for="businessLocation">Business Location:*</label>
+            <select id="businessLocation" formControlName="businessLocation">
+              <option value="" disabled>Select a location</option>
+              <option *ngFor="let location of locations" [value]="location.id">
+                {{ location.name }}
+              </option>
+            </select>
+          </div>
+  
+          <div class="form-group">
+            <label for="note">Note:</label>
+            <textarea id="note" formControlName="note" placeholder="Enter any additional notes"></textarea>
+          </div>
+  
+          <div class="form-actions">
+            <button type="submit" class="btn-save">Save</button>
+            <button type="button" class="btn-close" (click)="closePopup()">Close</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  
+    <div class="holidays-list">
+      <h2>Holidays List</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Location</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let holiday of holidays">
+            <td>{{ holiday.name }}</td>
+            <td>{{ holiday.startDate | date }}</td>
+            <td>{{ holiday.endDate | date }}</td>
+            <td>{{ getLocationName(holiday.businessLocation) }}</td>
+            <td>{{ holiday.note }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  

@@ -1,0 +1,182 @@
+<div class="life-stage-container">
+  <div class="header">
+    <h2>Life Stage <span class="manage-text">Manage Life Stage</span> <i class="info-icon">i</i></h2>
+  </div>
+
+  <div class="content-card">
+    <div class="top-actions">
+      <button class="add-button" (click)="toggleAddModal()">
+        <i class="plus-icon">+</i> Add
+      </button>
+      <button class="column-visibility-btn" (click)="toggleColumnModal()">
+        <i class="columns-icon">≡</i> Columns
+      </button>
+    </div>
+<!-- Column Visibility Modal -->
+<div class="modal" *ngIf="showColumnModal">
+  <div class="modal-content column-modal">
+    <div class="modal-header">
+      <h3>Column Visibility</h3>
+    </div>
+    <div class="modal-body">
+      <div class="checkbox-group">
+        <div class="checkbox-item select-all">
+          <!-- Change this line in your template -->
+<input type="checkbox" id="selectAll" 
+[checked]="allColumnsVisible" 
+(change)="toggleAllColumns($any($event.target).checked)">
+          <label for="selectAll"><strong>Select All</strong></label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="colName" [(ngModel)]="columns.name">
+          <label for="colName">Life Stage</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="colDesc" [(ngModel)]="columns.description">
+          <label for="colDesc">Description</label>
+        </div>
+        <div class="checkbox-item">
+          <input type="checkbox" id="colAction" [(ngModel)]="columns.action">
+          <label for="colAction">Action</label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="close-btn" (click)="toggleColumnModal()">Close</button>
+      <button class="save-btn" (click)="applyColumnVisibility()">Apply</button>
+    </div>
+  </div>
+</div>
+    <div class="table-controls">
+      <div class="entries-control">
+        Show
+        <select [(ngModel)]="entriesPerPage" (change)="updatePagination()">
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        entries
+      </div>
+
+      <div class="export-controls">
+        <button class="export-btn" (click)="exportToCsv()">
+          <i class="export-icon">↓</i> Export CSV
+        </button>
+      
+        <button class="export-btn" (click)="print()">
+          <i class="print-icon">⎙</i> Print
+        </button>
+    
+     
+      </div>
+
+      <div class="search-control">
+        <input type="text" placeholder="Search..." [(ngModel)]="searchText" (input)="applyFilter()">
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th *ngIf="columns.name" (click)="sortBy('name')">
+              Life Stage
+              <i class="sort-icon">⇕</i>
+            </th>
+            <th *ngIf="columns.description" (click)="sortBy('description')">
+              Description
+              <i class="sort-icon">⇕</i>
+            </th>
+            <th *ngIf="columns.action">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="filteredLifeStages.length === 0">
+            <td [attr.colspan]="visibleColumnsCount" class="no-data">No data available in table</td>
+          </tr>
+          <tr *ngFor="let stage of paginatedLifeStages">
+            <td *ngIf="columns.name">{{ stage.name }}</td>
+            <td *ngIf="columns.description">{{ stage.description }}</td>
+            <td *ngIf="columns.action" class="action-buttons">
+              <button class="edit-btn" (click)="editLifeStage(stage)">Edit</button>
+              <button class="delete-btn" (click)="confirmDelete(stage)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      <div class="showing-entries">
+        Showing {{ startEntry }} to {{ endEntry }} of {{ totalEntries }} entries
+      </div>
+      <div class="pagination">
+        <button [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+        <button [disabled]="currentPage >= totalPages" (click)="nextPage()">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Life Stage Modal -->
+<div class="modal" *ngIf="showAddModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Add Life Stage</h3>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="lifeStageName">Life Stage*</label>
+        <input type="text" id="lifeStageName" [(ngModel)]="newLifeStage.name" placeholder="Enter life stage name">
+      </div>
+      <div class="form-group">
+        <label for="lifeStageDesc">Description*</label>
+        <textarea id="lifeStageDesc" [(ngModel)]="newLifeStage.description" placeholder="Enter description"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="close-btn" (click)="toggleAddModal()">Close</button>
+      <button class="save-btn" (click)="saveLifeStage()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Life Stage Modal -->
+<div class="modal" *ngIf="showEditModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Edit Life Stage</h3>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="editLifeStageName">Life Stage*</label>
+        <input type="text" id="editLifeStageName" [(ngModel)]="editingLifeStage.name" placeholder="Enter life stage name">
+      </div>
+      <div class="form-group">
+        <label for="editLifeStageDesc">Description*</label>
+        <textarea id="editLifeStageDesc" [(ngModel)]="editingLifeStage.description" placeholder="Enter description"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="close-btn" (click)="toggleEditModal()">Close</button>
+      <button class="save-btn" (click)="updateLifeStage()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal" *ngIf="showDeleteModal">
+  <div class="modal-content delete-modal">
+    <div class="modal-header">
+      <h3>Confirm Delete</h3>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to delete the life stage "{{ stageToDelete?.name }}"?</p>
+    </div>
+    <div class="modal-footer">
+      <button class="close-btn" (click)="toggleDeleteModal()">Cancel</button>
+      <button class="delete-btn" (click)="deleteLifeStage()">Delete</button>
+    </div>
+  </div>
+</div>
+

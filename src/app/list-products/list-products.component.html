@@ -1,0 +1,735 @@
+<div class="container-fluid px-4 py-3">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-0">Products</h2>
+      <p class="text-muted mb-0">Manage your products</p>
+    </div>
+    <button class="btn btn-primary" (click)="navigateToAddProduct()">
+      <i class="fas fa-plus me-2"></i>Add Product
+    </button>
+  </div>
+  <div class="row mb-3">
+    
+    </div>
+   <!-- In the filter controls section -->
+<div class="col-md-4">
+  <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyLocationFilter()">
+    <option value="">All Locations</option>
+    <option *ngFor="let location of locations" [value]="location.id">
+      {{ location.name }}
+    </option>
+  </select>
+</div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <!-- Filters and Controls -->
+      <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-bottom">
+        <div class="d-flex align-items-center mb-2 mb-md-0">
+          <div class="me-3">
+            <label class="form-label mb-0">Show</label>
+            <select class="form-select form-select-sm" [(ngModel)]="itemsPerPage" (change)="updatePaginatedProducts()">
+              <option>25</option>
+              <option>50</option>
+              <option>100</option>
+            </select>
+          </div>
+          
+          <div class="btn-group ms-2">
+            <button class="btn btn-sm btn-outline-secondary" (click)="exportToCSV()">
+              <i class="fas fa-file-csv me-1"></i>CSV
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" (click)="exportToExcel()">
+              <i class="fas fa-file-excel me-1"></i>Excel
+            </button>
+          
+            <button class="btn btn-sm btn-outline-secondary" (click)="print()">
+              <i class="fas fa-print me-1"></i>Print
+            </button>
+            <button class="btn btn-outline-secondary me-2" (click)="toggleFilterSidebar()">
+  <i class="fas fa-filter me-1"></i> Filters
+</button>
+          </div>
+        </div>
+        
+        <div class="search-box">
+          <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+            <input 
+              type="text" 
+              class="form-control" 
+              placeholder="Search products..." 
+              [(ngModel)]="searchText" 
+              (input)="onSearchInput()"
+              aria-label="Search products"
+            >
+          </div>
+        </div>
+      </div>
+<!-- Add this after the "Add Product" button in the header -->
+<div class="d-flex align-items-center">
+  <div class="dropdown me-2" *ngIf="hasSelectedProducts()">
+    <button class="btn btn-outline-danger dropdown-toggle" type="button" 
+            data-bs-toggle="dropdown" aria-expanded="false">
+      <i class="fas fa-trash me-1"></i> Bulk Actions
+    </button>
+    <ul class="dropdown-menu">
+      <li>
+        <button class="dropdown-item text-danger" (click)="deleteSelectedProducts()">
+          <i class="fas fa-trash me-2"></i> Delete Selected
+        </button>
+      </li>
+    </ul>
+  </div>
+  <span class="text-muted me-2" *ngIf="hasSelectedProducts()">
+    {{ getSelectedCount() }} selected
+  </span>
+</div><!-- Add this at the end of your container div (before closing) -->
+<div class="filter-sidebar" [class.show]="showFilterSidebar">
+  <div class="filter-sidebar-header">
+    <h5>Filters</h5>
+    <button class="btn-close" (click)="toggleFilterSidebar()"></button>
+  </div>
+  <!-- Add this near your other filter controls -->
+<div class="filter-drawer-container">
+  <!-- Drawer Trigger Button -->
+<div class="input-group">
+  <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
+         readonly (click)="toggleDateDrawer()">
+  <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
+    <i class="fas fa-calendar-alt"></i>
+  </button>
+</div>
+  
+  <!-- Drawer Panel -->
+  <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+    <div class="drawer-header">
+      <h5>Date Range Filter</h5>
+      <button class="btn-close" (click)="toggleDateDrawer()"></button>
+    </div>
+    
+    <div class="drawer-body">
+      <!-- Predefined Date Ranges -->
+      <div class="date-options">
+        <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+          <span>Today</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+          <span>Yesterday</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+          <span>Last 7 Days</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+          <span>Last 30 Days</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+          <span>Last Month</span>
+        </div>
+        <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+          <span>Custom Range</span>
+        </div>
+      </div>
+      
+      <!-- Custom Date Range Picker -->
+      <div class="custom-date-container" *ngIf="isCustomDate">
+        <div class="mb-3">
+          <label class="form-label">From Date</label>
+          <input type="date" class="form-control" [(ngModel)]="fromDate">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">To Date</label>
+          <input type="date" class="form-control" [(ngModel)]="toDate">
+        </div>
+      </div>
+    </div>
+    
+    <div class="drawer-footer" *ngIf="isCustomDate">
+      <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+      <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+    </div>
+  </div>
+  
+  <!-- Backdrop when drawer is open -->
+  <div class="drawer-backdrop" [class.backdrop-visible]="isDateDrawerOpen" (click)="toggleDateDrawer()"></div>
+</div>
+  <div class="filter-sidebar-body">
+    <!-- Brand Filter -->
+ <!-- Brand Filter -->
+
+
+    <!-- Category Filter -->
+ 
+
+    <!-- Tax Filter -->
+    <div class="mb-3">
+      <label class="form-label">Tax</label>
+      <select class="form-select" [(ngModel)]="selectedTax" (change)="applyFilters()">
+        <option value="">All Tax Rates</option>
+        <option *ngFor="let tax of taxRates" [value]="tax.id">
+          {{ tax.name }} ({{ tax.percentage }}%)
+        </option>
+      </select>
+    </div>
+
+    <!-- Location Filter (you already have this, but can duplicate in sidebar) -->
+    <div class="mb-3">
+      <label class="form-label">Location</label>
+      <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyFilters()">
+        <option value="">All Locations</option>
+        <option *ngFor="let location of locations" [value]="location.id">
+          {{ location.name }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-grid gap-2 mt-4">
+      <button class="btn btn-primary" (click)="applyFilters()">
+        <i class="fas fa-check me-1"></i> Apply Filters
+      </button>
+      <button class="btn btn-outline-secondary" (click)="resetFilters()">
+        <i class="fas fa-times me-1"></i> Reset All
+      </button>
+    </div>
+  </div>
+</div>
+<div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th width="40">
+          <input type="checkbox" (change)="toggleAllProducts($event)">
+        </th>
+        <th width="120">Actions</th>
+        <th (click)="sortBy('productName')">
+          Product
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'productName',
+            'fa-sort-up': currentSortColumn === 'productName' && isAscending,
+            'fa-sort-down': currentSortColumn === 'productName' && !isAscending
+          }"></i>
+        </th>
+        <th (click)="sortBy('createdDate')">
+          Created Date
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'createdDate',
+            'fa-sort-up': currentSortColumn === 'createdDate' && isAscending,
+            'fa-sort-down': currentSortColumn === 'createdDate' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
+          Selling Price (Exc Tax)
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'defaultSellingPriceExcTax',
+            'fa-sort-up': currentSortColumn === 'defaultSellingPriceExcTax' && isAscending,
+            'fa-sort-down': currentSortColumn === 'defaultSellingPriceExcTax' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('defaultSellingPriceIncTax')">
+          Selling Price
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'defaultSellingPriceIncTax',
+            'fa-sort-up': currentSortColumn === 'defaultSellingPriceIncTax' && isAscending,
+            'fa-sort-down': currentSortColumn === 'defaultSellingPriceIncTax' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('unitPurchasePrice')">
+          Unit Purchase Price
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'unitPurchasePrice',
+            'fa-sort-up': currentSortColumn === 'unitPurchasePrice' && isAscending,
+            'fa-sort-down': currentSortColumn === 'unitPurchasePrice' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('defaultPurchasePriceIncTax')">
+          Purchase Price (Inc Tax)
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'defaultPurchasePriceIncTax',
+            'fa-sort-up': currentSortColumn === 'defaultPurchasePriceIncTax' && isAscending,
+            'fa-sort-down': currentSortColumn === 'defaultPurchasePriceIncTax' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('currentStock')">
+          Current Stock
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'currentStock',
+            'fa-sort-up': currentSortColumn === 'currentStock' && isAscending,
+            'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
+          }"></i>
+        </th>
+        <th class="text-end" (click)="sortBy('alertQuantity')">
+          Alert Qty
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'alertQuantity',
+            'fa-sort-up': currentSortColumn === 'alertQuantity' && isAscending,
+            'fa-sort-down': currentSortColumn === 'alertQuantity' && !isAscending
+          }"></i>
+        </th>
+        <th>Locations</th>
+        <th (click)="sortBy('productType')">
+          Product Type
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'productType',
+            'fa-sort-up': currentSortColumn === 'productType' && isAscending,
+            'fa-sort-down': currentSortColumn === 'productType' && !isAscending
+          }"></i>
+        </th>
+        <th (click)="sortBy('category')">
+          Category
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'category',
+            'fa-sort-up': currentSortColumn === 'category' && isAscending,
+            'fa-sort-down': currentSortColumn === 'category' && !isAscending
+          }"></i>
+        </th>
+        <th (click)="sortBy('brand')">
+          Brand
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'brand',
+            'fa-sort-up': currentSortColumn === 'brand' && isAscending,
+            'fa-sort-down': currentSortColumn === 'brand' && !isAscending
+          }"></i>
+        </th>
+        <th (click)="sortBy('expiryDate')">
+          Expiry Date
+          <i class="fas ms-1" [ngClass]="{
+            'fa-sort': currentSortColumn !== 'expiryDate',
+            'fa-sort-up': currentSortColumn === 'expiryDate' && isAscending,
+            'fa-sort-down': currentSortColumn === 'expiryDate' && !isAscending
+          }"></i>
+        </th>
+        <th (click)="sortBy('sku')">SKU</th>
+        <th (click)="sortBy('hsnCode')">HSN Code</th>
+        <th (click)="sortBy('tax')">Tax</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let product of filteredProducts | slice: (currentPage-1)*itemsPerPage : currentPage*itemsPerPage"
+          [class.table-secondary]="!product.isActive"
+          [class.text-muted]="!product.isActive">
+        <td><input type="checkbox" [(ngModel)]="product.selected"></td>
+        <td>
+          <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-ellipsis-v"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <button class="dropdown-item" (click)="viewProductDetails(product)">
+                  <i class="fas fa-eye me-2 text-info"></i>View
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item" (click)="editProduct(product.id)">
+                  <i class="fas fa-edit me-2 text-primary"></i>Edit
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item" (click)="viewProductAndPurchaseData(product)">
+                  <i class="fas fa-file-invoice me-2 text-primary"></i>View Details & Purchases
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item" (click)="viewProductSales(product)">
+                  <i class="fas fa-chart-line me-2 text-info"></i>View Sales
+                </button>
+              </li>
+              <li>
+                <button class="dropdown-item" (click)="duplicateProduct(product.id)">
+                  <i class="fas fa-copy me-2 text-secondary"></i>Duplicate
+                </button>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <button class="dropdown-item text-danger" (click)="deleteProduct(product.id)">
+                  <i class="fas fa-trash me-2"></i>Delete
+                </button>
+              </li>
+            </ul>
+          </div>
+        </td>
+        <td>
+          <div class="d-flex align-items-center">
+            <div class="me-2">
+              <div class="product-img-placeholder bg-light rounded">
+                <i class="fas fa-box text-muted"></i>
+              </div>
+            </div>
+            <div>
+              <div class="fw-medium d-flex align-items-center">
+                {{ product.productName }}
+              </div>
+              <small class="text-muted">{{ product.sku }}</small>
+              <span class="badge ms-2" [ngClass]="{
+                'bg-success': product.isActive && !product.notForSelling,
+                'bg-danger': !product.isActive,
+                'bg-warning': product.notForSelling
+              }">
+                {{ product.isActive ? (product.notForSelling ? 'Not for Sale' : 'Active') : 'Inactive' }}
+              </span>
+            </div>
+          </div>
+        </td>
+        <td>{{ product.createdDate | date:'medium' }}</td>
+        <td class="text-end">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</td>
+        <td class="text-end">₹{{ product.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</td>
+        <td class="text-end">₹{{ product.unitPurchasePrice || 0 | number:'1.2-2' }}</td>
+        <td class="text-end">₹{{ product.defaultPurchasePriceIncTax || 0 | number:'1.2-2' }}</td>
+        <td class="text-end">
+          <span class="badge" [ngClass]="{
+            'bg-success': (product.currentStock || 0) > 10,
+            'bg-warning': (product.currentStock || 0) <= 10 && (product.currentStock || 0) > 0,
+            'bg-danger': (product.currentStock || 0) <= 0
+          }">
+            {{ product.currentStock || '0.00' }}
+          </span>
+        </td>
+        <td class="text-end">
+          <span [class.text-danger]="product.currentStock <= product.alertQuantity">
+            {{ product.alertQuantity || '-' }}
+          </span>
+        </td>
+        <td>
+          <div *ngIf="product.locationNames?.length > 0">
+            <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
+              {{ locName }}
+            </span>
+          </div>
+          <div *ngIf="!product.locationNames?.length" class="text-muted">
+            No Location
+          </div>
+        </td>
+        <td>{{ product.productType }}</td>
+        <td>{{ product.category || '-' }}</td>
+        <td>{{ product.brand || '-' }}</td>
+        <td>
+          <span [class.text-danger]="isExpired(product.expiryDate)" 
+                [class.text-warning]="isExpiringSoon(product.expiryDate)">
+            {{ product.formattedExpiryDate || 'No expiry' }}
+          </span>
+        </td>
+        <td>{{ product.sku || '-' }}</td>
+        <td>{{ product.hsnCode || '-' }}</td>
+        <td>{{ product.displayTax || '-' }}</td>
+      </tr>
+      <tr *ngIf="filteredProducts.length === 0">
+        <td colspan="18" class="text-center py-4 text-muted">
+          <i class="fas fa-box-open fa-2x mb-2"></i>
+          <p class="mb-0">No products found matching your search criteria</p>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+      <!-- Pagination -->
+      <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-top">
+        <div class="text-muted">
+          Showing {{ filteredProducts.length ? (currentPage-1)*itemsPerPage + 1 : 0 }} to 
+          {{ Math.min(currentPage*itemsPerPage, filteredProducts.length) }} of 
+          {{ filteredProducts.length }} entries
+        </div>
+        <nav *ngIf="filteredProducts.length > itemsPerPage">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <a class="page-link" (click)="currentPage = currentPage - 1">
+                <i class="fas fa-chevron-left"></i>
+              </a>
+            </li>
+            <li class="page-item" *ngFor="let page of getPages()" [class.active]="page === currentPage">
+              <a class="page-link" (click)="currentPage = page">{{ page }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage*itemsPerPage >= filteredProducts.length">
+              <a class="page-link" (click)="currentPage = currentPage + 1">
+                <i class="fas fa-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="d-flex justify-content-between p-3 border-top">
+  <div>
+    <button class="btn btn-outline-primary me-2" (click)="openAddToLocationModal()" [disabled]="!hasSelectedProducts()">
+      <i class="fas fa-map-marker-alt me-1"></i> Add to Location
+    </button>
+    <button class="btn btn-outline-danger me-2" (click)="removeFromLocation()" [disabled]="!hasSelectedProducts()">
+      <i class="fas fa-trash-alt me-1"></i> Remove from Location
+    </button>
+    <button class="btn btn-outline-warning" (click)="toggleProductActivation()" [disabled]="!hasSelectedProducts()">
+      <i class="fas fa-power-off me-1"></i> {{ isDeactivating ? 'Activate Selected' : 'Deactivate Selected' }}
+    </button>
+  </div>
+</div>
+<!-- Add to Location Modal -->
+<div class="modal fade" [class.show]="showAddToLocationModal" tabindex="-1" role="dialog" 
+     [style.display]="showAddToLocationModal ? 'block' : 'none'">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title">
+          <i class="fas fa-map-marker-alt me-2"></i>
+          Add Selected Products to Location
+        </h5>
+        <button type="button" class="btn-close" (click)="closeAddToLocationModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="locationSelect" class="form-label">Select Location</label>
+          <select class="form-select" id="locationSelect" [(ngModel)]="selectedLocationForAdd">
+            <option value="">Select Location</option>
+            <option *ngFor="let location of locations" [value]="location.id">
+              {{ location.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeAddToLocationModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="addToLocation()" [disabled]="!selectedLocationForAdd">
+          <i class="fas fa-save me-1"></i> Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Stock History Modal -->
+<div class="modal fade" [class.show]="showStockHistoryModal" tabindex="-1" role="dialog" 
+     [style.display]="showStockHistoryModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title">
+          <i class="fas fa-history me-2"></i>
+          Stock History for {{ selectedProduct?.productName }}
+        </h5>
+        <button type="button" class="btn-close" (click)="closeStockHistoryModal()"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Product Summary -->
+        <div class="row mb-4">
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h6 class="card-title text-muted">Product</h6>
+                <p class="card-text">{{ selectedProduct?.productName }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h6 class="card-title text-muted">Current Stock</h6>
+                <p class="card-text">{{ selectedProduct?.displayStock }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body">
+                <h6 class="card-title text-muted">Location</h6>
+                <p class="card-text">{{ selectedProduct?.locationName || '-' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stock History Table -->
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Action</th>
+                <th>Quantity</th>
+                <th>Previous</th>
+                <th>Current</th>
+                <th>Location</th>
+                <th class="text-end">Purchase</th>
+                <th class="text-end">Selling</th>
+                <th class="text-end">Value</th>
+                <th>User</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of stockHistory">
+                <td>{{ entry.formattedTimestamp }}</td>
+                <td>
+                  <span class="badge" [ngClass]="{
+                    'bg-success': entry.action === 'stock_in',
+                    'bg-warning': entry.action === 'stock_out',
+                    'bg-info': entry.action === 'transfer',
+                    'bg-secondary': entry.action === 'adjustment'
+                  }">
+                    {{ getStockActionLabel(entry.action) }}
+                  </span>
+                </td>
+                <td>
+                  <span *ngIf="entry.action == 'transfer'">
+                    {{ entry.quantity }} 
+                    <small class="text-muted">({{ entry.fromLocation }} → {{ entry.toLocation }})</small>
+                  </span>
+                  <span *ngIf="entry.action != 'transfer'">
+                    {{ entry.quantity }}
+                  </span>
+                </td>
+                <td>{{ entry.previousStock || '-' }}</td>
+                <td>{{ entry.currentStock }}</td>
+                <td>{{ entry.location || entry.toLocation || '-' }}</td>
+                <td class="text-end">₹{{ entry.purchasePrice | number:'1.2-2' }}</td>
+                <td class="text-end">₹{{ calculateStockValue(entry.quantity, entry.purchasePrice) | number:'1.2-2' }}</td>
+                <td>{{ entry.userName }}</td>
+              </tr>
+              <tr *ngIf="stockHistory.length === 0">
+                <td colspan="10" class="text-center py-4 text-muted">
+                  No stock history available
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeStockHistoryModal()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="editProduct(selectedProduct?.id)">
+          <i class="fas fa-edit me-1"></i>Edit Product
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add this modal to your list-products.component.html -->
+<!-- Product Details Modal -->
+<div class="modal fade" [class.show]="showProductDetailsModal" tabindex="-1" role="dialog" 
+     [style.display]="showProductDetailsModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title">
+          <i class="fas fa-box me-2"></i>
+          Product Details - {{ selectedProduct?.productName }}
+        </h5>
+        <button type="button" class="btn-close" (click)="closeProductDetailsModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row">
+          <!-- Left Column -->
+          <div class="col-md-6">
+            <div class="mb-3">
+              <h6 class="text-muted">Basic Information</h6>
+              <hr class="mt-1">
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Product Name:</div>
+                <div class="col-8">{{ selectedProduct?.productName || '-' }}</div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">SKU:</div>
+                <div class="col-8">{{ selectedProduct?.sku || '-' }}</div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Product Type:</div>
+                <div class="col-8">{{ selectedProduct?.productType || '-' }}</div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Category:</div>
+                <div class="col-8">{{ selectedProduct?.category || '-' }}</div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Brand:</div>
+                <div class="col-8">{{ selectedProduct?.brand || '-' }}</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Right Column -->
+          <div class="col-md-6">
+            <div class="mb-3">
+              <h6 class="text-muted">Pricing & Stock</h6>
+              <hr class="mt-1">
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Purchase Price:</div>
+                <div class="col-8">₹{{ selectedProduct?.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</div>
+              </div>
+            <!-- In the Product Details Modal -->
+<div class="row mb-2">
+  <div class="col-4 fw-medium">MRP (Inc. Tax):</div>
+  <div class="col-8">₹{{ selectedProduct?.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</div>
+</div>
+<!-- Remove the Purchase Price row -->
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Current Stock:</div>
+                <div class="col-8">
+                  <span class="badge" [ngClass]="{
+                    'bg-success': (selectedProduct?.currentStock || 0) > 10,
+                    'bg-warning': (selectedProduct?.currentStock || 0) <= 10 && (selectedProduct?.currentStock || 0) > 0,
+                    'bg-danger': (selectedProduct?.currentStock || 0) <= 0
+                  }">
+                    {{ selectedProduct?.displayStock || '0.00' }}
+                  </span>
+                </div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Location:</div>
+                <div class="col-8">{{ selectedProduct?.locationName || '-' }}</div>
+              </div>
+              <div class="row mb-2">
+                <div class="col-4 fw-medium">Tax:</div>
+                <div class="col-8">{{ selectedProduct?.tax || '-' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+       
+<div class="row mb-4">
+  <div class="col-12 text-center">
+    <div class="product-image-container">
+      <img *ngIf="getProductImageUrl(selectedProduct)"
+           [src]="getProductImageUrl(selectedProduct)"
+           alt="{{ selectedProduct?.productName }}"
+           class="img-fluid rounded border"
+           style="max-height: 200px;">
+      <div *ngIf="!getProductImageUrl(selectedProduct)"
+           class="no-image-placeholder bg-light rounded border d-flex align-items-center justify-content-center"
+           style="height: 200px; width: 100%;">
+        <i class="fas fa-box-open fa-3x text-muted"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+        <!-- Additional Details Section -->
+        <div class="mt-3" *ngIf="selectedProduct?.description || selectedProduct?.barcode">
+          <h6 class="text-muted">Additional Information</h6>
+          <hr class="mt-1">
+          <div class="row mb-2" *ngIf="selectedProduct?.description">
+            <div class="col-3 fw-medium">Description:</div>
+            <div class="col-9">{{ selectedProduct?.description }}</div>
+          </div>
+          <div class="row mb-2" *ngIf="selectedProduct?.barcode">
+            <div class="col-3 fw-medium">Barcode:</div>
+            <div class="col-9">{{ selectedProduct?.barcode }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeProductDetailsModal()">
+          <i class="fas fa-times me-1"></i>Close
+        </button>
+        <button type="button" class="btn btn-primary" (click)="editProduct(selectedProduct?.id)">
+          <i class="fas fa-edit me-1"></i>Edit Product
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Add this near your other filter controls -->
+<div class="form-check form-switch mb-2">
+  <input class="form-check-input" type="checkbox" id="showInactiveToggle" 
+         [(ngModel)]="showInactiveProducts" (change)="toggleInactiveProducts()">
+  <label class="form-check-label" for="showInactiveToggle">
+    Show Inactive Products
+  </label>
+</div>

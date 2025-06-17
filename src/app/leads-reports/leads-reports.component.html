@@ -1,0 +1,166 @@
+<div class="leads-report-container">
+  <div class="report-header">
+    <h2>Leads Report</h2>
+    <div class="report-controls">
+      <div class="date-range-picker">
+        <label>From:</label>
+        <input type="date" [(ngModel)]="filters.fromDate" (change)="applyFilters()">
+        <label>To:</label>
+        <input type="date" [(ngModel)]="filters.toDate" (change)="applyFilters()">
+        <button class="clear-btn" (click)="clearDateFilter()">Clear Dates</button>
+      </div>
+      
+      <div class="filter-group">
+        <label>Report Type:</label>
+        <select [(ngModel)]="reportType" (change)="changeReportType()">
+          <option value="department">Department-wise</option>
+          <option value="executive">Executive-wise</option>
+          <option value="detailed">Detailed Report</option>
+        </select>
+      </div>
+      
+      <div class="export-buttons">
+        <button class="export-btn" (click)="exportExcel()">Export Excel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Department-wise Report -->
+  <div *ngIf="reportType === 'department'" class="report-section">
+    <h3>Department-wise Leads Report</h3>
+    <div class="report-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th>Total Leads</th>
+            <th>New Leads</th>
+            <th>Contacted</th>
+            <th>Qualified</th>
+            <th>Converted</th>
+            <th>Lost</th>
+            <th>Conversion Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let dept of departmentReports">
+            <td>{{ dept.department || 'Unassigned' }}</td>
+            <td>{{ dept.total }}</td>
+            <td>{{ dept.new }}</td>
+            <td>{{ dept.contacted }}</td>
+            <td>{{ dept.qualified }}</td>
+            <td>{{ dept.converted }}</td>
+            <td>{{ dept.lost }}</td>
+            <td>{{ dept.conversionRate }}%</td>
+          </tr>
+          <tr class="total-row">
+            <td><strong>Total</strong></td>
+            <td><strong>{{ getTotal('total') }}</strong></td>
+            <td><strong>{{ getTotal('new') }}</strong></td>
+            <td><strong>{{ getTotal('contacted') }}</strong></td>
+            <td><strong>{{ getTotal('qualified') }}</strong></td>
+            <td><strong>{{ getTotal('converted') }}</strong></td>
+            <td><strong>{{ getTotal('lost') }}</strong></td>
+            <td><strong>{{ getTotalConversionRate() }}%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Executive-wise Report -->
+  <div *ngIf="reportType === 'executive'" class="report-section">
+    <h3>Executive-wise Leads Report</h3>
+    <div class="report-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Executive</th>
+            <th>Department</th>
+            <th>Total Leads</th>
+            <th>New Leads</th>
+            <th>Contacted</th>
+            <th>Qualified</th>
+            <th>Converted</th>
+            <th>Lost</th>
+            <th>Conversion Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let exec of executiveReports">
+            <td>{{ exec.executive || 'Unassigned' }}</td>
+            <td>{{ exec.department || 'Unassigned' }}</td>
+            <td>{{ exec.total }}</td>
+            <td>{{ exec.new }}</td>
+            <td>{{ exec.contacted }}</td>
+            <td>{{ exec.qualified }}</td>
+            <td>{{ exec.converted }}</td>
+            <td>{{ exec.lost }}</td>
+            <td>{{ exec.conversionRate }}%</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="2"><strong>Total</strong></td>
+            <td><strong>{{ getTotal('total') }}</strong></td>
+            <td><strong>{{ getTotal('new') }}</strong></td>
+            <td><strong>{{ getTotal('contacted') }}</strong></td>
+            <td><strong>{{ getTotal('qualified') }}</strong></td>
+            <td><strong>{{ getTotal('converted') }}</strong></td>
+            <td><strong>{{ getTotal('lost') }}</strong></td>
+            <td><strong>{{ getTotalConversionRate() }}%</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Detailed Report -->
+  <div *ngIf="reportType === 'detailed'" class="report-section">
+    <h3>Detailed Leads Report</h3>
+    <div class="report-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Contact ID</th>
+            <th>Name</th>
+            <th>Mobile</th>
+            <th>Department</th>
+            <th>Executive</th>
+            <th>Life Stage</th>
+            <th>Source</th>
+            <th>Created Date</th>
+            <th>Last Follow Up</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let lead of filteredLeads">
+            <td>{{ lead.contactId || '-' }}</td>
+            <td>{{ lead.businessName || (lead.firstName + ' ' + (lead.lastName || '')) }}</td>
+            <td>{{ lead.mobile || '-' }}</td>
+            <td>{{ lead.department || 'Unassigned' }}</td>
+            <td>{{ lead.assignedTo || 'Unassigned' }}</td>
+            <td>{{ lead.lifeStage || '-' }}</td>
+            <td>{{ lead.source || '-' }}</td>
+            <td>{{ lead.createdAt | date:'shortDate' }}</td>
+*ngIf="filteredLeads && filteredLeads.length > 0"
+
+            <td [ngClass]="getStatusClass(lead.lifeStage)">{{ lead.lifeStage || '-' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination-controls" *ngIf="reportType === 'detailed'">
+      <button (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
+      <span>Page {{ currentPage }} of {{ totalPages }}</span>
+      <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
+      <span>Show</span>
+      <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <span>entries</span>
+    </div>
+  </div>
+</div>

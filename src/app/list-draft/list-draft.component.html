@@ -1,0 +1,245 @@
+<!-- list-draft.component.html -->
+<div class="drafts-container">
+  <h2>List of Drafts</h2>
+  <!-- Update the header-section in list-draft.component.html -->
+
+  <div class="header-section">
+
+  </div>
+  <div class="header-actions">
+    <button class="btn-add" (click)="navigateToAddDraft()">
+      <i class="fas fa-plus"></i> Add 
+    </button>
+  </div>
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <div class="left-actions">
+      <div class="entries-selector">
+        <span>Show</span>
+        <select [(ngModel)]="entriesPerPage" (change)="updatePagination()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+      
+      <button class="btn btn-export" (click)="exportCSV()">
+        <i class="fas fa-file-csv"></i> Export CSV
+      </button>
+      
+      <button class="btn btn-export" (click)="exportExcel()">
+        <i class="fas fa-file-excel"></i> Export Excel
+      </button>
+      
+      <button class="btn btn-print" (click)="printTable()">
+        <i class="fas fa-print"></i> Print
+      </button>
+      
+      <div class="column-visibility-container">
+        <button class="btn btn-columns" (click)="toggleColumnVisibility()">
+          <i class="fas fa-columns"></i> Column visibility
+        </button>
+        <div class="column-visibility-dropdown" *ngIf="showColumnVisibility">
+          <div class="visibility-option" (click)="toggleColumn('sno')">
+            <input type="checkbox" [checked]="columnVisibility.sno" />
+            <span>S.No</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('customer')">
+            <input type="checkbox" [checked]="columnVisibility.customer" />
+            <span>Customer name</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('saleDate')">
+            <input type="checkbox" [checked]="columnVisibility.saleDate" />
+            <span>Sale Date</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('discountAmount')">
+            <input type="checkbox" [checked]="columnVisibility.discountAmount" />
+            <span>Discount Amount</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('totalPayable')">
+            <input type="checkbox" [checked]="columnVisibility.totalPayable" />
+            <span>Total Payable</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('productName')">
+            <input type="checkbox" [checked]="columnVisibility.productName" />
+            <span>Product Name</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('quantity')">
+            <input type="checkbox" [checked]="columnVisibility.quantity" />
+            <span>Quantity</span>
+          </div>
+          <div class="visibility-option" (click)="toggleColumn('action')">
+            <input type="checkbox" [checked]="columnVisibility.action" />
+            <span>Action</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    
+    <div class="right-actions">
+      <div class="search-box">
+        <input type="text" placeholder="Search..." [(ngModel)]="searchQuery" (input)="applySearch()">
+      </div>
+    </div>
+  </div>
+  
+  <!-- Drafts Table -->
+  <div class="drafts-table" id="drafts-table">
+    <table class="drafts-list-table">
+   <!-- Update the table headers in list-draft.component.html -->
+<thead>
+  <tr>
+    <th *ngIf="columnVisibility.sno">S.No</th>
+    <th *ngIf="columnVisibility.customer" class="sortable" (click)="sortBy('customer')">
+      Customer
+      <span *ngIf="sortColumn === 'customer'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.saleDate" class="sortable" (click)="sortBy('saleDate')">
+      Sale Date
+      <span *ngIf="sortColumn === 'saleDate'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.discountAmount" class="sortable" (click)="sortBy('discountAmount')">
+      Discount Amount
+      <span *ngIf="sortColumn === 'discountAmount'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.totalPayable" class="sortable" (click)="sortBy('totalPayable')">
+      Total Payable
+      <span *ngIf="sortColumn === 'totalPayable'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.productName" class="sortable" (click)="sortBy('productName')">
+      Product Name
+      <span *ngIf="sortColumn === 'productName'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.quantity" class="sortable" (click)="sortBy('quantity')">
+      Quantity
+      <span *ngIf="sortColumn === 'quantity'">
+        <i class="fas" [ngClass]="{'fa-arrow-up': sortDirection === 'asc', 'fa-arrow-down': sortDirection === 'desc'}"></i>
+      </span>
+    </th>
+    <th *ngIf="columnVisibility.action">Action</th>
+  </tr>
+</thead>
+      <tbody>
+        <tr *ngIf="displayedDrafts.length === 0">
+          <td [attr.colspan]="
+            (columnVisibility.sno ? 1 : 0) +
+            (columnVisibility.customer ? 1 : 0) +
+            (columnVisibility.saleDate ? 1 : 0) +
+            (columnVisibility.discountAmount ? 1 : 0) +
+            (columnVisibility.totalPayable ? 1 : 0) +
+            (columnVisibility.productName ? 1 : 0) +
+            (columnVisibility.quantity ? 1 : 0) +
+            (columnVisibility.action ? 1 : 0)" class="no-data">No data available in table</td>
+        </tr>
+        <tr *ngFor="let draft of displayedDrafts; let i = index">
+          <td *ngIf="columnVisibility.sno">{{ (currentPage - 1) * entriesPerPage + i + 1 }}</td>
+          <td *ngIf="columnVisibility.customer">{{ getCustomerName(draft.customer) }}</td>
+          <td *ngIf="columnVisibility.saleDate">{{ draft.saleDate | date: 'short' }}</td>
+          <td *ngIf="columnVisibility.discountAmount">{{ draft.discountAmount | currency:'INR' }}</td>
+          <td *ngIf="columnVisibility.totalPayable">{{ calculateTotalPayable(draft) | currency:'INR' }}</td>
+          <td *ngIf="columnVisibility.productName">{{ getProductInfo(draft).name }}</td>
+          <td *ngIf="columnVisibility.quantity">{{ getProductInfo(draft).quantity }}</td>
+          <td *ngIf="columnVisibility.action" class="actions">
+            <button class="btn-edit" (click)="editDraft(draft)">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn-delete" (click)="deleteDraft(draft.id)">
+              <i class="fas fa-trash-alt"></i> Delete
+            </button>
+            <!-- Add to Quotation button -->
+            <button class="btn-quotation" (click)="addToQuotation(draft)">
+              <i class="fas fa-file-invoice"></i> Add to Quotation
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Pagination -->
+  <div class="bottom-actions">
+    <div class="pagination-info">
+      Showing {{ startEntry }} to {{ endEntry }} of {{ totalEntries }} entries
+    </div>
+    
+    <div class="pagination">
+      <button class="btn-page" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      <button class="btn-page" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+    </div>
+  </div>
+  
+  <!-- Edit Form Modal -->
+  <div *ngIf="showEditForm" class="modal-overlay">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3>Edit Draft</h3>
+        <button class="close-btn" (click)="closeEditForm()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="editForm" (ngSubmit)="saveDraft()">
+          <div class="form-group">
+            <label>Customer</label>
+            <input type="text" formControlName="customer" class="form-control">
+            <div *ngIf="editForm.get('customer')?.invalid && editForm.get('customer')?.touched" class="error-message">
+              Customer name is required
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Sale Date</label>
+            <input type="datetime-local" formControlName="saleDate" class="form-control">
+            <div *ngIf="editForm.get('saleDate')?.invalid && editForm.get('saleDate')?.touched" class="error-message">
+              Sale date is required
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Discount Amount</label>
+            <input type="number" formControlName="discountAmount" class="form-control">
+            <div *ngIf="editForm.get('discountAmount')?.invalid && editForm.get('discountAmount')?.touched" class="error-message">
+              Valid amount required (minimum 0)
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Shipping Charges</label>
+            <input type="number" formControlName="shippingCharges" class="form-control">
+            <div *ngIf="editForm.get('shippingCharges')?.invalid && editForm.get('shippingCharges')?.touched" class="error-message">
+              Valid amount required (minimum 0)
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Shipping Status</label>
+            <select formControlName="shippingStatus" class="form-control">
+              <option value="pending">Pending</option>
+              <option value="shipped">Shipped</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn btn-save" [disabled]="editForm.invalid">Save </button>
+
+            <button type="button" class="btn btn-cancel" (click)="closeEditForm()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

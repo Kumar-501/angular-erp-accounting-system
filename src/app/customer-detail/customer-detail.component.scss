@@ -1,0 +1,299 @@
+.customer-container {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+  background: #f5f7fa;
+  font-family: 'Segoe UI', sans-serif;
+  color: #333;
+
+  .customer-list-section,
+  .customer-detail-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    flex: 1;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    color: #2c3e50;
+  }
+
+  .loading,
+  .no-data {
+    color: #888;
+    font-style: italic;
+    margin-top: 1rem;
+  }
+
+  .customer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .customer-item {
+    padding: 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #fafafa;
+
+    &.selected {
+      border-color: #3498db;
+      background: #eaf6ff;
+    }
+
+    &:hover {
+      background: #f0f8ff;
+    }
+
+    .customer-name {
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: #34495e;
+    }
+
+    .customer-business {
+      font-size: 0.95rem;
+      color: #7f8c8d;
+      margin-top: 0.25rem;
+    }
+
+    .customer-contact {
+      font-size: 0.9rem;
+      color: #555;
+      margin-top: 0.25rem;
+    }
+
+    .customer-status {
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 8px;
+      display: inline-block;
+      background: #ecf0f1;
+      &.active {
+        background: #d4f4e3;
+        color: #27ae60;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .customer-detail-section {
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+
+      .customer-id {
+        font-size: 0.95rem;
+        color: #777;
+      }
+    }
+
+    .detail-content {
+      .detail-row {
+        margin-bottom: 0.75rem;
+
+        .label {
+          font-weight: 600;
+          margin-right: 0.5rem;
+        }
+
+        span {
+          display: inline-block;
+          color: #444;
+        }
+      }
+    }
+
+    .call-logs-section {
+      margin-top: 2rem;
+
+      .call-logs-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+
+        h3 {
+          margin: 0;
+        }
+
+        .add-log-btn {
+          background: #3498db;
+          color: white;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: 0.3s;
+
+          &:hover {
+            background: #2980b9;
+          }
+        }
+      }
+
+      .add-call-log-form {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+
+        .form-row {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1rem;
+
+          .form-field {
+            flex: 1;
+          }
+        }
+
+        .form-field {
+          display: flex;
+          flex-direction: column;
+
+          label {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+          }
+
+          input,
+          select,
+          textarea {
+            padding: 0.5rem;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 0.95rem;
+          }
+
+          .error {
+            color: red;
+            font-size: 0.8rem;
+            margin-top: 0.25rem;
+          }
+
+          &.checkbox-field {
+            flex-direction: row;
+            align-items: center;
+
+            label {
+              margin-left: 0.5rem;
+            }
+          }
+        }
+
+        .form-actions {
+          text-align: right;
+
+          button {
+            background: #2ecc71;
+            color: white;
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: 0.3s;
+
+            &:hover {
+              background: #27ae60;
+            }
+
+            &:disabled {
+              background: #bdc3c7;
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+
+      .call-logs-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+
+        .call-log-item {
+          border: 1px solid #ddd;
+          padding: 1rem;
+          border-radius: 12px;
+          background: #fff;
+
+          .log-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+
+            .log-subject {
+              font-weight: 600;
+            }
+
+            .log-meta {
+              font-size: 0.85rem;
+              color: #777;
+
+              .log-type {
+                margin-right: 0.5rem;
+                font-weight: 500;
+              }
+            }
+          }
+
+          .log-description {
+            margin-bottom: 0.5rem;
+            color: #555;
+          }
+
+          .log-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #666;
+
+            .delete-btn {
+              background: transparent;
+              color: #e74c3c;
+              border: 1px solid #e74c3c;
+              padding: 0.3rem 0.6rem;
+              border-radius: 6px;
+              cursor: pointer;
+              transition: 0.3s;
+
+              &:hover {
+                background: #e74c3c;
+                color: #fff;
+              }
+            }
+          }
+
+          .follow-up-info {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            background: #fef9e7;
+            padding: 0.5rem;
+            border-radius: 6px;
+            color: #b7950b;
+
+            .follow-up-badge {
+              font-weight: bold;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .empty-state {
+    font-size: 1.1rem;
+    font-style: italic;
+    color: #777;
+    margin: auto;
+  }
+}

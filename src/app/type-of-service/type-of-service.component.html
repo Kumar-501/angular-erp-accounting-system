@@ -1,0 +1,157 @@
+<div class="types-of-service-container">
+  <div class="header">
+    <h2>Types of service <span class="info-icon">i</span></h2>
+  </div>
+  
+  <div class="content-container">
+    <div class="table-controls">
+      <div class="entries-control">
+        Show 
+        <select [(ngModel)]="entriesPerPage">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        entries
+      </div>
+   
+      
+      <div class="search-control">
+        <input type="text" [(ngModel)]="searchText" placeholder="Search..." class="search-input">
+      </div>
+    </div>
+    
+    <table class="service-table">
+      <thead>
+        <tr>
+          <th>
+            Name
+            <div class="sort-arrows">
+              <i class="fa fa-arrow-up" [ngClass]="{'active': sortColumn === 'name' && sortDirection === 'asc'}" (click)="sortBy('name'); sortDirection = 'asc'"></i>
+              <i class="fa fa-arrow-down" [ngClass]="{'active': sortColumn === 'name' && sortDirection === 'desc'}" (click)="sortBy('name'); sortDirection = 'desc'"></i>
+            </div>
+          </th>
+          <th>
+            Description
+            <div class="sort-arrows">
+              <i class="fa fa-arrow-up" [ngClass]="{'active': sortColumn === 'description' && sortDirection === 'asc'}" (click)="sortBy('description'); sortDirection = 'asc'"></i>
+              <i class="fa fa-arrow-down" [ngClass]="{'active': sortColumn === 'description' && sortDirection === 'desc'}" (click)="sortBy('description'); sortDirection = 'desc'"></i>
+            </div>
+          </th>
+          <th>
+            Packing Charge
+            <div class="sort-arrows">
+              <i class="fa fa-arrow-up" [ngClass]="{'active': sortColumn === 'packingCharge' && sortDirection === 'asc'}" (click)="sortBy('packingCharge'); sortDirection = 'asc'"></i>
+              <i class="fa fa-arrow-down" [ngClass]="{'active': sortColumn === 'packingCharge' && sortDirection === 'desc'}" (click)="sortBy('packingCharge'); sortDirection = 'desc'"></i>
+            </div>
+          </th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of paginatedServices">
+          <td>{{ item.name }}</td>
+          <td>{{ item.description }}</td>
+          <td>{{ item.packingCharge || '0.00' }}</td>
+          <td class="action-buttons">
+            <button class="edit-btn" (click)="editService(item)">Edit</button>
+            <button class="delete-btn" (click)="deleteService(item.id)">Delete</button>
+          </td>
+        </tr>
+        <tr *ngIf="paginatedServices.length === 0">
+          <td colspan="4" class="no-data">No data available</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <div class="table-footer">
+      <div class="showing-entries">
+        Showing {{ ((currentPage - 1) * entriesPerPage) + 1 }} to 
+        {{ Math.min(currentPage * entriesPerPage, filteredServices().length) }} of {{ filteredServices().length }} entries
+      </div>
+      <div class="pagination">
+        <button [disabled]="currentPage === 1" (click)="previousPage()" class="page-btn">Previous</button>
+        <button class="page-number current">{{ currentPage }}</button>
+        <button [disabled]="currentPage === totalPages" (click)="nextPage()" class="page-btn">Next</button>
+      </div>
+    </div>
+    
+    <div class="footer-info">
+      <span>HYBRID CRM - V6.2 | Copyright © 2025 All rights reserved.</span>
+    </div>
+  </div>
+  
+  <!-- Add button (fixed at bottom right) -->
+  <button class="add-button" (click)="addNewService()">
+    <i class="fa fa-plus"></i> Add
+  </button>
+  
+  <!-- Modal form for adding/editing service -->
+  <div class="modal-overlay" *ngIf="openForm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>{{ isEdit ? 'Edit type of service' : 'Add type of service' }}</h3>
+        <button class="close-button" (click)="closeForm()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <form (ngSubmit)="saveService()" #serviceForm="ngForm">
+          <div class="form-group">
+            <label for="name">Name:*</label>
+            <input type="text" id="name" [(ngModel)]="service.name" name="name" required placeholder="Name">
+          </div>
+          
+          <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" [(ngModel)]="service.description" name="description" placeholder="Description"></textarea>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group half-width">
+              <label for="location">Location:</label>
+              <select id="location" [(ngModel)]="service.location" name="location" required>
+                <option *ngFor="let loc of locations" [value]="loc.name">{{ loc.name }}</option>
+              </select>
+            </div>
+            
+            
+            <div class="form-group half-width">
+              <label for="priceGroup">Price Group:</label>
+              <select id="priceGroup" [(ngModel)]="service.priceGroup" name="priceGroup">
+                <option value="Default Selling Price">Default Selling Price</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group half-width">
+              <label for="packingChargeType">Packing Charge Type:</label>
+              <select id="packingChargeType" [(ngModel)]="service.packingChargeType" name="packingChargeType">
+                <option value="Fixed">Fixed</option>
+                <option value="Variable">Variable</option>
+              </select>
+            </div>
+            
+            <div class="form-group half-width">
+              <label for="packingCharge">Packing Charge:</label>
+              <input type="number" id="packingCharge" [(ngModel)]="service.packingCharge" 
+                     name="packingCharge" placeholder="Packing Charge">
+            </div>
+          </div>
+          
+          <div class="form-group checkbox-group">
+            <input type="checkbox" id="enableCustomFields" [(ngModel)]="service.enableCustomFields" 
+                   name="enableCustomFields">
+            <label for="enableCustomFields">Enable custom fields <span class="info-icon">i</span></label>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="save-btn">Save</button>
+            <button type="button" class="close-btn" (click)="closeForm()">Close</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

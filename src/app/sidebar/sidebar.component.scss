@@ -1,0 +1,108 @@
+.sidebar {
+  width: 240px;
+  background-color: #021E33;
+  color: white;
+  transition: all 0.3s ease;
+  height: 100vh;
+  overflow-y: auto;
+  margin-top: -9%;
+
+  &.open {
+    transform: translateX(0);
+  }
+
+  &.closed {
+    transform: translateX(-100%);
+    width: 0;
+  }
+
+  .sidebar-content {
+    padding: 20px;
+
+    h3 {
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .main-menu {
+      list-style: none;
+      padding: 0;
+       margin-bottom: 88px;
+    margin-top: 23px;
+      
+     
+}
+
+      .menu-item {
+        margin-bottom: 5px;
+
+        // Default (inactive) state
+        .menu-header {
+          display: flex;
+          align-items: center;
+          padding: 10px;
+          cursor: pointer;
+          border-radius: 4px;
+          transition: all 0.2s;
+          color: #a8b5c0; // Inactive text color
+          background-color: transparent;
+
+          &:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+
+          .menu-icon {
+            margin-right: 10px;
+            color: #a8b5c0; // Inactive icon color
+          }
+
+          .menu-text {
+            flex-grow: 1;
+          }
+
+          .toggle-icon {
+            font-size: 18px;
+          }
+        }
+
+        // Active state (either main item or has active child)
+        &.active {
+          > .menu-header {
+            color: white; // Active text color
+            background-color: #0d3a5f; // Active background color
+
+            .menu-icon {
+              color: white; // Active icon color
+            }
+          }
+        }
+
+        .submenu {
+          list-style: none;
+          padding-left: 20px;
+          margin-top: 5px;
+          overflow: hidden;
+          transition: all 0.3s ease;
+
+          .submenu-item {
+            padding: 8px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+            color: #a8b5c0; // Inactive submenu text color
+
+            &:hover {
+              background-color: rgba(255, 255, 255, 0.1);
+            }
+
+            // Active submenu item
+            &.active {
+              color: white;
+              background-color: #0d3a5f;
+            }
+          }
+        }
+      }
+    }
+  }

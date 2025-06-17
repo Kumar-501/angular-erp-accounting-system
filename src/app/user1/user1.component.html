@@ -1,0 +1,173 @@
+<div class="container">
+  <div class="header">
+    <h1>Users</h1>
+    <span class="manage-link">Manage users</span>
+  </div>
+  
+  <div class="users-panel">
+    <h2>All users</h2>
+    
+    <div class="action-bar">
+      <div class="entries-section">
+        <span>Show</span>
+        <select [(ngModel)]="entries" (change)="updatePagination()">
+          <option value="4">4</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+      
+      <div class="export-buttons">
+        <button class="btn btn-outline" (click)="exportCSV()">
+          <i class="fas fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn btn-outline" (click)="exportExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn btn-outline" (click)="print()">
+          <i class="fas fa-print"></i> Print
+        </button>
+      
+        <button class="btn btn-outline" (click)="exportPDF()">
+          <i class="fas fa-file-pdf"></i> Export PDF
+        </button>
+      </div>
+      <button class="btn btn-outline" (click)="toggleColumnVisibility()">
+        <i class="fas fa-columns"></i> Column visibility
+      </button>
+      
+    
+      <div class="search-container">
+        <input type="text" placeholder="Search..." (input)="search($event)" />
+      </div>
+      
+      <button class="btn btn-primary add-button" (click)="goToAddUserPage()">
+        <i class="fas fa-plus"></i> Add
+      </button>
+
+      <button class="btn btn-filter" (click)="toggleFilters()">
+        <i class="fas fa-filter"></i> Filters
+      </button>
+    </div>
+    
+    <!-- Filters Sidebar -->
+    <div class="filters-sidebar" [class.active]="showFilters">
+      <div class="sidebar-header">
+        <h3>Filters</h3>
+        <button class="close-btn" (click)="toggleFilters()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="filter-section">
+        <label>Department</label>
+        <select [(ngModel)]="selectedDepartment" (change)="applyFilters()">
+          <option value="">All Departments</option>
+          <option *ngFor="let dept of departments" [value]="dept">{{ dept }}</option>
+        </select>
+      </div>
+      
+      <div class="filter-section">
+        <label>Role</label>
+        <select [(ngModel)]="selectedRole" (change)="applyFilters()">
+          <option value="">All Roles</option>
+          <option *ngFor="let role of roles" [value]="role">{{ role }}</option>
+        </select>
+      </div>
+      
+      <div class="filter-actions">
+        <button class="btn btn-clear" (click)="clearFilters()">Clear Filters</button>
+        <button class="btn btn-apply" (click)="applyFilters()">Apply</button>
+      </div>
+    </div>
+    
+    <div class="sidebar-overlay" [class.active]="showFilters" (click)="toggleFilters()"></div>
+    
+    <div class="column-visibility-menu" *ngIf="showColumnVisibilityMenu">
+      <div *ngFor="let column of columns" class="column-visibility-item">
+        <label>
+          <input type="checkbox" [(ngModel)]="column.visible" (change)="updateColumnVisibility()">
+          {{ column.displayName }}
+        </label>
+      </div>
+    </div>
+    <table class="user-table">
+      <thead>
+        <tr>
+          <th *ngIf="columns[0].visible" (click)="sortUsers('employeeId')">
+            Employee ID <i [class]="getSortIconClass('employeeId')"></i>
+          </th>
+          <th *ngIf="columns[1].visible">Name</th>
+          <th *ngIf="columns[2].visible" (click)="sortUsers('username')">
+            Username <i [class]="getSortIconClass('username')"></i>
+          </th>
+          <th *ngIf="columns[3].visible" (click)="sortUsers('role')">
+            Role <i [class]="getSortIconClass('role')"></i>
+          </th>
+          <th *ngIf="columns[4].visible" (click)="sortUsers('department')">
+            Department <i [class]="getSortIconClass('department')"></i>
+          </th>
+          <th *ngIf="columns[5].visible" (click)="sortUsers('designation')">
+            Designation <i [class]="getSortIconClass('designation')"></i>
+          </th>
+            <th *ngIf="columns[6].visible" (click)="sortUsers('locations')">
+        Locations <i [class]="getSortIconClass('locations')"></i>
+      </th>
+          <th *ngIf="columns[6].visible" (click)="sortUsers('email')">
+            Email <i [class]="getSortIconClass('email')"></i>
+          </th>
+          <th *ngIf="columns[7].visible">Actions</th>
+        </tr>
+      </thead>
+    
+      <tbody>
+        <tr *ngFor="let user of getPaginatedUsers()">
+          <td *ngIf="columns[0].visible">{{ user.employeeId || '-' }}</td>
+          <td *ngIf="columns[1].visible">{{ user.prefix }} {{ user.firstName }} {{ user.lastName }}</td>
+          <td *ngIf="columns[2].visible">{{ user.username }}</td>
+          <td *ngIf="columns[3].visible">{{ user.role }}</td>
+          <td *ngIf="columns[4].visible">{{ user.department || '-' }}</td>
+          <td *ngIf="columns[5].visible">{{ user.designation || '-' }}</td>
+          
+<td *ngIf="columns[6].visible">
+  <span *ngIf="user.allLocations">All Locations</span>
+  <span *ngIf="!user.allLocations">
+    {{ user.locationNames ? user.locationNames.join(', ') : '-' }}
+  </span>
+</td>
+          <td *ngIf="columns[6].visible">{{ user.email }}</td>
+          <td *ngIf="columns[7].visible" class="action-buttons">
+            <button class="btn btn-edit" (click)="editUser(user.id)">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-delete" (click)="deleteUser(user.id)">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredUsers.length === 0">
+          <td [attr.colspan]="getVisibleColumnCount()" class="no-data">No users found.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="pagination">
+      <div class="showing-info">
+        Showing {{ (currentPage - 1) * entries + 1 }} to {{ 
+          currentPage * entries > totalEntries ? totalEntries : currentPage * entries 
+        }} of {{ totalEntries }} entries
+      </div>
+      <div class="page-buttons">
+        <button [disabled]="currentPage === 1" (click)="previousPage()" class="btn pagination-btn">
+          Previous
+        </button>
+        <span class="page-number">{{ currentPage }} of {{ totalPages }}</span>
+        <button [disabled]="currentPage === totalPages" (click)="nextPage()" class="btn pagination-btn">
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

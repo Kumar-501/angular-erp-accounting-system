@@ -1,0 +1,111 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  h2{
+    margin-top: 5%;
+  }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  input, select, textarea {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+  }
+  
+  button {
+    background: #6c63ff;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    cursor: pointer;
+    margin-top: 10px;
+    border-radius: 4px;
+  }
+  
+  button:hover {
+    background: #5548c2;
+  }
+  /* Add this to your component's CSS */
+input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.btn-sm {
+  margin-right: 5px;
+}.bg-light {
+  background-color: #f8f9fa !important;
+}
+
+.input-group-text {
+  font-weight: bold;
+  background-color: #e9ecef;
+}.dropdown-menu {
+  width: 100%;
+  
+  .dropdown-item {
+    white-space: normal;
+    padding: 0.5rem 1rem;
+    
+    small {
+      font-size: 0.8rem;
+    }
+  }
+}
+
+// Make the dropdown match the input width
+.dropdown {
+  .dropdown-menu {
+    width: calc(100% - 2px); // Account for border
+  }
+}.dropdown-menu {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.dropdown-item {
+  cursor: pointer;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}.dropdown-like-input {
+  /* Makes it look like a dropdown */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  
+  /* Add a dropdown arrow */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+  
+  /* Prevent text from going under the arrow */
+  padding-right: 2rem;
+  
+  /* Other styling to match dropdowns */
+  cursor: pointer;
+}/* Ensure table columns maintain their width even when empty */
+.table {
+  table-layout: fixed;
+}
+
+.empty-row {
+  height: 150px; /* Give some height to the empty state */
+}
+
+/* Make sure all columns have appropriate widths */
+th:nth-child(1), td:nth-child(1) { width: 50px; }  /* Checkbox */
+th:nth-child(2), td:nth-child(2) { width: 60px; }  /* S.No */
+th:nth-child(3), td:nth-child(3) { width: 200px; } /* Product Name */
+th:nth-child(4), td:nth-child(4) { width: 80px; }  /* Qty */
+/* Continue for all columns as needed */

@@ -1,0 +1,29 @@
+.hrm-menu {
+    margin-top: 80px; // Moves the box down
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    color: #4b5563;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  
+    .title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+  
+    a {
+      text-decoration: none;
+      color: #4b5563;
+      font-weight: 400;
+  
+      &.active-link {
+        font-weight: 600;
+        color: #2563eb; // blue
+}
+}
+}

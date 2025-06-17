@@ -1,0 +1,403 @@
+// _variables.scss
+$primary-color: #007bff;
+$secondary-color: #6c757d;
+$success-color: #28a745;
+$danger-color: #dc3545;
+$warning-color: #ffc107;
+$info-color: #17a2b8;
+$light-color: #f8f9fa;
+$dark-color: #343a40;
+$font-family:Arial, sans-serif;
+
+$border-radius: 0.25rem;
+$transition-speed: 0.3s;
+
+// _mixins.scss
+@mixin card-shadow {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+
+
+
+@mixin table-hover {
+  tbody tr:hover {
+    background-color: $light-color;
+  }
+}
+
+// _base.scss
+body {
+  font-family: Arial, sans-serif;  background-color: #f4f6f9;
+  color: $dark-color;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: $primary-color;
+}
+
+.card {
+  background-color: $light-color;
+  border: 1px solid $light-color;
+  border-radius: $border-radius;
+  margin-bottom: 1rem;
+  @include card-shadow;
+}
+
+.card-header {
+  background-color: $primary-color;
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  border-top-left-radius: $border-radius;
+  border-top-right-radius: $border-radius;
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.badge.bg-warning {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.table {
+  width: 100%;
+  margin-bottom: 1rem;
+  background-color: transparent;
+  border-collapse: collapse;
+  @include table-hover;
+
+  th,
+  td {
+    padding: 0.75rem;
+    vertical-align: top;
+    $deeppurple: #673ab7; // Material Deep Purple color
+  }
+
+  th {
+    background-color: rgb(240, 237, 237);
+    color: rgb(10, 10, 10);
+    text-align: center;
+  }
+
+  td {
+    text-align: center;
+  }
+}
+
+.pagination {
+  justify-content: center;
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  border-radius: $border-radius;
+
+  .page-item {
+    margin: 0 0.25rem;
+    .page-link {
+      border-radius: $border-radius;
+      padding: 0.375rem 0.75rem;
+      color: $primary-color;
+      background-color: $light-color;
+      border: 1px solid $light-color;
+      &:hover {
+        background-color: $primary-color;
+        color: white;
+      }
+    }
+  }
+
+  .disabled .page-link {
+    color: $secondary-color;
+    pointer-events: none;
+  }
+
+  .active .page-link {
+    background-color: $primary-color;
+    color: white;
+  }
+}
+
+.btn {
+  border-radius: $border-radius;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color $transition-speed ease;
+
+  &.btn-primary {
+    background-color: $primary-color;
+    border-color: $primary-color;
+    color: white;
+    &:hover {
+      background-color: darken($primary-color, 10%);
+    }
+  }
+
+  &.btn-secondary {
+    background-color: $secondary-color;
+    border-color: $secondary-color;
+    color: white;
+    &:hover {
+      background-color: darken($secondary-color, 10%);
+    }
+  }
+
+  &.btn-danger {
+    background-color: $danger-color;
+    border-color: $danger-color;
+    color: white;
+    &:hover {
+      background-color: darken($danger-color, 10%);
+    }
+  }
+
+  &.btn-warning {
+    background-color: $warning-color;
+    border-color: $warning-color;
+    color: white;
+    &:hover {
+      background-color: darken($warning-color, 10%);
+    }
+  }
+
+  &.btn-info {
+    background-color: $info-color;
+    border-color: $info-color;
+    color: white;
+    &:hover {
+      background-color: darken($info-color, 10%);
+    }
+  }
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+
+  input {
+    width: 100%;
+    max-width: 300px;
+    margin-left: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: $border-radius;
+    border: 1px solid $light-color;
+    &:focus {
+      border-color: $primary-color;
+      box-shadow: 0 0 0 0.2rem rgba($primary-color, 0.25);
+    }
+  }
+}
+.product-img-placeholder {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-box {
+  min-width: 250px;
+}
+
+.table th {
+  white-space: nowrap;
+}
+
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.action-buttons .btn {
+  min-width: 80px;
+}
+
+.badge {
+  font-weight:normal;
+}
+/* In your component CSS or global styles */
+.product-image-container {
+  width: 100%;
+  height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.product-image-container img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.no-image-placeholder {
+  text-align: center;
+  color: #6c757d;
+}
+
+.no-image-placeholder i {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 10px;
+}.product-image-container {
+  img {
+    max-width: 100%;
+    object-fit: contain;
+  }
+  
+  .no-image-placeholder {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+}
+.filter-sidebar {
+  position: fixed;
+  top: 0;
+  right: -400px;
+  width: 400px;
+  height: 100vh;
+  background: white;
+  box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+  z-index: 1050;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  
+  &.show {
+    right: 0;
+  }
+  
+  .filter-sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    h5 {
+      margin: 0;
+    }
+  }
+  
+  .filter-sidebar-body {
+    padding: 1rem;
+    flex: 1;
+    overflow-y: auto;
+  }
+}
+
+// Backdrop when sidebar is open
+.filter-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1040;
+  display: none;
+  
+  &.show {
+    display: block;
+}
+}
+.filter-drawer-container {
+  position: relative;
+  display: inline-block;
+}
+
+.filter-drawer {
+  position: fixed;
+  top: 0;
+  right: -400px; /* Changed from left to right */
+  width: 385px;
+  height: 100vh;
+  background: white;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.1); /* Shadow on left side now */
+  z-index: 1050;
+  transition: right 0.3s ease; /* Changed from left to right */
+  padding: 20px;
+  overflow-y: auto;
+  
+  &.drawer-open {
+    right: 0; /* Changed from left to right */
+  }
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.drawer-body {
+  padding: 10px 0;
+}
+
+.date-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.date-option {
+  padding: 10px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  
+  &:hover {
+    background-color: #f8f9fa;
+  }
+  
+  &.active {
+    background-color: #e9f5ff;
+    color: #0d6efd;
+  }
+}
+
+.custom-date-container {
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  margin-top: 20px;
+}
+
+.drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 15px;
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  z-index: 1040;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  
+  &.backdrop-visible {
+    opacity: 1;
+    visibility: visible;
+}
+}

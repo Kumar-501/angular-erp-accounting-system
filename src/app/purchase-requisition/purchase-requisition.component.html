@@ -1,0 +1,306 @@
+<div class="purchase-requisition-container">
+  <h1>Purchase Requisition</h1>
+  <p>A purchase requisition is a document that an employee creates to request a purchase of goods or services.</p>
+
+  <div class="loading-overlay" *ngIf="isLoading">
+    <div class="spinner"></div>
+    Loading data...
+  </div>
+
+  <div class="bulk-actions" *ngIf="selectedRequisitions.length > 0">
+  <button class="btn-delete" (click)="deleteSelectedRequisitions()">
+    <i class="fa fa-trash"></i> Delete Selected ({{ selectedRequisitions.length }})
+  </button>
+</div>
+
+
+  <div class="table-container">
+    <div class="table-header">
+      <div class="entries-section">
+        <label>Show 
+          <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+          entries
+        </label>
+      </div>
+
+      <div class="export-buttons">
+        <button class="export-btn" (click)="exportCSV()">
+          <i class="fa fa-file-csv"></i> Export CSV
+        </button>
+        <button class="export-btn" (click)="exportExcel()">
+          <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+  <button class="btn-delete" (click)="deleteSelectedRequisitions()">
+    <i class="fa fa-trash"></i> Delete Selected ({{ selectedRequisitions.length }})
+  </button>
+        <button class="export-btn" (click)="print()">
+          <i class="fa fa-print"></i> Print
+        </button>
+        <button class="export-btn" (click)="toggleColumnVisibility()">
+          <i class="fa fa-columns"></i> Column visibility
+        </button>
+      </div>
+      <div class="filter-section">
+        <button class="filter-btn" style="width: 80px; padding: 4px 8px;" (click)="toggleFilters()">
+          <i class="fa fa-filter"></i> Filters
+        </button>
+      </div>
+    
+      <!-- Column Visibility Dropdown -->
+      <div class="column-visibility-dropdown" *ngIf="showColumnVisibility">
+        <div class="dropdown-content">
+          <ul class="column-list">
+            <li *ngFor="let column of columns" class="column-item">
+              <label>
+                <input type="checkbox" 
+                       [checked]="column.visible" 
+                       (change)="updateColumnVisibility(column)"
+                       [disabled]="column.visible && !hasVisibleColumns()">
+                {{ column.name }}
+              </label>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="search-section">
+        <input type="text" 
+               [(ngModel)]="searchTerm" 
+               (input)="onSearchInput($event)"
+               placeholder="Search..." 
+               class="search-input">
+      </div>
+
+      <button class="add-btn" (click)="navigateToAddRequisition()">
+        <i class="fa fa-plus"></i> Add
+      </button>
+    </div>
+    <div class="filter-sidebar" [class.active]="showFilters">
+      <div class="sidebar-header">
+        <h3>Filters</h3>
+        <button class="close-btn" (click)="toggleFilters()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="sidebar-body">
+        <div class="filter-group">
+          <label>Date Range</label>
+          <div class="date-range-picker">
+            <input type="date" [(ngModel)]="startDate" placeholder="Start Date">
+            <span>to</span>
+            <input type="date" [(ngModel)]="endDate" placeholder="End Date">
+          </div>
+        </div>
+    
+        <div class="filter-group">
+          <label>Location</label>
+          <select [(ngModel)]="selectedLocation" class="form-control">
+            <option value="All">All Locations</option>
+            <option *ngFor="let location of businessLocations" [value]="location.name">
+              {{ location.name }}
+            </option>
+          </select>
+        </div>
+    
+        <div class="filter-group">
+          <label>Status</label>
+          <select [(ngModel)]="selectedStatus" class="form-control">
+            <option value="All">All Statuses</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+    
+        <div class="filter-group">
+          <label>Required By Date</label>
+          <input type="date" [(ngModel)]="requiredByDate" class="form-control">
+        </div>
+    
+        <div class="filter-group">
+          <label>Supplier</label>
+          <select [(ngModel)]="selectedSupplier" class="form-control">
+            <option value="All">All Suppliers</option>
+            <option *ngFor="let supplier of suppliers" [value]="supplier.id">
+              {{ supplier.businessName || supplier.firstName + ' ' + supplier.lastName }}
+            </option>
+          </select>
+        </div>
+    
+        <div class="filter-actions">
+          <button class="apply-btn" (click)="applyFilters()">Apply Filters</button>
+          <button class="reset-btn" (click)="resetFilters()">Reset</button>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="requisition-table">
+   <!-- Update the table header section to include click events for sorting -->
+<thead>
+  <tr>
+    <th>
+      <input type="checkbox" 
+             [checked]="allSelected" 
+             (change)="toggleSelectAll($event)">
+    </th>
+    <th *ngIf="columns[0].visible" (click)="sortTable('date')">
+      Date <i class="fa" [ngClass]="getSortIcon('date')"></i>
+    </th>
+    <th *ngIf="columns[1].visible" (click)="sortTable('referenceNo')">
+      Reference No <i class="fa" [ngClass]="getSortIcon('referenceNo')"></i>
+    </th>
+    <th *ngIf="columns[2].visible" (click)="sortTable('brand')">
+      Brand <i class="fa" [ngClass]="getSortIcon('brand')"></i>
+    </th>
+    <th *ngIf="columns[3].visible" (click)="sortTable('category')">
+      Category <i class="fa" [ngClass]="getSortIcon('category')"></i>
+    </th>
+    <th *ngIf="columns[4].visible" (click)="sortTable('locationName')">
+      Location <i class="fa" [ngClass]="getSortIcon('locationName')"></i>
+    </th>
+    <th *ngIf="columns[5].visible" (click)="sortTable('status')">
+      Status <i class="fa" [ngClass]="getSortIcon('status')"></i>
+    </th>
+    <th *ngIf="columns[6].visible" (click)="sortTable('shippingStatus')">
+      Shipping Status <i class="fa" [ngClass]="getSortIcon('shippingStatus')"></i>
+    </th>
+    <th *ngIf="columns[14].visible" (click)="sortTable('unitPurchasePrice')">
+  Unit Purchase Price <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
+</th>
+<th *ngIf="columns[15].visible" (click)="sortTable('purchasePriceIncTax')">
+  Purchase Price (Inc Tax) <i class="fa" [ngClass]="getSortIcon('purchasePriceIncTax')"></i>
+</th>
+
+    <th *ngIf="columns[7].visible" (click)="sortTable('requiredByDate')">
+      Required by date <i class="fa" [ngClass]="getSortIcon('requiredByDate')"></i>
+    </th>
+    <th *ngIf="columns[8].visible" (click)="sortTable('addedBy')">
+      Added By <i class="fa" [ngClass]="getSortIcon('addedBy')"></i>
+    </th>
+    <th *ngIf="columns[9].visible" (click)="sortTable('supplierName')">
+      Supplier <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
+    </th>
+    <th *ngIf="columns[10].visible" (click)="sortTable('shippingDate')">
+      Shipping Date <i class="fa" [ngClass]="getSortIcon('shippingDate')"></i>
+    </th>
+    <th *ngIf="columns[11].visible" (click)="sortTable('items')">
+      Products <i class="fa" [ngClass]="getSortIcon('items')"></i>
+    </th>
+    <th *ngIf="columns[12].visible" (click)="sortTable('totalQuantity')">
+      Total Required Qty <i class="fa" [ngClass]="getSortIcon('totalQuantity')"></i>
+    </th>
+    <th *ngIf="columns[13].visible" (click)="sortTable('currentStock')">
+      Quantity Remaining <i class="fa" [ngClass]="getSortIcon('currentStock')"></i>
+    </th>
+    <th>Action</th>
+  </tr>
+</thead>
+        <tbody>
+          <tr *ngFor="let row of getPaginatedRows(); trackBy: trackByFn">
+            <td>
+      <input type="checkbox" 
+             [checked]="isSelected(row.id)" 
+             (change)="toggleSelection(row.id)">
+    </td>
+            <td *ngIf="columns[0].visible">{{ row.date | date }}</td>
+            <td *ngIf="columns[1].visible">{{ row.referenceNo }}</td>
+            <td *ngIf="columns[2].visible">{{ row.brand }}</td>
+            <td *ngIf="columns[3].visible">{{ row.category }}</td>
+            <td *ngIf="columns[4].visible">{{ row.locationName }}</td>
+            <td *ngIf="columns[5].visible">
+              <span class="status-badge" [ngClass]="row.status | lowercase">
+                {{ row.status }}
+              </span>
+            </td>
+            <td *ngIf="columns[6].visible">
+              <span class="status-badge" [ngClass]="row.shippingStatus | lowercase">
+                {{ row.shippingStatus || 'Not Shipped' }}
+              </span>
+            </td>
+            <td *ngIf="columns[14].visible">
+  <div *ngIf="row.items && row.items.length > 0">
+    <span *ngFor="let item of row.items; let last = last">
+      {{ item.unitPurchasePrice | currency:'INR' }}{{ !last ? ', ' : '' }}
+    </span>
+  </div>
+  <div *ngIf="!row.items || row.items.length === 0">
+    N/A
+  </div>
+</td>
+<td *ngIf="columns[15].visible">
+  <div *ngIf="row.items && row.items.length > 0">
+    <span *ngFor="let item of row.items; let last = last">
+      {{ item.purchasePriceIncTax |currency:'INR'  }}{{ !last ? ', ' : '' }}
+    </span>
+  </div>
+  <div *ngIf="!row.items || row.items.length === 0">
+    N/A
+  </div>
+</td>
+
+            <td *ngIf="columns[7].visible">{{ row.requiredByDate | date }}</td>
+            <td *ngIf="columns[8].visible">{{ row.addedBy }}</td>
+            <td *ngIf="columns[9].visible">{{ row.supplierName || 'N/A' }}</td>
+            <td *ngIf="columns[10].visible">{{ row.shippingDate | date }}</td>
+            <td *ngIf="columns[11].visible">
+              <div *ngIf="row.items && row.items.length > 0">
+                <span *ngFor="let item of row.items; let last = last">
+                  {{ item.productName }} ({{ item.requiredQuantity }}){{ !last ? ', ' : '' }}
+                </span>
+              </div>
+              <div *ngIf="!row.items || row.items.length === 0">
+                No products
+              </div>
+            </td>
+            <td *ngIf="columns[12].visible">
+              {{ calculateTotalRequiredQuantity(row.items) }}
+            </td>
+            <td *ngIf="columns[13].visible">
+              <div *ngIf="row.items && row.items.length > 0">
+                <span *ngFor="let item of row.items; let last = last">
+                  {{ item.currentStock || 0 }}{{ !last ? ', ' : '' }}
+                </span>
+              </div>
+              <div *ngIf="!row.items || row.items.length === 0">
+                N/A
+              </div>
+            </td>
+            <td>
+              <div class="action-buttons">
+                <button class="btn-view" title="View" (click)="viewRequisition(row.id, $event)">
+                  <i class="fa fa-eye"></i>
+                </button>
+                <button class="btn-approve" title="Approve" *ngIf="row.status !== 'Approved'" (click)="approveRequisition(row, $event)">
+                  <i class="fa fa-check"></i>
+                </button>
+                <button class="btn-delete" title="Delete" (click)="deleteRequisition(row.id, $event)">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredRows.length === 0">
+            <td [attr.colspan]="columns.length + 1" class="text-center">No records found</td>
+          </tr>
+          
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      <div class="showing-entries">
+        Showing {{ getFirstEntryIndex() }} to {{ getLastEntryIndex() }} of {{ filteredRows.length }} entries
+      </div>
+      <div class="pagination">
+        <button class="page-btn" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+        <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+        <button class="page-btn" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+      </div>
+    </div>
+  </div>
+</div>

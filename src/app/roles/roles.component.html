@@ -1,0 +1,1070 @@
+<div class="roles-container">
+  <h2>Add Role</h2>
+  
+  <form (ngSubmit)="onSubmit()">
+    <div class="form-section">
+      <h3>Role Name*</h3>
+      <input type="text" [(ngModel)]="roleName" name="roleName" required>
+    </div>
+    
+    <div class="form-section">
+      <h3>Permissions:</h3>
+    </div>
+    
+    <!-- Others -->
+    <div class="permissions-section">
+      <h3>Others</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.others.selectAll" 
+               name="othersSelectAll" (change)="toggleSelectAll('others')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.others.exportButtons" 
+               name="exportButtons" (change)="onPermissionChange('others')">
+        View export to buttons (csv/excel/print/pdf) on tables
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- User -->
+    <div class="permissions-section">
+      <h3>User</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.user.selectAll" 
+               name="userSelectAll" (change)="toggleSelectAll('user')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.user.view" 
+               name="userView" (change)="onPermissionChange('user')">
+        View user
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.user.add" 
+               name="userAdd" (change)="onPermissionChange('user')">
+        Add user
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.user.edit" 
+               name="userEdit" (change)="onPermissionChange('user')">
+        Edit user
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.user.delete" 
+               name="userDelete" (change)="onPermissionChange('user')">
+        Delete user
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Roles -->
+    <div class="permissions-section">
+      <h3>Roles</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.roles.selectAll" 
+               name="rolesSelectAll" (change)="toggleSelectAll('roles')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.roles.view" 
+               name="rolesView" (change)="onPermissionChange('roles')">
+        View role
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.roles.add" 
+               name="rolesAdd" (change)="onPermissionChange('roles')">
+        Add Role
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.roles.edit" 
+               name="rolesEdit" (change)="onPermissionChange('roles')">
+        Edit Role
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.roles.delete" 
+               name="rolesDelete" (change)="onPermissionChange('roles')">
+        Delete role
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Supplier -->
+    <div class="permissions-section">
+      <h3>Supplier</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.selectAll" 
+               name="supplierSelectAll" (change)="toggleSelectAll('supplier')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.viewAll" 
+               name="supplierViewAll" (change)="onPermissionChange('supplier')">
+        View all supplier
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.viewOwn" 
+               name="supplierViewOwn" (change)="onPermissionChange('supplier')">
+        View own supplier
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.add" 
+               name="supplierAdd" (change)="onPermissionChange('supplier')">
+        Add supplier
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.edit" 
+               name="supplierEdit" (change)="onPermissionChange('supplier')">
+        Edit supplier
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.supplier.delete" 
+               name="supplierDelete" (change)="onPermissionChange('supplier')">
+        Delete supplier
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Customer -->
+    <div class="permissions-section">
+      <h3>Customer</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.selectAll" 
+               name="customerSelectAll" (change)="toggleSelectAll('customer')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewAll" 
+               name="customerViewAll" (change)="onPermissionChange('customer')">
+        View all customer
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewOwn" 
+               name="customerViewOwn" (change)="onPermissionChange('customer')">
+        View own customer
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewNoSell1Month" 
+               name="customerViewNoSell1Month" (change)="onPermissionChange('customer')">
+        View customers with no sell from one month only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewNoSell3Months" 
+               name="customerViewNoSell3Months" (change)="onPermissionChange('customer')">
+        View customers with no sell from three months only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewNoSell6Months" 
+               name="customerViewNoSell6Months" (change)="onPermissionChange('customer')">
+        View customers with no sell from six months only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewNoSell1Year" 
+               name="customerViewNoSell1Year" (change)="onPermissionChange('customer')">
+        View customers with no sell from one year only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.viewIrrespectiveSell" 
+               name="customerViewIrrespectiveSell" (change)="onPermissionChange('customer')">
+        View customers irrespective of their sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.add" 
+               name="customerAdd" (change)="onPermissionChange('customer')">
+        Add customer
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.edit" 
+               name="customerEdit" (change)="onPermissionChange('customer')">
+        Edit customer
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.customer.delete" 
+               name="customerDelete" (change)="onPermissionChange('customer')">
+        Delete customer
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Product -->
+    <div class="permissions-section">
+      <h3>Product</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.selectAll" 
+               name="productSelectAll" (change)="toggleSelectAll('product')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.view" 
+               name="productView" (change)="onPermissionChange('product')">
+        View product
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.add" 
+               name="productAdd" (change)="onPermissionChange('product')">
+        Add product
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.edit" 
+               name="productEdit" (change)="onPermissionChange('product')">
+        Edit product
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.delete" 
+               name="productDelete" (change)="onPermissionChange('product')">
+        Delete product
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.addOpeningStock" 
+               name="productAddOpeningStock" (change)="onPermissionChange('product')">
+        Add Opening Stock
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.product.viewPurchasePrice" 
+               name="productViewPurchasePrice" (change)="onPermissionChange('product')">
+        View Purchase Price
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Purchase & Stock Adjustment -->
+    <div class="permissions-section">
+      <h3>Purchase & Stock Adjustment</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.selectAll" 
+               name="purchaseStockSelectAll" (change)="toggleSelectAll('purchaseStock')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.viewAll" 
+               name="purchaseStockViewAll" (change)="onPermissionChange('purchaseStock')">
+        View all Purchase & Stock Adjustment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.viewOwn" 
+               name="purchaseStockViewOwn" (change)="onPermissionChange('purchaseStock')">
+        View own Purchase & Stock Adjustment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.add" 
+               name="purchaseStockAdd" (change)="onPermissionChange('purchaseStock')">
+        Add purchase & Stock Adjustment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.edit" 
+               name="purchaseStockEdit" (change)="onPermissionChange('purchaseStock')">
+        Edit purchase & Stock Adjustment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.delete" 
+               name="purchaseStockDelete" (change)="onPermissionChange('purchaseStock')">
+        Delete purchase & Stock Adjustment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.addPayment" 
+               name="purchaseStockAddPayment" (change)="onPermissionChange('purchaseStock')">
+        Add purchase payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.editPayment" 
+               name="purchaseStockEditPayment" (change)="onPermissionChange('purchaseStock')">
+        Edit purchase payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.deletePayment" 
+               name="purchaseStockDeletePayment" (change)="onPermissionChange('purchaseStock')">
+        Delete purchase payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseStock.updateStatus" 
+               name="purchaseStockUpdateStatus" (change)="onPermissionChange('purchaseStock')">
+        Update Status
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Purchase Requisition -->
+    <div class="permissions-section">
+      <h3>Purchase Requisition</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseRequisition.selectAll" 
+               name="purchaseRequisitionSelectAll" (change)="toggleSelectAll('purchaseRequisition')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseRequisition.viewAll" 
+               name="purchaseRequisitionViewAll" (change)="onPermissionChange('purchaseRequisition')">
+        View all purchase requisition
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseRequisition.viewOwn" 
+               name="purchaseRequisitionViewOwn" (change)="onPermissionChange('purchaseRequisition')">
+        View own purchase requisition
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseRequisition.create" 
+               name="purchaseRequisitionCreate" (change)="onPermissionChange('purchaseRequisition')">
+        Create purchase requisition
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseRequisition.delete" 
+               name="purchaseRequisitionDelete" (change)="onPermissionChange('purchaseRequisition')">
+        Delete purchase requisition
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Purchase Order -->
+    <div class="permissions-section">
+      <h3>Purchase Order</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.selectAll" 
+               name="purchaseOrderSelectAll" (change)="toggleSelectAll('purchaseOrder')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.viewAll" 
+               name="purchaseOrderViewAll" (change)="onPermissionChange('purchaseOrder')">
+        View all purchase order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.viewOwn" 
+               name="purchaseOrderViewOwn" (change)="onPermissionChange('purchaseOrder')">
+        View own purchase order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.create" 
+               name="purchaseOrderCreate" (change)="onPermissionChange('purchaseOrder')">
+        Create purchase order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.edit" 
+               name="purchaseOrderEdit" (change)="onPermissionChange('purchaseOrder')">
+        Edit purchase order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.purchaseOrder.delete" 
+               name="purchaseOrderDelete" (change)="onPermissionChange('purchaseOrder')">
+        Delete purchase order
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- POS -->
+    <div class="permissions-section">
+      <h3>POS</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.selectAll" 
+               name="posSelectAll" (change)="toggleSelectAll('pos')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.editSell" 
+               name="posEditSell" (change)="onPermissionChange('pos')">
+        Edit POS sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.deleteSell" 
+               name="posDeleteSell" (change)="onPermissionChange('pos')">
+        Delete POS sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.editPrice" 
+               name="posEditPrice" (change)="onPermissionChange('pos')">
+        Edit product price from POS screen
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.editDiscount" 
+               name="posEditDiscount" (change)="onPermissionChange('pos')">
+        Edit product discount from POS screen
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.addEditPayment" 
+               name="posAddEditPayment" (change)="onPermissionChange('pos')">
+        Add/Edit Payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.printInvoice" 
+               name="posPrintInvoice" (change)="onPermissionChange('pos')">
+        Print Invoice
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableMultiplePay" 
+               name="posDisableMultiplePay" (change)="onPermissionChange('pos')">
+        Disable Multiple Pay
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableDraft" 
+               name="posDisableDraft" (change)="onPermissionChange('pos')">
+        Disable Draft
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableExpressCheckout" 
+               name="posDisableExpressCheckout" (change)="onPermissionChange('pos')">
+        Disable Express Checkout
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableDiscount" 
+               name="posDisableDiscount" (change)="onPermissionChange('pos')">
+        Disable Discount
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableSuspendSale" 
+               name="posDisableSuspendSale" (change)="onPermissionChange('pos')">
+        Disable Suspend Sale
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableCreditSale" 
+               name="posDisableCreditSale" (change)="onPermissionChange('pos')">
+        Disable credit sale button
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableQuotation" 
+               name="posDisableQuotation" (change)="onPermissionChange('pos')">
+        Disable Quotation
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.pos.disableCard" 
+               name="posDisableCard" (change)="onPermissionChange('pos')">
+        Disable Card
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Sell -->
+    <div class="permissions-section">
+      <h3>Sell</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.selectAll" 
+               name="sellSelectAll" (change)="toggleSelectAll('sell')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewAll" 
+               name="sellViewAll" (change)="onPermissionChange('sell')">
+        View all sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewOwn" 
+               name="sellViewOwn" (change)="onPermissionChange('sell')">
+        View own sell only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewPaid" 
+               name="sellViewPaid" (change)="onPermissionChange('sell')">
+        View paid sells only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewDue" 
+               name="sellViewDue" (change)="onPermissionChange('sell')">
+        View due sells only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewPartiallyPaid" 
+               name="sellViewPartiallyPaid" (change)="onPermissionChange('sell')">
+        View partially paid sells only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.viewOverdue" 
+               name="sellViewOverdue" (change)="onPermissionChange('sell')">
+        View overdue sells only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.add" 
+               name="sellAdd" (change)="onPermissionChange('sell')">
+        Add Sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.update" 
+               name="sellUpdate" (change)="onPermissionChange('sell')">
+        Update Sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.delete" 
+               name="sellDelete" (change)="onPermissionChange('sell')">
+        Delete Sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.commissionAgentView" 
+               name="sellCommissionAgentView" (change)="onPermissionChange('sell')">
+        Commission agent can view their own sell
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.addPayment" 
+               name="sellAddPayment" (change)="onPermissionChange('sell')">
+        Add sell payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.editPayment" 
+               name="sellEditPayment" (change)="onPermissionChange('sell')">
+        Edit sell payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.deletePayment" 
+               name="sellDeletePayment" (change)="onPermissionChange('sell')">
+        Delete sell payment
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.editPrice" 
+               name="sellEditPrice" (change)="onPermissionChange('sell')">
+        Edit product price from sales screen
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.editDiscount" 
+               name="sellEditDiscount" (change)="onPermissionChange('sell')">
+        Edit product discount from Sale screen
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.manageDiscount" 
+               name="sellManageDiscount" (change)="onPermissionChange('sell')">
+        Add/Edit/Delete Discount
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.accessServiceTypes" 
+               name="sellAccessServiceTypes" (change)="onPermissionChange('sell')">
+        Access types of service
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.accessAllReturns" 
+               name="sellAccessAllReturns" (change)="onPermissionChange('sell')">
+        Access all sell return
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.accessOwnReturns" 
+               name="sellAccessOwnReturns" (change)="onPermissionChange('sell')">
+        Access own sell return
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.sell.manageInvoiceNumber" 
+               name="sellManageInvoiceNumber" (change)="onPermissionChange('sell')">
+        Add/edit invoice number
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Sales Order -->
+    <div class="permissions-section">
+      <h3>Sales Order</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.selectAll" 
+               name="salesOrderSelectAll" (change)="toggleSelectAll('salesOrder')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.viewAll" 
+               name="salesOrderViewAll" (change)="onPermissionChange('salesOrder')">
+        View all sales order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.viewOwn" 
+               name="salesOrderViewOwn" (change)="onPermissionChange('salesOrder')">
+        View own sales order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.create" 
+               name="salesOrderCreate" (change)="onPermissionChange('salesOrder')">
+        Create sales order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.edit" 
+               name="salesOrderEdit" (change)="onPermissionChange('salesOrder')">
+        Edit sales order
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.salesOrder.delete" 
+               name="salesOrderDelete" (change)="onPermissionChange('salesOrder')">
+        Delete sales order
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Draft -->
+    <div class="permissions-section">
+      <h3>Draft</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.draft.selectAll" 
+               name="draftSelectAll" (change)="toggleSelectAll('draft')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.draft.viewAll" 
+               name="draftViewAll" (change)="onPermissionChange('draft')">
+        View all drafts
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.draft.viewOwn" 
+               name="draftViewOwn" (change)="onPermissionChange('draft')">
+        View own drafts
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.draft.edit" 
+               name="draftEdit" (change)="onPermissionChange('draft')">
+        Edit draft
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.draft.delete" 
+               name="draftDelete" (change)="onPermissionChange('draft')">
+        Delete draft
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Quotation -->
+    <div class="permissions-section">
+      <h3>Quotation</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.quotation.selectAll" 
+               name="quotationSelectAll" (change)="toggleSelectAll('quotation')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.quotation.viewAll" 
+               name="quotationViewAll" (change)="onPermissionChange('quotation')">
+        View all quotations
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.quotation.viewOwn" 
+               name="quotationViewOwn" (change)="onPermissionChange('quotation')">
+        View own quotations
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.quotation.edit" 
+               name="quotationEdit" (change)="onPermissionChange('quotation')">
+        Edit quotation
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.quotation.delete" 
+               name="quotationDelete" (change)="onPermissionChange('quotation')">
+        Delete quotation
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Shipments -->
+    <div class="permissions-section">
+      <h3>Shipments</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.shipments.selectAll" 
+               name="shipmentsSelectAll" (change)="toggleSelectAll('shipments')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.shipments.accessAll" 
+               name="shipmentsAccessAll" (change)="onPermissionChange('shipments')">
+        Access all shipments
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.shipments.accessOwn" 
+               name="shipmentsAccessOwn" (change)="onPermissionChange('shipments')">
+        Access own shipments
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.shipments.accessPending" 
+               name="shipmentsAccessPending" (change)="onPermissionChange('shipments')">
+        Access pending shipments only
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.shipments.commissionAgentAccess" 
+               name="shipmentsCommissionAgentAccess" (change)="onPermissionChange('shipments')">
+        Commission agent can access their own shipments
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Cash Register -->
+    <div class="permissions-section">
+      <h3>Cash Register</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.cashRegister.selectAll" 
+               name="cashRegisterSelectAll" (change)="toggleSelectAll('cashRegister')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.cashRegister.view" 
+               name="cashRegisterView" (change)="onPermissionChange('cashRegister')">
+        View cash register
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.cashRegister.close" 
+               name="cashRegisterClose" (change)="onPermissionChange('cashRegister')">
+        Close cash register
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Brand -->
+    <div class="permissions-section">
+      <h3>Brand</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.brand.selectAll" 
+               name="brandSelectAll" (change)="toggleSelectAll('brand')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.brand.view" 
+               name="brandView" (change)="onPermissionChange('brand')">
+        View brand
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.brand.add" 
+               name="brandAdd" (change)="onPermissionChange('brand')">
+        Add brand
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.brand.edit" 
+               name="brandEdit" (change)="onPermissionChange('brand')">
+        Edit brand
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.brand.delete" 
+               name="brandDelete" (change)="onPermissionChange('brand')">
+        Delete brand
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Tax rate -->
+    <div class="permissions-section">
+      <h3>Tax rate</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.taxRate.selectAll" 
+               name="taxRateSelectAll" (change)="toggleSelectAll('taxRate')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.taxRate.view" 
+               name="taxRateView" (change)="onPermissionChange('taxRate')">
+        View tax rate
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.taxRate.add" 
+               name="taxRateAdd" (change)="onPermissionChange('taxRate')">
+        Add tax rate
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.taxRate.edit" 
+               name="taxRateEdit" (change)="onPermissionChange('taxRate')">
+        Edit tax rate
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.taxRate.delete" 
+               name="taxRateDelete" (change)="onPermissionChange('taxRate')">
+        Delete tax rate
+      </label>
+    </div>
+    
+    <hr>
+    
+    <!-- Unit -->
+    <div class="permissions-section">
+      <h3>Unit</h3>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.unit.selectAll" 
+               name="unitSelectAll" (change)="toggleSelectAll('unit')">
+        Select all
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.unit.view" 
+               name="unitView" (change)="onPermissionChange('unit')">
+        View unit
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.unit.add" 
+               name="unitAdd" (change)="onPermissionChange('unit')">
+        Add unit
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.unit.edit" 
+               name="unitEdit" (change)="onPermissionChange('unit')">
+        Edit unit
+      </label>
+      <label>
+        <input type="checkbox" [(ngModel)]="permissions.unit.delete" 
+               name="unitDelete" (change)="onPermissionChange('unit')">
+        Delete unit
+      </label>
+    </div>
+    
+    <hr>
+    
+    <div class="permissions-container">
+      <!-- Category -->
+      <div class="permissions-section">
+        <h3>Category</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.category.selectAll" 
+                 name="categorySelectAll" (change)="toggleSelectAll('category')">
+          Select all
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.category.view" 
+                 name="categoryView" (change)="onPermissionChange('category')">
+          View category
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.category.add" 
+                 name="categoryAdd" (change)="onPermissionChange('category')">
+          Add category
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.category.edit" 
+                 name="categoryEdit" (change)="onPermissionChange('category')">
+          Edit category
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.category.delete" 
+                 name="categoryDelete" (change)="onPermissionChange('category')">
+          Delete category
+        </label>
+      </div>
+    
+      <!-- Report -->
+      <div class="permissions-section">
+        <h3>Report</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.selectAll" 
+                 name="reportSelectAll" (change)="toggleSelectAll('report')">
+          Select all
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.purchaseSell" 
+                 name="purchaseSell" (change)="onPermissionChange('report')">
+          View purchase & sell report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.tax" 
+                 name="tax" (change)="onPermissionChange('report')">
+          View Tax report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.supplierCustomer" 
+                 name="supplierCustomer" (change)="onPermissionChange('report')">
+          View Supplier & Customer report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.expense" 
+                 name="expense" (change)="onPermissionChange('report')">
+          View expense report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.profitLoss" 
+                 name="profitLoss" (change)="onPermissionChange('report')">
+          View profit/loss report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.stock" 
+                 name="stock" (change)="onPermissionChange('report')">
+          View stock report, stock adjustment report & stock expiry report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.trendingProduct" 
+                 name="trendingProduct" (change)="onPermissionChange('report')">
+          View trending product report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.register" 
+                 name="register" (change)="onPermissionChange('report')">
+          View register report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.salesRepresentative" 
+                 name="salesRepresentative" (change)="onPermissionChange('report')">
+          View sales representative report
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.report.productStockValue" 
+                 name="productStockValue" (change)="onPermissionChange('report')">
+          View product stock value
+        </label>
+      </div>
+    
+      <!-- Settings -->
+      <div class="permissions-section">
+        <h3>Settings</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.settings.selectAll" 
+                 name="settingsSelectAll" (change)="toggleSelectAll('settings')">
+          Select all
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.settings.business" 
+                 name="business" (change)="onPermissionChange('settings')">
+          Access business settings
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.settings.barcode" 
+                 name="barcode" (change)="onPermissionChange('settings')">
+          Access barcode settings
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.settings.invoice" 
+                 name="invoice" (change)="onPermissionChange('settings')">
+          Access invoice settings
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.settings.printers" 
+                 name="printers" (change)="onPermissionChange('settings')">
+          Access printers
+        </label>
+      </div>
+    
+      <!-- Expense -->
+      <div class="permissions-section">
+        <h3>Expense</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.selectAll" 
+                 name="expenseSelectAll" (change)="toggleSelectAll('expense')">
+          Select all
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.accessAll" 
+                 name="expenseAccessAll" (change)="onPermissionChange('expense')">
+          Access all expenses
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.viewOwn" 
+                 name="expenseViewOwn" (change)="onPermissionChange('expense')">
+          View own expense only
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.add" 
+                 name="expenseAdd" (change)="onPermissionChange('expense')">
+          Add Expense
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.edit" 
+                 name="expenseEdit" (change)="onPermissionChange('expense')">
+          Edit Expense
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.expense.delete" 
+                 name="expenseDelete" (change)="onPermissionChange('expense')">
+          Delete Expense
+        </label>
+      </div>
+    
+      <!-- Home -->
+      <div class="permissions-section">
+        <h3>Home</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.home.viewData" 
+                 name="homeView" (change)="onPermissionChange('home')">
+          View Home data
+        </label>
+      </div>
+    
+      <!-- Account -->
+      <div class="permissions-section">
+        <h3>Account</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.account.access" 
+                 name="accountAccess" (change)="onPermissionChange('account')">
+          Access Accounts
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.account.editTransaction" 
+                 name="accountEditTransaction" (change)="onPermissionChange('account')">
+          Edit account transaction
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.account.deleteTransaction" 
+                 name="accountDeleteTransaction" (change)="onPermissionChange('account')">
+          Delete account transaction
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.account.sellingPriceGroups" 
+                 name="accountAccessSellingPrice" (change)="onPermissionChange('account')">
+          Access selling price groups
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.account.defaultSellingPrice" 
+                 name="accountDefaultSellingPrice" (change)="onPermissionChange('account')">
+          Default Selling Price
+        </label>
+      </div>
+    
+      <!-- CRM -->
+      <div class="permissions-section">
+        <h3>CRM</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.allFollowUp" 
+                 name="crmAccessAllFollowUp" (change)="onPermissionChange('crm')">
+          Access all follow up
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.ownFollowUp" 
+                 name="crmAccessOwnFollowUp" (change)="onPermissionChange('crm')">
+          Access own follow up
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.allLeads" 
+                 name="crmAccessAllLeads" (change)="onPermissionChange('crm')">
+          Access all leads
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.ownLeads" 
+                 name="crmAccessOwnLeads" (change)="onPermissionChange('crm')">
+          Access own leads
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.allCampaigns" 
+                 name="crmAccessAllCampaigns" (change)="onPermissionChange('crm')">
+          Access all campaigns
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.ownCampaigns" 
+                 name="crmAccessOwnCampaigns" (change)="onPermissionChange('crm')">
+          Access own campaigns
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.contactLogin" 
+                 name="crmAccessContactLogin" (change)="onPermissionChange('crm')">
+          Access contact login
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.sources" 
+                 name="crmAccessSources" (change)="onPermissionChange('crm')">
+          Access sources
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.lifeStage" 
+                 name="crmAccessLifeStage" (change)="onPermissionChange('crm')">
+          Access life stage
+        </label>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.crm.proposal" 
+                 name="crmAccessProposal" (change)="onPermissionChange('crm')">
+          Access proposal
+        </label>
+      </div>
+    
+      <!-- Superadmin -->
+      <div class="permissions-section">
+        <h3>Superadmin</h3>
+        <label>
+          <input type="checkbox" [(ngModel)]="permissions.superadmin.packageSubscriptions" 
+                 name="superadminAccessPackage" (change)="onPermissionChange('superadmin')">
+          Access package subscriptions
+        </label>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" (click)="onSubmit()">Save Role</button>
+          </div>

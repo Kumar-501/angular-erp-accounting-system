@@ -1,0 +1,13 @@
+// supplier-view.component.scss
+.card-header {
+    .btn-light {
+      &:hover {
+        background-color: #f8f9fa;
+        color: #212529;
+      }
+      
+      i {
+        margin-right: 5px;
+      }
+    }
+  }

@@ -1,0 +1,647 @@
+// input-tax-report.component.scss
+
+// Color variables for consistent theming
+$primary-color: #2c3e50;
+$secondary-color: #3498db;
+$success-color: #27ae60;
+$warning-color: #f39c12;
+$danger-color: #e74c3c;
+$light-bg: #f8f9fa;
+$border-color: #dee2e6;
+$text-muted: #6c757d;
+$shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+// Main container styling
+.container-fluid {
+  padding: 1rem;
+  background-color: #f5f6fa;
+  min-height: 100vh;
+}
+
+// Card styling
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: $shadow;
+  background: white;
+  
+  .card-header {
+    background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
+    color: white;
+    border-radius: 12px 12px 0 0 !important;
+    border-bottom: none;
+    padding: 1.5rem;
+    
+    h4 {
+      font-weight: 600;
+      margin: 0;
+      font-size: 1.5rem;
+    }
+  }
+  
+  .card-body {
+    padding: 2rem;
+  }
+}
+
+// Filter section styling
+.filters-section {
+  background: $light-bg;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  border: 1px solid $border-color;
+}
+
+.form-label {
+  font-weight: 600;
+  color: $primary-color;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-control, .form-select {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  
+  &:focus {
+    border-color: $secondary-color;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+    outline: none;
+  }
+}
+
+// Button styling
+.btn {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  &.btn-primary {
+    background: linear-gradient(135deg, $secondary-color 0%, #2980b9 100%);
+    box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    }
+  }
+  
+  &.btn-secondary {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+    
+    &:hover {
+      transform: translateY(-2px);
+    }
+  }
+  
+  &.btn-outline-secondary {
+    border: 2px solid $border-color;
+    color: $text-muted;
+    
+    &:hover {
+      background: $light-bg;
+      border-color: $secondary-color;
+      color: $secondary-color;
+    }
+  }
+  
+  &.btn-outline-primary {
+    border: 2px solid $secondary-color;
+    color: $secondary-color;
+    
+    &:hover {
+      background: $secondary-color;
+      color: white;
+    }
+  }
+  
+  i {
+    margin-right: 0.5rem;
+  }
+}
+
+// Summary cards styling
+.summary-cards {
+  margin-bottom: 2rem;
+  
+  .col-md-3 {
+    margin-bottom: 1rem;
+  }
+  
+  .card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid $border-color;
+    transition: all 0.3s ease;
+    height: 100%;
+    
+    &:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-body {
+      padding: 1.5rem;
+      text-align: center;
+      
+      .card-title {
+        color: $text-muted;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 1rem;
+      }
+      
+      .card-text {
+        color: $primary-color;
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin: 0;
+      }
+    }
+    
+    // Different colors for different summary cards
+    &:nth-child(1) .card-text { color: #27ae60; }
+    &:nth-child(2) .card-text { color: #3498db; }
+    &:nth-child(3) .card-text { color: #e67e22; }
+    &:nth-child(4) .card-text { color: #9b59b6; }
+  }
+}
+
+// Export buttons styling
+.export-section {
+  margin-bottom: 2rem;
+  
+  .btn-group {
+    .btn {
+      margin-right: 0.5rem;
+      
+      &:last-child {
+        margin-right: 0;
+      }
+    }
+  }
+}
+
+// Table styling
+.table-responsive {
+  border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: visible;
+  box-shadow: $shadow;
+  max-width: 100%;
+  
+  .table {
+    margin-bottom: 0;
+    font-size: 0.875rem;
+    min-width: 1400px; // Ensure minimum width to prevent cramping
+    table-layout: fixed; // Fixed layout for better column control
+    
+    // Column width specifications
+    th:nth-child(1), td:nth-child(1) { width: 100px; } // Date
+    th:nth-child(2), td:nth-child(2) { width: 120px; } // Reference No
+    th:nth-child(3), td:nth-child(3) { width: 120px; } // Invoice No
+    th:nth-child(4), td:nth-child(4) { width: 140px; } // To Location
+    th:nth-child(5), td:nth-child(5) { width: 150px; } // Supplier
+    th:nth-child(6), td:nth-child(6) { width: 100px; } // Status
+    th:nth-child(7), td:nth-child(7) { width: 120px; } // Payment Method
+    th:nth-child(8), td:nth-child(8) { width: 90px; }  // Tax
+    th:nth-child(9), td:nth-child(9) { width: 90px; }  // CGST
+    th:nth-child(10), td:nth-child(10) { width: 90px; } // SGST
+    th:nth-child(11), td:nth-child(11) { width: 140px; } // Payment Account
+    th:nth-child(12), td:nth-child(12) { width: 100px; } // Payment Due
+    th:nth-child(13), td:nth-child(13) { width: 90px; }  // Discount
+    th:nth-child(14), td:nth-child(14) { width: 110px; } // Total Amount
+    
+    th {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      color: $primary-color;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 1rem 0.5rem;
+      border: none;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      
+      &:hover {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+      }
+      
+      i {
+        margin-left: 0.25rem;
+        opacity: 0.6;
+      }
+    }
+    
+    td {
+      padding: 0.75rem 0.5rem;
+      vertical-align: middle;
+      border-color: #f1f3f4;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      
+      &:first-child {
+        font-weight: 600;
+      }
+      
+      // Text alignment for specific columns
+      &:nth-child(5) { // Supplier
+        text-align: left;
+        white-space: normal;
+        word-wrap: break-word;
+      }
+      
+      &:nth-child(8), &:nth-child(9), &:nth-child(10), 
+      &:nth-child(12), &:nth-child(13), &:nth-child(14) { // Currency columns
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        font-weight: 600;
+      }
+    }
+    
+    tbody tr {
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background-color: rgba(52, 152, 219, 0.05);
+      }
+    }
+    
+    // Footer styling
+    tfoot {
+      th {
+        background: linear-gradient(135deg, $primary-color 0%, #34495e 100%);
+        color: white;
+        font-weight: 700;
+        border: none;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+      }
+    }
+  }
+}
+
+// Status badges
+.status-active {
+  background: linear-gradient(135deg, $success-color 0%, #2ecc71 100%);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-inactive {
+  background: linear-gradient(135deg, $warning-color 0%, #f1c40f 100%);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-partial {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-unknown {
+  background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+// Loading spinner
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+  color: $secondary-color;
+}
+
+// Pagination styling
+.pagination {
+  .page-item {
+    margin: 0 0.125rem;
+    
+    .page-link {
+      border-radius: 8px;
+      border: 2px solid $border-color;
+      color: $primary-color;
+      padding: 0.5rem 1rem;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      
+      &:hover {
+        background: $secondary-color;
+        border-color: $secondary-color;
+        color: white;
+        transform: translateY(-1px);
+      }
+    }
+    
+    &.active .page-link {
+      background: $secondary-color;
+      border-color: $secondary-color;
+      color: white;
+    }
+    
+    &.disabled .page-link {
+      background: $light-bg;
+      border-color: $border-color;
+      color: $text-muted;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// Responsive adjustments
+@media (max-width: 1200px) {
+  .table-responsive .table {
+    min-width: 1200px; // Reduced for medium screens
+    font-size: 0.8rem;
+    
+    th, td {
+      padding: 0.6rem 0.4rem;
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .table-responsive .table {
+    min-width: 1000px; // Further reduced for tablets
+    font-size: 0.75rem;
+    
+    th, td {
+      padding: 0.5rem 0.3rem;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  .container-fluid {
+    padding: 0.5rem;
+  }
+  
+  .card-body {
+    padding: 1rem !important;
+  }
+  
+  .table-responsive {
+    .table {
+      min-width: 900px; // Minimum width for mobile
+      font-size: 0.7rem;
+      
+      th, td {
+        padding: 0.4rem 0.2rem;
+      }
+      
+      // Hide less important columns on mobile
+      th:nth-child(7), td:nth-child(7), // Payment Method
+      th:nth-child(11), td:nth-child(11) { // Payment Account
+        display: none;
+      }
+    }
+  }
+  
+  .summary-cards .card-text {
+    font-size: 1.25rem;
+  }
+  
+  .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+  }
+  
+  // Stack export buttons vertically on mobile
+  .export-section .btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    
+    .btn {
+      margin-right: 0;
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 576px) {
+  .table-responsive .table {
+    // Hide more columns on very small screens
+    th:nth-child(4), td:nth-child(4), // To Location
+    th:nth-child(6), td:nth-child(6), // Status
+    th:nth-child(12), td:nth-child(12) { // Payment Due
+      display: none;
+    }
+  }
+  
+  // Make filter inputs stack vertically
+  .row.mb-3 .col-md-3 {
+    margin-bottom: 1rem;
+  }
+}
+
+// Print styles
+@media print {
+  .container-fluid {
+    background: white !important;
+  }
+  
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #000 !important;
+  }
+  
+  .card-header {
+    background: #f8f9fa !important;
+    color: #000 !important;
+  }
+  
+  .filters-section,
+  .export-section,
+  .pagination {
+    display: none !important;
+  }
+  
+  .table {
+    font-size: 0.75rem;
+    
+    th, td {
+      padding: 0.25rem !important;
+    }
+  }
+}
+
+// Animation keyframes
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card,
+.summary-cards .card {
+  animation: fadeIn 0.6s ease-out;
+}
+
+// Custom scrollbar for table
+.table-responsive {
+  &::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: $light-bg;
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, $secondary-color 0%, #2980b9 100%);
+    border-radius: 6px;
+    
+    &:hover {
+      background: linear-gradient(135deg, #2980b9 0%, #1f4e79 100%);
+    }
+  }
+  
+  &::-webkit-scrollbar-corner {
+    background: $light-bg;
+  }
+}
+
+// Table scroll indicators
+.table-scroll-indicator {
+  position: relative;
+  
+  &::after {
+    content: "← Scroll to see more →";
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: $secondary-color;
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    opacity: 0.8;
+    animation: pulse 2s infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+// Sticky column effect for important columns
+.table-sticky-cols {
+  .table {
+    th:first-child,
+    td:first-child {
+      position: sticky;
+      left: 0;
+      background: white;
+      z-index: 5;
+      border-right: 2px solid $border-color;
+    }
+    
+    th:nth-child(2),
+    td:nth-child(2) {
+      position: sticky;
+      left: 100px;
+      background: white;
+      z-index: 5;
+      border-right: 1px solid $border-color;
+    }
+  }
+}
+
+// Loading overlay
+.table-loading-overlay {
+  position: relative;
+  
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 100;
+    backdrop-filter: blur(2px);
+  }
+  
+  .spinner-border {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 101;
+  }
+}
+
+// Currency formatting
+.currency {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  text-align: right;
+}
+
+// Account info styling
+.account-info {
+  .account-name {
+    font-weight: 600;
+    color: $primary-color;
+  }
+  
+  .account-number {
+    font-size: 0.75rem;
+    color: $text-muted;
+    font-family: 'Courier New', monospace;
+  }
+}

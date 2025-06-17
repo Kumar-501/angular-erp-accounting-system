@@ -1,0 +1,100 @@
+.vat-card-container {
+    font-family: Arial, sans-serif;
+  
+    .card {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+      
+      &:hover {
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      }
+      
+      .card-header {
+        font-weight: bold;
+        padding: 15px;
+      }
+    }
+    
+    .summary-box {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 5px;
+      padding: 15px;
+      text-align: center;
+      
+      h4 {
+        margin: 0;
+        color: #495057;
+        font-weight: bold;
+      }
+    }
+    
+    .vat-table {
+      border-collapse: collapse;
+      width: 100%;
+      
+      th, td {
+        padding: 12px;
+        vertical-align: middle;
+      }
+      
+      .section-header {
+        font-weight: bold;
+        text-align: left;
+      }
+      
+      .badge {
+        font-size: 85%;
+        padding: 5px 8px;
+        border-radius: 3px;
+      }
+      
+      .badge-success {
+        background-color: #28a745;
+        color: white;
+      }
+      
+      .badge-info {
+        background-color: #17a2b8;
+        color: white;
+      }
+      
+      .badge-warning {
+        background-color: #ffc107;
+        color: #212529;
+      }
+    }
+    
+    .tax-rate-table {
+      width: 100%;
+      
+      th, td {
+        text-align: center;
+        padding: 10px;
+      }
+      
+      th {
+        background-color: #343a40;
+        color: white;
+      }
+      
+      tr:nth-child(even) {
+        background-color: #f2f2f2;
+      }
+    }
+    
+    .spinner-border {
+      width: 3rem;
+      height: 3rem;
+      margin: 2rem auto;
+      display: block;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .vat-table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+  }

@@ -1,0 +1,105 @@
+<div class="trial-balance-container">
+  <div class="header-section">
+    <h1>Trial Balance</h1>
+    <div class="controls">
+      <div class="date-range">
+        <label>As on:</label>
+        <input type="date" [(ngModel)]="asOfDate" (change)="generateTrialBalance()">
+        <button (click)="generateTrialBalance()" [disabled]="isLoading">
+          {{ isLoading ? 'Generating...' : 'Generate' }}
+        </button>
+      </div>
+      <div class="export-options">
+        <button (click)="exportToExcel()" class="export-btn excel">
+          <i class="fas fa-file-excel"></i> Excel
+        </button>
+        <button (click)="exportToPDF()" class="export-btn pdf">
+          <i class="fas fa-file-pdf"></i> PDF
+        </button>
+        <button (click)="printReport()" class="export-btn print">
+          <i class="fas fa-print"></i> Print
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-indicator">
+    <div class="spinner"></div>
+    <span>Generating trial balance...</span>
+  </div>
+
+  <div *ngIf="!isLoading && trialBalanceData.length > 0" class="trial-balance-content">
+    <div class="company-header">
+      <h2>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h2>
+      <p>Trial Balance as on {{ asOfDate | date:'longDate' }}</p>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="trial-balance-table">
+        <thead>
+          <tr>
+            <th class="account-name">Account Name</th>
+            <th class="account-number">Account No.</th>
+            <th class="account-head">Account Head</th>
+            <th class="debit-amount">Debit (₹)</th>
+            <th class="credit-amount">Credit (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of trialBalanceData">
+            <td class="account-name">{{ item.accountName }}</td>
+            <td class="account-number">{{ item.accountNumber }}</td>
+            <td class="account-head">{{ item.accountHead }}</td>
+            <td class="debit-amount">{{ item.debit | number:'1.2-2' }}</td>
+            <td class="credit-amount">{{ item.credit | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="3">Total</td>
+            <td class="debit-amount">{{ totalDebit | number:'1.2-2' }}</td>
+            <td class="credit-amount">{{ totalCredit | number:'1.2-2' }}</td>
+          </tr>
+          <tr class="difference-row" *ngIf="difference !== 0">
+            <td colspan="3">Difference</td>
+            <td colspan="2" [class.positive]="difference > 0" [class.negative]="difference < 0">
+              {{ difference | number:'1.2-2' }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="summary-section">
+      <div class="summary-card">
+        <h3>Summary</h3>
+        <div class="summary-item">
+          <span>Total Debit:</span>
+          <span>{{ totalDebit | number:'1.2-2' }}</span>
+        </div>
+        <div class="summary-item">
+          <span>Total Credit:</span>
+          <span>{{ totalCredit | number:'1.2-2' }}</span>
+        </div>
+        <div class="summary-item" *ngIf="difference !== 0">
+          <span>Difference:</span>
+          <span [class.positive]="difference > 0" [class.negative]="difference < 0">
+            {{ difference | number:'1.2-2' }}
+          </span>
+        </div>
+        <div class="summary-item status">
+          <span>Status:</span>
+          <span [class.balanced]="difference === 0" [class.unbalanced]="difference !== 0">
+            {{ difference === 0 ? 'Balanced' : 'Unbalanced' }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && trialBalanceData.length === 0" class="no-data">
+    <i class="fas fa-file-alt"></i>
+    <p>No trial balance data available</p>
+    <p>Please select a date and generate the report</p>
+  </div>
+</div>

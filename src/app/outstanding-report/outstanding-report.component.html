@@ -1,0 +1,156 @@
+<div class="container-fluid">
+  <div class="card my-3">
+    <div class="card-header bg-light py-3">
+      <h4 class="mb-0">Outstanding Purchases Report</h4>
+    </div>
+
+    <div class="card-body">
+      <!-- Filters Section -->
+      <div class="row mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Date Range</label>
+          <div class="input-group input-group-sm mb-2">
+            <span class="input-group-text">From</span>
+            <input type="date" class="form-control" [(ngModel)]="dateFilter.startDate" (change)="applyFilters()">
+          </div>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">To</span>
+            <input type="date" class="form-control" [(ngModel)]="dateFilter.endDate" (change)="applyFilters()">
+          </div>
+        </div>
+        
+        <div class="col-md-3">
+          <label class="form-label">Status</label>
+          <select class="form-select form-select-sm" [(ngModel)]="statusFilter" (change)="applyFilters()">
+            <option value="">All Statuses</option>
+            <option value="ordered">Ordered</option>
+            <option value="pending">Pending</option>
+            <option value="received">Received</option>
+          </select>
+        </div>
+        
+        <div class="col-md-3">
+          <label class="form-label">Location</label>
+          <select class="form-select form-select-sm" [(ngModel)]="locationFilter" (change)="applyFilters()">
+            <option value="">All Locations</option>
+            <option *ngFor="let location of uniqueLocations" [value]="location">{{location}}</option>
+          </select>
+        </div>
+        
+        <div class="col-md-3">
+          <label class="form-label">Search</label>
+          <input type="text" class="form-control form-control-sm" 
+                 [(ngModel)]="searchText" 
+                 (input)="applyFilters()"
+                 placeholder="Search reference, invoice, supplier...">
+        </div>
+      </div>
+
+      <!-- Export Buttons -->
+      <div class="d-flex justify-content-end mb-3">
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-secondary" (click)="exportToExcel()">
+            <i class="fas fa-file-excel me-1"></i> Export Excel
+          </button>
+       
+        </div>
+      </div>
+
+      <!-- Main Table -->
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-light">
+            <tr>
+              <th (click)="sortTable('purchaseDate')">
+                Date <i class="fas" [ngClass]="sortColumn === 'purchaseDate' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('referenceNo')">
+                Reference No <i class="fas" [ngClass]="sortColumn === 'referenceNo' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('invoiceNo')">
+                Invoice No <i class="fas" [ngClass]="sortColumn === 'invoiceNo' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('supplier')">
+                Supplier <i class="fas" [ngClass]="sortColumn === 'supplier' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+        
+              <th (click)="sortTable('purchaseStatus')">
+                Status <i class="fas" [ngClass]="sortColumn === 'purchaseStatus' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('grandTotal')" class="text-end">
+                Grand Total <i class="fas" [ngClass]="sortColumn === 'grandTotal' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('paymentAmount')" class="text-end">
+                Payment <i class="fas" [ngClass]="sortColumn === 'paymentAmount' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+              <th (click)="sortTable('paymentDue')" class="text-end">
+                Balance Due <i class="fas" [ngClass]="sortColumn === 'paymentDue' ? 
+                  (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort'"></i>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoading">
+              <td colspan="9" class="text-center">
+                <div class="spinner-border" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </td>
+            </tr>
+            
+            <tr *ngFor="let purchase of filteredPurchases">
+              <td>{{ purchase.purchaseDate || 'N/A' }}</td>
+              <td>{{ purchase.referenceNo || 'N/A' }}</td>
+              <td>{{ purchase.invoiceNo || 'N/A' }}</td>
+              <td>{{ purchase.supplier || 'N/A' }}</td>
+              <td>
+                <span class="badge" [ngClass]="{
+                  'bg-success': purchase.purchaseStatus === 'received',
+                  'bg-warning': purchase.purchaseStatus === 'pending',
+                  'bg-info': purchase.purchaseStatus === 'ordered',
+                  'bg-secondary': !purchase.purchaseStatus
+                }">
+                  {{ purchase.purchaseStatus || 'Unknown' }}
+                </span>
+              </td>
+              <td class="text-end">₹ {{ purchase.grandTotal?.toFixed(2) || '0.00' }}</td>
+              <td class="text-end">₹ {{ purchase.paymentAmount?.toFixed(2) || '0.00' }}</td>
+              <td class="text-end">₹ {{ purchase.paymentDue?.toFixed(2) || '0.00' }}</td>
+            </tr>
+            
+            <tr *ngIf="!isLoading && filteredPurchases.length === 0">
+              <td colspan="9" class="text-center">No outstanding purchases found</td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="!isLoading && filteredPurchases.length > 0">
+            <tr class="table-active">
+              <td colspan="6" class="text-end fw-bold">Totals:</td>
+              <td class="text-end fw-bold">₹ {{ getTotal('grandTotal').toFixed(2) }}</td>
+              <td class="text-end fw-bold">₹ {{ getTotal('paymentAmount').toFixed(2) }}</td>
+              <td class="text-end fw-bold">₹ {{ getTotal('paymentDue').toFixed(2) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Summary -->
+      <div class="row mt-3">
+        <div class="col-md-6">
+          <p>Showing {{ filteredPurchases.length }} of {{ purchases.length }} outstanding purchases</p>
+        </div>
+        <div class="col-md-6">
+          <div class="alert alert-info text-end">
+            Total Outstanding Balance: <strong>₹ {{ getTotal('paymentDue').toFixed(2) }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

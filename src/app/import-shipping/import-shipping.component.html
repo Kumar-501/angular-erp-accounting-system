@@ -1,0 +1,210 @@
+<div class="import-shipping-container">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="mb-0">Import Shipping Data</h4>
+    </div>
+    
+    <div class="card-body">
+      <!-- File Import Section -->
+      <div class="mb-4">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <label class="form-label">File To Import:</label>
+            <div class="input-group">
+              <input 
+                type="file" 
+                #fileInput 
+                (change)="onFileSelected($event)" 
+                accept=".csv" 
+                class="form-control"
+                [disabled]="isLoading"
+              />
+              <button 
+                class="btn btn-primary" 
+                (click)="onSubmit()" 
+                [disabled]="!selectedFile || isLoading"
+              >
+                <span *ngIf="!isLoading">
+                  <i class="fas fa-upload me-2"></i>Submit
+                </span>
+                <span *ngIf="isLoading">
+                  <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                  Processing...
+                </span>
+              </button>
+            </div>
+            <div class="form-text">
+              Only CSV files are accepted. Maximum file size: 5MB
+            </div>
+          </div>
+          
+          <div class="col-md-4 text-end">
+            <button class="btn btn-outline-secondary" (click)="downloadTemplate()">
+              <i class="fas fa-download me-2"></i>Download Template
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Bar (shown during processing) -->
+      <div *ngIf="isLoading" class="mb-4">
+        <div class="progress">
+          <div 
+            class="progress-bar progress-bar-striped progress-bar-animated" 
+            role="progressbar" 
+            [style.width.%]="processingProgress"
+          >
+            {{ processingProgress }}%
+          </div>
+        </div>
+        <div class="text-center mt-2">
+          <small class="text-muted">Processing {{ currentRowIndex }} of {{ totalRows }} rows...</small>
+        </div>
+      </div>
+
+      <!-- Import Results -->
+      <div *ngIf="importResult" class="alert" [ngClass]="{
+        'alert-success': importResult.errors === 0,
+        'alert-warning': importResult.errors > 0 && importResult.updated > 0,
+        'alert-danger': importResult.errors > 0 && importResult.updated === 0
+      }">
+        <h5 class="alert-heading">
+          <i class="fas" [ngClass]="{
+            'fa-check-circle': importResult.errors === 0,
+            'fa-exclamation-triangle': importResult.errors > 0 && importResult.updated > 0,
+            'fa-times-circle': importResult.errors > 0 && importResult.updated === 0
+          }"></i>
+          Import Results
+        </h5>
+        
+        <div class="row">
+          <div class="col-md-3">
+            <div class="stat-card">
+              <div class="stat-number text-primary">{{ importResult.totalProcessed }}</div>
+              <div class="stat-label">Total Rows</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <div class="stat-number text-success">{{ importResult.updated }}</div>
+              <div class="stat-label">Updated</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <div class="stat-number text-info">{{ importResult.skipped }}</div>
+              <div class="stat-label">Skipped</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="stat-card">
+              <div class="stat-number text-danger">{{ importResult.errors }}</div>
+              <div class="stat-label">Errors</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Details -->
+        <div *ngIf="importResult.errorDetails && importResult.errorDetails.length > 0" class="mt-3">
+          <button 
+            class="btn btn-sm btn-outline-danger" 
+            (click)="showErrorDetails = !showErrorDetails"
+          >
+            <i class="fas" [ngClass]="showErrorDetails ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            {{ showErrorDetails ? 'Hide' : 'Show' }} Error Details ({{ importResult.errorDetails.length }})
+          </button>
+          
+          <div *ngIf="showErrorDetails" class="mt-3">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>BARCODE</th>
+                    <th>ADDRMOBILE</th>
+                    <th>Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let error of importResult.errorDetails">
+                    <td>{{ error.row }}</td>
+                    <td>{{ error.barcode || 'N/A' }}</td>
+                    <td>{{ error.addrmobile || 'N/A' }}</td>
+                    <td class="text-danger">{{ error.error }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Success Details -->
+        <div *ngIf="importResult.successDetails && importResult.successDetails.length > 0" class="mt-3">
+          <button 
+            class="btn btn-sm btn-outline-success" 
+            (click)="showSuccessDetails = !showSuccessDetails"
+          >
+            <i class="fas" [ngClass]="showSuccessDetails ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            {{ showSuccessDetails ? 'Hide' : 'Show' }} Success Details ({{ importResult.successDetails.length }})
+          </button>
+          
+          <div *ngIf="showSuccessDetails" class="mt-3">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Invoice No</th>
+                    <th>Customer</th>
+                    <th>BARCODE</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let success of importResult.successDetails">
+                    <td>{{ success.row }}</td>
+                    <td>{{ success.invoiceNo }}</td>
+                    <td>{{ success.customer }}</td>
+                    <td>{{ success.barcode }}</td>
+                    <td class="text-success">{{ success.status }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Instructions -->
+      <div class="card bg-light">
+        <div class="card-body">
+          <h6 class="card-title">
+            <i class="fas fa-info-circle me-2"></i>Instructions
+          </h6>
+          <ol class="mb-0">
+            <li>Download the template file using the "Download Template" button above</li>
+            <li>Fill in the shipping data with the required fields:
+              <ul>
+                <li><strong>BARCODE</strong> - The product barcode (mandatory)</li>
+                <li><strong>ADDRMOBILE</strong> - The customer mobile number (mandatory)</li>
+                <li>All other fields are optional but will be included in shipping details</li>
+              </ul>
+            </li>
+            <li>Save the file as a CSV (Comma Separated Values) file</li>
+            <li>Select your CSV file and click "Submit" to import the data</li>
+          </ol>
+          
+          <div class="alert alert-warning mt-3 mb-0">
+            <strong>Important:</strong>
+            <ul class="mb-0">
+              <li>Only existing sales will be updated - no new sales will be created</li>
+              <li>ADDRMOBILE must match the contact number in existing sales</li>
+              <li>BARCODE will be used to identify the specific sale to update</li>
+              <li>Rows with missing BARCODE or ADDRMOBILE will be skipped</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

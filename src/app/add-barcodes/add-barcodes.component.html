@@ -1,0 +1,80 @@
+<div class="add-barcodes-container">
+    <h2>Add Barcode Sticker Settings</h2>
+  
+    <form (ngSubmit)="saveBarcodeSettings()">
+      <div>
+        <label for="stickerSheetName">Sticker Sheet Setting Name:</label>
+        <input type="text" id="stickerSheetName" [(ngModel)]="barcodeSettings.stickerSheetName" name="stickerSheetName" required />
+      </div>
+  
+      <div>
+        <label for="stickerSheetDescription">Sticker Sheet Setting Description:</label>
+        <input type="text" id="stickerSheetDescription" [(ngModel)]="barcodeSettings.stickerSheetDescription" name="stickerSheetDescription" required />
+      </div>
+  
+      <div>
+        <label>Feed Type:</label>
+        <select [(ngModel)]="barcodeSettings.feedType" name="feedType">
+          <option value="continuous">Continuous Feed</option>
+          <option value="rolls">Rolls</option>
+        </select>
+      </div>
+  
+      <div>
+        <label for="additionalTopMargin">Additional Top Margin (In Inches):</label>
+        <input type="number" id="additionalTopMargin" [(ngModel)]="barcodeSettings.additionalTopMargin" name="additionalTopMargin" required />
+      </div>
+  
+      <div>
+        <label for="additionalLeftMargin">Additional Left Margin (In Inches):</label>
+        <input type="number" id="additionalLeftMargin" [(ngModel)]="barcodeSettings.additionalLeftMargin" name="additionalLeftMargin" required />
+      </div>
+  
+      <div>
+        <label for="widthOfSticker">Width of Sticker (In Inches):</label>
+        <input type="number" id="widthOfSticker" [(ngModel)]="barcodeSettings.widthOfSticker" name="widthOfSticker" required />
+      </div>
+  
+      <div>
+        <label for="heightOfSticker">Height of Sticker (In Inches):</label>
+        <input type="number" id="heightOfSticker" [(ngModel)]="barcodeSettings.heightOfSticker" name="heightOfSticker" required />
+      </div>
+  
+      <div>
+        <label for="paperWidth">Paper Width (In Inches):</label>
+        <input type="number" id="paperWidth" [(ngModel)]="barcodeSettings.paperWidth" name="paperWidth" required />
+      </div>
+  
+      <div>
+        <label for="paperHeight">Paper Height (In Inches):</label>
+        <input type="number" id="paperHeight" [(ngModel)]="barcodeSettings.paperHeight" name="paperHeight" required />
+      </div>
+  
+      <div>
+        <label for="stickersInRow">Stickers in One Row:</label>
+        <input type="number" id="stickersInRow" [(ngModel)]="barcodeSettings.stickersInRow" name="stickersInRow" required />
+      </div>
+  
+      <div>
+        <label for="distanceBetweenRows">Distance Between Two Rows (In Inches):</label>
+        <input type="number" id="distanceBetweenRows" [(ngModel)]="barcodeSettings.distanceBetweenRows" name="distanceBetweenRows" />
+      </div>
+  
+      <div>
+        <label for="distanceBetweenColumns">Distance Between Two Columns (In Inches):</label>
+        <input type="number" id="distanceBetweenColumns" [(ngModel)]="barcodeSettings.distanceBetweenColumns" name="distanceBetweenColumns" />
+      </div>
+  
+      <div>
+        <label for="noOfStickersPerSheet">No. of Stickers Per Sheet:</label>
+        <input type="number" id="noOfStickersPerSheet" [(ngModel)]="barcodeSettings.noOfStickersPerSheet" name="noOfStickersPerSheet" required />
+      </div>
+  
+      <div>
+        <label for="setAsDefault">Set as Default:</label>
+        <input type="checkbox" id="setAsDefault" [(ngModel)]="barcodeSettings.setAsDefault" name="setAsDefault" />
+      </div>
+  
+      <button type="submit" class="add-btn">Save Barcode Settings</button>
+    </form>
+  </div>

@@ -1,0 +1,116 @@
+.update-price-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  width: 100%;
+}
+
+.page-title {
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  font-weight: bold;
+  margin-top: 5%;
+}
+
+.price-card {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  
+}
+
+.card-title {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #1a0b3f;
+  font-size: 18px;
+
+}
+
+.content-container {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.export-section {
+  flex: 1;
+  min-width: 200px;
+}
+
+.import-section {
+  flex: 1;
+  min-width: 300px;
+}
+
+.export-btn {
+  background-color: #1c31f1;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 18px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  
+  &:hover {
+    background-color: #4a21b3;
+  }
+}
+
+.file-input-container {
+  margin-bottom: 15px;
+}
+
+.file-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.file-input {
+  width: 50%;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.submit-btn {
+  background-color: #0f37e9;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 18px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  
+  &:hover {
+    background-color: #4a21b3;
+  }
+}
+
+.instructions {
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+  
+  h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    
+    color: #1a0b3f;
+  }
+  
+  p {
+    margin: 5px 0;
+    color: #1a1919;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-container {
+    flex-direction: column;}
+}

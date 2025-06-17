@@ -1,0 +1,5 @@
+<app-layout *ngIf="!isLoginPage()">
+  <router-outlet></router-outlet>
+</app-layout>
+
+<router-outlet *ngIf="isLoginPage()"></router-outlet>

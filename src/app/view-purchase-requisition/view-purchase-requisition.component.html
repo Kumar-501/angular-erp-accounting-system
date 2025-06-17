@@ -1,0 +1,93 @@
+<div class="view-requisition-container">
+  <div class="header">
+    <h2>View Purchase Requisition</h2>
+    <button class="back-btn" (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back
+    </button>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">
+    <i class="fa fa-spinner fa-spin"></i> Loading...
+  </div>
+
+  <div *ngIf="!isLoading && requisition" class="requisition-details">
+    <div class="detail-row">
+      <div class="detail-item">
+        <label>Reference No:</label>
+        <span>{{ requisition.referenceNo }}</span>
+      </div>
+      <div class="detail-item">
+        <label>Date:</label>
+        <span>{{ requisition.date | date }}</span>
+      </div>
+    </div>
+
+    <div class="detail-row">
+      <div class="detail-item">
+        <label>Location:</label>
+        <span>{{ requisition.locationName }}</span>
+      </div>
+      <div class="detail-item">
+        <label>Status:</label>
+        <span class="status-badge" [ngClass]="requisition.status.toLowerCase()">
+          {{ requisition.status }}
+        </span>
+      </div>
+    </div>
+
+    <div class="detail-row">
+      <div class="detail-item">
+        <label>Required by Date:</label>
+        <span>{{ requisition.requiredByDate | date }}</span>
+      </div>
+      <div class="detail-item">
+        <label>Added By:</label>
+        <span>{{ requisition.addedBy }}</span>
+      </div>
+    </div>
+
+    <div class="detail-row" *ngIf="requisition.supplierName">
+      <div class="detail-item">
+        <label>Supplier:</label>
+        <span>{{ requisition.supplierName }}</span>
+      </div>
+    </div>
+
+    <div class="items-section" *ngIf="requisition.items && requisition.items.length > 0">
+      <h3>Products</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>Quantity Required</th>
+            <th>Current Stock</th>
+            <th>Alert Quantity</th>
+            <th>Unit Price</th>
+            <th>Price Inc Tax</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of requisition.items">
+            <td>{{ item.productName }}</td>
+            <td>{{ item.requiredQuantity }}</td>
+            <td>{{ item.currentStock || 0 }}</td>
+            <td>{{ item.alertQuantity || 0 }}</td>
+            <td>{{ item.unitPurchasePrice | currency:'INR'}}</td>
+            <td>{{ item.purchasePriceIncTax | currency:'INR' }}</td>
+            <td>{{ (item.requiredQuantity * item.unitPurchasePrice) | currency:'INR' }}</td>
+          </tr>
+          <tr class="total-row">
+            <td colspan="5"></td>
+            <td colspan="2"><strong>Grand Total:</strong></td>
+            <td><strong>{{ getGrandTotal() |currency:'INR' }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="actions">
+    
+    </div>
+  </div>
+</div>

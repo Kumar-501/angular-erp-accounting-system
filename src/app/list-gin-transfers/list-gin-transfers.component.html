@@ -1,0 +1,187 @@
+<div class="list-gin-transfers-container">
+  <h2>Goods Issue Note</h2>
+
+  <div class="page-header">
+    <h3>All GIN Transfers</h3>
+    <button class="add-button" routerLink="/add-gin-transfer">
+      <i class="fa fa-plus"></i> Add
+    </button>
+  </div>
+
+  <div class="filters-row">
+    <div class="show-entries">
+      <label>Show</label>
+      <select [(ngModel)]="itemsPerPage" (change)="applyFilters()">
+        <option value="15">15</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <label>entries</label>
+    </div>
+
+    <div class="export-buttons">
+      <button class="export-btn" (click)="exportToExcel()" title="Export to Excel">
+        <i class="fa fa-file-excel-o"></i> Export to Excel
+      </button>
+      <button class="export-btn" (click)="exportToCsv()" title="Export to CSV">
+        <i class="fa fa-file-text"></i> Export to CSV
+      </button>
+      <button class="export-btn" (click)="exportToPdf()" title="Export to PDF">
+        <i class="fa fa-file-pdf-o"></i> Export to PDF
+      </button>
+       <button class="export-btn" (click)="printGinTransfers()" title="Print">
+    <i class="fa fa-print"></i> Print
+  </button>
+    </div>
+
+    <div class="search-box">
+      <input type="text" [(ngModel)]="searchTerm" placeholder="Search...">
+      <button class="search-btn" (click)="onSearch()">Search</button>
+      <button class="clear-btn" (click)="clearFilters()">Clear</button>
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table class="gin-transfers-table">
+      <thead>
+        <tr>
+          <th (click)="sortData('date')">
+            Date
+            <span class="sort-icon" *ngIf="currentSortColumn === 'date'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortData('referenceNo')">
+            Reference No
+            <span class="sort-icon" *ngIf="currentSortColumn === 'referenceNo'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortData('locationFrom')">
+            Location (From)
+            <span class="sort-icon" *ngIf="currentSortColumn === 'locationFrom'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortData('locationTo')">
+            Location (To)
+            <span class="sort-icon" *ngIf="currentSortColumn === 'locationTo'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+          <th (click)="sortData('status')">
+            Status
+            <span class="sort-icon" *ngIf="currentSortColumn === 'status'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+      
+          <th (click)="sortData('totalAmount')">
+            Total Amount
+            <span class="sort-icon" *ngIf="currentSortColumn === 'totalAmount'">
+              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
+            </span>
+          </th>
+          <th>Additional Notes</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let transfer of getCurrentPageItems()">
+          <td>{{ transfer.date }}</td>
+          <td>{{ transfer.referenceNo }}</td>
+          <td>{{ getLocationName(transfer.locationFrom) }}</td>
+          <td>{{ getLocationName(transfer.locationTo) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="transfer.status.toLowerCase()" (click)="openStatusModal(transfer)">
+              {{ transfer.status }}
+            </span>
+          </td>
+          <td>₹ {{ transfer.totalAmount.toFixed(2) }}</td>
+          <td>{{ transfer.additionalNotes || '-' }}</td>
+          <td>
+            <div class="action-buttons">
+             <button class="view-btn" (click)="viewGinTransfer(transfer)" title="View">
+      <i class="fa fa-eye"></i> View
+    </button>
+              <button class="delete-btn" (click)="deleteGinTransfer(transfer.id!)" title="Delete">
+                <i class="fa fa-trash"></i> Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="filteredGinTransfers.length === 0">
+          <td colspan="9" class="no-data">No GIN transfers found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pagination">
+    <div class="pagination-info">
+      Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+      {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} entries
+    </div>
+    <div class="pagination-controls">
+      <button class="page-btn" [disabled]="currentPage === 1" (click)="goToPage(currentPage - 1)">Previous</button>
+      
+      <button class="page-btn" [ngClass]="{'active': currentPage === 1}" (click)="goToPage(1)">1</button>
+      
+      <ng-container *ngIf="currentPage > 3">
+        <span class="ellipsis">...</span>
+      </ng-container>
+      
+      <ng-container *ngFor="let page of [currentPage - 1, currentPage, currentPage + 1]">
+        <button *ngIf="page > 1 && page < getTotalPages()" 
+                class="page-btn" 
+                [ngClass]="{'active': currentPage === page}" 
+                (click)="goToPage(page)">
+          {{ page }}
+        </button>
+      </ng-container>
+      
+      <ng-container *ngIf="currentPage < getTotalPages() - 2">
+        <span class="ellipsis">...</span>
+      </ng-container>
+      
+      <button *ngIf="getTotalPages() > 1" 
+              class="page-btn" 
+              [ngClass]="{'active': currentPage === getTotalPages()}" 
+              (click)="goToPage(getTotalPages())">
+        {{ getTotalPages() }}
+      </button>
+      
+      <button class="page-btn" [disabled]="currentPage === getTotalPages()" (click)="goToPage(currentPage + 1)">Next</button>
+    </div>
+  </div>
+
+<!-- Status Update Modal -->
+<div class="status-update-modal" *ngIf="showStatusModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h4>Update Status</h4>
+      <button class="close-btn" (click)="closeStatusModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p>Reference No: <strong>{{ selectedTransfer?.referenceNo }}</strong></p>
+      
+      <div class="form-group">
+        <label for="status">Status:</label>
+        <select id="status" [(ngModel)]="selectedStatus" class="form-control">
+          <option value="Pending">Pending</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="cancel-btn" (click)="closeStatusModal()">Cancel</button>
+      <button class="save-btn" (click)="updateStatus()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Backdrop -->
+<div class="modal-backdrop" *ngIf="showStatusModal" (click)="closeStatusModal()"></div>
+</div>

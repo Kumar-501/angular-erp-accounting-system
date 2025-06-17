@@ -1,0 +1,363 @@
+<div class="user-form-container">
+  <h2>Add User</h2>
+
+  <form [formGroup]="addUserForm" (ngSubmit)="onSubmit()">
+    <!-- BASIC INFO -->
+    <div class="user-basic-container">
+      <h3>Basic Info</h3>
+      <label>Prefix:</label>
+      <select formControlName="prefix">
+        <option value="Mr">Mr</option>
+        <option value="Mrs">Mrs</option>
+        <option value="Miss">Miss</option>
+      </select>
+
+      <label>First Name:*</label>
+      <input type="text" formControlName="firstName" required />
+      <div *ngIf="addUserForm.get('firstName')?.invalid && addUserForm.get('firstName')?.touched" class="error-message">
+        First Name is required
+      </div>
+
+      <label>Last Name:</label>
+      <input type="text" formControlName="lastName" />
+
+      <label>Email:*</label>
+      <input type="email" formControlName="email" required />
+      <div *ngIf="addUserForm.get('email')?.invalid && addUserForm.get('email')?.touched" class="error-message">
+        <span *ngIf="addUserForm.get('email')?.errors?.['required']">Email is required</span>
+        <span *ngIf="addUserForm.get('email')?.errors?.['email']">Enter a valid email address</span>
+      </div>
+
+      <div class="checkbox-group">
+        <label><input type="checkbox" formControlName="isActive" /> Is Active?</label>
+        <label><input type="checkbox" formControlName="enableServicePin" /> Enable Service Staff Pin</label>
+      </div>
+    </div>
+
+    <!-- ROLES AND PERMISSIONS SECTION -->
+    <div class="roles-permissions-section">
+      <h3>Roles & Permissions</h3>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="allowLogin">
+            <input type="checkbox" id="allowLogin" formControlName="allowLogin">
+            Allow Login
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label for="role">Role:*</label>
+          <select id="role" formControlName="role" class="form-control" [disabled]="!addUserForm.get('allowLogin')?.value">
+            <option value="" disabled>Select Role</option>
+            <!-- Dynamic roles from the roles service -->
+            <option *ngFor="let role of roles" [value]="role.name">
+              {{ role.name }} - {{ role.description || 'No description' }}
+            </option>
+            <!-- Fallback options if roles array is empty -->
+            <option *ngIf="roles.length === 0" value="Admin">Admin - Full access</option>
+            <option *ngIf="roles.length === 0" value="Cashier">Cashier - Limited access</option>
+            <option *ngIf="roles.length === 0" value="Staff">Staff - Basic access</option>
+          </select>
+          <div *ngIf="addUserForm.get('role')?.invalid && addUserForm.get('role')?.touched" class="error-message">
+            Role is required when login is enabled
+          </div>
+        </div>
+      </div>
+<!-- Add this in the roles-permissions-section div, after the role dropdown -->
+<div class="form-group">
+  <label>Department:*</label>
+  <select formControlName="department" class="form-control" (change)="onDepartmentChange()">
+    <option value="" disabled>Select Department</option>
+    <option *ngFor="let dept of departments" [value]="dept.department">
+      {{ dept.department }}
+    </option>
+  </select>
+  <div *ngIf="addUserForm.get('department')?.invalid && addUserForm.get('department')?.touched" class="error-message">
+    Department is required
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Designation:*</label>
+  <select formControlName="designation" class="form-control">
+    <option value="" disabled>Select Designation</option>
+    <option *ngFor="let desig of filteredDesignations" [value]="desig.designation">
+      {{ desig.designation }}
+    </option>
+  </select>
+  <div *ngIf="addUserForm.get('designation')?.invalid && addUserForm.get('designation')?.touched" class="error-message">
+    Designation is required
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Employee ID:</label>
+  <input type="text" formControlName="employeeId" class="form-control" />
+</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="allLocations">
+            <input type="checkbox" id="allLocations" formControlName="allLocations" (change)="onAllLocationsChange()">
+            All Locations
+          </label>
+        </div>
+
+        <div class="form-group" *ngIf="!addUserForm.get('allLocations')?.value">
+          <label>Select Location:</label>
+          <div class="location-checkboxes">
+            <div *ngFor="let location of businessLocations" class="location-option">
+              <label>
+                <input type="checkbox" 
+                      [checked]="isLocationSelected(location.id)" 
+                      (change)="onLocationSelect(location.id, $event)">
+                {{ location.name }}
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LOGIN INFO -->
+      <div class="form-row" *ngIf="addUserForm.get('allowLogin')?.value">
+        <div class="form-group">
+          <label for="username">Username:*</label>
+          <input type="text" id="username" formControlName="username" class="form-control">
+          <div *ngIf="addUserForm.get('username')?.invalid && addUserForm.get('username')?.touched" class="error-message">
+            <span *ngIf="addUserForm.get('username')?.errors?.['required']">Username is required</span>
+            <span *ngIf="addUserForm.get('username')?.errors?.['minlength']">Username must be at least 4 characters</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password:*</label>
+          <input type="password" id="password" formControlName="password" class="form-control">
+          <div *ngIf="addUserForm.get('password')?.invalid && addUserForm.get('password')?.touched" class="error-message">
+            <span *ngIf="addUserForm.get('password')?.errors?.['required']">Password is required</span>
+            <span *ngIf="addUserForm.get('password')?.errors?.['minlength']">Password must be at least 6 characters</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">Confirm Password:*</label>
+          <input type="password" id="confirmPassword" formControlName="confirmPassword" class="form-control">
+          <div *ngIf="addUserForm.errors?.['passwordMismatch'] && addUserForm.get('confirmPassword')?.touched" class="error-message">
+            Confirm password must match password
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALES INFO -->
+    <div class="sales-info-container">
+      <h3>Sales</h3>
+
+      <div class="form-group">
+        <label>Sales Commission Percentage (%):</label>
+        <input type="number" formControlName="salesCommission" min="0" max="100" />
+        <div *ngIf="addUserForm.get('salesCommission')?.invalid && addUserForm.get('salesCommission')?.touched" class="error-message">
+          Must be between 0 and 100
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Max Sales Discount Percent:</label>
+        <input type="number" formControlName="maxDiscount" min="0" max="100" />
+        <div *ngIf="addUserForm.get('maxDiscount')?.invalid && addUserForm.get('maxDiscount')?.touched" class="error-message">
+          Must be between 0 and 100
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <input type="checkbox" formControlName="allowSelectedContacts" /> 
+          Allow Selected Contacts
+        </label>
+      </div>
+
+      <div class="form-group" *ngIf="addUserForm.get('allowSelectedContacts')?.value">
+        <label>Select Contacts:</label>
+        <select formControlName="selectedContact" class="form-control">
+          <option value="">Select Contact</option>
+          <option value="contact1">Contact 1</option>
+          <option value="contact2">Contact 2</option>
+          <option value="contact3">Contact 3</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- MORE INFO -->
+    <div class="more-info-container">
+      <h3>More Information</h3>
+
+      <div class="form-group">
+        <label>Date of Birth:</label>
+        <input type="date" formControlName="dob" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Gender:</label>
+        <select formControlName="gender" class="form-control">
+          <option value="">Please Select</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+<!-- Replace the existing maritalStatus input with this dropdown -->
+<div class="form-group">
+  <label>Marital Status:</label>
+  <select formControlName="maritalStatus" class="form-control">
+    <option value="">Select Marital Status</option>
+    <option value="Single">Single</option>
+    <option value="Married">Married</option>
+    <option value="Divorced">Divorced</option>
+   
+  </select>
+</div>
+
+      <div class="form-group">
+        <label>Blood Group:</label>
+        <input type="text" formControlName="bloodGroup" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Mobile Number:</label>
+        <input type="tel" formControlName="mobileNumber" maxlength="10" 
+               (input)="validateDigitsOnly($event, 'mobileNumber')" class="form-control" />
+        <div *ngIf="addUserForm.get('mobileNumber')?.invalid && addUserForm.get('mobileNumber')?.touched" class="error-message">
+          Mobile number must be exactly 10 digits
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Alternate Contact Number:</label>
+        <input type="tel" formControlName="alternateContactNumber" maxlength="10" 
+               (input)="validateDigitsOnly($event, 'alternateContactNumber')" class="form-control" />
+        <div *ngIf="addUserForm.get('alternateContactNumber')?.invalid && addUserForm.get('alternateContactNumber')?.touched" class="error-message">
+          Alternate contact number must be exactly 10 digits
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Family Contact Number:</label>
+        <input type="tel" formControlName="familyContactNumber" maxlength="10" 
+               (input)="validateDigitsOnly($event, 'familyContactNumber')" class="form-control" />
+        <div *ngIf="addUserForm.get('familyContactNumber')?.invalid && addUserForm.get('familyContactNumber')?.touched" class="error-message">
+          Family contact number must be exactly 10 digits
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Facebook Link:</label>
+        <input type="url" formControlName="facebookLink" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Twitter Link:</label>
+        <input type="url" formControlName="twitterLink" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Social Media 1:</label>
+        <input type="url" formControlName="socialMedia1" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Social Media 2:</label>
+        <input type="url" formControlName="socialMedia2" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Custom Field 1:</label>
+        <input type="text" formControlName="customField1" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Custom Field 2:</label>
+        <input type="text" formControlName="customField2" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Custom Field 3:</label>
+        <input type="text" formControlName="customField3" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Custom Field 4:</label>
+        <input type="text" formControlName="customField4" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Guardian Name:</label>
+        <input type="text" formControlName="guardianName" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>ID Proof Name:</label>
+        <input type="text" formControlName="idProofName" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>ID Proof Number:</label>
+        <input type="text" formControlName="idProofNumber" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Permanent Address:</label>
+        <textarea formControlName="permanentAddress" class="form-control" rows="3"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Current Address:</label>
+        <textarea formControlName="currentAddress" class="form-control" rows="3"></textarea>
+      </div>
+    </div>
+
+    <!-- HORIZONTAL LINE -->
+    <hr />
+
+    <!-- BANK DETAILS -->
+    <div class="bank-details-container">
+      <h3>Bank Details</h3>
+
+      <div class="form-group">
+        <label>Account Holder's Name:</label>
+        <input type="text" formControlName="accountHolderName" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Account Number:</label>
+        <input type="text" formControlName="accountNumber" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Bank Name:</label>
+        <input type="text" formControlName="bankName" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Bank Identifier Code:</label>
+        <input type="text" formControlName="bankIdentifierCode" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Branch:</label>
+        <input type="text" formControlName="branch" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Tax Payer ID:</label>
+        <input type="text" formControlName="taxPayerId" class="form-control" />
+      </div>
+    </div>
+
+    <!-- SUBMIT -->
+    <div class="submit-button">
+      <button type="submit" [disabled]="!addUserForm.valid" class="btn btn-primary">
+        Submit
+      </button>
+    </div>
+  </form>
+</div>

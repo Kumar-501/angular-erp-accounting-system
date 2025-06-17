@@ -1,0 +1,51 @@
+<!-- barcodes.component.html -->
+<div class="barcodes-container">
+  <h1>Barcodes</h1>
+  <p class="subtitle">Manage your barcode settings</p>
+
+  <div class="card">
+    <h2>All your barcode settings</h2>
+
+    <div class="table-header">
+      <div class="search-container">
+        <input 
+          type="text" 
+          [(ngModel)]="searchText" 
+          placeholder="Search..." 
+          (input)="searchBarcodes()"
+        >
+      </div>
+      <button (click)="onAddBarcode()" class="add-btn">+ Add new settings</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Sticker Sheet Name</th>
+          <th>Sticker Sheet Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="barcodesList.length === 0">
+          <td colspan="3" class="no-data">
+            Showing 0 to 0 of 0 entries<br>
+            No data available in table
+          </td>
+        </tr>
+        <tr *ngFor="let barcode of barcodesList">
+          <td>{{ barcode.stickerSheetName }}</td>
+          <td>{{ barcode.stickerSheetDescription }}</td>
+          <td class="actions">
+            <button (click)="onEditBarcode(barcode.id)" class="edit-btn">Edit</button>
+            <button (click)="onDeleteBarcode(barcode.id)" class="delete-btn">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    HYBRID CRM - V6.21 Copyright © 2025 All rights reserved.
+  </footer>
+</div>

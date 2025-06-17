@@ -1,0 +1,667 @@
+<div class="container">
+  <h2>{{ isEditing ? 'Edit Product' : 'Add Product' }}</h2>
+
+  <div *ngIf="isLoading" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <form (ngSubmit)="addProduct()" #productForm="ngForm">
+    <!-- Basic Information Section -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Product Name:</label>
+          <input type="text" placeholder="Product Name"
+                 [(ngModel)]="product.productName" name="productName"
+                 (input)="onProductNameChange()" required>
+          <div *ngIf="productFormSubmitted && !product.productName" class="error-message">
+            Product name is required
+          </div>
+        </div>
+        <div class="form-group">
+          <label>SKU: <span class="info-icon" title="Stock Keeping Unit">i</span></label>
+          <input type="text" placeholder="SKU"
+                 [(ngModel)]="product.sku" name="sku"
+                 [readonly]="isGeneratingSku" required>
+          <span *ngIf="isGeneratingSku" class="generating-sku">Generating SKU...</span>
+          <div *ngIf="productFormSubmitted && !product.sku" class="error-message">
+            SKU is required
+          </div>
+        </div>
+        <div class="form-group">
+        <label class="required">Barcode Type:</label>
+        <select [(ngModel)]="product.barcodeType" name="barcodeType" required>
+          <option value="">Please Select</option>
+          <option>Code 128 (C128)</option>
+          <option>Code 39</option>
+          <option>EAN-13</option>
+          <option>UPC-A</option>
+        </select>
+        <div *ngIf="productFormSubmitted && !product.barcodeType" class="error-message">
+          Barcode type is required
+        </div>
+      </div>
+      </div>
+
+      
+
+      <!-- Add this after the Barcode Type field -->
+      <div class="form-row">
+<div class="form-group">
+  <label>Business Locations:</label>
+  <div class="searchable-multiselect">
+    <input 
+      type="text" 
+      placeholder="Search locations..." 
+      (input)="filterLocations($event)"
+      (click)="toggleDropdown($event)"
+      class="form-control"
+    >
+    <div class="dropdown-options" *ngIf="showDropdown && filteredLocations.length > 0">
+      <div 
+        *ngFor="let location of filteredLocations" 
+        (click)="toggleLocationSelection(location); $event.stopPropagation()"
+        [class.selected]="isLocationSelected(location.id)"
+      >
+        {{ location.name }}
+        <span *ngIf="isLocationSelected(location.id)">✓</span>
+      </div>
+    </div>
+    <div class="selected-items">
+      <span *ngFor="let loc of selectedLocations" class="selected-tag">
+        {{ loc.name }}
+        <span (click)="removeLocation(loc); $event.stopPropagation()">×</span>
+      </span>
+    </div>
+  </div>
+</div>
+        <div class="form-group">
+          <label>HSN Code:</label>
+          <input type="text" placeholder="HSN Code" 
+                 [(ngModel)]="product.hsnCode" name="hsnCode">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Unit:</label>
+          <div class="unit-select-container">
+            <select [(ngModel)]="product.unit" name="unit" required>
+              <option value="">Please Select</option>
+              <option *ngFor="let unit of units" [value]="unit.name">
+                {{ unit.name }} ({{ unit.shortName }})
+              </option>
+            </select>
+            <button type="button" class="btn-add" (click)="navigateToUnitsPage()">+</button>
+          </div>
+          <div *ngIf="productFormSubmitted && !product.unit" class="error-message">
+            Unit is required
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Brand:</label>
+          <select [(ngModel)]="product.brand" name="brand" class="form-control">
+            <option value="">Select Brand</option>
+            <option *ngFor="let brand of brands" [value]="brand.name">{{ brand.name }}</option>
+          </select>
+          <button type="button" class="btn-add" (click)="navigateToBrandsPage()">+</button>
+        </div>
+      </div>
+
+      <!-- In the template section -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category:</label>
+          <select [(ngModel)]="product.category" name="category" (change)="onCategoryChange()">
+            <option value="">Please Select</option>
+            <option *ngFor="let category of categories" [value]="category.name">
+              {{ category.name }}
+            </option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sub Category:</label>
+          <select [(ngModel)]="product.subCategory" name="subCategory">
+            <option value="">Select Sub Category</option>
+            <!-- Combined options - first show main categories, then subcategories -->
+            <optgroup *ngIf="categories.length > 0" label="Main Categories">
+              <option *ngFor="let category of categories" [value]="category.name">
+                {{ category.name }}
+              </option>
+            </optgroup>
+            <optgroup *ngIf="subCategories.length > 0" label="Sub Categories">
+              <option *ngFor="let subCat of subCategories" [value]="subCat.name">
+                {{ subCat.name }}
+              </option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+
+      <!-- Inventory Management Section -->
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="manageStock" [(ngModel)]="product.manageStock" name="manageStock">
+            <label for="manageStock">Manage Stock? <span class="info-icon" title="Enable stock management">i</span></label>
+          </div>
+          <div class="hint-text">Enable stock management at product level</div>
+        </div>
+        <div class="form-group" *ngIf="product.manageStock">
+          <label>Alert quantity: <span class="info-icon" title="Low stock alert level">i</span></label>
+          <input type="number" placeholder="Alert quantity"
+                 [(ngModel)]="product.alertQuantity" name="alertQuantity">
+        </div>
+      </div>
+<div class="form-row" *ngIf="product.manageStock">
+<div class="form-row" *ngIf="product.manageStock">
+  <div class="form-group">
+    <label>Total Quantity:</label>
+    <input type="number" placeholder="Total quantity"
+           [(ngModel)]="product.totalQuantity" name="totalQuantity" 
+           min="0" required>
+    <div *ngIf="productFormSubmitted && product.totalQuantity === null" class="error-message">
+      Total quantity is required when stock management is enabled
+    </div>
+  </div>
+</div>
+  <div class="form-group">
+    <label>Lot Number:</label>
+    <input type="text" placeholder="Enter last number or code"
+           [(ngModel)]="product.lastNumber" name="lastNumber">
+    <div class="hint-text">Can be number or text identifier</div>
+  </div>
+</div>
+
+<div class="form-row" *ngIf="product.manageStock">
+  <div class="form-group">
+    <label>Expiry Date:</label>
+    <input type="date" 
+           [(ngModel)]="product.expiryDate" 
+           name="expiryDate">
+  </div>
+</div>
+      <!-- Product Description -->
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>Product Description:</label>
+          <textarea [(ngModel)]="product.productDescription" name="productDescription"></textarea>
+        </div>
+      </div>
+
+      <!-- File Uploads -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Product brochure:</label>
+          <div class="file-upload">
+            <input type="file" id="productBrochure" (change)="onFileSelected($event, 'brochure')"
+                   accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png">
+          </div>
+          <div class="file-requirements">
+            Max File size: 5MB<br> Allowed: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png
+          </div>
+        </div>
+        
+    <div class="form-group added-date-group">
+      <label>Added Date:</label>
+      <input type="date" class="added-date-input" [(ngModel)]="product.addedDate" name="addedDate" [disabled]="isEditing">
+    </div>
+      </div>
+    </div>
+
+
+    <!-- Additional Information -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="enableDescription" [(ngModel)]="product.enableProductDescription" name="enableProductDescription">
+            <label for="enableDescription">Enable Product description, IMEI or Serial Number <span class="info-icon">i</span></label>
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="notForSelling" [(ngModel)]="product.notForSelling" name="notForSelling">
+            <label for="notForSelling">Not for selling <span class="info-icon">i</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Weight (kg):</label>
+          <input type="number" step="0.01" placeholder="Weight"
+                 [(ngModel)]="product.weight" name="weight">
+        </div>
+        <div class="form-group">
+          <label>Length (cm):</label>
+          <input type="number" step="0.01" placeholder="Length"
+                 [(ngModel)]="product.length" name="length">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Breadth (cm):</label>
+          <input type="number" step="0.01" placeholder="Breadth"
+                 [(ngModel)]="product.breadth" name="breadth">
+        </div>
+        <div class="form-group">
+          <label>Height (cm):</label>
+          <input type="number" step="0.01" placeholder="Height"
+                 [(ngModel)]="product.height" name="height">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Custom Field 1:</label>
+          <input type="text" placeholder="Custom Field 1"
+                 [(ngModel)]="product.customField1" name="customField1">
+        </div>
+        <div class="form-group">
+          <label>Custom Field 2:</label>
+          <input type="text" placeholder="Custom Field 2"
+                 [(ngModel)]="product.customField2" name="customField2">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Custom Field 3:</label>
+          <input type="text" placeholder="Custom Field 3"
+                 [(ngModel)]="product.customField3" name="customField3">
+        </div>
+        <div class="form-group">
+          <label>Custom Field 4:</label>
+          <input type="text" placeholder="Custom Field 4"
+                 [(ngModel)]="product.customField4" name="customField4">
+        </div>
+      </div>
+    </div>
+
+    <!-- Product Type Section -->
+    <div class="container">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Applicable Tax:</label>
+          <select [(ngModel)]="product.applicableTax" name="applicableTax" required 
+                  (change)="onTaxChange()"
+                  [class.invalid]="productFormSubmitted && !product.applicableTax">
+            <option value="" disabled selected>Select Tax</option>
+            <option [ngValue]="'None'">None</option>
+            <option *ngFor="let tax of taxRates" [ngValue]="tax">
+              {{ tax.name }} ({{ tax.percentage }}%)
+            </option>
+          </select>
+          <div *ngIf="productFormSubmitted && !product.applicableTax" class="error-message">
+            Applicable Tax is required
+          </div>
+          <div *ngIf="product.taxPercentage > 0" class="tax-info">
+            Current tax rate: {{ product.taxPercentage }}%
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="required">Selling Price Tax Type:</label>
+          <select [(ngModel)]="product.sellingPriceTaxType" name="sellingPriceTaxType" required (change)="calculateTax()">
+            <option value="">Please Select</option>
+            <option>Exclusive</option>
+            <option>Inclusive</option>
+          </select>
+          <div *ngIf="productFormSubmitted && !product.sellingPriceTaxType" class="error-message">
+            Selling Price Tax Type is required
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="required">Product Type:</label>
+          <select [(ngModel)]="product.productType" name="productType" required (change)="onProductTypeChange()">
+            <option value="">Please Select</option>
+            <option>Single</option>
+            <option>Variant</option>
+            <option>Combination</option>
+          </select>
+          <div *ngIf="productFormSubmitted && !product.productType" class="error-message">
+            Product Type is required
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW: Not For Selling Products Selection (Only for Single Product Type) -->
+      <div class="not-for-selling-section" *ngIf="product.productType === 'Single'">
+        <div class="form-group">
+          <label>Select Not For Selling Products:</label>
+          <div class="not-selling-products-container">
+            <div class="product-search">
+              <input type="text" placeholder="Search products..." 
+                     [(ngModel)]="searchNotSellingProducts" 
+                     name="searchNotSellingProducts"
+                     (input)="filterNotSellingProducts()">
+            </div>
+            
+            <div class="available-products" *ngIf="filteredNotSellingProducts && filteredNotSellingProducts.length > 0">
+              <h4>Available Not-For-Selling Products:</h4>
+              <div class="product-list">
+                <div *ngFor="let product of filteredNotSellingProducts" class="product-item">
+                  <div class="product-info">
+                    <span class="product-name">{{ product.productName }}</span>
+                    <span class="product-sku">({{ product.sku }})</span>
+                    <span class="product-stock">Stock: {{ product.currentStock || 0 }}</span>
+                  </div>
+                  <div class="quantity-controls">
+                    <label>Qty:</label>
+                    <input type="number" min="0" max="{{ product.currentStock || 0 }}" 
+                           [(ngModel)]="product.selectedQuantity" 
+                           [name]="'notSellingQty_' + product.id"
+                           (change)="onNotSellingQuantityChange(product)"
+                           placeholder="0">
+                    <button type="button" class="btn-add-product" 
+                            [disabled]="!product.selectedQuantity || product.selectedQuantity <= 0"
+                            (click)="addNotSellingProduct(product)">
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selected Not-For-Selling Products -->
+            <div class="selected-products" *ngIf="selectedNotSellingProducts && selectedNotSellingProducts.length > 0">
+              <h4>Selected Not-For-Selling Products:</h4>
+              <table class="selected-products-table">
+                <thead>
+                  <tr>
+                    <th>Product Name</th>
+                    <th>SKU</th>
+                    <th>Available Stock</th>
+                    <th>Selected Quantity</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let selectedProduct of selectedNotSellingProducts; let i = index">
+                    <td>{{ selectedProduct.productName }}</td>
+                    <td>{{ selectedProduct.sku }}</td>
+                    <td>{{ selectedProduct.currentStock || 0 }}</td>
+                    <td>
+                      <input type="number" min="1" max="{{ selectedProduct.currentStock || 0 }}" 
+                             [(ngModel)]="selectedProduct.selectedQuantity" 
+                             [name]="'selectedNotSellingQty_' + i"
+                             (change)="updateNotSellingQuantity(selectedProduct)">
+                    </td>
+                    <td>
+                      <button type="button" class="btn-remove" (click)="removeNotSellingProduct(i)">
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              
+              <div class="not-selling-summary">
+                <div class="summary-row">
+                  <span>Total Selected Products:</span>
+                  <span>{{ selectedNotSellingProducts.length }}</span>
+                </div>
+                <div class="summary-row">
+                  <span>Total Quantity:</span>
+                  <span>{{ getTotalNotSellingQuantity() }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Added By Field -->
+      <div class="form-group">
+        <label>Added By:</label>
+        <select [(ngModel)]="selectedUser" name="addedBy" (change)="onUserSelect(selectedUser)">
+          <option value="">Select User</option>
+          <option *ngFor="let user of users" [ngValue]="user">
+            {{ user.name || user.email }}
+          </option>
+        </select>
+      </div>
+      <br>
+
+      <!-- Variant Selection (for Variant type) -->
+      <div class="variant-section" *ngIf="product.productType === 'Variant'">
+        <h3>Select Variations</h3>
+        <div class="variation-options">
+          <div *ngFor="let variation of availableVariations" class="variation-option">
+            <label>
+              <input type="checkbox"
+                     [checked]="isVariationSelected(variation.id)"
+                     (change)="toggleVariationSelection(variation)">
+              {{ variation.name }}
+            </label>
+            <div *ngIf="isVariationSelected(variation.id)" class="variation-values">
+              <div *ngFor="let value of variation.values" class="value-option">
+                <label>
+                  <input type="checkbox"
+                         [checked]="isValueSelected(variation.id, value)"
+                         (change)="toggleValueSelection(variation.id, value)">
+                  {{ value }}
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+       
+        <div *ngIf="selectedVariations.length > 0" class="variant-combinations">
+          <h4>Variant Combinations</h4>
+          <table class="variant-table">
+            <thead>
+              <tr>
+                <th *ngFor="let variation of selectedVariations">{{ variation.name }}</th>
+                <th>SKU</th>
+                <th>Price</th>
+                <th>Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let combination of variantCombinations; let i = index">
+                <td *ngFor="let value of combination.values">{{ value }}</td>
+                <td>
+                  <input type="text" [(ngModel)]="combination.sku"
+                         [name]="'variantSku_' + i" placeholder="Auto-generated">
+                </td>
+                <td>
+                  <input type="number" step="0.01" [(ngModel)]="combination.price"
+                         [name]="'variantPrice_' + i" placeholder="0.00">
+                </td>
+                <td>
+                  <input type="number" [(ngModel)]="combination.quantity"
+                         [name]="'variantQuantity_' + i" placeholder="0">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="productFormSubmitted && product.productType === 'Variant' && (!variantCombinations || variantCombinations.length === 0)" class="error-message">
+          Please select at least one variation combination
+        </div>
+      </div>
+
+     <!-- Combination Product Section (for Combination type) -->
+      <div class="combination-section" *ngIf="product.productType === 'Combination'">
+        <h3>Product Components</h3>
+        <div class="component-list">
+          <div class="component-item" *ngFor="let component of product.components; let i = index">
+            <div class="component-details">
+              <select [(ngModel)]="component.productId" [name]="'componentProduct_' + i"
+                      class="product-select" (change)="onComponentProductChange(i)">
+                <option value="">Select Product</option>
+                <option *ngFor="let prod of availableProducts" [value]="prod.id">
+                  {{ prod.productName }} ({{ prod.sku }})
+                </option>
+              </select>
+              <input type="number" [(ngModel)]="component.quantity" [name]="'componentQuantity_' + i"
+                     class="quantity-input" placeholder="Qty" min="1">
+              <button type="button" class="btn-remove" (click)="removeComponent(i)">×</button>
+            </div>
+            <div class="component-info" *ngIf="getComponentProduct(i)">
+              <span>Price: {{ getComponentProduct(i).defaultSellingPriceExcTax | currency:'INR'}}</span>
+              <span>Stock: {{ getComponentProduct(i).currentStock || 0 }}</span>
+            </div>
+          </div>
+          <button type="button" class="btn-add-component" (click)="addComponent()">
+            + Add Component
+          </button>
+        </div>
+       
+     <div class="combination-summary" *ngIf="product.components.length > 0">
+  <h4>Combination Summary</h4>
+  <div class="summary-row">
+    <span>Total Components:</span>
+    <span>{{ product.components.length }}</span>
+  </div>
+  <div class="summary-row">
+    <span>Estimated Cost (Exc. Tax):</span>
+    <span>{{ product.defaultPurchasePriceExcTax | currency:'INR' }}</span>
+  </div>
+  <div class="summary-row">
+    <span>Estimated Cost (Inc. Tax):</span>
+    <span>{{ product.defaultPurchasePriceIncTax | currency:'INR' }}</span>
+  </div>
+  <div class="summary-row">
+    <span>Recommended Selling Price ({{ product.marginPercentage }}% margin):</span>
+    <span>{{ calculateRecommendedPrice() | currency:'INR' }}</span>
+  </div>
+</div>
+        <div *ngIf="productFormSubmitted && product.productType === 'Combination' && (!product.components || product.components.length === 0)" class="error-message">
+          Please add at least one component
+        </div>
+      </div>
+
+      <!-- Pricing Section (for Single and Combination types) -->
+      <div *ngIf="product.productType !== 'Variant'" class="pricing-section">
+        <table class="pricing-table">
+          <thead>
+            <tr>
+              <th>Purchase Price</th>
+              <th>Selling Price</th>
+              <th>Margin</th>
+              <th>Product Image</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <!-- Purchase Price Column -->
+              <td>
+                <div class="form-group">
+                  <label>Exc. Tax:</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                         [(ngModel)]="product.defaultPurchasePriceExcTax" 
+                         name="defaultPurchasePriceExcTax"
+                         (change)="calculatePurchasePriceIncTax()">
+                </div>
+                <div class="form-group">
+                  <label>Inc. Tax:</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                         [(ngModel)]="product.defaultPurchasePriceIncTax" 
+                         name="defaultPurchasePriceIncTax"
+                         (change)="calculatePurchasePriceExcTax()">
+                </div>
+              </td>
+              
+              <!-- Selling Price Column -->
+              <td>
+                <div class="form-group">
+                  <label class="required">Exc. Tax:</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                         [(ngModel)]="product.defaultSellingPriceExcTax" 
+                         name="defaultSellingPriceExcTax"
+                         (change)="calculateSellingPriceIncTax()" required>
+                  <div *ngIf="productFormSubmitted && !product.defaultSellingPriceExcTax" class="error-message">
+                    Selling Price (Exc. Tax) is required
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="required">Inc. Tax (MRP):</label>
+                  <input type="number" step="0.01" placeholder="0.00"
+                         [(ngModel)]="product.defaultSellingPriceIncTax" 
+                         name="defaultSellingPriceIncTax"
+                         (change)="calculateFromMRP()" required>
+                  <div *ngIf="productFormSubmitted && !product.defaultSellingPriceIncTax" class="error-message">
+                    Selling Price (Inc. Tax) is required
+                  </div>
+                  <!-- Tax breakdown section -->
+                  <div class="tax-breakdown" *ngIf="product.taxPercentage > 0 && product.defaultSellingPriceIncTax">
+                    <div class="tax-info-row">
+                      <span>Tax ({{ product.taxPercentage }}%):</span>
+                      <span>{{ calculateTaxAmount() | currency:'INR' }}</span>
+                    </div>
+                    <div class="tax-info-row">
+                      <span>Price before tax:</span>
+                      <span>{{ product.defaultSellingPriceExcTax | currency:'INR' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              
+              <!-- Margin Column -->
+              <td>
+                <div class="form-group">
+                  <label>Margin (%):</label>
+                  <input type="number" step="0.01" placeholder="25.00"
+                         [(ngModel)]="product.marginPercentage"
+                         name="marginPercentage"
+                         (change)="calculateAllPrices()">
+                </div>
+              </td>
+              
+              <!-- Product Image Column -->
+              <td>
+                <label>Product image:</label>
+                <div class="file-upload">
+                  <input type="file" id="pricingImage" (change)="onFileSelected($event, 'image')" accept="image/*">
+                </div>
+                <div class="file-requirements">
+                  Max File size: 5MB<br> Aspect ratio should be 1:1
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div *ngIf="product.taxPercentage > 0" class="tax-info">
+        <span>Tax ({{ product.taxPercentage }}%): {{ calculateTaxAmount() | currency:'INR' }}</span>
+        <span>Price before tax: {{ product.defaultSellingPriceExcTax | currency:'INR' }}</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="form-actions">
+        <!-- Save & Add Opening Stock Button -->
+        <!-- <button *ngIf="!isEditing" type="button" class="btn btn-opening-stock" [disabled]="isLoading" (click)="saveAndAddOpeningStock()">
+          Save & Add Opening Stock
+        </button> -->
+
+        <!-- Save And Add Another Button -->
+      <button type="button" class="btn btn-another" [disabled]="isLoading" (click)="saveAndAddAnother($event)">
+  Save And Add Another
+</button>
+
+        
+<!-- Change from type="button" to type="submit" -->
+<button type="submit" class="btn btn-save" [disabled]="isLoading">
+  {{ isEditing ? 'Update Product' : 'Save' }}
+</button>
+        <!-- Delete Button (only shown when editing) -->
+        <button *ngIf="isEditing" type="button" class="btn btn-danger" [disabled]="isLoading" (click)="deleteProduct(product.id)">
+          Delete Product
+        </button>
+      </div>
+
+      <div class="footer">
+        HYBRID CRM - v6.2 | Copyright © 2025 All rights reserved.
+      </div>
+    </div>
+
+    
+  </form>
+</div>

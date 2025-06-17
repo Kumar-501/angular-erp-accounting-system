@@ -1,0 +1,111 @@
+<div class="customer-group-container">
+  <div class="header-section">
+    <h3>Customer Groups</h3>
+    <div class="action-buttons">
+      <button class="add-button" (click)="toggleForm()">Add Customer Group</button>
+      <div class="export-controls">
+        <button class="btn-export" (click)="exportCSV()">
+          <i class="fa fa-file-csv"></i> Export CSV
+        </button>
+        <button class="btn-export" (click)="exportExcel()">
+          <i class="fa fa-file-excel"></i> Export Excel
+        </button>
+        <button class="btn-export" (click)="exportPDF()">
+          <i class="fa fa-file-pdf"></i> Export PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Form -->
+  <div *ngIf="showForm" class="form-modal">
+    <div class="form-content">
+      <div class="form-header">
+        <h3>{{ currentEditId ? 'Edit' : 'Add' }} Customer Group</h3>
+        <button class="close-button" (click)="resetForm()">×</button>
+      </div>
+      
+      <form (ngSubmit)="onSubmit()">
+        <div class="form-group">
+          <label for="customerGroupName">Customer Group Name:*</label>
+          <input type="text" id="customerGroupName" [(ngModel)]="customerGroupName" name="customerGroupName" required />
+        </div>
+
+        <div class="form-group">
+          <label for="priceCalculationType">Price calculation type:</label>
+          <select id="priceCalculationType" [(ngModel)]="priceCalculationType" name="priceCalculationType" (change)="onCalculationTypeChange(priceCalculationType)">
+            <option *ngFor="let type of priceCalculationTypes" [value]="type">{{ type | titlecase }}</option>
+          </select>
+        </div>
+
+        <div *ngIf="priceCalculationType === 'percentage'" class="form-group">
+          <label for="calculationPercentage">Calculation Percentage (%):</label>
+          <input type="number" id="calculationPercentage" [(ngModel)]="calculationPercentage" name="calculationPercentage" required />
+        </div>
+
+        <div *ngIf="priceCalculationType === 'sellingPrice'" class="form-group">
+          <label for="sellingPriceGroup">Selling Price Group:</label>
+          <input type="text" id="sellingPriceGroup" [(ngModel)]="sellingPriceGroup" name="sellingPriceGroup" required />
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="cancel-button" (click)="resetForm()">Close</button>
+          <button type="submit" class="save-button" [disabled]="!customerGroupName || (priceCalculationType === 'percentage' && !calculationPercentage) || (priceCalculationType === 'sellingPrice' && !sellingPriceGroup)">
+            Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Customer Groups Table -->
+  <div class="table-container">
+    <div class="table-header">
+      <div class="entries-info">
+        Show
+        <select>
+          <option>25</option>
+          <option>50</option>
+          <option>100</option>
+        </select>
+        entries
+      </div>
+      <div class="search-box">
+        <input type="text" placeholder="Search..." [(ngModel)]="searchText" (input)="filterCustomerGroups()" />
+      </div>
+    </div>
+
+    <table class="customer-groups-table">
+      <thead>
+        <tr>
+          <th>Customer Group Name</th>
+          <th>Calculation Percentage (%)</th>
+          <th>Selling Price Group</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="filteredCustomerGroups.length === 0">
+          <td colspan="4" class="no-data">No data available in table</td>
+        </tr>
+        <tr *ngFor="let group of filteredCustomerGroups">
+          <td>{{ group.customerGroupName }}</td>
+          <td>{{ group.priceCalculationType === 'percentage' ? group.calculationPercentage + '%' : '-' }}</td>
+          <td>{{ group.priceCalculationType === 'sellingPrice' ? group.sellingPriceGroup : '-' }}</td>
+          <td class="actions">
+            <button class="edit-button" (click)="editCustomerGroup(group)">Edit</button>
+            <button class="delete-button" (click)="deleteCustomerGroup(group.id)">Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="table-footer">
+      <div>Showing {{ filteredCustomerGroups.length ? 1 : 0 }} to {{ filteredCustomerGroups.length }} of {{ filteredCustomerGroups.length }} entries</div>
+      <div class="pagination">
+        <button [disabled]="true">Previous</button>
+        <button [disabled]="true">Next</button>
+      </div>
+    </div>
+  </div>
+</div>

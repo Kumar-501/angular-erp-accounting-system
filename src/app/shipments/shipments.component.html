@@ -1,0 +1,820 @@
+<!-- Prescription Modal -->
+<div class="modal fade" [class.show]="showPrescriptionModal" [style.display]="showPrescriptionModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Prescription</h5>
+        <button type="button" class="close" (click)="closePrescriptionModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="prescription-print-content" style="font-family: 'Arial Unicode MS', Arial, sans-serif;">
+          <!-- Header -->
+          <div style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid #000; padding-bottom: 10px;">
+            <h3 style="margin-bottom: 5px;">ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h3>
+            <p style="margin: 2px 0;">First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
+            <p style="margin: 2px 0;">E-mail: contactherballytouch.com | Ph: 7034110999</p>
+            <p style="margin: 2px 0;">ഡോ. രാജന പി.ആർ., BAMS</p>
+          </div>
+          
+          <!-- Patient Info -->
+          <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+            <p><strong>പേര്:</strong> {{currentPrescription.patientName || '.....................................................'}}</p>
+            <p><strong>തീയതി:</strong> {{currentPrescription.date || '.....................................................'}}</p>
+          </div>
+          
+          <!-- Medicines -->
+          <div style="margin-bottom: 15px;">
+            <div *ngFor="let medicine of currentPrescription.medicines; let i = index" style="margin-bottom: 15px;">
+              <p style="margin-bottom: 5px;">
+                {{i + 1}}. 
+                <span *ngIf="i < 5">ഔഷധം 15 ml. എടുക്കുക 45 ml. തിളപ്പിച്ച വെള്ളം ചേർത്ത് കുടിക്കുക. രാത്രി ഭക്ഷണത്തിന് ശേഷം / മുമ്പ് സൊവികുക.</span>
+                <span *ngIf="i >= 5">ഗുളിക {{medicine.pills || '.......................'}} എണ്ണം എടുക്കുക {{medicine.dosage || '...............'}} ml. തിളപ്പിച്ച വെള്ളം ചേർത്ത് നേരം ഭക്ഷണത്തിന് മുമ്പ് / ശേഷം സൊവികുക.</span>
+              </p>
+              <div *ngIf="i < 5" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                <span><strong>ചേരുവ:</strong> {{medicine.ingredients || '.......................'}}</span>
+                <span><strong>ഗുളിക:</strong> {{medicine.pills || '.......................'}}</span>
+                <span><strong>പൊടി ചേരുവ:</strong> {{medicine.powder || '.......................'}}</span>
+                <span><strong>നേരം:</strong> {{medicine.time || '.......................'}}</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Note -->
+          <div style="margin-top: 30px; font-style: italic; text-align: center;">
+            <p>NB: മുകളിലുള്ള മരുന്നുകള്‍ ഡോക്ടര്‍ പറയുന്ന വിധം ഉപയോഗിക്കുക.</p>
+          </div>
+          
+          <!-- Signature -->
+          <div style="margin-top: 50px; text-align: right;">
+            <div style="border-top: 1px solid #000; display: inline-block; width: 200px; text-align: center;">
+              <p>ഡോക്ടറുടെ ഒപ്പ്</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closePrescriptionModal()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="savePrescription()">Save</button>
+        <button type="button" class="btn btn-success" (click)="printPrescription()">
+          <i class="fas fa-print"></i> Print
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal-backdrop fade" [class.show]="showPrescriptionModal" [style.display]="showPrescriptionModal ? 'block' : 'none'"></div>
+<div class="controls-panel">
+  <div class="controls-wrapper">
+    <h2>Shipments</h2>
+    <!-- Left Side -->
+    <div class="controls-left">
+   
+
+      <div class="entries-control">
+        <span>Show</span>
+        <select (change)="changeEntriesPerPage($event)">
+          <option value="25" selected>25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+        <span>entries</span>
+      </div>
+    </div>
+
+    <!-- Right Side -->
+    <div class="controls-right">
+      <button class="filter-btn" (click)="toggleFilters()">
+        <i class="fas fa-filter"></i> Filters
+      </button>
+      <button class="export-btn" (click)="exportCSV()">
+        <i class="fas fa-file-csv"></i> CSV
+      </button>
+   <button class="export-btn" (click)="exportCSV()">
+        <i class="fas fa-file-csv"></i> Excel
+      </button>
+<button class="btn btn-primary" (click)="bulkPrintSelected()">
+  <i class="fas fa-print"></i>
+  Print Bulk
+  <span class="count-badge">{{selectedShipments.length}}</span>
+</button>
+
+
+      <button type="button" class="btn btn-primary" (click)="generateBulkDocuments('packing-slip')" [disabled]="selectedShipments.length === 0">
+  <i class="fas fa-box"></i> Bulk Packing Slips
+</button>
+
+<button type="button" class="btn btn-primary" (click)="generateBulkDocuments('invoice')" [disabled]="selectedShipments.length === 0">
+  <i class="fas fa-file-invoice"></i> Bulk Invoices
+</button>
+
+ 
+      <!-- Add this button with your other export buttons -->
+      <button class="export-btn" (click)="toggleColumnVisibilityDropdown()">
+        <i class="fas fa-columns"></i> Columns
+      </button>
+      
+      <!-- Add this dropdown menu right after the button -->
+      <div class="dropdown-menu" [class.show]="showColumnDropdown" style="min-width: 200px; padding: 10px;">
+        <div class="form-check" *ngFor="let column of columns">
+          <input class="form-check-input" type="checkbox" 
+                 [id]="'col-' + column.id" 
+                 [(ngModel)]="column.visible"
+                 (change)="updateVisibleColumns()">
+          <label class="form-check-label" [for]="'col-' + column.id">
+            {{ column.name }}
+          </label>
+        </div>
+      </div>
+      
+      
+<div class="input-group input-group-sm search-container">
+  <input
+    type="text"
+    class="form-control search-input"
+    placeholder="Search invoices, customers, contacts..."
+    [(ngModel)]="searchTerm"
+    (keyup)="onSearch()"
+  />
+  <button class="btn btn-outline-secondary search-btn" type="button" (click)="onSearch()">
+    <i class="fas fa-search"></i>
+  </button>
+</div>
+    </div>
+  </div>
+</div>
+<!-- Filter Sidebar - Added to right side -->
+<div class="filter-sidebar" [class.show]="showFilters">
+  <div class="filter-header">
+    <h5>Filter Shipments</h5>
+    <button type="button" class="close-btn" (click)="toggleFilters()">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+<div class="filter-sidebar" [class.show]="showFilters">
+  <div class="filter-header">
+    <h5>Filter Shipments</h5>
+    <button type="button" class="close-btn" (click)="toggleFilters()">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+      <div class="mb-3">
+      <label class="form-label">Quick Date Filters</label>
+      <div class="btn-group-vertical w-100">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('today')">Today</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('yesterday')">Yesterday</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('last7days')">Last 7 Days</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('last30days')">Last 30 Days</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('thisMonth')">This Month</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('lastMonth')">Last Month</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('thisFinancialYear')">This Financial Year</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="selectDatePreset('lastFinancialYear')">Last Financial Year</button>
+      </div>
+    </div>
+  <div class="filter-body">
+    <div class="mb-3">
+      <label class="form-label">Date Range</label>
+      <div class="input-group">
+        <input type="date" class="form-control" [(ngModel)]="filterValues.startDate">
+        <span class="input-group-text">to</span>
+        <input type="date" class="form-control" [(ngModel)]="filterValues.endDate">
+      </div>
+    </div>
+
+
+   
+
+    <div class="mb-3">
+      <label class="form-label">Type of Service</label>
+      <select class="form-select" [(ngModel)]="filterValues.typeOfService">
+        <option value="All">All Services</option>
+        <option *ngFor="let service of typeOfServices" [value]="service.id">
+          {{ service.name }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Added By</label>
+      <select class="form-select" [(ngModel)]="filterValues.addedBy">
+        <option value="All">All Users</option>
+        <option *ngFor="let user of users" [value]="user.id">
+          {{ user.displayName || user.email }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Payment Status</label>
+      <select class="form-select" [(ngModel)]="filterValues.paymentStatus">
+        <option value="All">All Statuses</option>
+        <option value="Paid">Paid</option>
+        <option value="Partial">Partial</option>
+        <option value="Unpaid">Unpaid</option>
+      </select>
+    </div>
+
+<div class="mb-3">
+  <label class="form-label">Shipping Status</label>
+  <select class="form-select" [(ngModel)]="filterValues.shippingStatus" name="shippingStatus">
+    <option value="All">All Statuses</option>
+    <option value="Processing">Processing</option>
+    <option value="Packed">Packed</option>
+    <option value="Pending">Pending</option>
+    <option value="Shipped">Shipped</option>
+    <option value="Onhold">Onhold</option>
+    <option value="Ordered">Ordered</option>
+    <option value="Print">Print</option>
+    <option value="Reached hub">Reached hub</option>
+    <option value="Out for delivery">Out for delivery</option>
+    <option value="Returned">Returned</option>
+    <option value="Cancelled">Cancelled</option>
+    <option value="Delivered">Delivered</option>
+  </select>
+</div>
+  </div>
+  <div class="filter-footer">
+    <button type="button" class="btn btn-secondary" (click)="resetFilters()">Reset</button>
+    <button type="button" class="btn btn-primary" (click)="applyFilters()">Apply</button>
+  </div>
+</div>
+</div>
+<div class="filter-overlay" [class.show]="showFilters" (click)="toggleFilters()"></div>
+<div class="card" (clickOutside)="showColumnDropdown = false">
+
+
+  <div class="card">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+          <thead>
+            <tr class="text-nowrap">
+              <th><input type="checkbox" (change)="selectAll($event)"></th>
+              <th>Action</th>
+              <th *ngIf="isColumnVisible('date')">Date <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('invoiceNo')">Invoice No. <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('contactNumber')">Contact <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('alternateContact')">Alternate Contact <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('customer')">Customer <i class="fas fa-sort"></i></th>
+
+              <th *ngIf="isColumnVisible('typeOfService')">Type of Service <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('location')"> Current Location</th> <!-- Add this column -->
+              <th *ngIf="isColumnVisible('billingAddress')">Billing Location<i class="fas fa-sort"></i></th>
+      <th *ngIf="isColumnVisible('shippingDetails')">Shipping Details</th>
+
+              <th *ngIf="isColumnVisible('shippingStatus')">Shipping Status <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('shippingCharge')">Shipping Charge <i class="fas fa-sort"></i></th>
+              <th *ngIf="isColumnVisible('addedBy')">Added By <i class="fas fa-sort"></i></th>
+
+              <th *ngIf="isColumnVisible('paymentStatus')">Payment Status <i class="fas fa-sort"></i></th>
+            </tr>
+          </thead>
+          <tbody>
+         <tr *ngIf="filteredShipments.length === 0">
+  <td colspan="11" class="text-center py-3">No data available in table</td>
+</tr>
+<tr *ngFor="let shipment of filteredShipments.slice((currentPage-1)*entriesPerPage, currentPage*entriesPerPage)">              <td><input type="checkbox" [checked]="isSelected(shipment.id)" (change)="toggleSelection(shipment.id)"></td>
+              <td>
+                <div class="dropdown">
+                  <button class="btn  dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Actions
+                  </button>
+                <ul class="dropdown-menu">
+  <li>
+    <a class="dropdown-item" [routerLink]="['/shipments/view', shipment.id]">View</a>
+  </li>
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="openEditFormModal(shipment)">Edit</a>
+  </li>
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="openEditModal(shipment)">Edit Payment Status</a>
+  </li>
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="generatePackingSlip(shipment.id)">Packing Slip</a>
+  </li>
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="generateInvoice(shipment)">
+      <i class="fas fa-file-invoice"></i> Generate Invoice
+    </a>
+  </li>
+  <!-- Add these new options -->
+<!-- In your table row actions -->
+<li>
+  <a class="dropdown-item" href="javascript:void(0)" (click)="printShipment(shipment)">Print</a>
+</li>
+  <li>
+    <a class="dropdown-item text-danger" href="javascript:void(0)" (click)="confirmDelete(shipment)">Delete</a>
+  </li>
+</ul>
+                </div>
+              </td>
+<td *ngIf="isColumnVisible('date')">
+  {{ formatDateForDisplay(shipment.date) }}
+</td>
+
+<td *ngIf="isColumnVisible('invoiceNo')">{{ shipment.invoiceNo }}</td>
+              <td *ngIf="isColumnVisible('contactNumber')">{{ shipment.contactNumber }}</td>
+<td *ngIf="isColumnVisible('alternateContact')">{{ shipment.alternateContact || 'N/A' }}</td>              <td *ngIf="isColumnVisible('customer')">{{ shipment.customer }}</td>
+              
+              <td *ngIf="isColumnVisible('typeOfService')">
+                {{ shipment.typeOfServiceName || shipment.typeOfService || 'Standard' }}
+              </td>
+              <td *ngIf="isColumnVisible('location')">{{ shipment.location }}</td> <!-- Add this cell -->
+              <td *ngIf="isColumnVisible('billingAddress')">{{ shipment.billingAddress || 'N/A' }}</td>
+      <td *ngIf="isColumnVisible('shippingDetails')">{{ shipment.shippingDetails || 'N/A' }}</td>
+
+              <td *ngIf="isColumnVisible('shippingStatus')">
+                <span [ngClass]="getStatusBadgeClass(shipment.shippingStatus)">
+                  {{ shipment.shippingStatus || 'N/A' }}
+                </span>
+              </td>
+              <td *ngIf="isColumnVisible('shippingCharge')">{{ shipment.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('addedBy')">{{ shipment.addedByDisplayName || shipment.addedBy || 'System' }}</td>
+              <td *ngIf="isColumnVisible('paymentStatus')">
+                <span [ngClass]="{
+                  'badge bg-danger': shipment.paymentStatus === 'Unpaid',
+                  'badge bg-warning': shipment.paymentStatus === 'Partial',
+                  'badge bg-success': shipment.paymentStatus === 'Paid'
+                }">{{ shipment.paymentStatus }}</span>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot class="table-active font-weight-bold">
+            <tr>
+              <td colspan="8" class="text-end fw-bold">Total Shipments:</td>
+              <td class="fw-bold">{{ totalShipmentCount }}</td>
+              <td class="fw-bold">₹{{ totalShipmentAmount | number:'1.2-2' }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    
+    <div class="card-footer bg-white">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          Showing {{ filteredShipments.length ? (currentPage - 1) * entriesPerPage + 1 : 0 }} to 
+          {{ getMinValue(currentPage * entriesPerPage, totalEntries) }} of {{ totalEntries }} entries
+        </div>
+        <div class="col-md-6">
+          <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-end mb-0">
+              <li class="page-item" [class.disabled]="currentPage === 1">
+                <button class="page-link" (click)="previousPage()">Previous</button>
+              </li>
+              <li class="page-item" *ngFor="let page of getPagesArray()" [class.active]="page === currentPage">
+                <button class="page-link" (click)="goToPage(page)">{{ page }}</button>
+              </li>
+              <li class="page-item" [class.disabled]="currentPage >= getTotalPages()">
+                <button class="page-link" (click)="nextPage()">Next</button>
+              </li>
+              
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- Add this below your table -->
+<div class="mt-3" *ngIf="selectedShipments.length > 0">
+  <button class="btn btn-primary" (click)="openBulkStatusModal()">
+    Change Shipping Status ({{selectedShipments.length}} selected)
+  </button>
+
+>
+
+
+
+
+</div>
+
+<!-- Add this modal near the bottom of your shipments.component.html -->
+<div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="invoiceModalLabel">Invoice #{{ invoiceData.invoiceNo }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="invoicePrintContent">
+        <!-- Invoice Header -->
+        <div class="text-center mb-4">
+          <h3>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h3>
+          <p>1st Floor, Chirackal Tower, Ayroor P.O, Emakulam, Kerala, 683579, India</p>
+          <p>Mobile: 00917034110999 | GST: 32AAGCH3136H12X</p>
+        </div>
+
+        <!-- Invoice Details -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <p><strong>Invoice No:</strong> {{ invoiceData.invoiceNo }}</p>
+            <p><strong>Date:</strong> {{ invoiceData.date }}</p>
+            <p><strong>Order No:</strong> {{ currentShipment?.orderNo || 'N/A' }}</p>
+          </div>
+          <div class="col-md-6 text-end">
+            <p><strong>Customer:</strong> {{ invoiceData.to.name }}</p>
+            <p>{{ invoiceData.to.address }}</p>
+            <p>Mobile: {{ invoiceData.to.mobile }}</p>
+          </div>
+        </div>
+
+        <!-- Products Table -->
+        <div class="table-responsive mb-4">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Unit Price (₹)</th>
+                <th>Discount</th>
+                <th>Taxable Value (₹)</th>
+                <th>CGST (₹)</th>
+                <th>SGST (₹)</th>
+                <th>Subtotal (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let product of invoiceData.products; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.quantity }} Nos.</td>
+                <td class="text-end">{{ product.unitPrice | number:'1.2-2' }}</td>
+                <td class="text-end">
+                  {{ product.discount | number:'1.2-2' }} 
+                  <span *ngIf="product.discount > 0">({{ product.discountPercent | number:'1.2-2' }}%)</span>
+                </td>
+                <td class="text-end">{{ product.taxableValue | number:'1.2-2' }}</td>
+                <td class="text-end">{{ product.cgstAmount | number:'1.2-2' }} ({{ product.cgstRate | number:'1.2-2' }}%)</td>
+                <td class="text-end">{{ product.sgstAmount | number:'1.2-2' }} ({{ product.sgstRate | number:'1.2-2' }}%)</td>
+                <td class="text-end">{{ product.subtotal | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Shipping Row -->
+        <div class="row mb-3">
+          <div class="col-8">
+            <p>Shipping Charges</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ (invoiceData.shippingCharge - invoiceData.shippingTax) | number:'1.2-2' }}</p>
+          </div>
+          <div class="col-8">
+            <p>Shipping Tax (18%)</p>
+          </div>
+          <div class="col-4 text-end">
+            <p>₹{{ invoiceData.shippingTax | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Totals -->
+        <div class="row mb-4">
+          <div class="col-8 text-end">
+            <p><strong>Total Taxable Value:</strong></p>
+            <p><strong>Total CGST (9.00%):</strong></p>
+            <p><strong>Total SGST (9.00%):</strong></p>
+            <p><strong>Grand Total:</strong></p>
+          </div>
+          <div class="col-4 text-end">
+            <p><strong>₹{{ invoiceData.totalTaxableValue | number:'1.2-2' }}</strong></p>
+            <p><strong>₹{{ getTotalCGST() | number:'1.2-2' }}</strong></p>
+            <p><strong>₹{{ getTotalSGST() | number:'1.2-2' }}</strong></p>
+            <p><strong>₹{{ invoiceData.total | number:'1.2-2' }}</strong></p>
+          </div>
+        </div>
+
+        <!-- Payment Info -->
+        <div class="row">
+          <div class="col-12">
+            <p><strong>Payment Method:</strong> {{ currentShipment?.paymentMethod || 'N/A' }}</p>
+            <p><strong>Amount Paid:</strong> ₹{{ currentShipment?.paymentAmount | number:'1.2-2' }}</p>
+            <p><strong>Balance Due:</strong> ₹{{ currentShipment?.balance | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-4">
+          <p>Thank you for your business!</p>
+          <small class="text-muted">This is a computer generated invoice and does not require signature</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" (click)="printGeneratedInvoice()">
+          <i class="fas fa-print"></i> Print Invoice
+        </button>
+      
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+</div>
+<!-- Bulk Status Update Modal -->
+<div class="modal fade" id="bulkStatusModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Update Shipping Status</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Status</label>
+       <select class="form-select" [(ngModel)]="bulkStatusUpdate.status">
+  <option value="Processing">Processing</option>
+  <option value="Packed">Packed</option>
+  <option value="Pending">Pending</option>
+  <option value="Shipped">Shipped</option>
+  <option value="Onhold">Onhold</option>
+  <option value="Ordered">Ordered</option>
+  <option value="Print">Print</option>
+  <option value="Reached hub">Reached hub</option>
+  <option value="Out for delivery">Out for delivery</option>
+  <option value="Returned">Returned</option>
+  <option value="Cancelled">Cancelled</option>
+  <option value="Delivered">Delivered</option>
+</select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="updateBulkStatus()" [disabled]="isUpdating">
+          <span *ngIf="isUpdating" class="spinner-border spinner-border-sm"></span>
+          Update Status
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="filterModal" tabindex="-1" *ngIf="showFilters">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Filter Shipments</h5>
+        <button type="button" class="btn-close" (click)="toggleFilters()"></button>
+      </div>
+   
+        
+    
+        
+        <div class="mb-3">
+          <label class="form-label">Date Range</label>
+          <input type="text" class="form-control" [(ngModel)]="filterValues.dateRange">
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">User</label>
+          <select class="form-select" [(ngModel)]="filterValues.user">
+            <option value="All">All Users</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Payment Status</label>
+          <select class="form-select" [(ngModel)]="filterValues.paymentStatus">
+            <option value="All">All</option>
+            <option value="Paid">Paid</option>
+            <option value="Partial">Partial</option>
+            <option value="Unpaid">Unpaid</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Shipping Status</label>
+          <select class="form-select" [(ngModel)]="filterValues.shippingStatus">
+  <option value="All">All</option>
+  <option value="Processing">Processing</option>
+  <option value="Packed">Packed</option>
+  <option value="Pending">Pending</option>
+  <option value="Shipped">Shipped</option>
+  <option value="Onhold">Onhold</option>
+  <option value="Ordered">Ordered</option>
+  <option value="Print">Print</option>
+  <option value="Reached hub">Reached hub</option>
+  <option value="Out for delivery">Out for delivery</option>
+  <option value="Returned">Returned</option>
+  <option value="Cancelled">Cancelled</option>
+  <option value="Delivered">Delivered</option>
+</select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Delivery Person</label>
+          <select class="form-select" [(ngModel)]="filterValues.deliveryPerson">
+            <option value="All">All</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="resetFilters()">Reset</button>
+        <button type="button" class="btn btn-primary" (click)="applyFilters()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+
+<!-- Payment Status Edit Modal -->
+<div class="modal fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Payment Status</h5>
+        <button type="button" class="close" (click)="cancelEdit()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Payment Status</label>
+          <select class="form-control" [(ngModel)]="editData.paymentStatus">
+            <option value="Paid">Paid</option>
+            <option value="Partial">Partial</option>
+            <option value="Unpaid">Unpaid</option>
+          </select>
+        </div>
+        <div class="form-group mt-3" *ngIf="editData.paymentStatus === 'Partial'">
+          <label>Partial Amount</label>
+          <input 
+          type="number" 
+          class="form-control" 
+          [(ngModel)]="editData.partialAmount" 
+          [max]="currentShipment?.totalPayable ?? null" 
+          min="0">
+        
+        </div>
+  
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cancelEdit()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="savePaymentStatus()" [disabled]="isSaving">
+          <span *ngIf="!isSaving">Save</span>
+          <span *ngIf="isSaving">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Saving...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Activities Section -->
+
+</div>
+
+<div class="modal-backdrop fade" [class.show]="showEditModal" [style.display]="showEditModal ? 'block' : 'none'"></div>
+<!-- Edit Shipment Modal -->
+<!-- Update the edit modal in your template -->
+<div class="modal fade" [class.show]="showEditFormModal" [style.display]="showEditFormModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Shipment Details</h5>
+        <button type="button" class="close" (click)="closeEditFormModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form #editForm="ngForm">
+          <div class="row">
+           
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Date</label>
+                <input type="date" class="form-control" [(ngModel)]="editFormData.date" name="date" required>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+           
+            
+         
+      
+          <!-- Add new fields here -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Shipping Address</label>
+                <input type="text" class="form-control" [(ngModel)]="editFormData.billingAddress" name="billingAddress">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Shipping Details</label>
+                <textarea class="form-control" [(ngModel)]="editFormData.shippingDetails" name="shippingDetails" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Shipping Status</label>
+                <select class="form-control" [(ngModel)]="editFormData.shippingStatus" name="shippingStatus">
+                  <option value="Processing">Processing</option>
+  <option value="Packed">Packed</option>
+  <option value="Pending">Pending</option>
+  <option value="Shipped">Shipped</option>
+  <option value="Onhold">Onhold</option>
+  <option value="Ordered">Ordered</option>
+  <option value="Print">Print</option>
+  <option value="Reached hub">Reached hub</option>
+  <option value="Out for delivery">Out for delivery</option>
+  <option value="Returned">Returned</option>
+  <option value="Cancelled">Cancelled</option>
+  <option value="Delivered">Delivered</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Shipping Charge</label>
+                <input type="number" class="form-control" [(ngModel)]="editFormData.shippingCharge" name="shippingCharge" min="0" step="0.01">
+              </div>
+            </div>
+          </div>
+          <!-- Add this near the top of your edit form -->
+<div class="form-group">
+  <label>Combined Address:</label>
+  <textarea [(ngModel)]="combinedAddress" name="combinedAddress" 
+            class="form-control" rows="3" readonly></textarea>
+  <small class="text-muted">This is the complete formatted address including customer name</small>
+</div>
+           </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Delivery Person</label>
+                <input type="text" class="form-control" 
+                       [(ngModel)]="editFormData.deliveryPerson" 
+                       name="deliveryPerson"
+                       placeholder="Enter delivery person name">
+              </div>
+            </div>
+          
+          <div class="row">
+            <div class="col-md-12">
+              <div class="form-group">
+                <label>Shipping Notes</label>
+                <textarea class="form-control" [(ngModel)]="editFormData.shippingNotes" name="shippingNotes" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-12">
+              <div class="form-group">
+                <label>Shipping Document</label>
+                <input type="file" class="form-control" (change)="handleShippingDocument($event)" name="shippingDocument">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Activity Section -->
+          <div class="row mt-3">
+            <div class="col-md-12">
+              <h5>Add Activity</h5>
+              <div class="form-group">
+                <label>Note</label>
+                <textarea class="form-control" [(ngModel)]="newActivity.note" name="activityNote" rows="2"></textarea>
+              </div>
+              <button type="button" class="btn btn-primary btn-sm mt-2" (click)="addActivity()">
+                Add Activity
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeEditFormModal()">Cancel</button>
+        <button type="button" class="btn btn-primary" (click)="saveEditedShipment()" [disabled]="isSavingForm">
+          <span *ngIf="!isSavingForm">Save Changes</span>
+          <span *ngIf="isSavingForm">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+            Saving...
+          </span>
+        </button>
+      </div>
+<!-- In your template -->
+<div class="activity-log">
+  <div *ngFor="let activity of editFormData.activities" class="activity-item mb-2 p-2 border rounded">
+    <div class="d-flex justify-content-between">
+      <strong>{{activity.userName || 'System'}}</strong>
+      <small class="text-muted">{{activity.timestamp | date:'medium'}}</small>
+    </div>
+    <div>
+      <span *ngIf="activity.fromStatus || activity.toStatus">
+        Changed status from 
+        <span class="badge" [ngClass]="getStatusBadgeClass(activity.fromStatus)">{{activity.fromStatus || 'None'}}</span>
+        to 
+        <span class="badge" [ngClass]="getStatusBadgeClass(activity.toStatus)">{{activity.toStatus}}</span>
+      </span>
+      <span *ngIf="activity.note">
+        <div class="mt-1">
+          <small>Note: {{activity.note}}</small>
+        </div>
+      </span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,181 @@
+<form [formGroup]="stockForm" (ngSubmit)="onSubmit()">
+    <div class="container">
+      <!-- Header -->
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h2>{{ isEditMode ? 'Edit Stock Transfer' : 'New Stock Transfer' }}</h2>
+          <button type="button" class="btn btn-outline-secondary" (click)="router.navigate(['/list-stock'])">
+            <i class="bi bi-arrow-left me-2"></i>Back to List
+          </button>
+        </div>
+  
+        <div class="card-body">
+          <!-- First Container: Stock Info -->
+          <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+              <div class="form-group">
+                <label for="date" class="form-label">Date</label>
+                <input type="datetime-local" id="date" class="form-control" formControlName="date" required />
+                <div *ngIf="stockForm.get('date')?.invalid && stockForm.get('date')?.touched" class="text-danger">
+                  Date is required
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <div class="form-group">
+                <label for="referenceNo" class="form-label">Reference No</label>
+                <input type="text" id="referenceNo" class="form-control" formControlName="referenceNo" />
+              </div>
+            </div>
+            
+            <div class="col-md-4 mb-3">
+              <div class="form-group">
+                <label for="status" class="form-label">Status</label>
+                <select id="status" class="form-select" formControlName="status" required>
+                  <option value="pending">Pending</option>
+                  <option value="in transit">In Transit</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row mb-4">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="locationFrom" class="form-label">From Location</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                  <input type="text" id="locationFrom" class="form-control" formControlName="locationFrom" required />
+                </div>
+                <div *ngIf="stockForm.get('locationFrom')?.invalid && stockForm.get('locationFrom')?.touched" class="text-danger">
+                  Source location is required
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="locationTo" class="form-label">To Location</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
+                  <input type="text" id="locationTo" class="form-control" formControlName="locationTo" required />
+                </div>
+                <div *ngIf="stockForm.get('locationTo')?.invalid && stockForm.get('locationTo')?.touched" class="text-danger">
+                  Destination location is required
+                </div>
+              </div>
+            </div>
+          </div>
+  
+          <!-- Second Container: Product Table -->
+          <div class="card mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">Product Details</h5>
+              <button type="button" (click)="addProduct()" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle me-2"></i>Add Product
+              </button>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody formArrayName="products">
+                  <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
+                    <td>
+                      <input type="text" class="form-control" formControlName="product" placeholder="Product Name" required />
+                      <div *ngIf="products.at(i).get('product')?.invalid && products.at(i).get('product')?.touched" class="text-danger">
+                        Required
+                      </div>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control" formControlName="quantity" 
+                             (input)="calculateSubtotal(i)" 
+                             placeholder="Qty" min="1" required />
+                      <div *ngIf="products.at(i).get('quantity')?.invalid && products.at(i).get('quantity')?.touched" class="text-danger">
+                        Required
+                      </div>
+                    </td>
+                    <td>
+                      <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" formControlName="unitPrice" 
+                               (input)="calculateSubtotal(i)" 
+                               placeholder="Price" min="0" step="0.01" required />
+                      </div>
+                      <div *ngIf="products.at(i).get('unitPrice')?.invalid && products.at(i).get('unitPrice')?.touched" class="text-danger">
+                        Required
+                      </div>
+                    </td>
+                    <td class="fw-bold">{{ getSubtotal(i) | currency:'INR':'symbol':'1.2-2'}}</td>
+                    <td>
+                      <button type="button" (click)="removeProduct(i)" class="btn btn-icon-only btn-outline-danger">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="products.length === 0">
+                    <td colspan="5" class="text-center py-4 text-muted">
+                      No products added. Click "Add Product" to start.
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot *ngIf="products.length > 0">
+                  <tr>
+                    <td colspan="3" class="text-end">Subtotal:</td>
+<td class="fw-bold">{{ totalAmount | currency:'INR':'symbol':'1.2-2' }}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+  
+          <!-- Third Container: Shipping and Notes -->
+          <div class="row">
+            <div class="col-md-8">
+              <div class="form-group mb-3">
+                <label for="additionalNotes" class="form-label">Additional Notes</label>
+                <textarea id="additionalNotes" class="form-control" formControlName="additionalNotes" rows="3" 
+                          placeholder="Enter any special instructions or comments here..."></textarea>
+              </div>
+            </div>
+            
+            <div class="col-md-4">
+              <div class="card bg-light">
+                <div class="card-body">
+                  <div class="form-group mb-3">
+                    <label for="shippingCharges" class="form-label">Shipping Charges</label>
+                    <div class="input-group">
+                      <span class="input-group-text">$</span>
+                      <input type="number" id="shippingCharges" class="form-control" formControlName="shippingCharges" 
+                            (input)="calculateTotal()" min="0" step="0.01" placeholder="0.00" />
+                    </div>
+                  </div>
+                  
+                  <div class="d-flex justify-content-between align-items-center fw-bold fs-5 mb-3">
+                    <span>Total:</span>
+                    <span>{{ (totalAmount + (stockForm.value.shippingCharges || 0)) | currency:'INR':'symbol':'1.2-2' }}</span>
+                  </div>
+                  
+                  <button type="submit" [disabled]="stockForm.invalid" class="btn btn-primary w-100">
+                    <i class="bi bi-save me-2"></i>{{ isEditMode ? 'Update Stock' : 'Save Stock Transfer' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>

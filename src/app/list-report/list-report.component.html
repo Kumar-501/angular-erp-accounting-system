@@ -1,0 +1,99 @@
+<div class="report-container">
+  <h2>Financial Report</h2>
+  
+  <div class="report-controls">
+    <div class="search-container">
+      <input type="text" class="search-input" placeholder="Search by date or category..." 
+             [(ngModel)]="searchTerm" (input)="onSearch($event)" />
+    </div>
+    
+    <div class="entries-selector">
+      <span>Show</span>
+      <select [(ngModel)]="entriesPerPage" (change)="changeEntriesPerPage($event)">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+      </select>
+      <span>entries</span>
+    </div>
+  </div>
+  
+  <div class="report-table">
+    <table *ngIf="!isLoading">
+      <thead>
+        <tr>
+          <th (click)="sortData('date')">
+            Date
+            <i class="fas" 
+               [ngClass]="{
+                 'fa-sort-up': sortField === 'date' && sortDirection === 'asc',
+                 'fa-sort-down': sortField === 'date' && sortDirection === 'desc',
+                 'fa-sort': sortField !== 'date'
+               }">
+            </i>
+          </th>
+          <th (click)="sortData('category')">
+            Category
+            <i class="fas" 
+               [ngClass]="{
+                 'fa-sort-up': sortField === 'category' && sortDirection === 'asc',
+                 'fa-sort-down': sortField === 'category' && sortDirection === 'desc',
+                 'fa-sort': sortField !== 'category'
+               }">
+            </i>
+          </th>
+          <th (click)="sortData('totalAmount')">
+            Amount
+            <i class="fas" 
+               [ngClass]="{
+                 'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc',
+                 'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc',
+                 'fa-sort': sortField !== 'totalAmount'
+               }">
+            </i>
+          </th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let entry of paginatedEntries">
+          <td>{{ formatDate(entry.date) }}</td>
+          <td>{{ entry.category }}</td>
+          <td>₹{{ entry.totalAmount | number:'1.2-2' }}</td>
+          <td>
+            <button class="delete-btn" (click)="deleteEntry(entry)">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredEntries.length === 0">
+          <td colspan="4" class="no-data">No matching records found</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="3">Total:</td>
+          <td>₹{{ getTotalAmount() | number:'1.2-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+    
+    <div *ngIf="isLoading" class="loading-spinner">
+      <div class="spinner"></div>
+      <span>Loading data...</span>
+    </div>
+  </div>
+  
+  <div class="pagination" *ngIf="!isLoading && filteredEntries.length > 0">
+    <div class="entries-info">
+      Showing {{ (currentPage - 1) * entriesPerPage + 1 }} to 
+      {{ Math.min(currentPage * entriesPerPage, totalEntries) }} of 
+      {{ totalEntries }} entries
+    </div>
+    
+    <div class="pagination-buttons">
+      <button (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
+      <button (click)="nextPage()" [disabled]="currentPage * entriesPerPage >= totalEntries">Next</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,87 @@
+import { Injectable } from '@angular/core';
+import {
+  Firestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  doc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
+  where
+} from '@angular/fire/firestore';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class LocationService {
+  constructor(private firestore: Firestore) {}
+
+  // Add a new location
+  addLocation(data: any) {
+    const locationsCollection = collection(this.firestore, 'locations');
+    return addDoc(locationsCollection, {
+      ...data,
+      active: true,
+      createdAt: new Date()
+    });
+  }
+
+  // Get locations with real-time updates (only active ones)
+  getLocations(): Observable<any[]> {
+    const locationsCollection = collection(this.firestore, 'locations');
+    
+    // Return an Observable that will emit the latest locations data
+    return new Observable<any[]>((observer) => {
+      // Create a query to get only active locations
+      const activeLocationsQuery = query(
+        locationsCollection,
+        where('active', '==', true)
+      );
+      
+      // onSnapshot provides real-time updates
+      const unsubscribe = onSnapshot(
+        activeLocationsQuery,
+        (snapshot) => {
+          const locations = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          observer.next(locations);
+        },
+        (error) => {
+          observer.error(error);
+        }
+      );
+      
+      // Clean up the subscription when the observable is unsubscribed
+      return () => unsubscribe();
+    });
+  }
+
+  // Update an existing location
+  updateLocation(id: string, data: any) {
+    const locationDoc = doc(this.firestore, 'locations', id);
+    return updateDoc(locationDoc, {
+      ...data,
+      updatedAt: new Date()
+    });
+  }
+
+  // Deactivate a location (soft delete)
+  deactivateLocation(id: string) {
+    const locationDoc = doc(this.firestore, 'locations', id);
+    return updateDoc(locationDoc, {
+      active: false,
+      deactivatedAt: new Date()
+    });
+  }
+
+  // Hard delete a location (use with caution)
+  deleteLocation(id: string) {
+    const locationDoc = doc(this.firestore, 'locations', id);
+    return deleteDoc(locationDoc);
+  }
+}

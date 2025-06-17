@@ -1,0 +1,481 @@
+<div class="payment-accounts-container">
+  <!-- Header Section -->
+  <div class="header">
+    <h2>Payment Accounts</h2>
+  </div>
+
+  <!-- Tabs Section -->
+  <div class="tabs-container">
+    <ul class="tabs">
+      <li [class.active]="activeTab === 'Accounts'" (click)="changeTab('Accounts')">
+        <i class="fas fa-wallet"></i> Accounts
+      </li>
+    </ul>
+  </div>
+
+  <!-- Filter and Add Button Section -->
+  <div class="filter-container">
+    <div class="filter-dropdown">
+      <select class="select-status">
+        <option>Active</option>
+        <option>Inactive</option>
+        <option>All</option>
+      </select>
+    </div>
+    <div class="add-btn-container">
+      <button class="btn btn-add" (click)="openForm()">
+        <i class="fas fa-plus"></i> Add
+      </button>
+    </div>
+  </div>
+
+  <!-- Table Controls Section -->
+  <div class="table-controls">
+    <div class="entries-selector">
+      Show 
+      <select [(ngModel)]="entriesPerPage">
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      entries
+    </div>
+    
+    <div class="export-buttons">
+      <button class="btn btn-export" (click)="exportCSV()">
+        <i class="fas fa-file-csv"></i> Export CSV
+      </button>
+      <button class="btn btn-export" (click)="exportExcel()">
+        <i class="fas fa-file-excel"></i> Export Excel
+      </button>
+      <button class="btn btn-export" (click)="printData()">
+        <i class="fas fa-print"></i> Print
+      </button>
+    </div>
+
+    <div class="search-box">
+      <input 
+        type="text" 
+        placeholder="Search..." 
+        class="search-input"
+        [(ngModel)]="searchTerm"
+        (input)="applySearchFilter()"
+      >
+      <button *ngIf="searchTerm" class="btn btn-clear" (click)="clearSearch()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Accounts Table Section -->
+  <div class="table-wrapper">
+    <table class="accounts-table">
+      <!-- Table Header with Sorting -->
+ <thead>
+  <tr>
+    <th (click)="sortData('name')">
+      Account Name
+      <i class="fas" [ngClass]="getSortIcon('name')"></i>
+    </th>
+    <th (click)="sortData('accountHead')">
+      Account Head
+      <i class="fas" [ngClass]="getSortIcon('accountHead')"></i>
+    </th>
+    <th (click)="sortData('accountNumber')">
+      Account Number
+      <i class="fas" [ngClass]="getSortIcon('accountNumber')"></i>
+    </th>
+    <th>Debit (₹)</th>
+    <th>Credit (₹)</th>
+    <th (click)="sortData('openingBalance')">
+      Balance (₹)
+      <i class="fas" [ngClass]="getSortIcon('openingBalance')"></i>
+    </th>
+    <th>Recent Transactions</th>
+    <th>Action</th>
+  </tr>
+</thead>
+
+<tbody>
+  <tr *ngFor="let acc of filteredAccounts | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage">
+    <td>{{ acc.name }}</td>
+    <td>
+      <span *ngIf="acc.accountHead?.group">{{acc.accountHead.group}} - </span>
+      {{acc.accountHead?.value || acc.accountHeadValue || ''}}
+    </td>
+    <td>{{ acc.accountNumber }}</td>
+    <td class="debit-amount">{{ getAccountDebitTotal(acc.id) | number:'1.2-2' }}</td>
+    <td class="credit-amount">{{ getAccountCreditTotal(acc.id) | number:'1.2-2' }}</td>
+    <td [class.negative-balance]="(acc.openingBalance || 0) < 0">
+      {{ (acc.openingBalance || 0) | number:'1.2-2' }}
+    </td>
+    <td class="recent-transactions">
+      <div *ngFor="let tx of getAccountTransactions(acc.id) | slice:0:3" class="transaction-item">
+        <span class="tx-date">{{ tx.date | date:'shortDate' }}</span>
+        <span class="tx-desc">{{ tx.description }}</span>
+        <span class="tx-amount" [class.debit]="tx.debit > 0" [class.credit]="tx.credit > 0">
+          {{ tx.debit > 0 ? ('-' + (tx.debit | number:'1.2-2')) : ('+' + (tx.credit | number:'1.2-2')) }}
+        </span>
+      </div>
+      <div *ngIf="getAccountTransactions(acc.id).length === 0" class="no-transactions">
+        No recent transactions
+      </div>
+    </td>
+ <td class="action-buttons">
+          <button class="btn btn-edit" (click)="editAccount(acc)">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          <button class="btn btn-delete" (click)="close(acc)">
+            <i class="fas fa-trash"></i> Delete
+          </button>
+          <button class="btn btn-book" (click)="accountBook(acc)">
+            <i class="fas fa-book"></i> Book
+          </button>
+          <button class="btn btn-transfer" (click)="fundTransfer(acc)">
+            <i class="fas fa-exchange-alt"></i> Transfer
+          </button>
+          <button class="btn btn-deposit" (click)="deposit(acc)">
+            <i class="fas fa-piggy-bank"></i> Deposit
+          </button>
+        </td>
+  </tr>
+</tbody>
+<tfoot>
+  <tr>
+    <td colspan="3">Total:</td>
+    <td>{{ getTotalDebit() | number:'1.2-2' }}</td>
+    <td>{{ getTotalCredit() | number:'1.2-2' }}</td>
+    <td>{{ totalBalance | number:'1.2-2' }}</td>
+    <td colspan="2"></td>
+  </tr>
+</tfoot>
+    </table>
+  </div>
+
+  <!-- Pagination Section -->
+  <div class="pagination">
+    <div class="pagination-info">
+      Showing {{ (currentPage - 1) * entriesPerPage + 1 }} to 
+      {{ getMinValue(currentPage * entriesPerPage, totalEntries) }} 
+      of {{ totalEntries }} entries
+    </div>
+    <div class="pagination-controls">
+      <button class="btn btn-pagination" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      <button class="btn btn-pagination current">{{ currentPage }}</button>
+      <button class="btn btn-pagination" [disabled]="currentPage * entriesPerPage >= totalEntries" (click)="nextPage()">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Account Modal Form -->
+<div *ngIf="showModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>{{ isEdit ? 'Edit Account' : 'Add Account' }}</h3>
+      <button class="close-btn-icon" (click)="closeForm()">×</button>
+    </div>
+
+    <form [formGroup]="accountForm" (ngSubmit)="saveAccount()" class="modal-form">
+      <div class="form-scroll">
+        <div class="form-group">
+          <label>Account Name:*</label>
+          <input formControlName="name" type="text" class="form-control" />
+          <div *ngIf="accountForm.get('name')?.invalid && accountForm.get('name')?.touched" class="error-message">
+            Account name is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Account Number:*</label>
+          <input formControlName="accountNumber" type="text" class="form-control" />
+          <div *ngIf="accountForm.get('accountNumber')?.invalid && accountForm.get('accountNumber')?.touched" class="error-message">
+            Account number is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Account Head Group:*</label>
+          <select formControlName="accountHeadGroup" (change)="onAccountHeadGroupChange($event)" class="form-control">
+            <option value="">-- Select Group --</option>
+            <option value="Asset">Asset</option>
+            <option value="Equity">Equity</option>
+            <option value="Liabilities">Liabilities</option>
+          </select>
+          <div *ngIf="accountForm.get('accountHeadGroup')?.invalid && accountForm.get('accountHeadGroup')?.touched" class="error-message">
+            Account head group is required
+          </div>
+        </div>
+
+        <div class="form-group" *ngIf="accountForm.get('accountHeadGroup')?.value">
+          <label>Account Head:*</label>
+          <select formControlName="accountHeadValue" class="form-control">
+            <option value="">-- Select Account Head --</option>
+            
+            <!-- Asset Options -->
+            <ng-container *ngIf="accountForm.get('accountHeadGroup')?.value === 'Asset'">
+              <option value="Asset|fixed_assets">Fixed Assets</option>
+              <option value="Asset|deposits_assets">Deposits (Assets)</option>
+              <option value="Asset|investments">Investments</option>
+              <option value="Asset|loans_advances">Loans and Advances</option>
+              <option value="Asset|sundry_debtors">Sundry Debtors</option>
+              <option value="Asset|suspense_account">Suspense A/C</option>
+              <option value="Asset|income_receivables">Income Receivables</option>
+              <option value="Asset|input_tax_credits">Input Tax Credits</option>
+              <option value="Asset|prepaid_advances">Prepaid Advances</option>
+              <option value="Asset|bank_accounts">Banks</option>
+              <option value="Asset|current_assets">Current Assets</option>
+            </ng-container>
+
+            <!-- Equity Options -->
+            <ng-container *ngIf="accountForm.get('accountHeadGroup')?.value === 'Equity'">
+              <option value="Equity|capital_account">Capital Account</option>
+            </ng-container>
+
+            <!-- Liabilities Options -->
+            <ng-container *ngIf="accountForm.get('accountHeadGroup')?.value === 'Liabilities'">
+              <option value="Liabilities|current_liabilities">Current Liabilities</option>
+              <option value="Liabilities|duties_taxes">Duties and Taxes</option>
+              <option value="Liabilities|loans_liabilities">Loans (Liabilities)</option>
+              <option value="Liabilities|secured_loans">Secured Loans</option>
+              <option value="Liabilities|sundry_creditors">Sundry Creditors</option>
+              <option value="Liabilities|expenses_payable">Expense Payable</option>
+              <option value="Liabilities|advance_earned">Advance Earned</option>
+              <option value="Liabilities|tax_payable">Tax Payable</option>
+              <option value="Liabilities|tds_payable">TDS Payable</option>
+            </ng-container>
+          </select>
+          <div *ngIf="accountForm.get('accountHeadValue')?.invalid && accountForm.get('accountHeadValue')?.touched" class="error-message">
+            Account head is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Account Sub Type:</label>
+          <select formControlName="accountSubType" class="form-control">
+            <option value="">Select</option>
+            <option value="Savings">Savings</option>
+            <option value="Current">Current</option>
+            <option value="Petty Cash">Petty Cash</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Opening Balance:*</label>
+          <input formControlName="openingBalance" type="number" class="form-control" step="0.01" />
+          <div *ngIf="accountForm.get('openingBalance')?.invalid && accountForm.get('openingBalance')?.touched" class="error-message">
+            Opening balance is required
+          </div>
+        </div>
+
+        <div formArrayName="accountDetails" class="form-group">
+          <label>Account Details:</label>
+          <div *ngFor="let detail of accountDetailsArray.controls; let i = index" [formGroupName]="i" class="account-detail">
+            <div class="detail-row">
+              <input formControlName="label" placeholder="Label" class="form-control" />
+              <input formControlName="value" placeholder="Value" class="form-control" />
+              <button type="button" class="btn btn-remove" (click)="removeAccountDetail(i)">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-add-detail" (click)="addAccountDetail()">
+            <i class="fas fa-plus"></i> Add Detail
+          </button>
+        </div>
+        
+        <div class="form-group">
+          <label>Added By:*</label>
+          <select formControlName="addedBy" class="form-control">
+            <option value="">Select User</option>
+            <option *ngFor="let user of users" [value]="user.username">
+              {{user.username}} ({{user.role}})
+            </option>
+          </select>
+          <div *ngIf="accountForm.get('addedBy')?.invalid && accountForm.get('addedBy')?.touched" class="error-message">
+            Added by is required
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Note:</label>
+          <textarea formControlName="note" class="form-control" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="save-btn" [disabled]="accountForm.invalid">
+          {{ isEdit ? 'Update' : 'Save' }}
+        </button>
+        <button type="button" (click)="closeForm()" class="close-btn">Close</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Close Confirmation Modal -->
+<div *ngIf="showCloseConfirmModal" class="modal-overlay">
+  <div class="modal-box confirmation-modal">
+    <div class="confirmation-content">
+      <div class="confirmation-icon">
+        <i class="fas fa-exclamation-circle"></i>
+      </div>
+      <h3>Are you sure?</h3>
+      <p>Do you really want to delete the account "{{ accountToClose?.name }}"? This action cannot be undone.</p>
+      <div class="confirmation-actions">
+        <button class="btn-cancel" (click)="closeConfirmModal()">Cancel</button>
+        <button class="btn-ok" (click)="confirmClose()">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fund Transfer Modal -->
+<div *ngIf="showFundTransferModal" class="modal-overlay">
+  <div class="modal-box fund-transfer-modal">
+    <div class="modal-header">
+      <h3>Fund Transfer</h3>
+      <button class="close-btn-icon" (click)="closeFundTransferForm()">×</button>
+    </div>
+
+    <form [formGroup]="fundTransferForm" (ngSubmit)="submitFundTransfer()" class="modal-form">
+      <div class="form-group">
+        <label>Transfer from:*</label>
+        <select formControlName="fromAccount" class="form-control">
+          <option value="">-- Select Account --</option>
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('toAccount')?.value">
+            {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+          </option>
+        </select>
+        <div *ngIf="fundTransferForm.get('fromAccount')?.invalid && fundTransferForm.get('fromAccount')?.touched" class="error-message">
+          Transfer from account is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Transfer To:*</label>
+        <select formControlName="toAccount" class="form-control">
+          <option value="">-- Select Account --</option>
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('fromAccount')?.value">
+            {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+          </option>
+        </select>
+        <div *ngIf="fundTransferForm.get('toAccount')?.invalid && fundTransferForm.get('toAccount')?.touched" class="error-message">
+          Transfer to account is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Amount:*</label>
+        <input type="number" formControlName="amount" class="form-control" placeholder="0" step="0.01" min="0.01">
+        <div *ngIf="fundTransferForm.get('amount')?.invalid && fundTransferForm.get('amount')?.touched" class="error-message">
+          Valid amount is required
+        </div>
+      </div>
+    
+      <div class="form-group">
+        <label>Date:*</label>
+        <input type="date" formControlName="date" class="form-control">
+        <div *ngIf="fundTransferForm.get('date')?.invalid && fundTransferForm.get('date')?.touched" class="error-message">
+          Date is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Note:</label>
+        <textarea formControlName="note" class="form-control" rows="3" placeholder="Enter transfer description..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Attach Document:</label>
+        <input type="file" (change)="onFileSelected($event)" class="form-control" accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png">
+        <div class="file-info">
+          <small>Max File size: 5MB</small><br>
+          <small>Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="submit-btn" [disabled]="fundTransferForm.invalid">Submit</button>
+        <button type="button" class="close-btn" (click)="closeFundTransferForm()">Close</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Deposit Modal -->
+<div *ngIf="showDepositModal" class="modal-overlay">
+  <div class="modal-box deposit-modal">
+    <div class="modal-header">
+      <h3>Deposit</h3>
+      <button class="close-btn-icon" (click)="closeDepositForm()">×</button>
+    </div>
+
+    <form [formGroup]="depositForm" (ngSubmit)="submitDeposit()" class="modal-form">
+      <div class="form-group">
+        <label>Selected Account:</label>
+        <input type="text" class="form-control" [value]="selectedAccount?.name || ''" readonly>
+      </div>
+
+      <div class="form-group">
+        <label>Deposit to:*</label>
+        <select formControlName="depositTo" class="form-control">
+          <option value="">-- Select Account --</option>
+          <option *ngFor="let acc of accounts" [value]="acc.id" [selected]="acc.id === selectedAccount?.id">
+            {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+          </option>
+        </select>
+        <div *ngIf="depositForm.get('depositTo')?.invalid && depositForm.get('depositTo')?.touched" class="error-message">
+          Deposit to account is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Amount:*</label>
+        <input type="number" formControlName="amount" class="form-control" placeholder="0" step="0.01" min="0.01">
+        <div *ngIf="depositForm.get('amount')?.invalid && depositForm.get('amount')?.touched" class="error-message">
+          Valid amount is required
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Deposit From:*</label>
+        <select formControlName="depositFrom" class="form-control">
+          <option value="">Please Select</option>
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === depositForm.get('depositTo')?.value">
+            {{acc.name}} (Balance: ₹{{acc.openingBalance?.toFixed(2)}})
+          </option>
+        </select>
+        <div *ngIf="depositForm.get('depositFrom')?.invalid && depositForm.get('depositFrom')?.touched" class="error-message">
+          Deposit source is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Date:*</label>
+        <input type="date" formControlName="date" class="form-control">
+        <div *ngIf="depositForm.get('date')?.invalid && depositForm.get('date')?.touched" class="error-message">
+          Date is required
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Note:</label>
+        <textarea formControlName="note" class="form-control" rows="3" placeholder="Enter deposit description..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Attach Document:</label>
+        <input type="file" (change)="onFileSelected($event)" class="form-control" accept=".pdf,.csv,.zip,.doc,.docx,.jpeg,.jpg,.png">
+        <div class="file-info">
+          <small>Max File size: 5MB</small><br>
+          <small>Allowed File: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="submit-btn" [disabled]="depositForm.invalid">Submit</button>
+        <button type="button" class="close-btn" (click)="closeDepositForm()">Close</button>
+      </div>
+    </form>
+  </div>
+</div>

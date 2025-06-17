@@ -1,0 +1,243 @@
+<div class="business-locations-container">
+  <h1>Business Locations</h1>
+  <p>Manage your business locations</p>
+
+  <button class="btn-add" (click)="openPopup()">Add +</button>
+
+  <div class="locations-table-container">
+    
+    <div class="table-responsive">
+      <table class="table table-hover no-vertical-lines"></table>
+      <table class="locations-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Location ID</th>
+            <th>Landmark</th>
+            <th>City</th>
+            <th>Zip Code</th>
+            <th>State</th>
+            <th>Country</th>
+            <th>Price Group</th>
+            <th>Invoice scheme</th>
+            <th>Invoice layout for POS</th>
+            <th>Invoice layout for sale</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let location of locations">
+            <td>{{ location.name }}</td>
+            <td>{{ location.locationId || 'BL000' + (locations.indexOf(location) + 1) }}</td>
+            <td>{{ location.landmark || '-' }}</td>
+            <td>{{ location.city }}</td>
+            <td>{{ location.zipCode }}</td>
+            <td>{{ location.state }}</td>
+            <td>{{ location.country }}</td>
+            <td>{{ location.sellingPriceGroup || 'Default' }}</td>
+            <td>{{ location.invoiceSchemePOS || 'Default' }}</td>
+            <td>{{ location.invoiceLayoutPOS || 'Default' }}</td>
+            <td>{{ location.invoiceLayoutSale || 'Default' }}</td>
+            <td class="action-buttons">
+              <button class="btn edit" (click)="editLocation(location)">
+                <i class="fas fa-pen"></i> Edit
+              </button>
+              <button class="btn deactivate" (click)="deactivateLocation(location)">
+                <i class="fas fa-ban"></i> Deactivate
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-footer">
+      Showing {{ locations.length }} to {{ locations.length }} of {{ locations.length }} entries
+    </div>
+  </div>
+
+  <div *ngIf="showPopup" class="popup-overlay">
+    <div class="popup">
+      <!-- Added close button to top-right corner -->
+      <button class="close-button" (click)="closePopup()">
+        <i class="fas fa-times"></i>
+      </button>
+      
+      <form [formGroup]="locationForm" (ngSubmit)="saveLocation()">
+        <h3>{{ editMode ? 'Edit' : 'Add' }} Location</h3>
+
+        <div class="form-group">
+          <label for="name">Name:*</label>
+          <input id="name" formControlName="name" placeholder="Enter name" />
+          <div *ngIf="locationForm.get('name')?.invalid && (locationForm.get('name')?.dirty || locationForm.get('name')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="locationId">Location ID:</label>
+          <input id="locationId" formControlName="locationId" placeholder="Enter location ID" />
+        </div>
+
+        <div class="form-group">
+          <label for="landmark">Landmark:</label>
+          <input id="landmark" formControlName="landmark" placeholder="Enter landmark" />
+        </div>
+
+        <div class="form-group">
+          <label for="state">State:*</label>
+          <select id="state" formControlName="state">
+            <option value="">Select State</option>
+            <option *ngFor="let state of states" [value]="state">{{ state }}</option>
+          </select>
+          <div *ngIf="locationForm.get('state')?.invalid && (locationForm.get('state')?.dirty || locationForm.get('state')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="city">City:*</label>
+          <select id="city" formControlName="city">
+            <option value="">Select City</option>
+            <option *ngFor="let city of cityOptions" [value]="city">{{ city }}</option>
+          </select>
+          <div *ngIf="locationForm.get('city')?.invalid && (locationForm.get('city')?.dirty || locationForm.get('city')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="zipCode">Zip Code:*</label>
+          <input id="zipCode" formControlName="zipCode" placeholder="Enter zip code" />
+          <div *ngIf="locationForm.get('zipCode')?.invalid && (locationForm.get('zipCode')?.dirty || locationForm.get('zipCode')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="country">Country:*</label>
+          <input id="country" formControlName="country" placeholder="Enter country" />
+          <div *ngIf="locationForm.get('country')?.invalid && (locationForm.get('country')?.dirty || locationForm.get('country')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="mobile">Mobile: (10 digits only)</label>
+          <input id="mobile" formControlName="mobile" placeholder="Enter 10-digit mobile number" maxlength="10" pattern="[0-9]{10}" />
+          <div *ngIf="locationForm.get('mobile')?.invalid && (locationForm.get('mobile')?.dirty || locationForm.get('mobile')?.touched)" class="error-message">
+            Please enter a valid 10-digit mobile number
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="alternateContact">Alternate contact number: (10 digits only)</label>
+          <input id="alternateContact" formControlName="alternateContact" placeholder="Enter 10-digit alternate contact" maxlength="10" pattern="[0-9]{10}" />
+          <div *ngIf="locationForm.get('alternateContact')?.invalid && (locationForm.get('alternateContact')?.dirty || locationForm.get('alternateContact')?.touched)" class="error-message">
+            Please enter a valid 10-digit contact number
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email:</label>
+          <input id="email" formControlName="email" placeholder="Enter email" />
+        </div>
+
+        <div class="form-group">
+          <label for="website">Website:</label>
+          <input id="website" formControlName="website" placeholder="Enter website" />
+        </div>
+
+        <div class="form-group">
+          <label for="invoiceSchemePOS">Invoice scheme for POS:*</label>
+          <input id="invoiceSchemePOS" formControlName="invoiceSchemePOS" placeholder="Enter invoice scheme for POS" />
+          <div *ngIf="locationForm.get('invoiceSchemePOS')?.invalid && (locationForm.get('invoiceSchemePOS')?.dirty || locationForm.get('invoiceSchemePOS')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="invoiceSchemeSale">Invoice scheme for sale:*</label>
+          <input id="invoiceSchemeSale" formControlName="invoiceSchemeSale" placeholder="Enter invoice scheme for sale" />
+          <div *ngIf="locationForm.get('invoiceSchemeSale')?.invalid && (locationForm.get('invoiceSchemeSale')?.dirty || locationForm.get('invoiceSchemeSale')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="invoiceLayoutPOS">Invoice layout for POS:*</label>
+          <input id="invoiceLayoutPOS" formControlName="invoiceLayoutPOS" placeholder="Enter invoice layout for POS" />
+          <div *ngIf="locationForm.get('invoiceLayoutPOS')?.invalid && (locationForm.get('invoiceLayoutPOS')?.dirty || locationForm.get('invoiceLayoutPOS')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="invoiceLayoutSale">Invoice layout for sale:*</label>
+          <input id="invoiceLayoutSale" formControlName="invoiceLayoutSale" placeholder="Enter invoice layout for sale" />
+          <div *ngIf="locationForm.get('invoiceLayoutSale')?.invalid && (locationForm.get('invoiceLayoutSale')?.dirty || locationForm.get('invoiceLayoutSale')?.touched)" class="error-message">
+            This field is required
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="sellingPriceGroup">Default Selling Price Group:</label>
+          <input id="sellingPriceGroup" formControlName="sellingPriceGroup" placeholder="Enter default selling price group" />
+        </div>
+
+        <div class="form-group">
+          <label for="customField1">Custom field 1:</label>
+          <input id="customField1" formControlName="customField1" placeholder="Enter custom field 1" />
+        </div>
+
+        <div class="form-group">
+          <label for="customField2">Custom field 2:</label>
+          <input id="customField2" formControlName="customField2" placeholder="Enter custom field 2" />
+        </div>
+
+        <div class="form-group">
+          <label for="customField3">Custom field 3:</label>
+          <input id="customField3" formControlName="customField3" placeholder="Enter custom field 3" />
+        </div>
+
+        <div class="form-group">
+          <label for="customField4">Custom field 4:</label>
+          <input id="customField4" formControlName="customField4" placeholder="Enter custom field 4" />
+        </div>
+
+        <h4>Payment Options</h4>
+        <div formGroupName="paymentOptions" class="payment-options">
+          <div class="form-group">
+            <label for="cash">Cash:</label>
+            <input id="cash" formControlName="cash" placeholder="Enter cash option" />
+          </div>
+
+          <div class="form-group">
+            <label for="card">Card:</label>
+            <input id="card" formControlName="card" placeholder="Enter card option" />
+          </div>
+
+          <div class="form-group">
+            <label for="cheque">Cheque:</label>
+            <input id="cheque" formControlName="cheque" placeholder="Enter cheque option" />
+          </div>
+
+          <div class="form-group">
+            <label for="bankTransfer">Bank Transfer:</label>
+            <input id="bankTransfer" formControlName="bankTransfer" placeholder="Enter bank transfer option" />
+          </div>
+
+          <div class="form-group">
+            <label for="other">Other:</label>
+            <input id="other" formControlName="other" placeholder="Enter other option" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-save">Save</button>
+          <button type="button" class="btn-close" (click)="closePopup()">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

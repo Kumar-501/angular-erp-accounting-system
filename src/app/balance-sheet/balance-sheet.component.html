@@ -1,0 +1,168 @@
+<div class="balance-sheet">
+  <div class="sheet-header">
+    <div class="header-content">
+      <h1>Balance Sheet</h1>
+      <div class="header-controls">
+        <div class="date-control">
+          <label>As on:</label>
+          <input type="date" [(ngModel)]="balanceSheetDate" (change)="generateBalanceSheet()">
+          <button (click)="generateBalanceSheet()" [disabled]="isLoading">
+            {{ isLoading ? 'Generating...' : 'Generate' }}
+          </button>
+        </div>
+        <div class="export-controls">
+          <button class="export-btn excel" (click)="exportToExcel()">
+            <i class="fas fa-file-excel"></i> Excel
+          </button>
+          <button class="export-btn pdf" (click)="exportToPDF()">
+            <i class="fas fa-file-pdf"></i> PDF
+          </button>
+          <button class="export-btn print" (click)="printBalanceSheet()">
+            <i class="fas fa-print"></i> Print
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-indicator">
+    <div class="spinner"></div>
+    <span>Generating balance sheet...</span>
+  </div>
+
+  <div *ngIf="!isLoading && balanceSheetData.equity.length > 0" class="sheet-content">
+    <div class="company-info">
+      <h2>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h2>
+      <p class="report-title">Balance Sheet as on {{ balanceSheetDate | date:'longDate' }}</p>
+      <p *ngIf="profitLossData" class="report-period">
+        (Profit/Loss period: {{ profitLossData.reportDate.start | date:'mediumDate' }} to {{ profitLossData.reportDate.end | date:'mediumDate' }})
+      </p>
+    </div>
+
+    <div class="financial-sections">
+      <!-- Equity Section -->
+      <div class="financial-section equity">
+        <div class="section-header">
+          <h3>Equity</h3>
+        </div>
+        <div class="section-table">
+          <table>
+            <thead>
+              <tr>
+                <th class="account-name">Account Name</th>
+                <th class="account-head">Account Head</th>
+                <th class="amount">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of balanceSheetData.equity">
+                <td class="account-name">{{ item.name }}</td>
+                <td class="account-head">{{ item.accountHead }}</td>
+                <td class="amount">{{ formatCurrency(item.value) }}</td>
+              </tr>
+              <tr *ngIf="profitLossData" class="profit-loss-row" [ngClass]="{'profit': profitLossData.netProfit >= 0, 'loss': profitLossData.netProfit < 0}">
+                <td colspan="2">{{ profitLossData.netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss' }}</td>
+                <td class="amount">{{ formatCurrency(profitLossData.netProfit) }}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="2">Total Equity</td>
+                <td class="amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0)) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Liabilities Section -->
+      <div class="financial-section liabilities">
+        <div class="section-header">
+          <h3>Liabilities</h3>
+        </div>
+        <div class="section-table">
+          <table>
+            <thead>
+              <tr>
+                <th class="account-name">Account Name</th>
+                <th class="account-head">Account Head</th>
+                <th class="amount">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of balanceSheetData.liabilities">
+                <td class="account-name">{{ item.name }}</td>
+             <td class="account-head">{{ item.accountHead }}</td>
+                <td class="amount">{{ formatCurrency(item.value) }}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="3">Total Liabilities</td>
+                <td class="amount">{{ formatCurrency(balanceSheetData.totals.liabilities) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Assets Section -->
+      <div class="financial-section assets">
+        <div class="section-header">
+          <h3>Assets</h3>
+        </div>
+        <div class="section-table">
+          <table>
+            <thead>
+              <tr>
+                <th class="account-name">Account Name</th>
+                <th class="account-number">Account No.</th>
+                <th class="account-head">Account Head</th>
+                <th class="amount">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of balanceSheetData.assets">
+                <td class="account-name">{{ item.name }}</td>
+                <td class="account-number">{{ item.accountNumber }}</td>
+                <td class="account-head">{{ item.accountHead }}</td>
+                <td class="amount">{{ formatCurrency(item.value) }}</td>
+              </tr>
+              <tr class="total-row">
+                <td colspan="3">Total Assets</td>
+                <td class="amount">{{ formatCurrency(balanceSheetData.totals.assets) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Section -->
+    <div class="summary-section">
+      <h3>Financial Summary</h3>
+      <table>
+        <tbody>
+          <tr>
+            <td class="summary-label">Total Equity</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0)) }}</td>
+          </tr>
+          <tr>
+            <td class="summary-label">Total Liabilities</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.liabilities) }}</td>
+          </tr>
+          <tr class="summary-total">
+            <td>Total Equity + Liabilities</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0) + balanceSheetData.totals.liabilities) }}</td>
+          </tr>
+          <tr class="summary-total">
+            <td>Total Assets</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.assets) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && balanceSheetData.equity.length === 0" class="no-data-message">
+    <i class="fas fa-file-alt"></i>
+    <p>No balance sheet data available</p>
+    <p>Please select a date and generate the balance sheet</p>
+  </div>
+</div>
