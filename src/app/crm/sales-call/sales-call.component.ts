@@ -233,10 +233,8 @@ export class SalesCallComponent implements OnInit, OnDestroy {
       default: return status;
     }
   }
-
-  // FIXED: Improved bulk update method
+  // Enhanced bulk update method with call logs
   async bulkUpdateStatus(newStatus: string): Promise<void> {
-    console.log("Fanisus", newStatus);
     if (!newStatus || this.selectedCalls.length === 0) {
       return;
     }
@@ -247,6 +245,9 @@ export class SalesCallComponent implements OnInit, OnDestroy {
     this.selectedCalls.forEach(id => this.isUpdatingStatus.add(id));
     
     try {
+      // Get current user ID for the call logs
+      const currentUserId = await this.getCurrentUserId();
+      
       // Prepare updates
       const updates = this.selectedCalls.map(customerId => ({
         id: customerId,
@@ -260,16 +261,36 @@ export class SalesCallComponent implements OnInit, OnDestroy {
       const result = await this.salesCallService.bulkUpdateCalls(updates);
       console.log('Bulk update result:', result);
       
-      // Update local state for all selected calls
-      this.selectedCalls.forEach(customerId => {
-        this.updateLocalCallStatus(customerId, newStatus);
-      });
+      // Create call logs and update local state for successful updates
+      const successfulIds = updates
+        .map(update => update.id)
+        .filter(id => !result.failures.find(f => f.id === id));
       
-      // Clear selection after successful update
+      // Update local state and create call logs for successful updates
+      for (const customerId of successfulIds) {
+        // Update local state
+        this.updateLocalCallStatus(customerId, newStatus);
+        
+        // Create call log entry
+        await this.callLogService.addCallLog(customerId, {
+          subject: `Status changed to ${newStatus}`,
+          description: `Status bulk updated to ${newStatus}`,
+          callOutcome: this.mapStatusToCallOutcome(newStatus),
+          createdAt: Timestamp.now(),
+          createdBy: currentUserId,
+          isStatusUpdate: true
+        });
+      }
+      
+      // Clear selection after update
       this.selectedCalls = [];
       this.selectAll = false;
 
-      console.log('Bulk status update completed successfully');
+      if (result.failures.length > 0) {
+        alert(`Updated ${result.success} calls successfully. Failed to update ${result.failures.length} calls.`);
+      } else {
+        console.log('Bulk status update completed successfully');
+      }
 
     } catch (error) {
       console.error('Bulk update failed:', error);

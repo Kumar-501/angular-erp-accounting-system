@@ -364,20 +364,4 @@
 /* Remove margin from last button */
 .actions button:last-child {
   margin-right: 0;
-}.product-display {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.product-tag {
-  background-color: #e0e0e0;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.deleted-product {
-  color: #f44336;
-  font-style: italic;
 }

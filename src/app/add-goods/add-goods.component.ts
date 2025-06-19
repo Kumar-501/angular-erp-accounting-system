@@ -128,30 +128,37 @@ isProcessing: boolean = false;
     );
   }
 
-  loadPurchaseOrders(): void {
-    this.subscriptions.push(
-      this.purchaseService.getPurchases().subscribe((orders: Purchase[]) => {
-        this.purchaseOrders = orders
-          .filter(order => 
-            (order.status === undefined || order.status !== 'Completed') && 
-            order.referenceNo
-          )
-          .map(order => ({
-            id: order.id,
-            referenceNo: order.referenceNo,
-            supplierId: order.supplierId,
-            supplierName: order.supplierName || 'Unknown Supplier',
-            purchaseDate: order.purchaseDate,
-            status: order.status || 'Pending',
-            products: order.products || [],
-            invoiceNo: order.invoiceNo
-          }));
-        
-        this.filteredPurchaseOrders = [...this.purchaseOrders];
-        console.log('Purchase orders loaded:', this.purchaseOrders.length);
-      })
-    );
-  }
+loadPurchaseOrders(): void {
+  this.subscriptions.push(
+    this.purchaseService.getPurchases().subscribe((orders: Purchase[]) => {
+      this.purchaseOrders = orders
+        .filter(order => 
+          (order.status === undefined || order.status !== 'Completed') && 
+          order.referenceNo &&
+          order.id !== undefined &&
+          !this.isOrderReceived(order.id)
+        )
+        .map(order => ({
+          id: order.id,
+          referenceNo: order.referenceNo,
+          supplierId: order.supplierId,
+          supplierName: order.supplierName || 'Unknown Supplier',
+          purchaseDate: order.purchaseDate,
+          status: order.status || 'Pending',
+          products: order.products || [],
+          invoiceNo: order.invoiceNo
+        }));
+      
+      this.filteredPurchaseOrders = [...this.purchaseOrders];
+    })
+  );
+}
+
+private isOrderReceived(orderId: string): boolean {
+  // You might want to check against a service or local list of received orders
+  // This is just a placeholder - implement based on your actual data structure
+  return false;
+}
 
   loadInvoiceNumbers(): void {
     this.subscriptions.push(
@@ -572,7 +579,9 @@ async saveForm(): Promise<void> {
       createdAt: new Date(),
       updatedAt: new Date()
     });
-
+ if (formData.purchaseOrder) {
+      this.removePurchaseOrderFromLists(formData.purchaseOrder);
+    }
     // Then update stock for each product (using INCREMENT operation)
     if (formData.products && formData.products.length > 0) {
       const processedProducts = new Set(); 
@@ -638,6 +647,21 @@ async saveForm(): Promise<void> {
     this.isProcessing = false;
     console.log('=== SAVE FORM DEBUG END ===');
   }
+  }
+  private removePurchaseOrderFromLists(purchaseOrderId: string): void {
+  // Remove from main purchaseOrders array
+  this.purchaseOrders = this.purchaseOrders.filter(order => order.id !== purchaseOrderId);
+  
+  // Remove from filteredPurchaseOrders array
+  this.filteredPurchaseOrders = this.filteredPurchaseOrders.filter(order => order.id !== purchaseOrderId);
+  
+  // If this was the selected purchase order, clear it
+  if (this.selectedPurchaseOrder?.id === purchaseOrderId) {
+    this.selectedPurchaseOrder = null;
+    this.goodsReceivedForm.get('purchaseOrder')?.setValue('');
+  }
+  
+  console.log('Purchase order removed from selection lists:', purchaseOrderId);
 }
   resetForm(): void {
     this.goodsReceivedForm.reset();

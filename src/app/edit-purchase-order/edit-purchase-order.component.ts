@@ -81,25 +81,27 @@ export class EditPurchaseOrderComponent implements OnInit {
 
   ) {}
 
-  ngOnInit(): void {
-    this.initForm();
-    this.loadSuppliers();
-    this.loadBusinessLocations();
-    this.loadProducts();
-    this.loadUsers();
-      this.loadTaxRates(); // Add this line
+ngOnInit(): void {
+  this.initForm();
+  this.loadSuppliers();
+  this.loadBusinessLocations();
+  this.loadProducts();
+  this.loadUsers();
+  this.loadTaxRates();
 
-    // Get the order ID from route params
-    this.route.params.subscribe(params => {
-      this.orderId = params['id'];
-      if (this.orderId) {
-        this.loadOrderDetails(this.orderId);
-      } else {
-        this.isLoading = false;
-        this.addProduct(); // Add at least one empty product row
-      }
-    });
-  }
+  this.route.params.subscribe(params => {
+    this.orderId = params['id'];
+    if (this.orderId) {
+      this.loadOrderDetails(this.orderId).then(() => {
+        // Initialize taxes for all products after loading
+        this.initializeProductTaxes();
+      });
+    } else {
+      this.isLoading = false;
+      this.addProduct();
+    }
+  });
+}
 
   addEmptyProduct() {
     this.productsFormArray.push(
@@ -285,12 +287,11 @@ loadTaxRates() {
       supplier: ['', Validators.required],
       address: [''],
       referenceNo: [{ value: '', disabled: true }, Validators.required],
-      orderDate: ['', Validators.required],
+      orderDate: ['', ],
       deliveryDate: [''],
-      requiredDate: ['', Validators.required],
-      addedBy: ['', Validators.required],
-      businessLocation: ['', Validators.required],
-      payTerm: [''],
+      requiredDate: ['', ],
+      addedBy: ['', ],
+      businessLocation: ['', ],
       status: ['Pending'],
       products: this.fb.array([]),
       shippingDetails: this.fb.group({
@@ -368,92 +369,99 @@ loadTaxRates() {
     });
   }
 
-  async loadOrderDetails(orderId: string): Promise<void> {
-    this.isLoading = true;
-    try {
-      const orderData = await this.orderService.getOrderById(orderId);
-      
-      if (orderData) {
-        // Clear existing products
-        while (this.productsFormArray.length) {
-          this.productsFormArray.removeAt(0);
-        }
-        
-        // Populate the form with order data
-        this.purchaseOrderForm.patchValue({
-          supplier: orderData.supplier,
-          address: orderData.address || '',
-          referenceNo: orderData.referenceNo,
-          orderDate: this.formatDateForInput(orderData.date),
-          // Fix: Change property names to match PurchaseOrder interface
-          deliveryDate: orderData.expectedDeliveryDate ? this.formatDateForInput(orderData.expectedDeliveryDate) : '',
-          requiredDate: orderData.requiredByDate ? this.formatDateForInput(orderData.requiredByDate) : '',
-          addedBy: orderData.addedBy || '',
-          businessLocation: orderData.businessLocation,
-          payTerm: orderData.payTerm || '',
-          status: orderData.status || 'Pending',
-          additionalNotes: orderData.additionalNotes || ''
-        });
-        
-        // Populate shipping details if they exist
-        if (orderData.shippingDetails) {
-          this.purchaseOrderForm.get('shippingDetails')?.patchValue({
-            shippingAddress: orderData.shippingDetails.shippingAddress || '',
-            shippingCharges: orderData.shippingDetails.shippingCharges || 0,
-            shippingStatus: orderData.shippingDetails.shippingStatus || '',
-            deliveredTo: orderData.shippingDetails.deliveredTo || ''
-          });
-        }
-        
-        // Add products if they exist
-        if (orderData.products && orderData.products.length > 0) {
-          orderData.products.forEach((product: any) => {
-            this.productsFormArray.push(
-              this.fb.group({
-                productId: [product.productId, Validators.required],
-                quantity: [product.quantity, [Validators.required, Validators.min(1)]],
-                unitCost: [product.unitCost, [Validators.required, Validators.min(0)]],
-                discountType: [product.discountType || 'percent'],
-                discountPercent: [product.discountPercent || 0, [Validators.min(0), Validators.max(100)]],
-                discountAmount: [product.discountAmount || 0, [Validators.min(0)]],
-                unitCostBeforeTax: [product.unitCostBeforeTax || 0],
-                subtotalBeforeTax: [product.subtotalBeforeTax || 0],
-                taxPercent: [product.taxPercent || 0, [Validators.min(0), Validators.max(100)]],
-                taxAmount: [product.taxAmount || 0],
-                netCost: [product.netCost || 0],
-                lineTotal: [product.lineTotal || 0],
-                currentStock: [product.currentStock || 0],
-                selected: [false],
-                profitMargin: [product.profitMargin || 0],
-                sellingPrice: [product.sellingPrice || 0],
-                lotNumber: [product.lotNumber || '']
-              })
-            );
-          });
-          this.updateTotals();
-        } else {
-          // Add at least one empty product
-          this.addProduct();
-        }
-      } else {
-        alert('Purchase order not found!');
-        this.router.navigate(['/purchase-order']);
+async loadOrderDetails(orderId: string): Promise<void> {
+  this.isLoading = true;
+  try {
+    const orderData = await this.orderService.getOrderById(orderId);
+    
+    if (orderData) {
+      // Clear existing products
+      while (this.productsFormArray.length) {
+        this.productsFormArray.removeAt(0);
       }
-    } catch (error) {
-      console.error('Error loading order details:', error);
-      alert('Error loading purchase order details');
-      this.router.navigate(['/purchase-order']);
-    } finally {
-      this.isLoading = false;
+      
+      // Populate the form with order data
+      this.purchaseOrderForm.patchValue({
+        supplier: orderData.supplier,
+        address: orderData.address,
+        referenceNo: orderData.referenceNo,
+        orderDate: this.formatDateForInput(orderData.date),
+        deliveryDate: this.formatDateForInput(orderData.expectedDeliveryDate),
+        requiredDate: this.formatDateForInput(orderData.requiredByDate),
+        addedBy: orderData.addedBy,
+        businessLocation: orderData.businessLocation,
+        status: orderData.status,
+        shippingDetails: {
+          shippingAddress: orderData.shippingDetails?.shippingAddress || '',
+          shippingCharges: orderData.shippingDetails?.shippingCharges || 0,
+          shippingStatus: orderData.shippingDetails?.shippingStatus || '',
+          deliveredTo: orderData.shippingDetails?.deliveredTo || ''
+        },
+        additionalNotes: orderData.additionalNotes || ''
+      });
+      
+      // Add products if they exist
+      if (orderData.products && orderData.products.length > 0) {
+        for (const product of orderData.products) {
+          // Get the full product details from productsList
+          const fullProduct = this.productsList.find(p => p.id === product.productId);
+          
+          // Calculate before-tax values
+          const discountValue = product.discountType === 'percent' 
+            ? (product.unitCost * (product.discountPercent || 0)) / 100
+            : (product.discountAmount || 0);
+            
+          const unitCostBeforeTax = product.unitCost - discountValue;
+          const subtotalBeforeTax = unitCostBeforeTax * product.quantity;
+          
+          // Use product's tax rate if available, otherwise use the one from order data
+          const taxPercent = fullProduct?.taxPercentage || product.taxPercent || 0;
+          
+          const productFormGroup = this.fb.group({
+            productId: [product.productId, Validators.required],
+            quantity: [product.quantity, [Validators.required, Validators.min(1)]],
+            unitCost: [product.unitCost, [Validators.required, Validators.min(0)]],
+            discountType: [product.discountType || 'percent'],
+            discountPercent: [product.discountPercent || 0, [Validators.min(0), Validators.max(100)]],
+            discountAmount: [product.discountAmount || 0, [Validators.min(0)]],
+            unitCostBeforeTax: [this.roundToTwo(unitCostBeforeTax)],
+            subtotalBeforeTax: [this.roundToTwo(subtotalBeforeTax)],
+            taxPercent: [taxPercent, [Validators.min(0), Validators.max(100)]],
+            taxAmount: [product.taxAmount || 0],
+            netCost: [product.netCost || 0],
+            lineTotal: [product.lineTotal || 0],
+            currentStock: [fullProduct?.currentStock || 0],
+            selected: [false]
+          });
+          
+          this.productsFormArray.push(productFormGroup);
+          
+          // Calculate line total to ensure all values are correct
+          this.calculateLineTotal(this.productsFormArray.length - 1);
+        }
+        this.updateTotals();
+      } else {
+        this.addProduct();
+      }
     }
+  } catch (error) {
+    console.error('Error loading order details:', error);
+  } finally {
+    this.isLoading = false;
   }
+}
 
-  formatDateForInput(dateString: string | Date): string {
-    if (!dateString) return '';
-    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    return date.toISOString().split('T')[0];
-  }
-
+formatDateForInput(dateString: string | Date | undefined | null): string {
+  if (!dateString) return '';
+  
+  // Handle both string and Date inputs
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) return '';
+  
+  return date.toISOString().split('T')[0];
+}
   loadBusinessLocations(): void {
     this.locationService.getLocations().subscribe(
       (locations) => {
@@ -511,68 +519,89 @@ loadTaxRates() {
     this.productsFormArray.removeAt(index);
     this.updateTotals();
   }
-
-  onProductSelect(index: number) {
-    const productFormGroup = this.productsFormArray.at(index);
-    const productId = productFormGroup.get('productId')?.value;
-    
+private initializeProductTaxes() {
+  this.productsFormArray.controls.forEach((control, index) => {
+    const productId = control.get('productId')?.value;
     if (productId) {
-      const selectedProduct = this.productsList.find(p => p.id === productId);
-      if (selectedProduct) {
-        const unitPrice = selectedProduct.defaultPurchasePrice || 
-                         selectedProduct.purchasePrice || 
-                         selectedProduct.sellingPrice || 
-                         100;
-        
-        productFormGroup.patchValue({
-          unitCost: unitPrice,
-          currentStock: selectedProduct.currentStock || 0, // Fixed: Now using optional property
-          taxPercent: selectedProduct.taxPercentage || 0 // Fixed: Now using optional property
-        });
-        
+      const product = this.productsList.find(p => p.id === productId);
+      if (product && product.taxPercentage !== undefined) {
+        // Only update if we have a tax percentage from the product
+        control.get('taxPercent')?.setValue(product.taxPercentage);
         this.calculateLineTotal(index);
       }
     }
-  }
-
-  calculateLineTotal(index: number) {
-    const productFormGroup = this.productsFormArray.at(index);
-    const quantity = productFormGroup.get('quantity')?.value || 0;
-    const unitCost = productFormGroup.get('unitCost')?.value || 0;
-    const discountType = productFormGroup.get('discountType')?.value;
-    let discountValue = 0;
-
-    // Calculate discount based on type
-    if (discountType === 'percent') {
-      const discountPercent = productFormGroup.get('discountPercent')?.value || 0;
-      discountValue = (unitCost * discountPercent) / 100;
-      productFormGroup.get('discountAmount')?.setValue(discountValue.toFixed(2));
-    } else {
-      discountValue = productFormGroup.get('discountAmount')?.value || 0;
-      const discountPercent = unitCost > 0 ? (discountValue / unitCost) * 100 : 0;
-      productFormGroup.get('discountPercent')?.setValue(discountPercent.toFixed(2));
+  });
+}
+onProductSelect(index: number) {
+  const productFormGroup = this.productsFormArray.at(index);
+  const productId = productFormGroup.get('productId')?.value;
+  
+  if (productId) {
+    const selectedProduct = this.productsList.find(p => p.id === productId);
+    if (selectedProduct) {
+      // Get the appropriate price (prioritize purchase price, fall back to selling price)
+      const unitPrice = selectedProduct.defaultPurchasePriceIncTax || 
+                      selectedProduct.defaultPurchasePriceExcTax || 
+                      selectedProduct.unitPurchasePrice || 
+                      selectedProduct.purchasePrice ||
+                      selectedProduct.defaultSellingPriceIncTax ||
+                      selectedProduct.sellingPrice || 
+                      0;
+      
+      // Set the tax percentage from the product or default to 0
+      const taxPercent = selectedProduct.taxPercentage || 0;
+      
+      productFormGroup.patchValue({
+        unitCost: unitPrice,
+        currentStock: selectedProduct.currentStock || 0,
+        taxPercent: taxPercent
+      });
+      
+      // Force calculation after setting values
+      this.calculateLineTotal(index);
     }
-
-    // Calculate costs after discount
-    const unitCostBeforeTax = unitCost - discountValue;
-    const subtotalBeforeTax = unitCostBeforeTax * quantity;
-    
-    // Calculate tax
-    const taxPercent = productFormGroup.get('taxPercent')?.value || 0;
-    const taxAmount = (subtotalBeforeTax * taxPercent) / 100;
-    const netCost = subtotalBeforeTax + taxAmount;
-
-    productFormGroup.patchValue({
-      unitCostBeforeTax: unitCostBeforeTax.toFixed(2),
-      subtotalBeforeTax: subtotalBeforeTax.toFixed(2),
-      taxAmount: taxAmount.toFixed(2),
-      netCost: netCost.toFixed(2),
-      lineTotal: netCost.toFixed(2)
-    });
-
-    this.updateTotals();
   }
+}
+calculateLineTotal(index: number) {
+  const productFormGroup = this.productsFormArray.at(index);
+  
+  // Get all necessary values with proper defaults
+  const quantity = parseFloat(productFormGroup.get('quantity')?.value) || 1;
+  const unitCost = parseFloat(productFormGroup.get('unitCost')?.value) || 0;
+  const discountType = productFormGroup.get('discountType')?.value || 'percent';
+  const discountPercent = parseFloat(productFormGroup.get('discountPercent')?.value) || 0;
+  const discountAmount = parseFloat(productFormGroup.get('discountAmount')?.value) || 0;
+  const taxPercent = parseFloat(productFormGroup.get('taxPercent')?.value) || 0;
 
+  // Calculate discount value
+  const discountValue = discountType === 'percent' 
+    ? (unitCost * discountPercent) / 100
+    : Math.min(discountAmount, unitCost); // Ensure discount doesn't exceed unit cost
+
+  // Calculate before-tax values
+  const unitCostBeforeTax = unitCost - discountValue;
+  const subtotalBeforeTax = unitCostBeforeTax * quantity;
+  
+  // Calculate tax and total
+  const taxAmount = (subtotalBeforeTax * taxPercent) / 100;
+  const lineTotal = subtotalBeforeTax + taxAmount;
+
+  // Update form values without triggering events
+  productFormGroup.patchValue({
+    unitCostBeforeTax: this.roundToTwo(unitCostBeforeTax),
+    subtotalBeforeTax: this.roundToTwo(subtotalBeforeTax),
+    taxAmount: this.roundToTwo(taxAmount),
+    lineTotal: this.roundToTwo(lineTotal)
+  }, { emitEvent: false });
+
+  // Update the grand totals
+  this.updateTotals();
+}
+
+// Helper function to round to 2 decimal places
+private roundToTwo(num: number): number {
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
   calculateSellingPrice(index: number) {
     const productFormGroup = this.productsFormArray.at(index);
     const unitCostBeforeTax = parseFloat(productFormGroup.get('unitCostBeforeTax')?.value) || 0;
@@ -584,13 +613,27 @@ loadTaxRates() {
     productFormGroup.get('sellingPrice')?.setValue(sellingPrice.toFixed(2));
   }
 
-  updateTotals() {
-    this.totalItems = this.productsFormArray.length;
+ updateTotals() {
+  let totalItems = 0;
+  let netTotalAmount = 0;
+
+  // Calculate totals for all products
+  this.productsFormArray.controls.forEach(control => {
+    const quantity = parseFloat(control.get('quantity')?.value) || 0;
+    const lineTotal = parseFloat(control.get('lineTotal')?.value) || 0;
     
-    this.netTotalAmount = this.productsFormArray.controls.reduce((total, control) => {
-      return total + (parseFloat(control.get('lineTotal')?.value) || 0);
-    }, 0);
-  }
+    totalItems += quantity;
+    netTotalAmount += lineTotal;
+  });
+
+  // Add shipping charges if applicable
+  const shippingCharges = parseFloat(this.purchaseOrderForm.get('shippingDetails.shippingCharges')?.value) || 0;
+  netTotalAmount += shippingCharges;
+
+  // Update component properties
+  this.totalItems = totalItems;
+  this.netTotalAmount = netTotalAmount;
+}
 
   onFileChange(event: any, fieldName: string) {
     const file = event.target.files[0];
@@ -631,7 +674,6 @@ loadTaxRates() {
           requiredByDate: formData.requiredDate,
           addedBy: formData.addedBy,
           businessLocation: formData.businessLocation,
-          payTerm: formData.payTerm,
           status: formData.status,
           products: formData.products,
           shippingDetails: formData.shippingDetails,

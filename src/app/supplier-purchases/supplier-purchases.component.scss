@@ -205,4 +205,46 @@
     background-color: darken(#3d82bb, 10%);
     border-color: darken(#3d82bb, 10%);
   }
+}/* In your suppliers.component.scss */
+.dropdown {
+  position: relative;
+  
+  .dropdown-menu {
+    position: absolute;
+    z-index: 1000;
+    top: 100%; /* This ensures it appears below the button */
+    right: 0; /* For dropdown-menu-end alignment */
+  }
+}
+
+/* Ensure the button has proper stacking context */
+.btn-outline-secondary {
+  position: relative;
+  z-index: 1;
+}/* Ensure parent containers don't clip the dropdown */
+.table-responsive, .card-body {
+  overflow: visible !important;
+}.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th, td {
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    text-align: left;
+  }
+  
+  th {
+    background-color: #f8f9fa;
+    position: sticky;
+    top: 0;
+  }
+  
+  tr:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  .text-center {
+    text-align: center;
+  }
 }

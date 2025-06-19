@@ -163,78 +163,85 @@
           </div>
   
           <!-- Product Table -->
-          <div class="table-responsive">
-            <table class="table table-bordered align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Product</th>
-                  <th>Quantity</th>
-                  <th>Unit Price</th>
-                  <th>Tax Rate (%)</th>
-                  <th>Tax Amount</th>
-                  <th>Subtotal</th>
-                  <th *ngIf="products.length > 0">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- Only show dynamic rows for added products -->
-                <tr *ngFor="let product of products; let i = index">
-            <td>
-  <select class="form-control" [(ngModel)]="product.name" [ngModelOptions]="{standalone: true}"
-          (change)="onDynamicProductSelect($any($event.target).value, i)">
-    <option value="">Select a product</option>
-    <option *ngFor="let prod of filteredProducts" [value]="prod.productName">
-      {{prod.productName}} 
-      <span *ngIf="prod.currentStock <= 0" class="text-danger">(Out of Stock - Edit Mode: Allowed)</span>
-      <span *ngIf="prod.currentStock > 0" class="text-muted">(Stock: {{prod.currentStock || 0}})</span>
-    </option>
-  </select>
-</td>
-               <td>
-  <input type="number" class="form-control" min="1" placeholder="1"
-        [(ngModel)]="product.quantity" [ngModelOptions]="{standalone: true}"
-        (input)="updateProduct(i)">
-  <small *ngIf="getProductStock(product.name) <= 0" class="text-warning">
-    ⚠ Product is out of stock (allowed in edit mode)
-  </small>
-</td>
-                  <td>
-                    <input type="number" class="form-control" min="0" step="0.01" placeholder="0.00"
-                          [(ngModel)]="product.unitPrice" [ngModelOptions]="{standalone: true}"
-                          (input)="updateProduct(i)">
-                  </td>
-                  <td>
-                    <input type="number" class="form-control" min="0" max="100" step="0.01" placeholder="0.00"
-                          [(ngModel)]="product.taxRate" [ngModelOptions]="{standalone: true}"
-                          (input)="updateProduct(i)">
-                  </td>
-                  <td>
-                    <input type="number" class="form-control" 
-                           [(ngModel)]="product.taxAmount" 
-                           [ngModelOptions]="{standalone: true}"
-                           readonly>
-                  </td>
-                  <td class="text-nowrap">{{ product.subtotal | currency:'INR' }}</td>
-                  <td>
-                    <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
-                      <i class="fas fa-trash"></i>
-                    </button>
-                  </td>
-                </tr>
-                <!-- Show message when no products added -->
-                <tr *ngIf="products.length === 0">
-                  <td colspan="6" class="text-center text-muted">No products added yet</td>
-                </tr>
-              </tbody>
-            <tfoot>
-  <tr>
-    <td colspan="5" class="text-end fw-semibold">Total:</td>
-    <td class="fw-bold text-nowrap">{{ itemsTotal | currency:'INR'}}</td>
-    <td *ngIf="products.length > 0"></td>
-  </tr>
-</tfoot>
-            </table>
-          </div>
+    <div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Product</th>
+        <th>Quantity</th>
+        <th>Unit Price</th>
+        <th>Tax Rate (%)</th>
+        <th>Tax Amount</th>
+        <th>Subtotal</th>
+        <th *ngIf="products.length > 0">Action</th> <!-- Only show Action column when products exist -->
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Show product rows -->
+      <tr *ngFor="let product of products; let i = index">
+        <td>
+          <select class="form-control" [(ngModel)]="product.name" [ngModelOptions]="{standalone: true}"
+                  (change)="onDynamicProductSelect($any($event.target).value, i)">
+            <option value="">Select a product</option>
+            <option *ngFor="let prod of filteredProducts" [value]="prod.productName">
+              {{prod.productName}} 
+              <span *ngIf="prod.currentStock <= 0" class="text-danger">(Out of Stock - Edit Mode: Allowed)</span>
+              <span *ngIf="prod.currentStock > 0" class="text-muted">(Stock: {{prod.currentStock || 0}})</span>
+            </option>
+          </select>
+        </td>
+        <td>
+          <input type="number" class="form-control" min="1" placeholder="1"
+                [(ngModel)]="product.quantity" [ngModelOptions]="{standalone: true}"
+                (input)="updateProduct(i)">
+          <small *ngIf="getProductStock(product.name) <= 0" class="text-warning">
+            ⚠ Product is out of stock (allowed in edit mode)
+          </small>
+        </td>
+        <td>
+          <input type="number" class="form-control" min="0" step="0.01" placeholder="0.00"
+                [(ngModel)]="product.unitPrice" [ngModelOptions]="{standalone: true}"
+                (input)="updateProduct(i)">
+        </td>
+        <td>
+          <input type="number" class="form-control" min="0" max="100" step="0.01" placeholder="0.00"
+                [(ngModel)]="product.taxRate" [ngModelOptions]="{standalone: true}"
+                (input)="updateProduct(i)">
+        </td>
+        <td>
+          <input type="number" class="form-control" 
+                 [(ngModel)]="product.taxAmount" 
+                 [ngModelOptions]="{standalone: true}"
+                 readonly>
+        </td>
+        <td class="text-nowrap">{{ product.subtotal | currency:'INR' }}</td>
+        <td *ngIf="products.length > 0"> <!-- Only show Action cell when products exist -->
+          <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+      <!-- Show message when no products added -->
+      <tr *ngIf="products.length === 0">
+        <td colspan="6" class="text-center text-muted">
+          No products added yet (Total: {{ products.length }})
+        </td>
+      </tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="5" class="text-end fw-semibold">Total:</td>
+        <td class="fw-bold text-nowrap">{{ itemsTotal | currency:'INR'}}</td>
+        <td *ngIf="products.length > 0"></td> <!-- Only show empty cell when products exist -->
+      </tr>
+      <!-- Add product count row -->
+      <tr *ngIf="products.length > 0">
+        <td colspan="6" class="text-end fw-semibold">Total Products:</td>
+        <td class="fw-bold">{{ products.length }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
   
           <!-- Add Product Button -->
           <div class="mt-2">

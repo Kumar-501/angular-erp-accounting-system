@@ -16,6 +16,7 @@ export interface PurchaseOrder {
   businessLocationId?: string;
   supplier: string;
     grandTotal?: number; 
+  isUsedForPurchase?: boolean;
 
   status: string;
   quantityRemaining: number;
@@ -120,7 +121,16 @@ private mapItemsToProducts(items: any[]): any[] {
       throw error;
     }
   }
+  // Add a new purchase order
 
+// In purchase-order.service.ts
+async markOrderAsUsed(orderId: string): Promise<void> {
+  const orderRef = doc(this.firestore, 'purchase-orders', orderId);
+  return updateDoc(orderRef, {
+    isUsedForPurchase: true,
+    updatedAt: new Date()
+  });
+}
   // Update an existing purchase order
   async updateOrder(id: string, orderData: Partial<PurchaseOrder>): Promise<void> {
     try {

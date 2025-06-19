@@ -26,6 +26,7 @@ export class ExpenseCategoriesComponent implements OnInit {
   parentCategories: any[] = [];
   editingCategoryId: string | null = null;
   editingCategoryType: string = 'expense'; // Track original type for editing
+onSubCategoryChange: any;
   
   constructor(private expenseService: ExpenseCategoriesService, private fb: FormBuilder) {}
   

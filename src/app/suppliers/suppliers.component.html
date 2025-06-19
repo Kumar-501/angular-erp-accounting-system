@@ -1,12 +1,3 @@
-<style>
-  .table-responsive {
-  overflow-x: auto; /* Keep horizontal scroll if needed */
-  overflow-y: hidden; /* Remove vertical scroll */
-  -webkit-overflow-scrolling: touch;
-}
-</style>
-
-
 <div class="suppliers-container">
   <div class="suppliers-header">
     <h3>Suppliers</h3>
@@ -39,7 +30,13 @@
     <i class="fas fa-calendar-alt"></i>
   </button>
 </div>
-  
+      <div class="form-group">
+    <label>State:</label>
+    <select [(ngModel)]="filterOptions.state" (change)="applyFilters()">
+      <option value="">All States</option>
+      <option *ngFor="let state of statesList" [value]="state">{{state}}</option>
+    </select>
+  </div>
   <!-- Drawer Panel -->
   <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
     <div class="drawer-header">
@@ -82,7 +79,10 @@
         </div>
       </div>
     </div>
-    
+   </div>
+  
+  <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
+</div>
     <div class="drawer-footer" *ngIf="isCustomDate">
       <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
       <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
@@ -94,29 +94,13 @@
 
   <!-- Dropdown Filters -->
   <div class="dropdown-filters">
-    <div class="filter-group">
-      <label>Assigned to:</label>
-      <select [(ngModel)]="filterOptions.assignedTo" (change)="applyFilters()">
-        <option value="">All</option>
-        <option *ngFor="let user of assignedUsers" [value]="user.id">{{user.username}}</option>
-      </select>
-    </div>
+   
     
-    <div class="filter-group">
-      <label>Status:</label>
-      <select [(ngModel)]="filterOptions.status" (change)="applyFilters()">
-        <option value="">All</option>
-        <option value="Active">Active</option>
-        <option value="Inactive">Inactive</option>
-      </select>
-    </div>
+   
     
   
 </div>
-  </div>
-  
-  <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
-</div>
+ 
 
   <!-- Main Content Section -->
   <div class="main-content">
@@ -129,16 +113,17 @@
     
     <!-- Table Controls -->
     <div class="table-controls">
-      <div class="entries-control">
-        Show 
-        <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select> 
-        entries
-      </div>
+     <div class="entries-control">
+    Show 
+    <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select> 
+    entries
+  </div>
+  
       
       <div class="export-controls">
         <button class="btn-export" (click)="exportCSV()">
@@ -155,138 +140,184 @@
 </div>
     </div>
     
-    <!-- Suppliers Table -->
-    <div class="table-responsive">
-      <table class="suppliers-table">
-        <thead>
-          <tr>
-            <th>Action</th>
-            <th (click)="sortBy('contactId')">Contact ID</th>
-<th (click)="sortBy('createdAt')">Created Date</th>
+<!-- Suppliers Table -->
+<div class="table-responsive">
+  <table class="suppliers-table">
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th (click)="sortBy('contactId')">Contact ID</th>
+        <th (click)="sortBy('createdAt')">Created Date</th>
+        <th (click)="sortBy('businessName')">Business Name</th>
+      <th (click)="sortBy('firstName')">Name</th>
+        <th (click)="sortBy('email')">Email</th>
+        <th (click)="sortBy('taxNumber')">Tax Number</th>
+        <th (click)="sortBy('payTerm')">Pay Term</th>
+        <th (click)="sortBy('openingBalance')">Opening Balance</th>
+        <th (click)="sortBy('city')">Address</th>
+        <th (click)="sortBy('mobile')">Mobile</th>
+        <th (click)="sortBy('landline')">Landline</th>
+        <th (click)="sortBy('alternateContact')">Alternate Contact</th>
+        <th (click)="sortBy('prefix')">Prefix</th>
+        <th (click)="sortBy('middleName')">Middle Name</th>
+        <th (click)="sortBy('dob')">Date of Birth</th>
+        <th (click)="sortBy('addressLine1')">Address Line 1</th>
+        <th (click)="sortBy('addressLine2')">Address Line 2</th>
+        <th (click)="sortBy('state')">State</th>
+        <th (click)="sortBy('country')">Country</th>
+        <th (click)="sortBy('zipCode')">Zip Code</th>
+        <th (click)="sortBy('contactType')">Contact Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let supplier of paginatedSuppliers">
+        <!-- Action Column -->
+        <td>
+          <div class="action-container">
+            <button class="action-btn" (click)="openActionPopup(supplier)">
+              Actions
+              <span class="status-dot" [ngClass]="{'active': supplier.status === 'Active', 'inactive': supplier.status !== 'Active'}"></span>
+            </button>
+          </div>
 
-            <th (click)="sortBy('businessName')">Business Name</th>
-            <th (click)="sortBy('firstName')">Name</th>
-            <th (click)="sortBy('email')">Email</th>
-            <th (click)="sortBy('taxNumber')">Tax Number</th>
-            <th (click)="sortBy('payTerm')">Pay Term</th>
-            <th (click)="sortBy('openingBalance')">Opening Balance</th>
-            <th (click)="sortBy('city')">Address</th>
-            <th (click)="sortBy('mobile')">Mobile</th>
-            <th (click)="sortBy('landline')">Landline</th>
-            <th (click)="sortBy('alternateContact')">Alternate Contact</th>
-            <th (click)="sortBy('assignedTo')">Assigned To</th>
-            <th (click)="sortBy('prefix')">Prefix</th>
-            <th (click)="sortBy('middleName')">Middle Name</th>
-            <th (click)="sortBy('dob')">Date of Birth</th>
-            <th (click)="sortBy('addressLine1')">Address Line 1</th>
-            <th (click)="sortBy('addressLine2')">Address Line 2</th>
-            <th (click)="sortBy('state')">State</th>
+          <!-- Action Popup -->
+          <div class="action-popup-overlay" *ngIf="currentActionPopup === supplier.id" (click)="closeActionPopup()">
+            <div class="action-popup" (click)="$event.stopPropagation()">
+              <div class="popup-header">
+                <h4>{{supplier.businessName || (supplier.firstName + ' ' + (supplier.lastName || ''))}}</h4>
+                <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+              </div>
+              
+              <div class="popup-body">
+                <div class="action-item" (click)="editSupplier(supplier); closeActionPopup()">
+                  <i class="fa fa-edit icon-edit"></i> 
+                  <span>Edit</span>
+                </div>
+                
+                <div class="action-item text-danger" (click)="deleteSupplier(supplier.id); closeActionPopup()">
+                  <i class="fa fa-trash icon-delete"></i> 
+                  <span>Delete</span>
+                </div>
+                
+                <div class="action-item" [routerLink]="['/suppliers', supplier.id]" (click)="closeActionPopup()">
+                  <i class="fa fa-eye icon-view"></i> 
+                  <span>View</span>
+                </div>
+                
+                <div class="action-item" (click)="viewPurchases(supplier); closeActionPopup()">
+                  <i class="fa fa-list-alt icon-purchases"></i> 
+                  <span>Purchases</span>
+                </div>
+<!--                 
+                <div class="action-item" (click)="viewPaymentHistory(supplier); closeActionPopup()">
+                  <i class="fa fa-history icon-history"></i> 
+                  <span>Payment History</span>
+                </div> -->
+                
+                <div class="divider"></div>
+                
+                <div class="status-section">
+                  <h5>Status</h5>
+                  <div class="status-option">
+                    <input type="radio" id="activeCheckbox{{supplier.id}}" 
+                           [checked]="supplier.status === 'Active'"
+                           (change)="updateSupplierStatus(supplier, 'Active'); closeActionPopup()">
+                    <label for="activeCheckbox{{supplier.id}}">Active</label>
+                  </div>
+                  <div class="status-option">
+                    <input type="radio" id="inactiveCheckbox{{supplier.id}}" 
+                           [checked]="supplier.status !== 'Active'"
+                           (change)="updateSupplierStatus(supplier, 'Inactive'); closeActionPopup()">
+                    <label for="inactiveCheckbox{{supplier.id}}">Inactive</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </td>
 
-            <th (click)="sortBy('country')">Country</th>
-            <th (click)="sortBy('zipCode')">Zip Code</th>
-            <th (click)="sortBy('contactType')">Contact Type</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let supplier of paginatedSuppliers">
-            <td>
-       <!-- suppliers.component.html -->
-<!-- Add this to the dropdown actions section -->
-<div class="dropdown">
-    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
-            type="button" style="height: 27px;
-    width: 83px;
-    color: aliceblue;
-    background-color: rgb(74, 195, 211);"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-            (click)="$event.stopPropagation()">
-      Actions
-    </button>
-    <ul class="dropdown-menu dropdown-menu-end">
-      <li>
-        <a class="dropdown-item" (click)="editSupplier(supplier)">
-          <i class="fa fa-edit me-2"></i> Edit
-        </a>
-      </li>
-      <li>
-        <a class="dropdown-item text-danger" (click)="deleteSupplier(supplier.id)">
-          <i class="fa fa-trash me-2"></i> Delete
-        </a>
-      </li>
-      <li>
-        <a class="dropdown-item" (click)="addPayment(supplier)">
-          <i class="fas fa-money-bill-wave text-success me-2"></i> Add Payment
-        </a>
-      </li>
-      <li>
-        <a class="dropdown-item" [routerLink]="['/suppliers', supplier.id]">
-          <i class="fa fa-eye me-2"></i> View
-        </a>
-      </li>
-  
-      <li>
-        <a class="dropdown-item" (click)="viewPurchases(supplier)">
-          <i class="fa fa-list-alt me-2"></i> Purchases
-        </a>
-      </li>
-      <li>
-        <a class="dropdown-item" (click)="viewPaymentHistory(supplier)">
-          <i class="fa fa-history me-2"></i> Payment History
-        </a>
-      </li>
-    </ul>
-  </div>
-            </td>
-            <td>{{ supplier.contactId }}</td>
-<!-- In your suppliers.component.html -->
-<td>{{ supplier.createdAt ? (supplier.createdAt | date:'medium') : '' }}</td>
-            <td>{{ !supplier.isIndividual ? supplier.businessName : '' }}</td>
-            
+        <!-- Contact ID -->
+        <td>{{ supplier.contactId }}</td>
+
+        <!-- Created Date -->
+        <td>{{ supplier.createdAt ? (supplier.createdAt | date:'medium') : '' }}</td>
+
+        <!-- Business Name -->
+        <td>{{ supplier.businessName || '' }}</td>
+
+        <!-- Name (First Name + Last Name for individuals, Business Name for companies) -->
 <td>
-  <div [class]="'status-badge ' + (supplier.status === 'Active' ? 'active' : 'inactive')">
-    {{ supplier.status || 'Inactive' }}
-  </div>
-  <div>
-    {{ supplier.isIndividual ? (supplier.firstName + ' ' + (supplier.lastName || '')) : '' }}
-  </div>
+  {{ supplier.firstName }} {{ supplier.lastName || '' }}
 </td>
 
+        <!-- Email -->
+        <td>{{ supplier.email }}</td>
 
+        <!-- Tax Number -->
+        <td>{{ supplier.taxNumber }}</td>
 
-            <td>{{ supplier.email }}</td>
-            <td>{{ supplier.taxNumber }}</td>
-            <td>{{ supplier.payTerm }} Days</td>
-            <td>₹ {{ supplier.openingBalance || '0.00' }}</td>
-            <td>{{ supplier.city }}</td>
-            <td>{{ supplier.mobile }}</td>
-            <td>{{ supplier.landline }}</td>
-            <td>{{ supplier.alternateContact }}</td>
-<td>{{ getAssignedUserName(supplier.assignedTo ?? '') }}</td>
-          <td>{{ supplier.prefix }}</td>
-            <td>{{ supplier.middleName }}</td>
-            <td>{{ supplier.dob | date }}</td>
-            <td>{{ supplier.addressLine1 }}</td>
-            <td>{{ supplier.addressLine2 }}</td>
-<td>{{ supplier.state }}</td>
+        <!-- Pay Term -->
+        <td>{{ supplier.payTerm }} Days</td>
 
-            <td>{{ supplier.country }}</td>
-            <td>{{ supplier.zipCode }}</td>
-            <td>{{ supplier.contactType }}</td>
-          </tr>
-          <tr *ngIf="paginatedSuppliers.length === 0">
-            <td colspan="22" class="no-data">No suppliers found</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+        <!-- Opening Balance -->
+        <td>₹ {{ supplier.openingBalance || '0.00' }}</td>
+
+        <!-- Address (City) -->
+        <td>{{ supplier.city }}</td>
+
+        <!-- Mobile -->
+        <td>{{ supplier.mobile }}</td>
+
+        <!-- Landline -->
+        <td>{{ supplier.landline }}</td>
+
+        <!-- Alternate Contact -->
+        <td>{{ supplier.alternateContact }}</td>
+
+ 
+
+        <!-- Prefix -->
+        <td>{{ supplier.prefix }}</td>
+
+        <!-- Middle Name -->
+        <td>{{ supplier.middleName }}</td>
+
+        <!-- Date of Birth -->
+        <td>{{ supplier.dob | date }}</td>
+
+        <!-- Address Line 1 -->
+        <td>{{ supplier.addressLine1 }}</td>
+
+        <!-- Address Line 2 -->
+        <td>{{ supplier.addressLine2 }}</td>
+
+        <!-- State -->
+        <td>{{ supplier.state }}</td>
+
+        <!-- Country -->
+        <td>{{ supplier.country }}</td>
+
+        <!-- Zip Code -->
+        <td>{{ supplier.zipCode }}</td>
+
+        <!-- Contact Type -->
+        <td>{{ supplier.contactType }}</td>
+      </tr>
+
+      <!-- No Data Row -->
+      <tr *ngIf="paginatedSuppliers.length === 0">
+        <td colspan="23" class="no-data">No suppliers found</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
     
     <!-- Pagination Controls -->
-    <div class="pagination-controls">
-      <button [disabled]="currentPage <= 1" (click)="prevPage()" class="btn-page">Previous</button>
-      <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button [disabled]="currentPage >= totalPages" (click)="nextPage()" class="btn-page">Next</button>
-    </div>
+   <div class="pagination-controls">
+  <button [disabled]="currentPage <= 1 || filteredSuppliers.length === 0" (click)="prevPage()" class="btn-page">Previous</button>
+  <span>Page {{ currentPage }} of {{ totalPages }}</span>
+  <button [disabled]="currentPage >= totalPages || filteredSuppliers.length === 0" (click)="nextPage()" class="btn-page">Next</button>
+</div>
   </div>
   
   
@@ -458,15 +489,10 @@
     type="datetime-local" 
     formControlName="createdAt" 
     id="createdAt" 
-    required>
+    required
+    [value]="supplierForm.get('createdAt')?.value || ''">
 </div>
-          <div class="form-group">
-            <label for="assignedTo">Assigned To:</label>
-            <select formControlName="assignedTo" id="assignedTo">
-              <option value="">Select</option>
-              <option *ngFor="let user of assignedUsers" [value]="user.id">{{ user.username }}</option>
-            </select>
-          </div>
+        
           
           <!-- More Information Accordion -->
           <div class="accordion">

@@ -26,10 +26,6 @@ export interface Expense {
   businessLocationName?: string;
   expenseCategory?: string;
   expenseCategoryName?: string;
-    categoryName?: string; // Add this
-
-    amount?: number; // Add this if needed
-  total?: number; // Add this if needed
   incomeCategory?: string;
   incomeCategoryName?: string;
   subCategory?: string;
@@ -66,10 +62,7 @@ export interface Expense {
   addedBy?: string;
   addedByDisplayName?: string;
 }
-interface IndirectExpense {
-  name: string;
-  amount: number;
-}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -292,50 +285,43 @@ private listenToIncomes(): void {
   });
 }
 
-async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]> {
-  const q = query(
-    this.expensesCollection,
-    where('date', '>=', startDate),
-    where('date', '<=', endDate),
-    orderBy('date', 'desc')
-  );
-  
-  const snapshot = await getDocs(q);
-  return Promise.all(snapshot.docs.map(async doc => {
-    const expenseData = doc.data() as Expense;
-    return {
-      ...await this.resolveDocumentReferences({
+  async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
+    const expensesCollection = collection(this.firestore, 'expenses');
+    const q = query(
+      expensesCollection,
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+    
+    const snapshot = await getDocs(q);
+    return Promise.all(snapshot.docs.map(async doc => {
+      const expenseData = doc.data();
+      const resolvedData = await this.resolveDocumentReferences({
         id: doc.id,
         ...expenseData
-      }),
-      type: 'expense',
-      entryType: 'expense'
-    };
-  }));
-}
+      });
+      return resolvedData;
+    }));
+  }
 
-async getIncomesByDateRange(startDate: Date, endDate: Date): Promise<Expense[]> {
-  const q = query(
-    this.incomesCollection,
-    where('date', '>=', startDate),
-    where('date', '<=', endDate),
-    orderBy('date', 'desc')
-  );
-  
-  const snapshot = await getDocs(q);
-  return Promise.all(snapshot.docs.map(async doc => {
-    const incomeData = doc.data() as Expense;
-    return {
-      ...await this.resolveDocumentReferences({
+  async getIncomesByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
+    const incomesCollection = collection(this.firestore, 'incomes');
+    const q = query(
+      incomesCollection,
+      where('date', '>=', startDate),
+      where('date', '<=', endDate)
+    );
+    
+    const snapshot = await getDocs(q);
+    return Promise.all(snapshot.docs.map(async doc => {
+      const incomeData = doc.data();
+      const resolvedData = await this.resolveDocumentReferences({
         id: doc.id,
         ...incomeData
-      }),
-      type: 'income',
-      entryType: 'income'
-    };
-  }));
-}
-
+      });
+      return resolvedData;
+    }));
+  }
 
   private generateReferenceNumber(prefix: string): string {
     const date = new Date();

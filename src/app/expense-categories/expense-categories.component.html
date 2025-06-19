@@ -82,12 +82,12 @@
           <ng-container *ngIf="expenseCategories$ | async as categories">
             <tr *ngFor="let category of categories">
               <td>{{ category.categoryName }}</td>
-              <td>
-                <span class="badge" 
-                      [ngClass]="category.type === 'income' ? 'badge-income' : 'badge-expense'">
-                  {{ (category.type || 'expense') | titlecase }}
-                </span>
-              </td>
+        <td>
+  <span class="badge" 
+        [ngClass]="category.type === 'income' ? 'badge-income' : 'badge-expense'">
+    {{ (category.type || 'expense') | titlecase }}
+  </span>
+</td>
               <td>{{ category.accountHead || '-' }}</td>
               <td class="action-buttons">
                 <button class="btn-edit" (click)="openModal(category)">
@@ -116,58 +116,66 @@
     </div>
   </div>
 
-  <!-- Category Modal -->
-  <div class="modal" [class.show]="showModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>{{ isEditing ? 'Edit Category' : 'Add New Category' }}</h3>
-        <button class="btn-close" (click)="closeModal()">×</button>
-      </div>
-      <div class="modal-body">
-        <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()">
-          <div class="form-group">
-            <label>Type *</label>
-            <div class="radio-group">
-              <label>
-                <input type="radio" formControlName="type" value="expense" (change)="onTypeChange()"> Expense
-              </label>
-              <label>
-                <input type="radio" formControlName="type" value="income" (change)="onTypeChange()"> Income
-              </label>
-            </div>
+<!-- Category Modal -->
+<div class="modal" [class.show]="showModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>{{ isEditing ? 'Edit Category' : 'Add New Category' }}</h3>
+      <button class="btn-close" (click)="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <form [formGroup]="categoryForm" (ngSubmit)="saveCategory()">
+        <div class="form-group">
+          <label>Type *</label>
+          <div class="radio-group">
+            <label>
+              <input type="radio" formControlName="type" value="expense" (change)="onTypeChange()"> Expense
+            </label>
+            <label>
+              <input type="radio" formControlName="type" value="income" (change)="onTypeChange()"> Income
+            </label>
           </div>
+        </div>
 
-          <div class="form-group">
-            <label for="categoryName">Category Name *</label>
-            <input type="text" id="categoryName" formControlName="categoryName" />
-            <span class="error-message" *ngIf="categoryForm.get('categoryName')?.invalid && categoryForm.get('categoryName')?.touched">
-              Category name is required
-            </span>
-          </div>
-          
-          <div class="form-group">
-            <label for="accountHead">Account Head</label>
-            <select id="accountHead" formControlName="accountHead">
-              <option value="">-- Select Account Head --</option>
-              
-              <ng-container *ngFor="let group of getAccountHeadOptions()">
-                <optgroup [label]="group.group">
-                  <option *ngFor="let option of group.options" [value]="option.value">
-                    {{ option.label }}
-                  </option>
-                </optgroup>
-              </ng-container>
-            </select>
-          </div>
+        <div class="form-group">
+          <label for="categoryName">Category Name *</label>
+          <input type="text" id="categoryName" formControlName="categoryName" />
+          <span class="error-message" *ngIf="categoryForm.get('categoryName')?.invalid && categoryForm.get('categoryName')?.touched">
+            Category name is required
+          </span>
+        </div>
         
-          <div class="form-actions">
-            <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
-            <button type="submit" class="btn-primary" [disabled]="categoryForm.invalid">
-              {{ isEditing ? 'Update' : 'Save' }}
-            </button>
-          </div>
-        </form>
-      </div>
+        <div class="form-group">
+          <label for="accountHead">Account Head</label>
+          <select id="accountHead" formControlName="accountHead">
+            <option value="">-- Select Account Head --</option>
+            
+            <!-- Expense Options -->
+            <ng-container *ngIf="categoryForm.get('type')?.value === 'expense'">
+              <option value="Expense|Indirect Expense">Indirect Expense</option>
+              <option value="Expense|Direct Expense">Direct Expense</option>
+              <option value="Expense|Cost of Goods Sold">Cost of Goods Sold</option>
+              <option value="Expense|GST Deposit">GST Deposit</option>
+              <option value="Expense|TDS Deposit">TDS Deposit</option>
+            </ng-container>
+
+            <!-- Income Options -->
+            <ng-container *ngIf="categoryForm.get('type')?.value === 'income'">
+              <option value="Income|Sales">Sales</option>
+              <option value="Income|Direct Income">Direct Income</option>
+              <option value="Income|Indirect Income">Indirect Income</option>
+            </ng-container>
+          </select>
+        </div>
+      
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="categoryForm.invalid">
+            {{ isEditing ? 'Update' : 'Save' }}
+          </button>
+        </div>
+      </form>
     </div>
   </div>
+</div>
 </div>

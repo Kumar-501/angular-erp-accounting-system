@@ -49,13 +49,13 @@ export class EditUserComponent implements OnInit {
     this.editUserForm = this.fb.group({
       // Basic Info
       prefix: ['Mr'],
-      firstName: ['', Validators.required],
+      firstName: ['', ],
       lastName: [''],
-      department: ['', Validators.required],
-      designation: ['', Validators.required],
+      department: ['', ],
+      designation: ['',],
       employeeId: [''],
 
-      email: ['', [Validators.required, Validators.email]],
+      email: ['', [, Validators.email]],
       isActive: [false],
       enableServicePin: [false],
 

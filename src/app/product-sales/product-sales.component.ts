@@ -169,6 +169,8 @@ export class ProductSalesComponent implements OnInit, OnDestroy {
   expandedSaleId: string | null = null;
   productFilterName: string = '';
 
+  userAllowedLocations: string[] = []; // Add this property, adjust initialization as needed
+
   // Add these properties for totals
   totalPaymentAmount = 0;
   totalBalance = 0;
@@ -220,26 +222,40 @@ export class ProductSalesComponent implements OnInit, OnDestroy {
   }
 
   loadSales(): void {
-    this.loading = true;
-    this.error = null;
-    
-    const subscription = this.saleService.listenForSales(this.filters).subscribe({
-      next: (sales) => {
-        this.sales = sales;
-        this.applyFiltersAndSort();
-        this.calculateStatistics();
-        this.calculateTotals();
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading sales:', error);
-        this.error = 'Failed to load sales data';
-        this.loading = false;
+  this.loading = true;
+  this.error = null;
+
+  const subscription = this.saleService.listenForSales().subscribe({
+    next: (sales) => {
+      // Apply product filter if exists
+      if (this.filters.productId) {
+        sales = sales.filter(sale => 
+          sale.products?.some((product: any) => product.id === this.filters.productId)
+        );
       }
-    });
-    
-    this.subscriptions.push(subscription);
-  }
+      
+      // Apply location filter if user has restricted locations
+      if (this.userAllowedLocations.length > 0) {
+        sales = sales.filter(sale => 
+          this.userAllowedLocations.includes(sale.businessLocation)
+        );
+      }
+      
+      this.sales = sales;
+      this.applyFiltersAndSort();
+      this.calculateStatistics();
+      this.calculateTotals();
+      this.loading = false;
+    },
+    error: (error) => {
+      console.error('Error loading sales:', error);
+      this.error = 'Failed to load sales data';
+      this.loading = false;
+    }
+  });
+  
+  this.subscriptions.push(subscription);
+}
 
   subscribeToStockUpdates(): void {
     const stockSubscription = this.saleService.stockUpdated$.subscribe(() => {

@@ -1,27 +1,281 @@
-.modal {
-  background-color: rgba(0, 0, 0, 0.5);
-  &.show {
-    display: block;
+/* General Container Styling */
+.container-fluid {
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Card Styling */
+.card {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border-radius: 0.5rem;
+}
+
+.card-header {
+  background-color: #fff;
+  border-bottom: 1px solid #e9ecef;
+  border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+/* Tab Navigation */
+.nav-tabs {
+  border-bottom: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+.nav-tabs .nav-link {
+  border: none;
+  color: #6c757d;
+  font-weight: 500;
+  padding: 1rem 1.5rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.nav-tabs .nav-link:hover {
+  border-color: transparent;
+  background-color: #e9ecef;
+  color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+  color: #0d6efd;
+  background-color: #fff;
+  border: none;
+  border-bottom: 3px solid #0d6efd;
+}
+
+/* Table Styling */
+.table {
+  background-color: #fff;
+}
+
+.table-light {
+  background-color: #f8f9fa;
+}
+
+.table th {
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table td {
+  vertical-align: middle;
+  border-top: 1px solid #dee2e6;
+}
+
+.table-hover tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Badge Styling */
+.badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+}
+
+.bg-success {
+  background-color: #198754 !important;
+}
+
+.bg-warning {
+  background-color: #ffc107 !important;
+}
+
+.bg-danger {
+  background-color: #dc3545 !important;
+}
+
+.bg-info {
+  background-color: #0dcaf0 !important;
+}
+
+.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+.bg-primary {
+  background-color: #0d6efd !important;
+}
+
+.bg-light {
+  background-color: #f8f9fa !important;
+  color: #495057 !important;
+  border: 1px solid #dee2e6;
+}
+
+/* Button Styling */
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: 0.25rem;
+}
+
+.btn-outline-primary {
+  color: #0d6efd;
+  border-color: #0d6efd;
+  transition: all 0.15s ease-in-out;
+}
+
+.btn-outline-primary:hover {
+  color: #fff;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+/* Product Information Styling */
+.row.mb-2 {
+  margin-bottom: 0.75rem;
+}
+
+.fw-medium {
+  font-weight: 500;
+}
+
+.text-muted {
+  color: #6c757d !important;
+}
+
+/* Statistics Section */
+.opening-stock {
+  color: #0d6efd;
+  font-weight: 600;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-left: 4px solid #0d6efd;
+  border-radius: 0.25rem;
+}
+
+/* Loading Spinner */
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+.spinner-border {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Empty State Styling */
+.text-center.py-4 {
+  padding: 3rem 1.5rem;
+}
+
+.text-center.py-4 i {
+  color: #dee2e6;
+  margin-bottom: 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .nav-tabs .nav-link {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .card-body {
+    padding: 1rem;
+  }
+  
+  .table-responsive {
+    font-size: 0.875rem;
   }
 }
 
-.product-image-container {
-  img {
-    max-height: 200px;
-    object-fit: contain;
-  }
-  
-  .no-image-placeholder {
-    height: 200px;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6c757d;
-  }
+/* Purchase History Table Specific */
+.purchase-history-table th {
+  background-color: #e7f3ff;
+  color: #0d6efd;
+}
+
+/* Animation for Loading States */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .table-responsive {
-  max-height: 400px;
-  overflow-y: auto;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Custom Scrollbar for Tables */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Hover Effects */
+.nav-link i {
+  transition: transform 0.2s ease-in-out;
+}
+
+.nav-link:hover i {
+  transform: scale(1.1);
+}
+
+/* Status-specific Badge Colors */
+.badge.bg-success {
+  background-color: #198754 !important;
+  color: white;
+}
+
+.badge.bg-warning {
+  background-color: #ffc107 !important;
+  color: #212529;
+}
+
+.badge.bg-danger {
+  background-color: #dc3545 !important;
+  color: white;
+}
+
+.badge.bg-info {
+  background-color: #0dcaf0 !important;
+  color: #212529;
+}
+
+/* Table Row Hover Effect */
+.table tbody tr {
+  transition: background-color 0.15s ease-in-out;
+}
+
+/* Button Focus States */
+.btn:focus {
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* Custom Spacing */
+.mb-3 {
+  margin-bottom: 1.5rem !important;
+}
+
+.me-2 {
+  margin-right: 0.5rem !important;
+}
+
+.ms-2 {
+  margin-left: 0.5rem !important;
+}
+
+.py-4 {
+  padding-top: 2rem !important;
+  padding-bottom: 2rem !important;
 }

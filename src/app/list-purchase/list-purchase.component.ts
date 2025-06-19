@@ -14,10 +14,10 @@ import { LocationService } from '../services/location.service';
 import { AccountService } from '../services/account.service';
 import { SupplierService } from '../services/supplier.service';
 
-// Define the product item interface
 interface ProductItem {
   id?: string;
-    taxAmount?: number;  // Add this
+  productId?: string;
+  taxAmount?: number;
   taxRate?: number; 
   name: string;
   productName?: string;
@@ -38,7 +38,7 @@ interface Payment {
   paymentMethod: string;
   paymentNote?: string;
   createdAt: Date;
-  type: 'purchase' | 'supplier'; // Add this to distinguish payment types
+  type: 'purchase' | 'supplier';
 }
 // Define return product item interface
 interface ReturnProductItem extends ProductItem {
@@ -52,21 +52,19 @@ interface User {
   name?: string;
   email?: string;
 }
-
 interface Purchase {
   id: string;
   purchaseDate?: Date | string | { toDate: () => Date };
   referenceNo?: string;
   businessLocation?: string;
-    productsTotal?: number; // Add this line
- taxRate?: number; 
+  productsTotal?: number;
+  taxRate?: number; 
   cgst?: number;
   sgst?: number;
-    isInterState?: boolean; // Add this to determine if IGST should be used
-
+  isInterState?: boolean;
   igst?: number;
-    netTotalAmount?: number;  // Add this if coming from edit
-  taxAmount?: number;  // Add this
+  netTotalAmount?: number;
+  taxAmount?: number;
   supplier?: string;
   supplierName?: string;
   supplierId?: string;
@@ -87,13 +85,10 @@ interface Purchase {
   paymentAccount?: {
     id: string;
     name: string;
-        accountType?: string;  // Add this line
-
+    accountType?: string;
     accountNumber?: string;
-    
   };
   paymentNote?: string;
-  
   additionalNotes?: string;
   document?: string;
   totalTax?: number;
@@ -103,7 +98,6 @@ interface Purchase {
   supplierAddress?: string;
 }
 
-// Define the PurchaseReturn interface
 interface PurchaseReturn {
   id?: string;
   returnDate: string;
@@ -120,7 +114,6 @@ interface PurchaseReturn {
   createdAt: Date;
   createdBy: string;
 }
-
 @Component({
   selector: 'app-list-purchase',
   templateUrl: './list-purchase.component.html',
@@ -131,44 +124,32 @@ export class ListPurchaseComponent implements OnInit, AfterViewInit {
   purchases: Purchase[] = [];
   filteredPurchases: Purchase[] = [];
   isLoading = true;
-paymentAccounts: any[] = [];
+  paymentAccounts: any[] = [];
   paymentAccountsLoading = false;
-
   errorMessage = '';
   showFilterSidebar = false;
   statusFilter = '';
   selectedPurchaseForAction: Purchase | null = null;
-actionModal: Modal | null = null;
-
-
-
-paymentStatusFilter = '';
-supplierFilter = '';
-
-locationFilter = '';
-
-uniqueSuppliers: string[] = [];
-uniqueLocations: string[] = [];
-
-dateFilter = {
-  startDate: '',
-  endDate: ''
-};
+  actionModal: Modal | null = null;
+  paymentStatusFilter = '';
+  supplierFilter = '';
+  locationFilter = '';
+  uniqueSuppliers: string[] = [];
+  uniqueLocations: string[] = [];
+  dateFilter = {
+    startDate: '',
+    endDate: ''
+  };
   searchText = '';
   showPaymentForm = false;
   sortColumn: string = '';
-sortDirection: 'asc' | 'desc' = 'asc';
+  sortDirection: 'asc' | 'desc' = 'asc';
   currentPaymentPurchase: Purchase | null = null;
   paymentForm: FormGroup;
-  // Add these properties to your component
-supplierSearchText: string = '';
-filteredSuppliers: string[] = [];
-  
-  
-  // Return modal properties
+  supplierSearchText: string = '';
+  filteredSuppliers: string[] = [];
   returnModal: Modal | null = null;
   private currentOpenModal: Modal | null = null;
-
   selectedPurchase: Purchase | null = null;
   returnData: {
     returnDate: string;
@@ -176,19 +157,16 @@ filteredSuppliers: string[] = [];
     returnStatus: string;
     paymentStatus: string;
     products: ReturnProductItem[];
-    
   } = this.initReturnData();
   statusModal: Modal | null = null;
-selectedPurchaseForStatus: Purchase | null = null;
-newPurchaseStatus: string = 'ordered';
+  selectedPurchaseForStatus: Purchase | null = null;
+  newPurchaseStatus: string = 'ordered';
   totalReturnsAmount = 0;
-
-  constructor(
+constructor(
     private purchaseService: PurchaseService,
     private purchaseReturnService: PurchaseReturnService,
     private datePipe: DatePipe,
     private snackBar: MatSnackBar,
-    
     private router: Router,
     private route: ActivatedRoute,
     private paymentService: PaymentService,
@@ -196,21 +174,16 @@ newPurchaseStatus: string = 'ordered';
     private locationService: LocationService,
     private supplierService: SupplierService,
     private accountService: AccountService,
-
-
-
-    
   ) {
     this.paymentForm = this.fb.group({
-    purchaseId: [''],
-    referenceNo: [''],
-    supplierName: [''],
-    paymentAccount: [Validators.required],
-    paymentMethod: ['Cash', Validators.required],
-    paymentNote: [''],
-    paidDate: [new Date().toISOString().slice(0, 16), Validators.required],
-    amount: [0, [Validators.required, Validators.min(0.01)]]
-
+      purchaseId: [''],
+      referenceNo: [''],
+      supplierName: [''],
+      paymentAccount: [null, Validators.required],
+      paymentMethod: ['Cash', Validators.required],
+      paymentNote: [''],
+      paidDate: [new Date().toISOString().slice(0, 16), Validators.required],
+      amount: [0, [Validators.required, Validators.min(0.01)]]
     });
   }
   openModal(modalId: string): void {
@@ -397,34 +370,35 @@ filterSuppliers(): void {
     supplier.toLowerCase().includes(searchText)
   );
 }
-  ngOnInit(): void {
-  this.loadPurchases();
-  this.loadPurchaseReturns();
-  this.loadPaymentAccounts(); // Add this line
-  this.loadBusinessLocations();
-  this.loadSuppliers();
-  this.router.events.subscribe(() => {
-    if (this.router.url === '/list-purchase') {
-      this.loadPurchases();
-      this.loadPurchaseReturns();
-    }
-  });
-}
-  ngAfterViewInit(): void {
-    // Initialize modal after view is initialized
+ ngOnInit(): void {
+    this.loadPurchases();
+    this.loadPurchaseReturns();
+    this.loadPaymentAccounts();
+    this.loadBusinessLocations();
+    this.loadSuppliers();
+    this.router.events.subscribe(() => {
+      if (this.router.url === '/list-purchase') {
+        this.loadPurchases();
+        this.loadPurchaseReturns();
+      }
+    });
+  }
+
+ ngAfterViewInit(): void {
     const modalElement = document.getElementById('returnModal');
     if (modalElement) {
       this.returnModal = new Modal(modalElement);
     }
-  
-    // Initialize status modal
+
     const statusModalElement = document.getElementById('statusModal');
     if (statusModalElement) {
       this.statusModal = new Modal(statusModalElement);
     }
   }
+  
 
-  initReturnData() {
+
+   initReturnData() {
     return {
       returnDate: new Date().toISOString().split('T')[0],
       reason: '',
@@ -434,78 +408,77 @@ filterSuppliers(): void {
     };
   }
 
-
-async submitPayment(): Promise<void> {
-  if (this.paymentForm.invalid || !this.currentPaymentPurchase) {
-    this.paymentForm.markAllAsTouched();
-    return;
-  }
-
-  try {
-    const paymentData = {
-      purchaseId: this.currentPaymentPurchase.id,
-      supplierId: this.currentPaymentPurchase.supplierId || '',
-      supplierName: this.currentPaymentPurchase.supplier || '',
-      referenceNo: this.currentPaymentPurchase.referenceNo || '',
-      paymentDate: new Date(this.paymentForm.value.paidDate),
-      amount: this.paymentForm.value.amount,
-      paymentMethod: this.paymentForm.value.paymentMethod,
-      paymentAccount: this.paymentForm.value.paymentAccount,
-      paymentNote: this.paymentForm.value.paymentNote || '',
-      createdAt: new Date(),
-      type: 'purchase'
-    };
-
-    const newPaymentAmount = (this.currentPaymentPurchase.paymentAmount || 0) + paymentData.amount;
-    const newPaymentDue = (this.currentPaymentPurchase.grandTotal || 0) - newPaymentAmount;
-    
-    // Update purchase record
-    await this.purchaseService.updatePurchase(this.currentPaymentPurchase.id, {
-      paymentAmount: newPaymentAmount,
-      paymentDue: newPaymentDue,
-      paymentStatus: newPaymentDue <= 0 ? 'Paid' : 'Partial',
-      paymentAccount: paymentData.paymentAccount
-    });
-
-    // Update supplier's balance
-    if (this.currentPaymentPurchase.supplierId) {
-      await this.supplierService.updateSupplierBalance(
-        this.currentPaymentPurchase.supplierId,
-        paymentData.amount,
-        true // isPayment
-      );
+  async submitPayment(): Promise<void> {
+    if (this.paymentForm.invalid || !this.currentPaymentPurchase) {
+      this.paymentForm.markAllAsTouched();
+      return;
     }
 
-    // Update account balance
-    await this.accountService.updateAccountBalance(
-      paymentData.paymentAccount.id,
-      -paymentData.amount // Deduct from account
-    );
+    try {
+      const paymentData = {
+        purchaseId: this.currentPaymentPurchase.id,
+        supplierId: this.currentPaymentPurchase.supplierId || '',
+        supplierName: this.currentPaymentPurchase.supplier || '',
+        referenceNo: this.currentPaymentPurchase.referenceNo || '',
+        paymentDate: new Date(this.paymentForm.value.paidDate),
+        amount: this.paymentForm.value.amount,
+        paymentMethod: this.paymentForm.value.paymentMethod,
+        paymentAccount: this.paymentForm.value.paymentAccount,
+        paymentNote: this.paymentForm.value.paymentNote || '',
+        createdAt: new Date(),
+        type: 'purchase'
+      };
 
-    // Record transaction
-    await this.accountService.recordTransaction(paymentData.paymentAccount.id, {
-      amount: paymentData.amount,
-      type: 'expense',
-      date: paymentData.paymentDate,
-      reference: `PUR-${this.currentPaymentPurchase.referenceNo}`,
-      relatedDocId: this.currentPaymentPurchase.id,
-      description: `Payment for purchase ${this.currentPaymentPurchase.referenceNo}`,
-      paymentMethod: paymentData.paymentMethod
-    });
+      const newPaymentAmount = (this.currentPaymentPurchase.paymentAmount || 0) + paymentData.amount;
+      const newPaymentDue = (this.currentPaymentPurchase.grandTotal || 0) - newPaymentAmount;
+      
+      // Update purchase record
+      await this.purchaseService.updatePurchase(this.currentPaymentPurchase.id, {
+        paymentAmount: newPaymentAmount,
+        paymentDue: newPaymentDue,
+        paymentStatus: newPaymentDue <= 0 ? 'Paid' : 'Partial',
+        paymentAccount: paymentData.paymentAccount
+      });
 
-    // Add payment record
-    await this.paymentService.addPayment(paymentData);
+      // Update supplier's balance
+      if (this.currentPaymentPurchase.supplierId) {
+        await this.supplierService.updateSupplierBalance(
+          this.currentPaymentPurchase.supplierId,
+          paymentData.amount,
+          true
+        );
+      }
 
-    this.showSnackbar('Payment added successfully!', 'success');
-    this.closePaymentForm();
-    this.loadPurchases(); // Refresh the list
-    
-  } catch (error) {
-    console.error('Error processing payment:', error);
-    this.showSnackbar('Error processing payment', 'error');
+      // Update account balance
+      await this.accountService.updateAccountBalance(
+        paymentData.paymentAccount.id,
+        -paymentData.amount
+      );
+
+      // Record transaction
+      await this.accountService.recordTransaction(paymentData.paymentAccount.id, {
+        amount: paymentData.amount,
+        type: 'expense',
+        date: paymentData.paymentDate,
+        reference: `PUR-${this.currentPaymentPurchase.referenceNo}`,
+        relatedDocId: this.currentPaymentPurchase.id,
+        description: `Payment for purchase ${this.currentPaymentPurchase.referenceNo}`,
+        paymentMethod: paymentData.paymentMethod
+      });
+
+      // Add payment record
+      await this.paymentService.addPayment(paymentData);
+
+      this.showSnackbar('Payment added successfully!', 'success');
+      this.closePaymentForm(); // Close the form after successful submission
+      this.loadPurchases(); // Refresh the list
+      
+    } catch (error) {
+      console.error('Error processing payment:', error);
+      this.showSnackbar('Error processing payment', 'error');
+    }
   }
-}
-// Close payment form
+
 closePaymentForm(): void {
   this.showPaymentForm = false;
   this.paymentForm.reset({
@@ -529,7 +502,31 @@ closePaymentForm(): void {
   }
   
 
-
+// In list-purchase.component.ts where you navigate to product details:
+viewProductDetails(product: any) {
+  // Get the original purchases data from the service to ensure we have the raw date objects
+  this.purchaseService.getPurchasesByProductId(product.id).then(purchasesData => {
+    this.router.navigate(['/product-purchase-details', product.id], {
+      state: {
+        productData: product,
+        purchaseData: purchasesData // Pass the raw purchase data with original date objects
+      }
+    });
+  }).catch(error => {
+    console.error('Error fetching purchase data for product:', error);
+    // Fallback to filtered purchases if service call fails
+    const filteredPurchaseData = this.purchases.filter(p => 
+      p.products?.some(prod => prod.id === product.id || prod.productId === product.id)
+    );
+    
+    this.router.navigate(['/product-purchase-details', product.id], {
+      state: {
+        productData: product,
+        purchaseData: filteredPurchaseData
+      }
+    });
+  });
+}
   viewPayments(purchase: Purchase): void {
     if (!purchase.id || !purchase.supplierId) {
       this.showSnackbar('Purchase data is incomplete', 'error');

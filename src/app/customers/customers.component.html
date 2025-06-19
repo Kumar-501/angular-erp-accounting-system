@@ -60,15 +60,15 @@
         </option>
       </select>
     </div>
-    <div class="filter-group">
-      <label>Ad Code:</label>
-      <select [(ngModel)]="filterOptions.adcode" (change)="applyFilters()">
-        <option value="">None</option>
-        <option *ngFor="let status of leadStatuses" [value]="status.id">
-          {{ status.leadStatus }} ({{ status.id }})
-        </option>
-      </select>
-    </div>
+  <div class="filter-group">
+  <label>Ad Code:</label>
+  <select [(ngModel)]="filterOptions.adcode" (change)="applyFilters()" class="form-control">
+    <option value="">All Ad Codes</option>
+    <option *ngFor="let status of leadStatuses" [value]="status.id">
+      {{ status.leadStatus }}
+    </option>
+  </select>
+</div>
     
     <div class="filter-group">
       <label>Life Stage:</label>
@@ -151,10 +151,10 @@
   <table class="customers-table">
     <thead>
       <tr>
-        <th [class.hidden]="!isColumnVisible('Select')">
-  <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
-</th>
-        <th [class.hidden]="!isColumnVisible('Action')">Action</th>
+        <th [class.hidden]="!isColumnVisible('Select')" class="select-column">
+          <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
+        </th>
+        <th [class.hidden]="!isColumnVisible('Action')" class="action-column">Action</th>
         <th [class.hidden]="!isColumnVisible('Contact ID')" (click)="sortBy('contactId')">Contact ID</th>
         <th [class.hidden]="!isColumnVisible('Prefix')" (click)="sortBy('prefix')">Prefix</th>
         <th [class.hidden]="!isColumnVisible('First Name')" (click)="sortBy('firstName')">First Name</th>
@@ -170,6 +170,7 @@
         <th [class.hidden]="!isColumnVisible('Address Line 1')" (click)="sortBy('addressLine1')">Address Line 1</th>
         <th [class.hidden]="!isColumnVisible('Address Line 2')" (click)="sortBy('addressLine2')">Address Line 2</th>
         <th [class.hidden]="!isColumnVisible('City')" (click)="sortBy('city')">City</th>
+        <th [class.hidden]="!isColumnVisible('District')" (click)="sortBy('district')">District</th>
         <th [class.hidden]="!isColumnVisible('State')" (click)="sortBy('state')">State</th>
         <th [class.hidden]="!isColumnVisible('Country')" (click)="sortBy('country')">Country</th>
         <th [class.hidden]="!isColumnVisible('Zip Code')" (click)="sortBy('zipCode')">Zip Code</th>
@@ -177,28 +178,61 @@
         <th [class.hidden]="!isColumnVisible('Pay Term')" (click)="sortBy('payTerm')">Pay Term</th>
         <th [class.hidden]="!isColumnVisible('Opening Balance')" (click)="sortBy('openingBalance')">Opening Balance</th>
         <th [class.hidden]="!isColumnVisible('Assigned To')" (click)="sortBy('assignedTo')">Assigned To</th>
-<th [class.hidden]="!isColumnVisible('Gender')" (click)="sortBy('gender')">Gender</th>
-<th [class.hidden]="!isColumnVisible('Age')" (click)="sortBy('age')">Age</th><th [class.hidden]="!isColumnVisible('Life Stage')" (click)="sortBy('lifestage')">Life Stage</th>
-<th [class.hidden]="!isColumnVisible('Ad Code')" (click)="sortBy('adcode')">Ad Code</th>
+        <th [class.hidden]="!isColumnVisible('Gender')" (click)="sortBy('gender')">Gender</th>
+        <th [class.hidden]="!isColumnVisible('Age')" (click)="sortBy('age')">Age</th>
+        <th [class.hidden]="!isColumnVisible('Life Stage')" (click)="sortBy('lifestage')">Life Stage</th>
+        <th [class.hidden]="!isColumnVisible('Ad Code')" (click)="sortBy('adcode')">Ad Code</th>
         <th [class.hidden]="!isColumnVisible('Contact Type')" (click)="sortBy('contactType')">Contact Type</th>
-       
-
-
       </tr>
     </thead>
     <tbody>
       <tr *ngFor="let customer of paginatedCustomers">
-        <td [class.hidden]="!isColumnVisible('Select')">
-  <input type="checkbox" 
-         [checked]="isCustomerSelected(customer.id || '')" 
-         (change)="toggleCustomerSelection(customer.id || '')">
-</td>
-        <td [class.hidden]="!isColumnVisible('Action')">
-          <div class="dropdown">
-            <button class="btn-dropdown">Actions</button>
-            <div class="dropdown-content">
-              <a (click)="editCustomer(customer)">Edit</a>
-              <a (click)="deleteCustomer(customer.id)">Delete</a>
+        <td [class.hidden]="!isColumnVisible('Select')" class="select-column">
+          <input type="checkbox" 
+                 [checked]="isCustomerSelected(customer.id || '')" 
+                 (change)="toggleCustomerSelection(customer.id || '')">
+        </td>
+        <td [class.hidden]="!isColumnVisible('Action')" class="action-column">
+          <div class="action-container">
+            <button class="btn-dropdown" (click)="openActionPopup(customer)">Actions</button>
+          </div>
+
+          <div class="action-popup-overlay" *ngIf="currentActionPopup === customer.id" (click)="closeActionPopup()">
+            <div class="action-popup" (click)="$event.stopPropagation()">
+              <div class="popup-header">
+                <h4>{{customer.businessName || (customer.firstName + ' ' + (customer.lastName || ''))}}</h4>
+                <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+              </div>
+              
+              <div class="popup-body">
+                <div class="action-item" (click)="editCustomer(customer); closeActionPopup()">
+                  <i class="fa fa-edit"></i> 
+                  <span>Edit</span>
+                </div>
+                
+                <div class="action-item text-danger" (click)="deleteCustomer(customer.id); closeActionPopup()">
+                  <i class="fa fa-trash"></i> 
+                  <span>Delete</span>
+                </div>
+                
+                <div class="divider"></div>
+                
+                <div class="status-section">
+                  <h5>Status</h5>
+                  <div class="status-option">
+                    <input type="radio" id="activeCheckbox{{customer.id}}" 
+                          [checked]="customer.status === 'Active'"
+                          (change)="updateCustomerStatus(customer, 'Active'); closeActionPopup()">
+                    <label for="activeCheckbox{{customer.id}}">Active</label>
+                  </div>
+                  <div class="status-option">
+                    <input type="radio" id="inactiveCheckbox{{customer.id}}" 
+                          [checked]="customer.status !== 'Active'"
+                          (change)="updateCustomerStatus(customer, 'Inactive'); closeActionPopup()">
+                    <label for="inactiveCheckbox{{customer.id}}">Inactive</label>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </td>
@@ -217,6 +251,7 @@
         <td [class.hidden]="!isColumnVisible('Address Line 1')">{{ customer.addressLine1 }}</td>
         <td [class.hidden]="!isColumnVisible('Address Line 2')">{{ customer.addressLine2 }}</td>
         <td [class.hidden]="!isColumnVisible('City')">{{ customer.city }}</td>
+        <td [class.hidden]="!isColumnVisible('District')">{{ customer.district }}</td>
         <td [class.hidden]="!isColumnVisible('State')">{{ customer.state }}</td>
         <td [class.hidden]="!isColumnVisible('Country')">{{ customer.country }}</td>
         <td [class.hidden]="!isColumnVisible('Zip Code')">{{ customer.zipCode }}</td>
@@ -224,10 +259,12 @@
         <td [class.hidden]="!isColumnVisible('Pay Term')">{{ customer.payTerm }} {{ customer.payTerm ? 'Days' : '' }}</td>
         <td [class.hidden]="!isColumnVisible('Opening Balance')">₹ {{ customer.openingBalance || '0.00' }}</td>
         <td [class.hidden]="!isColumnVisible('Assigned To')">{{ customer.assignedTo }}</td>
-<td [class.hidden]="!isColumnVisible('Gender')">{{ customer.gender }}</td>
-<td [class.hidden]="!isColumnVisible('Age')">{{ customer.age }}</td><td [class.hidden]="!isColumnVisible('Life Stage')">{{ customer.lifestage }}</td>
-<td [class.hidden]="!isColumnVisible('Ad Code')">{{ getAdCodeName(customer.adcode) }}</td>
-        <td [class.hidden]="!isColumnVisible('Contact Type')">{{ customer.contactType }}</td>
+        <td [class.hidden]="!isColumnVisible('Gender')">{{ customer.gender }}</td>
+        <td [class.hidden]="!isColumnVisible('Age')">{{ customer.age }}</td>
+        <td [class.hidden]="!isColumnVisible('Life Stage')">{{ customer.lifestage }}</td>
+<td [class.hidden]="!isColumnVisible('Ad Code')">
+  {{ getLeadStatusText(customer.adcode || '') }}
+</td>       <td [class.hidden]="!isColumnVisible('Contact Type')">{{ customer.contactType }}</td>
       </tr>
       <tr *ngIf="filteredCustomers.length === 0">
         <td [attr.colspan]="visibleColumns.length + 1" class="no-data">No customers found</td>
@@ -235,7 +272,6 @@
     </tbody>
   </table>
 </div>
-
    <!-- Pagination -->
 <div class="pagination-controls">
   <button class="page-btn" (click)="prevPage()" [disabled]="currentPage === 1">
@@ -490,7 +526,7 @@
     <select [(ngModel)]="customerData.adcode" name="adcode" id="adcode" class="form-control">
       <option value="">Select Ad Code</option>
       <option *ngFor="let status of leadStatuses" [value]="status.id">
-        {{ status.leadStatus }} ({{ status.id }})
+        {{ status.leadStatus }} 
       </option>
     </select>
   </div>
@@ -622,16 +658,22 @@
                     placeholder="Enter City" />
                 </div>
                 
-                <div class="form-group">
-                  <label for="state">State:</label>
-                  <input 
-                    type="text" 
-                    [(ngModel)]="customerData.state" 
-                    name="state" 
-                    id="state" 
-                    placeholder="Enter State" />
-                </div>
-              </div>
+        <div class="form-group">
+    <label for="state">State:</label>
+    <select [(ngModel)]="customerData.state" name="state" id="state" (change)="onStateChange()">
+      <option value="">Select State</option>
+      <option *ngFor="let state of states" [value]="state">{{ state }}</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label for="district">District:</label>
+    <select [(ngModel)]="customerData.district" name="district" id="district" [disabled]="!customerData.state">
+      <option value="">Select District</option>
+      <option *ngFor="let district of districts" [value]="district">{{ district }}</option>
+    </select>
+  </div>
+</div>
               
               <div class="form-row">
                 <div class="form-group">

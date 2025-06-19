@@ -578,10 +578,11 @@
   <button type="button" class="btn btn-info me-2" (click)="openPrescriptionModal()">
     <i class="fas fa-file-prescription"></i> Add Prescription
   </button>
-   <button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="openPrescriptionModal()">
+  <button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="openPrescriptionModal()">
     <i class="fas fa-plus"></i> Add Another Prescription
   </button>
 </div>
+
 <div class="prescription-list mt-3" *ngIf="prescriptions.length > 0">
   <h6>Prescriptions ({{prescriptions.length}})</h6>
   <div class="list-group">
@@ -668,14 +669,14 @@
             </div>
           </div>
           
-          <div class="prescription-items" id="medicineItems">
+      <div class="prescription-items" id="medicineItems">
             <div *ngFor="let medicine of prescriptionData.medicines; let i = index" class="prescription-item mb-4 p-3 border rounded">
-              <!-- <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-2">
                 <h6>{{i + 1}}. {{getMedicineTypeName(medicine.type)}}</h6>
                 <button class="btn btn-sm btn-outline-danger" (click)="removeMedicine(i)">
                   <i class="fas fa-trash"></i>
                 </button>
-              </div> -->
+              </div>
               
               <!-- Dynamic Medicine Templates -->
               <div [ngSwitch]="medicine.type">
@@ -765,13 +766,13 @@
       
       <!-- Modal Footer -->
    <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" (click)="printPrescription()">
-          <i class="fas fa-print"></i> Print
-        </button>
-        <button type="button" class="btn btn-success" (click)="savePrescription()">
-          {{editingPrescriptionIndex !== null ? 'Update' : 'Save'}} Prescription
-        </button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" (click)="$event.preventDefault()">Close</button>
+  <button type="button" class="btn btn-primary" (click)="printPrescription()">
+    <i class="fas fa-print"></i> Print
+  </button>
+  <button type="button" class="btn btn-success" (click)="savePrescription()">
+    {{editingPrescriptionIndex !== null ? 'Update' : 'Save'}} Prescription
+  </button>
       </div>
     </div>
   </div>

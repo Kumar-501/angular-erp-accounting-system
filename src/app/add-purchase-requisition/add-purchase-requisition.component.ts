@@ -8,6 +8,9 @@ import { LocationService } from '../services/location.service';
 import { ProductsService } from '../services/products.service';
 import { UserService } from '../services/user.service';
 import { SupplierService } from '../services/supplier.service';
+// Add this import
+import { AuthService } from '../auth.service';
+
 import { Subscription } from 'rxjs';
 interface RequisitionItem {
   productId: string;
@@ -53,13 +56,17 @@ allSelected = false;
     private productsService: ProductsService,
     private userService: UserService,
     private supplierService: SupplierService,
-    public router: Router
+    public router: Router,
+        private authService: AuthService
+
   ) {}
 
   ngOnInit(): void {
     this.initializeForm();
     this.loadData();
     this.generateReferenceNumber();
+        this.setCurrentUser(); // Add this line
+
   }
 onSearchInput(event: any): void {
   if (this.searchTimeout) {
@@ -178,6 +185,21 @@ handleKeyDown(event: KeyboardEvent) {
       }
     }
   }
+  }
+   private setCurrentUser(): void {
+    const currentUser = this.authService.currentUserValue;
+    if (currentUser) {
+      // Set the form control value to the current user's display name
+      this.purchaseForm.get('addedBy')?.setValue(currentUser.displayName || currentUser.email);
+      
+      // If you want to store the user ID as well, you might want to add a hidden field
+      // this.purchaseForm.get('addedById')?.setValue(currentUser.uid);
+    }
+  }
+  onUserSelect(userName: string): void {
+  if (userName) {
+    this.purchaseForm.get('addedBy')?.setValue(userName);
+  }
 }
 addProductFromSearch(product: any) {
   const existingIndex = this.products.controls.findIndex(
@@ -251,7 +273,7 @@ initializeForm(): void {
     addedBy: ['', Validators.required],
     status: ['pending', Validators.required],
     shippingStatus: ['not_shipped'],
-    supplier: [''],
+    supplier:  ['', Validators.required],
     shippingDate: [''], // Removed Validators.required
     products: this.fb.array([])
   });

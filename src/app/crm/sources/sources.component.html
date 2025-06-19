@@ -43,8 +43,9 @@
     
     <div class="form-actions">
       <button class="close-btn" (click)="toggleForm()">Close</button>
-      <button class="save-btn" (click)="onSave()">{{ isEditMode ? 'Update' : 'Save' }}</button>
-    </div>
+<button class="save-btn" (click)="onSave()" [disabled]="isSaving">
+  {{ isEditMode ? 'Update' : 'Save' }}
+</button>    </div>
   </div>
   
   <!-- Display added sources -->

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
 import { PurchaseOrderService } from '../services/purchase-order.service';
 import { ProductsService } from '../services/products.service';
@@ -127,7 +127,8 @@ supplierSearchTerm: string = '';
 filteredSuppliers: string[] = [];
   totalPages: number = 1;
   sortColumn: string = '';
- 
+ currentActionPopup: string | null = null;
+
 showSupplierDropdown: boolean = false;
 sortDirection: 'asc' | 'desc' = 'asc';
   showColumnVisibility: boolean = false;
@@ -440,6 +441,19 @@ applyCustomRange(): void {
   } else {
     alert('Please select both from and to dates');
   }
+}
+openActionPopup(order: PurchaseOrder, event: Event): void {
+  event.stopPropagation();
+  this.currentActionPopup = order.id;
+}
+
+closeActionPopup(): void {
+  this.currentActionPopup = null;
+}
+
+@HostListener('document:keydown.escape', ['$event'])
+onKeydownHandler(event: KeyboardEvent) {
+  this.closeActionPopup();
 }
 
 private formatDate(date: Date): string {

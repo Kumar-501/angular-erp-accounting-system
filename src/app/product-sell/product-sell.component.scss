@@ -49,6 +49,87 @@
   display: flex;
   flex-direction: column;
 }
+/* Purchase History Card */
+.card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.card-header h5 {
+    font-weight: 600;
+    color: #333;
+}
+
+/* Opening Stock */
+.opening-stock {
+    padding: 12px 16px;
+    margin: 0;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 1rem;
+}
+
+.opening-stock .label {
+    font-weight: 500;
+    color: #555;
+}
+
+.opening-stock .value {
+    font-weight: 600;
+    color: #333;
+}
+
+/* Table Styling */
+.purchase-history-table {
+    font-size: 0.9rem;
+}
+
+.purchase-history-table th {
+    font-weight: 600;
+    color: #495057;
+    background-color: #f8f9fa;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+.purchase-history-table td {
+    vertical-align: middle;
+    padding: 10px 12px;
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
+}
+
+.status-paid {
+    background-color: #28a745; /* Green */
+}
+
+.status-partial {
+    background-color: #ffc107; /* Yellow */
+    color: #212529; /* Dark text for better contrast */
+}
+
+.status-due {
+    background-color: #dc3545; /* Red */
+}
+
+
 
 .filter-sidebar.show {
   right: 0;

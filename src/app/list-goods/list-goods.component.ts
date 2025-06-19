@@ -16,11 +16,13 @@ export class ListGoodsComponent implements OnInit, OnDestroy {
   goodsReceived: any[] = [];
   filteredGoodsReceived: any[] = [];
   paginatedGoodsReceived: any[] = [];
+  selectedGrnForAction: any = null;
+
   suppliers: any[] = [];
     currentGrn: any; // or your specific GRN type
   grnList: any[] = []; 
 selectedGrn: any = null;
-
+showPopup = false;
   currentPage: number = 1;
   pageSize: number = 10;
   totalPages: number = 1;
@@ -187,7 +189,28 @@ loadGoodsReceived(): void {
 
     this.updatePagination();
   }
+openActionModal(grn: any, index: number): void {
+  this.selectedGrnForAction = grn;
+  // Open the modal (you can use Bootstrap modal or Angular Material)
+  const modal = document.getElementById('grnActionModal');
+  if (modal) {
+    // For Bootstrap modal
+    const bootstrapModal = new (window as any).bootstrap.Modal(modal);
+    bootstrapModal.show();
+  }
+}
 
+closeActionModal(): void {
+  this.selectedGrnForAction = null;
+  // Close the modal
+  const modal = document.getElementById('grnActionModal');
+  if (modal) {
+    const bootstrapModal = (window as any).bootstrap.Modal.getInstance(modal);
+    if (bootstrapModal) {
+      bootstrapModal.hide();
+    }
+  }
+}
   applySearch(): void {
     this.currentPage = 1;
     this.applyFilters();

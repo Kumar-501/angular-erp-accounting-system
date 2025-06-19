@@ -95,7 +95,41 @@ export class EditProductComponent implements OnInit, OnDestroy {
   }
 
 
+calculateFromMRP() {
+  const taxPercentage = this.getTaxPercentage();
+  if (this.product.defaultSellingPriceIncTax !== null && this.product.defaultSellingPriceIncTax !== undefined) {
+    // Calculate price before tax from MRP
+    this.product.defaultSellingPriceExcTax = 
+      this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100);
+    
+    // Calculate margin based on purchase price
+    if (this.product.defaultPurchasePriceExcTax) {
+      const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
+      const sellingPrice = parseFloat(this.product.defaultSellingPriceExcTax);
+      this.product.marginPercentage = this.roundToTwoDecimals(((sellingPrice - cost) / cost) * 100);
+    }
+    
+    // Round the values
+    this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(this.product.defaultSellingPriceExcTax);
+    this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(this.product.defaultSellingPriceIncTax);
+  }
+}
 
+
+// Update these methods to match add-product
+
+// calculateAllPrices() method removed to resolve duplicate function implementation error.
+
+// Add this helper method
+private roundToTwoDecimals(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+// Removed duplicate calculateRecommendedPrice to resolve duplicate function implementation error.
+
+private roundToWholeNumber(value: number): number {
+  return Math.round(value);
+}
   private setupEditMode() {
     // Populate tax percentages
     if (this.product.applicableTax && this.product.applicableTax !== 'None') {
@@ -492,19 +526,26 @@ isExpiringSoon(dateString: string): boolean {
     }
   }
 
-  onProductTypeChange() {
-    if (this.product.productType === 'Combination') {
-      // Initialize with one empty component
-      if (this.product.components.length === 0) {
-        this.addComponent();
-      }
-      // For combination products, calculate price based on components
-      this.calculateCombinationPrices();
-    } else if (this.product.productType === 'Variant') {
-      // Initialize variant data if needed
-      this.generateVariantCombinations();
+onProductTypeChange() {
+  if (this.product.productType === 'Combination') {
+    // Initialize with one empty component
+    if (!this.product.components || this.product.components.length === 0) {
+      this.product.components = [];
+      this.addComponent();
     }
+    // For combination products, calculate price based on components
+    this.calculateCombinationPrices();
+  } else if (this.product.productType === 'Variant') {
+    // Initialize variant data if needed
+    if (!this.selectedVariations) {
+      this.selectedVariations = [];
+    }
+    this.generateVariantCombinations();
   }
+  
+  // Reset prices when changing product type
+  this.calculateAllPrices();
+}
 
   removeComponent(index: number) {
     this.product.components.splice(index, 1);
@@ -721,10 +762,17 @@ isExpiringSoon(dateString: string): boolean {
     this.calculateSellingPriceIncTax();
   }
 
- // In edit-product.component.ts
 async updateProduct() {
   try {
     this.isLoading = true;
+
+    // Basic validation - only check required fields that must be present
+    if (!this.product.productName || !this.product.unit || !this.product.barcodeType || 
+        !this.product.sellingPriceTaxType || !this.product.productType) {
+      alert('Please fill in all required fields');
+      this.isLoading = false;
+      return;
+    }
 
     // If stock management is enabled, ensure quantity is set
     if (this.product.manageStock) {

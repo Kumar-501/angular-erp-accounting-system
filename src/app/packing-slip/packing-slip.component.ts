@@ -22,6 +22,7 @@ export class PackingSlipComponent implements OnInit {
   loading = true;
   error = false;
   currentDate = new Date();
+showTaxDetails = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -81,6 +82,19 @@ export class PackingSlipComponent implements OnInit {
       }
     });
   }
+getGrandTotal(): number {
+  const productTotal = this.getTotalTaxableValue();
+  const productGST = productTotal * 0.18;
+  const shipping = this.packingSlip?.shippingCharge || 0;
+  const shippingGST = shipping * 0.18;
+
+  return productTotal + productGST + shipping + shippingGST;
+}
+
+  
+  getShippingGST(): number {
+  return this.packingSlip.shippingCharge * 0.18; // 18% on shipping
+}
 getTotalTaxableValue(): number {
   if (!this.packingSlip?.products) return 0;
   return this.packingSlip.products.reduce(
@@ -90,20 +104,16 @@ getTotalTaxableValue(): number {
   );
 }
 
-
 getTotalCGST(): number {
   return this.getTotalTaxableValue() * 0.09; // 9% CGST
 }
+
 
 getTotalSGST(): number {
   return this.getTotalTaxableValue() * 0.09; // 9% SGST
 }
 
-getGrandTotal(): number {
-  const productsTotal = this.getTotalTaxableValue() * 1.18; // 18% GST on products
-  const shippingWithGST = this.packingSlip.shippingCharge * 1.18; // 18% GST on shipping
-  return productsTotal + shippingWithGST;
-}
+
   private formatCustomerAddress(sale: any): string {
     const parts = [];
     if (sale.billingAddress) parts.push(sale.billingAddress);
@@ -122,6 +132,9 @@ getGrandTotal(): number {
   formatDate(dateString: string): string {
     return this.datePipe.transform(dateString, 'dd-MM-yyyy HH:mm') || 'N/A';
   }
+getTotalGST(): number {
+  return this.getTotalTaxableValue() * 0.18; // 18% total GST
+}
 
  print(): void {
   window.print();

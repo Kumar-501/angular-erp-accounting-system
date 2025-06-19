@@ -8,18 +8,19 @@
       <i class="fas fa-plus me-2"></i>Add Product
     </button>
   </div>
+
   <div class="row mb-3">
-    
+    <!-- Location Filter -->
+    <div class="col-md-4">
+      <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyLocationFilter()">
+        <option value="">All Locations</option>
+        <option *ngFor="let location of locations" [value]="location.id">
+          {{ location.name }}
+        </option>
+      </select>
     </div>
-   <!-- In the filter controls section -->
-<div class="col-md-4">
-  <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyLocationFilter()">
-    <option value="">All Locations</option>
-    <option *ngFor="let location of locations" [value]="location.id">
-      {{ location.name }}
-    </option>
-  </select>
-</div>
+  </div>
+
   <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
       <!-- Filters and Controls -->
@@ -33,6 +34,18 @@
               <option>100</option>
             </select>
           </div>
+
+          <!-- Active/All Products Toggle -->
+          <div class="btn-group ms-2 me-2">
+            <button class="btn btn-sm btn-outline-secondary" [class.active]="!showInactiveProducts" 
+                    (click)="showInactiveProducts = false; applyFilters()">
+              Active Only
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" [class.active]="showInactiveProducts" 
+                    (click)="showInactiveProducts = true; applyFilters()">
+              All Products
+            </button>
+          </div>
           
           <div class="btn-group ms-2">
             <button class="btn btn-sm btn-outline-secondary" (click)="exportToCSV()">
@@ -41,13 +54,12 @@
             <button class="btn btn-sm btn-outline-secondary" (click)="exportToExcel()">
               <i class="fas fa-file-excel me-1"></i>Excel
             </button>
-          
             <button class="btn btn-sm btn-outline-secondary" (click)="print()">
               <i class="fas fa-print me-1"></i>Print
             </button>
             <button class="btn btn-outline-secondary me-2" (click)="toggleFilterSidebar()">
-  <i class="fas fa-filter me-1"></i> Filters
-</button>
+              <i class="fas fa-filter me-1"></i> Filters
+            </button>
           </div>
         </div>
         
@@ -65,363 +77,383 @@
           </div>
         </div>
       </div>
-<!-- Add this after the "Add Product" button in the header -->
-<div class="d-flex align-items-center">
-  <div class="dropdown me-2" *ngIf="hasSelectedProducts()">
-    <button class="btn btn-outline-danger dropdown-toggle" type="button" 
-            data-bs-toggle="dropdown" aria-expanded="false">
-      <i class="fas fa-trash me-1"></i> Bulk Actions
-    </button>
-    <ul class="dropdown-menu">
-      <li>
-        <button class="dropdown-item text-danger" (click)="deleteSelectedProducts()">
-          <i class="fas fa-trash me-2"></i> Delete Selected
-        </button>
-      </li>
-    </ul>
-  </div>
-  <span class="text-muted me-2" *ngIf="hasSelectedProducts()">
-    {{ getSelectedCount() }} selected
-  </span>
-</div><!-- Add this at the end of your container div (before closing) -->
-<div class="filter-sidebar" [class.show]="showFilterSidebar">
-  <div class="filter-sidebar-header">
-    <h5>Filters</h5>
-    <button class="btn-close" (click)="toggleFilterSidebar()"></button>
-  </div>
-  <!-- Add this near your other filter controls -->
-<div class="filter-drawer-container">
-  <!-- Drawer Trigger Button -->
-<div class="input-group">
-  <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
-         readonly (click)="toggleDateDrawer()">
-  <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
-    <i class="fas fa-calendar-alt"></i>
-  </button>
-</div>
-  
-  <!-- Drawer Panel -->
-  <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
-    <div class="drawer-header">
-      <h5>Date Range Filter</h5>
-      <button class="btn-close" (click)="toggleDateDrawer()"></button>
-    </div>
-    
-    <div class="drawer-body">
-      <!-- Predefined Date Ranges -->
-      <div class="date-options">
-        <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
-          <span>Today</span>
+
+      <!-- Bulk Actions -->
+      <div class="d-flex align-items-center px-3 py-2 bg-light border-bottom" *ngIf="hasSelectedProducts()">
+        <div class="dropdown me-2">
+          <button class="btn btn-outline-danger dropdown-toggle" type="button" 
+                  data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-trash me-1"></i> Bulk Actions
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button class="dropdown-item text-danger" (click)="deleteSelectedProducts()">
+                <i class="fas fa-trash me-2"></i> Delete Selected
+              </button>
+            </li>
+          </ul>
         </div>
-        <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
-          <span>Yesterday</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
-          <span>Last 7 Days</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
-          <span>Last 30 Days</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
-          <span>Last Month</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
-          <span>Custom Range</span>
-        </div>
+        <span class="text-muted me-2">
+          {{ getSelectedCount() }} selected
+        </span>
       </div>
-      
-      <!-- Custom Date Range Picker -->
-      <div class="custom-date-container" *ngIf="isCustomDate">
-        <div class="mb-3">
-          <label class="form-label">From Date</label>
-          <input type="date" class="form-control" [(ngModel)]="fromDate">
+
+      <!-- Filter Sidebar -->
+      <div class="filter-sidebar" [class.show]="showFilterSidebar">
+        <div class="filter-sidebar-header">
+          <h5>Filters</h5>
+          <button class="btn-close" (click)="toggleFilterSidebar()"></button>
         </div>
-        <div class="mb-3">
-          <label class="form-label">To Date</label>
-          <input type="date" class="form-control" [(ngModel)]="toDate">
-        </div>
-      </div>
-    </div>
-    
-    <div class="drawer-footer" *ngIf="isCustomDate">
-      <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
-      <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
-    </div>
-  </div>
-  
-  <!-- Backdrop when drawer is open -->
-  <div class="drawer-backdrop" [class.backdrop-visible]="isDateDrawerOpen" (click)="toggleDateDrawer()"></div>
-</div>
-  <div class="filter-sidebar-body">
-    <!-- Brand Filter -->
- <!-- Brand Filter -->
-
-
-    <!-- Category Filter -->
- 
-
-    <!-- Tax Filter -->
-    <div class="mb-3">
-      <label class="form-label">Tax</label>
-      <select class="form-select" [(ngModel)]="selectedTax" (change)="applyFilters()">
-        <option value="">All Tax Rates</option>
-        <option *ngFor="let tax of taxRates" [value]="tax.id">
-          {{ tax.name }} ({{ tax.percentage }}%)
-        </option>
-      </select>
-    </div>
-
-    <!-- Location Filter (you already have this, but can duplicate in sidebar) -->
-    <div class="mb-3">
-      <label class="form-label">Location</label>
-      <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyFilters()">
-        <option value="">All Locations</option>
-        <option *ngFor="let location of locations" [value]="location.id">
-          {{ location.name }}
-        </option>
-      </select>
-    </div>
-
-    <!-- Action Buttons -->
-    <div class="d-grid gap-2 mt-4">
-      <button class="btn btn-primary" (click)="applyFilters()">
-        <i class="fas fa-check me-1"></i> Apply Filters
-      </button>
-      <button class="btn btn-outline-secondary" (click)="resetFilters()">
-        <i class="fas fa-times me-1"></i> Reset All
-      </button>
-    </div>
-  </div>
-</div>
-<div class="table-responsive">
-  <table class="table table-hover mb-0">
-    <thead class="table-light">
-      <tr>
-        <th width="40">
-          <input type="checkbox" (change)="toggleAllProducts($event)">
-        </th>
-        <th width="120">Actions</th>
-        <th (click)="sortBy('productName')">
-          Product
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'productName',
-            'fa-sort-up': currentSortColumn === 'productName' && isAscending,
-            'fa-sort-down': currentSortColumn === 'productName' && !isAscending
-          }"></i>
-        </th>
-        <th (click)="sortBy('createdDate')">
-          Created Date
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'createdDate',
-            'fa-sort-up': currentSortColumn === 'createdDate' && isAscending,
-            'fa-sort-down': currentSortColumn === 'createdDate' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
-          Selling Price (Exc Tax)
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'defaultSellingPriceExcTax',
-            'fa-sort-up': currentSortColumn === 'defaultSellingPriceExcTax' && isAscending,
-            'fa-sort-down': currentSortColumn === 'defaultSellingPriceExcTax' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('defaultSellingPriceIncTax')">
-          Selling Price
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'defaultSellingPriceIncTax',
-            'fa-sort-up': currentSortColumn === 'defaultSellingPriceIncTax' && isAscending,
-            'fa-sort-down': currentSortColumn === 'defaultSellingPriceIncTax' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('unitPurchasePrice')">
-          Unit Purchase Price
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'unitPurchasePrice',
-            'fa-sort-up': currentSortColumn === 'unitPurchasePrice' && isAscending,
-            'fa-sort-down': currentSortColumn === 'unitPurchasePrice' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('defaultPurchasePriceIncTax')">
-          Purchase Price (Inc Tax)
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'defaultPurchasePriceIncTax',
-            'fa-sort-up': currentSortColumn === 'defaultPurchasePriceIncTax' && isAscending,
-            'fa-sort-down': currentSortColumn === 'defaultPurchasePriceIncTax' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('currentStock')">
-          Current Stock
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'currentStock',
-            'fa-sort-up': currentSortColumn === 'currentStock' && isAscending,
-            'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
-          }"></i>
-        </th>
-        <th class="text-end" (click)="sortBy('alertQuantity')">
-          Alert Qty
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'alertQuantity',
-            'fa-sort-up': currentSortColumn === 'alertQuantity' && isAscending,
-            'fa-sort-down': currentSortColumn === 'alertQuantity' && !isAscending
-          }"></i>
-        </th>
-        <th>Locations</th>
-        <th (click)="sortBy('productType')">
-          Product Type
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'productType',
-            'fa-sort-up': currentSortColumn === 'productType' && isAscending,
-            'fa-sort-down': currentSortColumn === 'productType' && !isAscending
-          }"></i>
-        </th>
-        <th (click)="sortBy('category')">
-          Category
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'category',
-            'fa-sort-up': currentSortColumn === 'category' && isAscending,
-            'fa-sort-down': currentSortColumn === 'category' && !isAscending
-          }"></i>
-        </th>
-        <th (click)="sortBy('brand')">
-          Brand
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'brand',
-            'fa-sort-up': currentSortColumn === 'brand' && isAscending,
-            'fa-sort-down': currentSortColumn === 'brand' && !isAscending
-          }"></i>
-        </th>
-        <th (click)="sortBy('expiryDate')">
-          Expiry Date
-          <i class="fas ms-1" [ngClass]="{
-            'fa-sort': currentSortColumn !== 'expiryDate',
-            'fa-sort-up': currentSortColumn === 'expiryDate' && isAscending,
-            'fa-sort-down': currentSortColumn === 'expiryDate' && !isAscending
-          }"></i>
-        </th>
-        <th (click)="sortBy('sku')">SKU</th>
-        <th (click)="sortBy('hsnCode')">HSN Code</th>
-        <th (click)="sortBy('tax')">Tax</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let product of filteredProducts | slice: (currentPage-1)*itemsPerPage : currentPage*itemsPerPage"
-          [class.table-secondary]="!product.isActive"
-          [class.text-muted]="!product.isActive">
-        <td><input type="checkbox" [(ngModel)]="product.selected"></td>
-        <td>
-          <div class="dropdown">
-            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-              <i class="fas fa-ellipsis-v"></i>
+        
+        <div class="filter-drawer-container">
+          <!-- Date Filter Drawer -->
+          <div class="input-group mb-3">
+            <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
+                   readonly (click)="toggleDateDrawer()">
+            <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
+              <i class="fas fa-calendar-alt"></i>
             </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-              <li>
-                <button class="dropdown-item" (click)="viewProductDetails(product)">
-                  <i class="fas fa-eye me-2 text-info"></i>View
-                </button>
-              </li>
-              <li>
-                <button class="dropdown-item" (click)="editProduct(product.id)">
-                  <i class="fas fa-edit me-2 text-primary"></i>Edit
-                </button>
-              </li>
-              <li>
-                <button class="dropdown-item" (click)="viewProductAndPurchaseData(product)">
-                  <i class="fas fa-file-invoice me-2 text-primary"></i>View Details & Purchases
-                </button>
-              </li>
-              <li>
-                <button class="dropdown-item" (click)="viewProductSales(product)">
-                  <i class="fas fa-chart-line me-2 text-info"></i>View Sales
-                </button>
-              </li>
-              <li>
-                <button class="dropdown-item" (click)="duplicateProduct(product.id)">
-                  <i class="fas fa-copy me-2 text-secondary"></i>Duplicate
-                </button>
-              </li>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <button class="dropdown-item text-danger" (click)="deleteProduct(product.id)">
-                  <i class="fas fa-trash me-2"></i>Delete
-                </button>
-              </li>
-            </ul>
           </div>
-        </td>
-        <td>
-          <div class="d-flex align-items-center">
-            <div class="me-2">
-              <div class="product-img-placeholder bg-light rounded">
-                <i class="fas fa-box text-muted"></i>
+          
+          <!-- Date Drawer Panel -->
+          <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+            <div class="drawer-header">
+              <h5>Date Range Filter</h5>
+              <button class="btn-close" (click)="toggleDateDrawer()"></button>
+            </div>
+            
+            <div class="drawer-body">
+              <div class="date-options">
+                <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+                  <span>Today</span>
+                </div>
+                <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+                  <span>Yesterday</span>
+                </div>
+                <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+                  <span>Last 7 Days</span>
+                </div>
+                <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+                  <span>Last 30 Days</span>
+                </div>
+                <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+                  <span>Last Month</span>
+                </div>
+                <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+                  <span>Custom Range</span>
+                </div>
+              </div>
+              
+              <div class="custom-date-container" *ngIf="isCustomDate">
+                <div class="mb-3">
+                  <label class="form-label">From Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="fromDate">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">To Date</label>
+                  <input type="date" class="form-control" [(ngModel)]="toDate">
+                </div>
               </div>
             </div>
-            <div>
-              <div class="fw-medium d-flex align-items-center">
-                {{ product.productName }}
-              </div>
-              <small class="text-muted">{{ product.sku }}</small>
-              <span class="badge ms-2" [ngClass]="{
-                'bg-success': product.isActive && !product.notForSelling,
-                'bg-danger': !product.isActive,
-                'bg-warning': product.notForSelling
-              }">
-                {{ product.isActive ? (product.notForSelling ? 'Not for Sale' : 'Active') : 'Inactive' }}
-              </span>
+            
+            <div class="drawer-footer" *ngIf="isCustomDate">
+              <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+              <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
             </div>
           </div>
-        </td>
-        <td>{{ product.createdDate | date:'medium' }}</td>
-        <td class="text-end">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</td>
-        <td class="text-end">₹{{ product.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</td>
-        <td class="text-end">₹{{ product.unitPurchasePrice || 0 | number:'1.2-2' }}</td>
-        <td class="text-end">₹{{ product.defaultPurchasePriceIncTax || 0 | number:'1.2-2' }}</td>
-        <td class="text-end">
-          <span class="badge" [ngClass]="{
-            'bg-success': (product.currentStock || 0) > 10,
-            'bg-warning': (product.currentStock || 0) <= 10 && (product.currentStock || 0) > 0,
-            'bg-danger': (product.currentStock || 0) <= 0
-          }">
-            {{ product.currentStock || '0.00' }}
-          </span>
-        </td>
-        <td class="text-end">
-          <span [class.text-danger]="product.currentStock <= product.alertQuantity">
-            {{ product.alertQuantity || '-' }}
-          </span>
-        </td>
-        <td>
-          <div *ngIf="product.locationNames?.length > 0">
-            <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
-              {{ locName }}
-            </span>
+          
+          <div class="drawer-backdrop" [class.backdrop-visible]="isDateDrawerOpen" (click)="toggleDateDrawer()"></div>
+        </div>
+
+        <div class="filter-sidebar-body">
+          <!-- Tax Filter -->
+          <div class="mb-3">
+            <label class="form-label">Tax</label>
+            <select class="form-select" [(ngModel)]="selectedTax" (change)="applyFilters()">
+              <option value="">All Tax Rates</option>
+              <option *ngFor="let tax of taxRates" [value]="tax.id">
+                {{ tax.name }} ({{ tax.percentage }}%)
+              </option>
+            </select>
           </div>
-          <div *ngIf="!product.locationNames?.length" class="text-muted">
-            No Location
+
+          <!-- Location Filter -->
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <select class="form-select" [(ngModel)]="selectedLocation" (change)="applyFilters()">
+              <option value="">All Locations</option>
+              <option *ngFor="let location of locations" [value]="location.id">
+                {{ location.name }}
+              </option>
+            </select>
           </div>
-        </td>
-        <td>{{ product.productType }}</td>
-        <td>{{ product.category || '-' }}</td>
-        <td>{{ product.brand || '-' }}</td>
-        <td>
-          <span [class.text-danger]="isExpired(product.expiryDate)" 
-                [class.text-warning]="isExpiringSoon(product.expiryDate)">
-            {{ product.formattedExpiryDate || 'No expiry' }}
-          </span>
-        </td>
-        <td>{{ product.sku || '-' }}</td>
-        <td>{{ product.hsnCode || '-' }}</td>
-        <td>{{ product.displayTax || '-' }}</td>
-      </tr>
-      <tr *ngIf="filteredProducts.length === 0">
-        <td colspan="18" class="text-center py-4 text-muted">
-          <i class="fas fa-box-open fa-2x mb-2"></i>
-          <p class="mb-0">No products found matching your search criteria</p>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+
+          <!-- Product Status Filter -->
+          <div class="mb-3">
+            <label class="form-label">Product Status</label>
+            <select class="form-select" [(ngModel)]="selectedStatus" (change)="applyFilters()">
+              <option value="">All Products</option>
+              <option value="active">Active Products</option>
+              <option value="notForSelling">Not for Selling</option>
+              <option value="inactive">Inactive Products</option>
+            </select>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="d-grid gap-2 mt-4">
+            <button class="btn btn-primary" (click)="applyFilters()">
+              <i class="fas fa-check me-1"></i> Apply Filters
+            </button>
+            <button class="btn btn-outline-secondary" (click)="resetFilters()">
+              <i class="fas fa-times me-1"></i> Reset All
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products Table -->
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th width="40">
+                <input type="checkbox" (change)="toggleAllProducts($event)">
+              </th>
+              <th width="120">Actions</th>
+              <th (click)="sortBy('productName')">
+                Product
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'productName',
+                  'fa-sort-up': currentSortColumn === 'productName' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'productName' && !isAscending
+                }"></i>
+              </th>
+              <th>Locations</th>
+              <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
+                Selling Price (Exc Tax)
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'defaultSellingPriceExcTax',
+                  'fa-sort-up': currentSortColumn === 'defaultSellingPriceExcTax' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'defaultSellingPriceExcTax' && !isAscending
+                }"></i>
+              </th>
+              <th class="text-end" (click)="sortBy('defaultSellingPriceIncTax')">
+                Selling Price
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'defaultSellingPriceIncTax',
+                  'fa-sort-up': currentSortColumn === 'defaultSellingPriceIncTax' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'defaultSellingPriceIncTax' && !isAscending
+                }"></i>
+              </th>
+              <th class="text-end" (click)="sortBy('unitPurchasePrice')">
+                Unit Purchase Price
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'unitPurchasePrice',
+                  'fa-sort-up': currentSortColumn === 'unitPurchasePrice' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'unitPurchasePrice' && !isAscending
+                }"></i>
+              </th>
+              <th class="text-end" (click)="sortBy('defaultPurchasePriceIncTax')">
+                Purchase Price (Inc Tax)
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'defaultPurchasePriceIncTax',
+                  'fa-sort-up': currentSortColumn === 'defaultPurchasePriceIncTax' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'defaultPurchasePriceIncTax' && !isAscending
+                }"></i>
+              </th>
+              <th class="text-end" (click)="sortBy('currentStock')">
+                Current Stock
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'currentStock',
+                  'fa-sort-up': currentSortColumn === 'currentStock' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
+                }"></i>
+              </th>
+              <th class="text-end" (click)="sortBy('alertQuantity')">
+                Alert Qty
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'alertQuantity',
+                  'fa-sort-up': currentSortColumn === 'alertQuantity' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'alertQuantity' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortBy('productType')">
+                Product Type
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'productType',
+                  'fa-sort-up': currentSortColumn === 'productType' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'productType' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortBy('category')">
+                Category
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'category',
+                  'fa-sort-up': currentSortColumn === 'category' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'category' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortBy('brand')">
+                Brand
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'brand',
+                  'fa-sort-up': currentSortColumn === 'brand' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'brand' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortBy('expiryDate')">
+                Expiry Date
+                <i class="fas ms-1" [ngClass]="{
+                  'fa-sort': currentSortColumn !== 'expiryDate',
+                  'fa-sort-up': currentSortColumn === 'expiryDate' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'expiryDate' && !isAscending
+                }"></i>
+              </th>
+              <th (click)="sortBy('sku')">SKU</th>
+              <th (click)="sortBy('hsnCode')">HSN Code</th>
+              <th (click)="sortBy('tax')">Tax</th>
+            </tr>
+          </thead>
+          <tbody style="text-align: center;">
+            <tr *ngFor="let product of filteredProducts | slice: (currentPage-1)*itemsPerPage : currentPage*itemsPerPage"
+                [class.table-secondary]="!product.isActive || product.notForSelling"
+                [class.text-muted]="!product.isActive">
+              <td><input type="checkbox" [(ngModel)]="product.selected"></td>
+              <td>
+                <!-- Action Button -->
+                <button class="btn btn-sm btn-outline-secondary" type="button" 
+                        (click)="openActionPopup(product)">
+                  <i class="fas fa-ellipsis-v"></i>
+                </button>
+
+                <!-- Action Popup -->
+                <div class="action-popup-overlay" *ngIf="currentActionPopup === product.id" (click)="closeActionPopup()">
+                  <div class="action-popup" (click)="$event.stopPropagation()">
+                    <div class="popup-header">
+                      <h4>{{product.productName}}</h4>
+                      <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+                    </div>
+                    
+                    <div class="popup-body">
+                      <div class="action-item" (click)="viewProductDetails(product); closeActionPopup()">
+                        <i class="fas fa-eye text-info"></i>
+                        <span>View</span>
+                      </div>
+                      
+                      <div class="action-item" (click)="editProduct(product.id); closeActionPopup()">
+                        <i class="fas fa-edit text-primary"></i>
+                        <span>Edit</span>
+                      </div>
+                      
+                      <div class="action-item" (click)="viewProductAndPurchaseData(product); closeActionPopup()">
+                        <i class="fas fa-file-invoice text-primary"></i>
+                        <span>View Details & Purchases</span>
+                      </div>
+                      
+                      <div class="action-item" (click)="viewProductSales(product); closeActionPopup()">
+                        <i class="fas fa-chart-line text-info"></i>
+                        <span>View Sales</span>
+                      </div>
+                      
+                      <div class="action-item" (click)="duplicateProduct(product.id); closeActionPopup()">
+                        <i class="fas fa-copy text-secondary"></i>
+                        <span>Duplicate</span>
+                      </div>
+                      
+                      <div class="divider"></div>
+                      
+                      <!-- Toggle Selling Status -->
+                      <div class="action-item" *ngIf="!product.notForSelling" 
+                           (click)="toggleSellingStatus(product.id, true); closeActionPopup()">
+                        <i class="fas fa-ban text-warning"></i>
+                        <span>Mark as Not for Selling</span>
+                      </div>
+                      
+                      <div class="action-item" *ngIf="product.notForSelling" 
+                           (click)="toggleSellingStatus(product.id, false); closeActionPopup()">
+                        <i class="fas fa-check text-success"></i>
+                        <span>Mark as Available for Selling</span>
+                      </div>
+                      
+                      <div class="action-item text-danger" (click)="deleteProduct(product.id); closeActionPopup()">
+                        <i class="fas fa-trash"></i>
+                        <span>Delete</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center">
+                  <div class="me-2">
+                    <!-- Product image placeholder -->
+                  </div>
+                  <div>
+                    <div class="fw-medium d-flex align-items-center flex-wrap">
+                      <span>{{ product.productName }}</span>
+                      <!-- Not for Selling Badge -->
+                      <span *ngIf="product.notForSelling" class="badge bg-warning text-dark ms-2 mb-1">
+                        <i class="fas fa-ban me-1"></i>Not for Selling
+                      </span>
+                      <!-- Inactive Badge -->
+                      <span *ngIf="!product.isActive" class="badge bg-danger ms-2 mb-1">
+                        <i class="fas fa-times-circle me-1"></i>Inactive
+                      </span>
+                    </div>
+                    <small class="text-muted">{{ product.sku }}</small>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div *ngIf="product.locationNames?.length > 0">
+                  <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
+                    {{ locName }}
+                  </span>
+                </div>
+                <div *ngIf="!product.locationNames?.length" class="text-muted">
+                  No Location
+                </div>
+              </td>
+              <td class="text-end">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</td>
+              <td class="text-end">₹{{ product.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</td>
+              <td class="text-end">₹{{ product.unitPurchasePrice || 0 | number:'1.2-2' }}</td>
+              <td class="text-end">₹{{ product.defaultPurchasePriceIncTax || 0 | number:'1.2-2' }}</td>
+              <td class="text-end">
+                <span class="badge" [ngClass]="{
+                  'bg-success': (product.currentStock || 0) > 10,
+                  'bg-warning': (product.currentStock || 0) <= 10 && (product.currentStock || 0) > 0,
+                  'bg-danger': (product.currentStock || 0) <= 0
+                }">
+                  {{ product.currentStock || '0.00' }}
+                </span>
+              </td>
+              <td class="text-end">
+                <span [class.text-danger]="product.currentStock <= product.alertQuantity">
+                  {{ product.alertQuantity || '-' }}
+                </span>
+              </td>
+              <td>{{ product.productType }}</td>
+              <td>{{ product.category || '-' }}</td>
+              <td>{{ product.brand || '-' }}</td>
+              <td>
+                <span [class.text-danger]="isExpired(product.expiryDate)" 
+                      [class.text-warning]="isExpiringSoon(product.expiryDate)">
+                  {{ product.formattedExpiryDate || 'No expiry' }}
+                </span>
+              </td>
+              <td>{{ product.sku || '-' }}</td>
+              <td>{{ product.hsnCode || '-' }}</td>
+              <td>{{ product.displayTax || '-' }}</td>
+            </tr>
+            <tr *ngIf="filteredProducts.length === 0">
+              <td colspan="17" class="text-center py-4 text-muted">
+                <i class="fas fa-box-open fa-2x mb-2"></i>
+                <p class="mb-0">No products found matching your search criteria</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Pagination -->
       <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-top">
@@ -450,159 +482,30 @@
       </div>
     </div>
   </div>
-</div>
-<div class="d-flex justify-content-between p-3 border-top">
-  <div>
-    <button class="btn btn-outline-primary me-2" (click)="openAddToLocationModal()" [disabled]="!hasSelectedProducts()">
-      <i class="fas fa-map-marker-alt me-1"></i> Add to Location
-    </button>
-    <button class="btn btn-outline-danger me-2" (click)="removeFromLocation()" [disabled]="!hasSelectedProducts()">
-      <i class="fas fa-trash-alt me-1"></i> Remove from Location
-    </button>
-    <button class="btn btn-outline-warning" (click)="toggleProductActivation()" [disabled]="!hasSelectedProducts()">
-      <i class="fas fa-power-off me-1"></i> {{ isDeactivating ? 'Activate Selected' : 'Deactivate Selected' }}
-    </button>
-  </div>
-</div>
-<!-- Add to Location Modal -->
-<div class="modal fade" [class.show]="showAddToLocationModal" tabindex="-1" role="dialog" 
-     [style.display]="showAddToLocationModal ? 'block' : 'none'">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title">
-          <i class="fas fa-map-marker-alt me-2"></i>
-          Add Selected Products to Location
-        </h5>
-        <button type="button" class="btn-close" (click)="closeAddToLocationModal()"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label for="locationSelect" class="form-label">Select Location</label>
-          <select class="form-select" id="locationSelect" [(ngModel)]="selectedLocationForAdd">
-            <option value="">Select Location</option>
-            <option *ngFor="let location of locations" [value]="location.id">
-              {{ location.name }}
-            </option>
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeAddToLocationModal()">Cancel</button>
-        <button type="button" class="btn btn-primary" (click)="addToLocation()" [disabled]="!selectedLocationForAdd">
-          <i class="fas fa-save me-1"></i> Save
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<!-- Stock History Modal -->
-<div class="modal fade" [class.show]="showStockHistoryModal" tabindex="-1" role="dialog" 
-     [style.display]="showStockHistoryModal ? 'block' : 'none'">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title">
-          <i class="fas fa-history me-2"></i>
-          Stock History for {{ selectedProduct?.productName }}
-        </h5>
-        <button type="button" class="btn-close" (click)="closeStockHistoryModal()"></button>
-      </div>
-      <div class="modal-body">
-        <!-- Product Summary -->
-        <div class="row mb-4">
-          <div class="col-md-4">
-            <div class="card border-0 shadow-sm mb-3">
-              <div class="card-body">
-                <h6 class="card-title text-muted">Product</h6>
-                <p class="card-text">{{ selectedProduct?.productName }}</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card border-0 shadow-sm mb-3">
-              <div class="card-body">
-                <h6 class="card-title text-muted">Current Stock</h6>
-                <p class="card-text">{{ selectedProduct?.displayStock }}</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="card border-0 shadow-sm mb-3">
-              <div class="card-body">
-                <h6 class="card-title text-muted">Location</h6>
-                <p class="card-text">{{ selectedProduct?.locationName || '-' }}</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Stock History Table -->
-        <div class="table-responsive">
-          <table class="table table-sm table-hover">
-            <thead class="table-light">
-              <tr>
-                <th>Date</th>
-                <th>Action</th>
-                <th>Quantity</th>
-                <th>Previous</th>
-                <th>Current</th>
-                <th>Location</th>
-                <th class="text-end">Purchase</th>
-                <th class="text-end">Selling</th>
-                <th class="text-end">Value</th>
-                <th>User</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let entry of stockHistory">
-                <td>{{ entry.formattedTimestamp }}</td>
-                <td>
-                  <span class="badge" [ngClass]="{
-                    'bg-success': entry.action === 'stock_in',
-                    'bg-warning': entry.action === 'stock_out',
-                    'bg-info': entry.action === 'transfer',
-                    'bg-secondary': entry.action === 'adjustment'
-                  }">
-                    {{ getStockActionLabel(entry.action) }}
-                  </span>
-                </td>
-                <td>
-                  <span *ngIf="entry.action == 'transfer'">
-                    {{ entry.quantity }} 
-                    <small class="text-muted">({{ entry.fromLocation }} → {{ entry.toLocation }})</small>
-                  </span>
-                  <span *ngIf="entry.action != 'transfer'">
-                    {{ entry.quantity }}
-                  </span>
-                </td>
-                <td>{{ entry.previousStock || '-' }}</td>
-                <td>{{ entry.currentStock }}</td>
-                <td>{{ entry.location || entry.toLocation || '-' }}</td>
-                <td class="text-end">₹{{ entry.purchasePrice | number:'1.2-2' }}</td>
-                <td class="text-end">₹{{ calculateStockValue(entry.quantity, entry.purchasePrice) | number:'1.2-2' }}</td>
-                <td>{{ entry.userName }}</td>
-              </tr>
-              <tr *ngIf="stockHistory.length === 0">
-                <td colspan="10" class="text-center py-4 text-muted">
-                  No stock history available
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeStockHistoryModal()">Close</button>
-        <button type="button" class="btn btn-primary" (click)="editProduct(selectedProduct?.id)">
-          <i class="fas fa-edit me-1"></i>Edit Product
-        </button>
-      </div>
+  <!-- Bulk Actions Footer -->
+  <div class="d-flex justify-content-between p-3 border-top">
+    <div>
+      <button class="btn btn-outline-primary me-2" (click)="openAddToLocationModal()" [disabled]="!hasSelectedProducts()">
+        <i class="fas fa-map-marker-alt me-1"></i> Add to Location
+      </button>
+      <button class="btn btn-outline-danger me-2" (click)="removeFromLocation()" [disabled]="!hasSelectedProducts()">
+        <i class="fas fa-trash-alt me-1"></i> Remove from Location
+      </button>
+<button class="btn btn-outline-warning me-2" 
+        (click)="toggleProductActivation()" 
+        [disabled]="!hasSelectedProducts()">
+  <i class="fas fa-power-off me-1"></i> 
+  {{ getActivationButtonText() }}
+</button>
+      <button class="btn btn-outline-secondary" (click)="toggleBulkSellingStatus()" [disabled]="!hasSelectedProducts()">
+        <i class="fas fa-ban me-1"></i> Toggle Selling Status
+      </button>
     </div>
   </div>
 </div>
-<!-- Add this modal to your list-products.component.html -->
-<!-- Product Details Modal -->
+
+<!-- Product Details Modal (Updated) -->
 <div class="modal fade" [class.show]="showProductDetailsModal" tabindex="-1" role="dialog" 
      [style.display]="showProductDetailsModal ? 'block' : 'none'">
   <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
@@ -630,6 +533,20 @@
                 <div class="col-8">{{ selectedProduct?.sku || '-' }}</div>
               </div>
               <div class="row mb-2">
+                <div class="col-4 fw-medium">Status:</div>
+                <div class="col-8">
+                  <span *ngIf="selectedProduct?.notForSelling" class="badge bg-warning text-dark">
+                    <i class="fas fa-ban me-1"></i>Not for Selling
+                  </span>
+                  <span *ngIf="!selectedProduct?.notForSelling && selectedProduct?.isActive" class="badge bg-success">
+                    <i class="fas fa-check me-1"></i>Active
+                  </span>
+                  <span *ngIf="!selectedProduct?.isActive" class="badge bg-danger">
+                    <i class="fas fa-times-circle me-1"></i>Inactive
+                  </span>
+                </div>
+              </div>
+              <div class="row mb-2">
                 <div class="col-4 fw-medium">Product Type:</div>
                 <div class="col-8">{{ selectedProduct?.productType || '-' }}</div>
               </div>
@@ -643,6 +560,7 @@
               </div>
             </div>
           </div>
+          
           
           <!-- Right Column -->
           <div class="col-md-6">
@@ -726,10 +644,3 @@
   </div>
 </div>
 <!-- Add this near your other filter controls -->
-<div class="form-check form-switch mb-2">
-  <input class="form-check-input" type="checkbox" id="showInactiveToggle" 
-         [(ngModel)]="showInactiveProducts" (change)="toggleInactiveProducts()">
-  <label class="form-check-label" for="showInactiveToggle">
-    Show Inactive Products
-  </label>
-</div>

@@ -22,7 +22,7 @@ export class AddStockComponent implements OnInit {
   private searchTimeout: any;
   allLocations: any[] = []; 
   stockValidationErrors: { [key: number]: string | null } = {};
-i: any;
+  i: any;
 
   constructor(
     private fb: FormBuilder,
@@ -76,7 +76,7 @@ i: any;
       product: ['', Validators.required],
       productName: [''],
       quantity: [1, [Validators.required, Validators.min(1)]],
-      unitPrice: [0, [Validators.required, Validators.min(0.01)]],
+      unitPrice: [0, [Validators.min(0)]], // Removed Validators.required
       subtotal: [0]
     });
   }
@@ -208,7 +208,7 @@ i: any;
     }
   }
 
-  addProductFromSearch(transferIndex: number, product: any) {
+  async addProductFromSearch(transferIndex: number, product: any) {
     const transfer = this.locationTransfers.at(transferIndex);
     const productsArray = this.getProductsArray(transfer);
     
@@ -221,11 +221,17 @@ i: any;
       productsArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
       this.calculateSubtotal(transferIndex, existingIndex);
     } else {
+      // Get the product details including the price
+      const productDetails = await this.productService.getProductById(product.id);
+      
       const productFormGroup = this.createProduct();
       productFormGroup.patchValue({
         product: product.id,
         productName: product.productName,
-        unitPrice: product.defaultPurchasePrice || 0,
+        unitPrice: productDetails?.defaultPurchasePriceIncTax || 
+                  productDetails?.defaultPurchasePriceExcTax || 
+                  productDetails?.unitPurchasePrice || 
+                  0, // Default to 0 if no price found
         quantity: 1
       });
       
@@ -335,115 +341,116 @@ i: any;
         
         const product = productGroup.get('product')?.value;
         const quantity = productGroup.get('quantity')?.value;
-        const unitPrice = productGroup.get('unitPrice')?.value;
-        return product && quantity > 0 && unitPrice > 0;
+        // Removed unitPrice check
+        return product && quantity > 0;
       });
 
       return hasValidProducts ? null : { noValidProducts: true };
     };
   }
-async validateStockQuantities(): Promise<boolean> {
-  this.stockValidationErrors = {};
-  let isValid = true;
 
-  for (let i = 0; i < this.locationTransfers.length; i++) {
-    const transfer = this.locationTransfers.at(i);
-    const productsArray = this.getProductsArray(transfer);
-    const locationFrom = transfer.get('locationFrom')?.value;
+  async validateStockQuantities(): Promise<boolean> {
+    this.stockValidationErrors = {};
+    let isValid = true;
 
-    for (let j = 0; j < productsArray.length; j++) {
-      const productGroup = productsArray.at(j) as FormGroup;
-      const productId = productGroup.get('product')?.value;
-      const requestedQuantity = productGroup.get('quantity')?.value || 0;
-      
-      if (productId && requestedQuantity > 0) {
-        try {
-          const product = await this.productService.getProductById(productId);
-          
-          if (product) {
-            const currentStock = product.currentStock || 0;
+    for (let i = 0; i < this.locationTransfers.length; i++) {
+      const transfer = this.locationTransfers.at(i);
+      const productsArray = this.getProductsArray(transfer);
+      const locationFrom = transfer.get('locationFrom')?.value;
+
+      for (let j = 0; j < productsArray.length; j++) {
+        const productGroup = productsArray.at(j) as FormGroup;
+        const productId = productGroup.get('product')?.value;
+        const requestedQuantity = productGroup.get('quantity')?.value || 0;
+        
+        if (productId && requestedQuantity > 0) {
+          try {
+            const product = await this.productService.getProductById(productId);
             
-            if (requestedQuantity > currentStock) {
-              const productName = product.productName || 'Product';
-              this.stockValidationErrors[i] = `Insufficient stock for ${productName}. Available: ${currentStock}, Requested: ${requestedQuantity}`;
-              isValid = false;
-              // Highlight the problematic row
-              productGroup.get('quantity')?.setErrors({ insufficientStock: true });
+            if (product) {
+              const currentStock = product.currentStock || 0;
+              
+              if (requestedQuantity > currentStock) {
+                const productName = product.productName || 'Product';
+                this.stockValidationErrors[i] = `Insufficient stock for ${productName}. Available: ${currentStock}, Requested: ${requestedQuantity}`;
+                isValid = false;
+                // Highlight the problematic row
+                productGroup.get('quantity')?.setErrors({ insufficientStock: true });
+              }
             }
+          } catch (error) {
+            console.error(`Error validating stock for product ${productId}:`, error);
+            this.stockValidationErrors[i] = `Error validating stock for product`;
+            isValid = false;
           }
-        } catch (error) {
-          console.error(`Error validating stock for product ${productId}:`, error);
-          this.stockValidationErrors[i] = `Error validating stock for product`;
-          isValid = false;
         }
       }
     }
+    
+    return isValid;
   }
-  
-  return isValid;
-}
 
   async onSubmit(): Promise<void> {
-  // Mark all form controls as touched to trigger validation messages
-  this.markAllAsTouched();
+    // Mark all form controls as touched to trigger validation messages
+    this.markAllAsTouched();
 
-  if (this.stockForm.invalid) {
-    this.submitError = 'Please fill all required fields correctly.';
-    return;
-  }
-
-  // Validate stock quantities before submitting
-  const isStockValid = await this.validateStockQuantities();
-  if (!isStockValid) {
-    this.submitError = 'Some products have insufficient stock. Please check the quantities.';
-    return;
-  }
-
-  this.isSubmitting = true;
-  this.submitError = null;
-
-  try {
-    // Prepare the form data
-    const formValue = this.stockForm.getRawValue();
-    
-    // Format the data for the service
-    const transfersData = {
-      date: new Date(formValue.date).toISOString(),
-      referenceNo: formValue.referenceNo,
-      status: formValue.status,
-      additionalNotes: formValue.additionalNotes,
-      locationTransfers: formValue.locationTransfers.map((transfer: any, index: number) => ({
-        locationFrom: transfer.locationFrom,
-        locationTo: transfer.locationTo,
-        products: transfer.products.map((product: any) => ({
-          product: product.product,
-          productName: product.productName,
-          quantity: product.quantity,
-          unitPrice: product.unitPrice,
-          subtotal: product.quantity * product.unitPrice
-        })),
-        subtotal: this.getTransferSubtotal(index),
-        totalAmount: this.getTransferSubtotal(index)
-      })),
-      grandTotal: this.grandTotal,
-      createdAt: new Date().toISOString()
-    };
-
-    // Call the service to add stock
-    await this.stockService.addStock(transfersData);
-    
-    // Navigate to list page after successful submission
-    this.router.navigate(['/list-stock']);
-  } catch (error) {
-    console.error('Error adding stock:', error);
-    this.submitError = 'Failed to save stock transfer. Please try again.';
-    if (error instanceof Error) {
-      this.submitError += ` Error: ${error.message}`;
+    if (this.stockForm.invalid) {
+      this.submitError = 'Please fill all required fields correctly.';
+      return;
     }
-  } finally {
-    this.isSubmitting = false;
+
+    // Validate stock quantities before submitting
+    const isStockValid = await this.validateStockQuantities();
+    if (!isStockValid) {
+      this.submitError = 'Some products have insufficient stock. Please check the quantities.';
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.submitError = null;
+
+    try {
+      // Prepare the form data
+      const formValue = this.stockForm.getRawValue();
+      
+      // Format the data for the service
+      const transfersData = {
+        date: new Date(formValue.date).toISOString(),
+        referenceNo: formValue.referenceNo,
+        status: formValue.status,
+        additionalNotes: formValue.additionalNotes,
+        locationTransfers: formValue.locationTransfers.map((transfer: any, index: number) => ({
+          locationFrom: transfer.locationFrom,
+          locationTo: transfer.locationTo,
+          products: transfer.products.map((product: any) => ({
+            product: product.product,
+            productName: product.productName,
+            quantity: product.quantity,
+            unitPrice: product.unitPrice,
+            subtotal: product.quantity * product.unitPrice
+          })),
+          subtotal: this.getTransferSubtotal(index),
+          totalAmount: this.getTransferSubtotal(index)
+        })),
+        grandTotal: this.grandTotal,
+        createdAt: new Date().toISOString()
+      };
+
+      // Call the service to add stock
+      await this.stockService.addStock(transfersData);
+      
+      // Navigate to list page after successful submission
+      this.router.navigate(['/list-stock']);
+    } catch (error) {
+      console.error('Error adding stock:', error);
+      this.submitError = 'Failed to save stock transfer. Please try again.';
+      if (error instanceof Error) {
+        this.submitError += ` Error: ${error.message}`;
+      }
+    } finally {
+      this.isSubmitting = false;
+    }
   }
-}
 
   private markAllAsTouched(): void {
     Object.values(this.stockForm.controls).forEach(control => {

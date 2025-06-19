@@ -17,7 +17,231 @@
   display: block;
   zoom: 0.75; /* 75% zoom */
 }
+/* Action Button Styling */
+.action-btn {
+  border: 1px solid #6c757d;
+  color: #6c757d;
+  background-color: transparent;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
 
+.action-btn:hover {
+  background-color: #6c757d;
+  color: white;
+  border-color: #6c757d;
+}
+
+.action-btn:focus {
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
+/* Modal Styling */
+.modal-dialog {
+  max-width: 800px;
+  width: 95%;
+}
+
+.modal-content {
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border: none;
+}
+
+.modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  padding: 16px 20px;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-title {
+  font-weight: 600;
+  color: #212529;
+  margin: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.btn-close:hover {
+  opacity: 1;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  background-color: #f8f9fa;
+  border-top: 1px solid #dee2e6;
+  padding: 12px 20px;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Action List Styling */
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-item {
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  padding: 12px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.action-item:hover {
+  background-color: #e9ecef;
+  border-color: #ced4da;
+}
+
+/* Custom Checkbox Styling */
+.action-checkbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  width: 100%;
+  margin: 0;
+}
+
+.action-checkbox input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  height: 18px;
+  width: 18px;
+  background-color: #ffffff;
+  border: 2px solid #ced4da;
+  border-radius: 3px;
+  position: relative;
+  margin-right: 12px;
+  transition: all 0.2s ease;
+}
+
+.action-checkbox:hover input ~ .checkmark {
+  border-color: #007bff;
+  background-color: #f8f9ff;
+}
+
+.action-checkbox input:checked ~ .checkmark {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.action-checkbox input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.action-checkbox .checkmark:after {
+  left: 5px;
+  top: 2px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Action Text Styling */
+.action-text {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #495057;
+  flex: 1;
+}
+
+.action-text i {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+}
+
+/* Icon Colors */
+.text-primary { color: #007bff !important; }
+.text-warning { color: #ffc107 !important; }
+.text-danger { color: #dc3545 !important; }
+.text-info { color: #17a2b8 !important; }
+.text-secondary { color: #6c757d !important; }
+.text-success { color: #28a745 !important; }
+
+/* Utility Classes */
+.me-2 { margin-right: 8px; }
+
+/* Button Styling */
+.btn {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+  border-color: #4e555b;
+  color: white;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Responsive Design */
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 10px;
+  }
+  
+  .action-text {
+    font-size: 13px;
+  }
+  
+  .action-text i {
+    font-size: 14px;
+  }
+}
+
+/* Animation for modal */
+.modal.fade .modal-dialog {
+  transition: transform 0.3s ease-out;
+}
+
+.modal.show .modal-dialog {
+  transform: none;
+}
 
 /* Payment Modal Styles */
 .modal {

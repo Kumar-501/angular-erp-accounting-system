@@ -355,4 +355,21 @@
       }
     }
   }
+}/* Add these styles to your component's CSS or global styles */
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.badge-expense {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.badge-income {
+  background-color: #e8f5e9;
+  color: #2e7d32;
 }

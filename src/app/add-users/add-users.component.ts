@@ -129,10 +129,10 @@ export class AddUsersComponent implements OnInit {
     this.addUserForm = this.fb.group({
       // Basic Info
       prefix: ['Mr'],
-      firstName: [''],
+      firstName: ['', Validators.required],
       lastName: [''],
-      department: [''],
-      designation: [''],
+      department: ['', ],
+      designation: ['', ],
       employeeId: [''], // No longer readonly, will be manually entered
 
       email: ['', [Validators.required, Validators.email]],
@@ -238,53 +238,30 @@ export class AddUsersComponent implements OnInit {
     }
   }
 
-onSubmit(): void {
-  if (this.addUserForm.invalid) {
-    Object.keys(this.addUserForm.controls).forEach(key => {
-      this.addUserForm.get(key)?.markAsTouched();
-    });
-    console.log('Form is invalid. Please check all required fields.');
-    return;
-  }
-
-  // Get location names from selected IDs
-  const selectedLocationNames = this.businessLocations
-    .filter(loc => this.selectedLocations.includes(loc.id))
-    .map(loc => loc.name);
-
-  // Prepare form data with proper location handling
-  const formData = {
-    ...this.addUserForm.value,
-    // Save both IDs and names for locations
-    locationIds: this.selectedLocations,
-    locationNames: selectedLocationNames,
-    allLocations: this.addUserForm.get('allLocations')?.value,
-    createdAt: new Date(),
-    updatedAt: new Date()
-  };
-
-  // Remove confirmPassword from the data being saved
-  delete formData.confirmPassword;
-
-  // Submit the form
-  this.userService.addUser(formData)
-    .then((docRef) => {
-      console.log("User added successfully with ID: ", docRef.id);
-      this.addUserForm.reset();
-      this.selectedLocations = [];
-      this.addUserForm.patchValue({
-        prefix: 'Mr',
-        allLocations: true,
-        isActive: false,
-        enableServicePin: false,
-        allowLogin: false,
-        allowSelectedContacts: false
+  onSubmit(): void {
+    // Mark all fields as touched to show validation errors
+    if (this.addUserForm.invalid) {
+      Object.keys(this.addUserForm.controls).forEach(key => {
+        this.addUserForm.get(key)?.markAsTouched();
       });
-      this.router.navigate(['hrm/user1']);
-    })
-    .catch((error) => {
-      console.error("Error adding user: ", error);
-      alert('Error adding user. Please try again.');
-    });
-}
+      return;
+    }
+  
+    const formData = {
+      ...this.addUserForm.value,
+      selectedLocations: this.selectedLocations,
+    };
+  
+    this.userService.addUser(formData)
+      .then((docRef) => {
+        console.log("User added with ID: ", docRef.id);
+        this.addUserForm.reset();
+        this.selectedLocations = [];
+        // Navigate after successful submission
+        this.router.navigate(['hrm/user1']);
+      })
+      .catch((error) => {
+        console.error("Error adding user: ", error);
+      });
+  }
 }

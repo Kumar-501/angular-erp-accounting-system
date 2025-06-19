@@ -183,37 +183,24 @@ export class ImportOpeningComponent {
     await this.productService.updateProduct(product.id, updateData);
   }
 
-downloadTemplate(): void {
-  const templateData = [
-    {
-      'SKU': 'PROD001',
-      'Product Name': 'Sample Product',
-      'Quantity': 100,
-      'Unit Cost (Before Tax)': 50.00,
-      'Selling Price': 75.00,
-      'Location': 'Warehouse A',
-      'Location ID': 'loc123',
-      'HSN Code': '123456',
-      'Batch Number': 'BATCH001',
-      'Expiry Date': '03/25/2025',
-      'Barcode Type': 'CODE128',
-      'Unit': 'pcs',
-      'Brand': 'Sample Brand',
-      'Category': 'Sample Category',
-      'Sub Category': 'Sample Subcategory',
-      'Product Type': 'Standard',
-      'Tax Percentage': 18,
-      'Weight (kg)': 0.5,
-      'Alert Quantity': 10,
-      'Status': 'Active'
-    }
-  ];
+  downloadTemplate(): void {
+    const templateData = [
+      {
+        'SKU': 'PROD001',
+        'Quantity': 100,
+        'Unit Cost (Before Tax)': 50.00,
+        'Location': 'Warehouse A',
+        'Lot Number': 'LOT001',
+        'Expiry Date': '03/25/2025'
+      }
+    ];
 
-  const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(templateData);
-  const wb: XLSX.WorkBook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'OpeningStock');
-  XLSX.writeFile(wb, 'OpeningStock_Template.xlsx');
-}
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(templateData);
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'OpeningStock');
+    XLSX.writeFile(wb, 'OpeningStock_Template.xlsx');
+  }
+
   downloadCurrentStockTemplate(): void {
     this.productService.fetchAllProducts().then(products => {
       const exportData = products.map(product => ({

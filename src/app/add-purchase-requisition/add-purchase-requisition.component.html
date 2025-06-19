@@ -104,17 +104,29 @@
 </div>
           </div>
 
-          <div class="col-md-4">
-            <div class="form-group">
-              <label>Added By:</label>
-              <select formControlName="addedBy" class="form-control" required>
-                <option value="">Select User</option>
-                <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
+     <!-- In your form template -->
+<div class="form-group">
+  <label for="addedBy">Added By</label>
+  <select class="form-control" 
+          id="addedBy" 
+          formControlName="addedBy"
+          (change)="onUserSelect($any($event.target).value)">
+    <!-- Current value as first option -->
+    <option [value]="purchaseForm.get('addedBy')?.value || ''"
+            [selected]="true">
+      {{ purchaseForm.get('addedBy')?.value || 'Select user' }}
+    </option>
+    
+    <!-- Separator (optional) -->
+\    
+    <!-- Other users -->
+    <option *ngFor="let user of users" 
+            [value]="user.displayName || user.email"
+            [disabled]="(user.displayName || user.email) === (purchaseForm.get('addedBy')?.value || '')">
+      {{ user.displayName || user.email }}
+    </option>
+  </select>
+</div>
         <div class="row mt-3">
           <div class="col-md-6">
             <div class="form-group">

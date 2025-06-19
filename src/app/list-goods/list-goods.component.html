@@ -83,11 +83,11 @@
           <tr *ngFor="let grn of paginatedGoodsReceived">
             <td>
               <div class="dropdown">
-                <button class="action-btn">Actions ▼</button>
-                <div class="dropdown-content">
-                
-                  <a href="javascript:void(0)" (click)="deleteGrn(grn.id)">Delete</a>
-                </div>
+               <div class="delete-icon-container">
+  <button class="delete-btn" (click)="deleteGrn(grn.id)" title="Delete">
+    <i class="fas fa-trash"></i>
+  </button>
+</div>
               </div>
             </td>
             <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>

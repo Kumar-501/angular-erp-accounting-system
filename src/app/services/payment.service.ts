@@ -291,6 +291,7 @@ async processSupplierPayment(paymentData: any): Promise<string> {
    * @returns Observable of supplier payments array
    */
   getSupplierPayments(supplierId: string): Observable<PaymentData[]> {
+    console.log('getSupplierPayments called with supplierId:', supplierId);
     if (!supplierId) {
       return throwError(() => new Error('Supplier ID is required'));
     }
@@ -300,36 +301,34 @@ async processSupplierPayment(paymentData: any): Promise<string> {
       const q = query(
         paymentsRef,
         where('supplierId', '==', supplierId),
-        where('type', '==', 'supplier'),
+        // where('type', '==', 'supplier'), // Temporarily remove type filter for debugging
         orderBy('paymentDate', 'desc')
       );
 
       return (collectionData(q, { idField: 'id' }) as Observable<PaymentData[]>).pipe(
-        map(payments => payments.map(payment => this.processPaymentData(payment))),
+        map(payments => {
+          console.log('Payments fetched from Firestore:', payments);
+          return payments.map(payment => this.processPaymentData(payment));
+        }),
         catchError(error => {
           console.error('Error getting supplier payments:', error);
           // Try without orderBy if index error occurs
           if (error.code === 'failed-precondition') {
             const simpleQuery = query(
               paymentsRef,
-              where('supplierId', '==', supplierId),
-              where('type', '==', 'supplier')
+              where('supplierId', '==', supplierId)
+              // where('type', '==', 'supplier')
             );
             return (collectionData(simpleQuery, { idField: 'id' }) as Observable<PaymentData[]>).pipe(
-              map(payments => payments.map(payment => this.processPaymentData(payment))),
-              map(payments => payments.sort((a, b) => {
-                const dateA = this.getDateFromTimestamp(a.paymentDate);
-                const dateB = this.getDateFromTimestamp(b.paymentDate);
-                return dateB.getTime() - dateA.getTime();
-              }))
+              map(payments => payments.map(payment => this.processPaymentData(payment)))
             );
           }
-          return of([]);
+          return throwError(() => error);
         })
       );
     } catch (error) {
       console.error('Error in getSupplierPayments setup:', error);
-      return of([]);
+      return throwError(() => error);
     }
   }
 

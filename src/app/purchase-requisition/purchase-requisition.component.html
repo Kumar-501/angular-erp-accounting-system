@@ -16,16 +16,17 @@
 
   <div class="table-container">
     <div class="table-header">
-      <div class="entries-section">
-        <label>Show 
-          <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
-            <option [value]="25">25</option>
-            <option [value]="50">50</option>
-            <option [value]="100">100</option>
-          </select>
-          entries
-        </label>
-      </div>
+<div class="entries-section">
+  <label>Show 
+    <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
+      <option [value]="10">10</option>  <!-- Changed from 25 to 10 -->
+      <option [value]="25">25</option>
+      <option [value]="50">50</option>
+      <option [value]="100">100</option>
+    </select>
+    entries
+  </label>
+</div>
 
       <div class="export-buttons">
         <button class="export-btn" (click)="exportCSV()">
@@ -87,15 +88,63 @@
         </button>
       </div>
       
-      <div class="sidebar-body">
-        <div class="filter-group">
-          <label>Date Range</label>
-          <div class="date-range-picker">
-            <input type="date" [(ngModel)]="startDate" placeholder="Start Date">
-            <span>to</span>
-            <input type="date" [(ngModel)]="endDate" placeholder="End Date">
-          </div>
-        </div>
+<div class="sidebar-body">
+  <div class="filter-group">
+    <label>Date Range</label>
+    <div class="date-range-picker">
+      <input type="date" [(ngModel)]="startDate" placeholder="Start Date">
+      <span>to</span>
+      <input type="date" [(ngModel)]="endDate" placeholder="End Date">
+    </div>
+    
+    <!-- Quick Date Range Options -->
+    <div class="quick-date-ranges">
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'today'" 
+           (click)="filterByDate('today')">
+        Today
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'yesterday'" 
+           (click)="filterByDate('yesterday')">
+        Yesterday
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'sevenDays'" 
+           (click)="filterByDate('sevenDays')">
+        Last 7 Days
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'thirtyDays'" 
+           (click)="filterByDate('thirtyDays')">
+        Last 30 Days
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'lastMonth'" 
+           (click)="filterByDate('lastMonth')">
+        Last Month
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'thisMonth'" 
+           (click)="filterByDate('thisMonth')">
+        This Month
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'thisFinancialYear'" 
+           (click)="filterByDate('thisFinancialYear')">
+        This Financial Year
+      </div>
+      <div class="quick-date-option" 
+           [class.active]="selectedRange === 'lastFinancialYear'" 
+           (click)="filterByDate('lastFinancialYear')">
+        Last Financial Year
+      </div>
+ 
+    </div>
+  </div>
+  
+  <!-- Other filter groups... -->
+
     
         <div class="filter-group">
           <label>Location</label>
@@ -292,15 +341,31 @@
       </table>
     </div>
 
-    <div class="table-footer">
-      <div class="showing-entries">
-        Showing {{ getFirstEntryIndex() }} to {{ getLastEntryIndex() }} of {{ filteredRows.length }} entries
-      </div>
-      <div class="pagination">
-        <button class="page-btn" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
-        <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-        <button class="page-btn" [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
-      </div>
+<div class="table-footer">
+  <div class="showing-entries">
+    Showing {{ getFirstEntryIndex() }} to {{ getLastEntryIndex() }} of {{ filteredRows.length }} entries
+  </div>
+  
+  <!-- Add totals row -->
+  <div class="totals-row" *ngIf="filteredRows.length > 0">
+    <div class="total-label">Totals:</div>
+    <div *ngIf="columns[14].visible" class="total-amount">
+      Unit Purchase Price: {{ calculateTotalUnitPurchasePrice() | currency:'INR' }}
     </div>
+    <div *ngIf="columns[15].visible" class="total-amount">
+      Purchase Price (Inc Tax): {{ calculateTotalPurchasePriceIncTax() | currency:'INR' }}
+    </div>
+  </div>
+  
+  <div class="pagination">
+    <button class="page-btn" [disabled]="currentPage === 1" (click)="previousPage()">
+      <i class="fa fa-chevron-left"></i> Previous
+    </button>
+    <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+    <button class="page-btn" [disabled]="currentPage === totalPages" (click)="nextPage()">
+      Next <i class="fa fa-chevron-right"></i>
+    </button>
+  </div>
+</div>
   </div>
 </div>

@@ -182,6 +182,7 @@ $transition: all 0.2s ease-in-out;
 // Table Styles
 .table-responsive {
   overflow-x: auto;
+  overflow-y: auto;
   
   .customers-table {
     width: 100%;
@@ -241,18 +242,13 @@ $transition: all 0.2s ease-in-out;
   position: relative;
   display: inline-block;
   
-  .btn-dropdown {
-    background-color: white;
-    border: 1px solid $border-color;
-    padding: 0.5rem 1rem;
-    border-radius: $radius;
-    font-size: 0.9rem;
-    color: $text-color;
-    
-    &:hover {
-      background-color: $secondary-color;
-    }
-  }
+.action-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
   
   .dropdown-content {
     display: none;
@@ -1005,4 +1001,121 @@ tr.selected {
   border: 1px solid #ccc;
   border-radius: 4px;
   background-color: white;
+}.action-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.action-popup {
+  background-color: white;
+  border-radius: 8px;
+  width: 280px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.popup-header {
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+  }
+  
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6c757d;
+    
+    &:hover {
+      color: #495057;
+    }
+  }
+}
+
+.popup-body {
+  padding: 8px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.action-item {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f8f9fa;
+  }
+  
+  i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+    color: #495057;
+  }
+  
+  &.text-danger {
+    color: #dc3545;
+    
+    i {
+      color: #dc3545;
+    }
+    
+    &:hover {
+      background-color: rgba(220, 53, 69, 0.1);
+    }
+  }
+}
+
+.divider {
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 8px 0;
+}
+
+.status-section {
+  padding: 8px 16px;
+  
+  h5 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #6c757d;
+  }
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  
+  input {
+    margin-right: 8px;
+  }
+  
+  label {
+    cursor: pointer;
+    user-select: none;
+  }
 }

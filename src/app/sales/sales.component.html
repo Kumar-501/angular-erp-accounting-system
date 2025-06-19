@@ -1,5 +1,4 @@
-
-<!-- Add this modal to your template -->
+<!-- Fixed Invoice Template - No Double Taxation -->
 <div class="modal fade" id="printInvoiceModal" tabindex="-1" aria-labelledby="printInvoiceModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -64,7 +63,7 @@
           </table>
         </div>
 
-        <!-- Shipping Row -->
+        <!-- FIXED: Shipping Section - Separate base charge and tax -->
         <div class="row mb-3">
           <div class="col-8">
             <p>Shipping Charges</p>
@@ -72,6 +71,9 @@
           <div class="col-4 text-end">
             <p>₹{{ (selectedSale?.shippingCharges || 0) | number:'1.2-2' }}</p>
           </div>
+        </div>
+        
+        <div class="row mb-3">
           <div class="col-8">
             <p>Shipping Tax (18%)</p>
           </div>
@@ -88,12 +90,6 @@
             <p><strong>Total SGST (9%): </strong><strong>₹{{ getTotalSGSTForPrint() | number:'1.2-2' }}</strong></p>
             <p><strong>Grand Total: </strong><strong>₹{{ getGrandTotalForPrint() | number:'1.2-2' }}</strong></p>
           </div>
-          <!-- <div class="col-2">
-            <p></p>
-            <p></p>
-            <p></p>
-            <p></p>
-          </div> -->
         </div>
 
         <!-- Payment Info -->

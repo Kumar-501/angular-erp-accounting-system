@@ -17,6 +17,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
+import { EndOfDayService } from './services/end-of-day.service';
 
 
 import { MatNativeDateModule } from '@angular/material/core';
@@ -222,8 +223,6 @@ import { LeadsReportComponent } from './leads-report/leads-report.component';
 import { LeadsReportsComponent } from './leads-reports/leads-reports.component';
 import { CustomerReportComponent } from './customer-report/customer-report.component';
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
-import { BalanceComponent } from './balance/balance.component';
-import { AccountBook1Component } from './account-book1/account-book1.component';
 @NgModule({
   declarations: [
     AppComponent,
@@ -403,8 +402,6 @@ import { AccountBook1Component } from './account-book1/account-book1.component';
     LeadsReportsComponent,
     CustomerReportComponent,
     SellReturnReportComponent,
-    BalanceComponent,
-    AccountBook1Component,
  
 
 
@@ -461,7 +458,7 @@ import { AccountBook1Component } from './account-book1/account-book1.component';
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideFirestore(() => getFirestore()),
         AngularFirestoreModule,
-
+EndOfDayService
   ],
   bootstrap: [AppComponent]
 })

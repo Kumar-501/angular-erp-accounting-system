@@ -2,11 +2,13 @@
 import { Timestamp } from '@angular/fire/firestore';
 
 export interface Purchase {
+[x: string]: any;
   id?: string;
   supplierId: string;
   supplierName: string;
   purchaseNumber?: string;
-
+ subtotal?: number;       // Add this
+ 
   address?: string;
   referenceNo?: string;  // Made optional
   

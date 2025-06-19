@@ -66,11 +66,17 @@ export class PurchaseRequisitionComponent implements OnInit {
   isLoading: boolean = false;
   selectedRequisitions: string[] = [];
 allSelected: boolean = false;
-
+// Add these properties to your component class
+isDateDrawerOpen: boolean = false;
+selectedRange: string = '';
+isCustomDate: boolean = false;
+fromDate: string = '';
+toDate: string = '';
   showFilters: boolean = false;
   showColumnVisibility: boolean = false;
   currentPage: number = 1;
-  entriesPerPage: number = 25;
+  // Change from 25 to 10 as default
+entriesPerPage: number = 10;
   totalPages: number = 1;
   searchTerm: string = '';
   private searchTerms = new Subject<string>();
@@ -152,7 +158,73 @@ selectedSupplier: string = 'All';
     if (!items || items.length === 0) return 0;
     return items.reduce((total, item) => total + (item.requiredQuantity || 0), 0);
   }
+  toggleDateDrawer(): void {
+  this.isDateDrawerOpen = !this.isDateDrawerOpen;
+  }
   
+
+filterByDate(range: string): void {
+  this.selectedRange = range;
+  this.isCustomDate = false;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  switch (range) {
+    case 'today':
+      this.startDate = this.endDate = this.formatDate(today);
+      break;
+    case 'yesterday':
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      this.startDate = this.endDate = this.formatDate(yesterday);
+      break;
+    case 'sevenDays':
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      this.startDate = this.formatDate(sevenDaysAgo);
+      this.endDate = this.formatDate(today);
+      break;
+    case 'thirtyDays':
+      const thirtyDaysAgo = new Date(today);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      this.startDate = this.formatDate(thirtyDaysAgo);
+      this.endDate = this.formatDate(today);
+      break;
+    case 'lastMonth':
+      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      this.startDate = this.formatDate(firstDayLastMonth);
+      this.endDate = this.formatDate(lastDayLastMonth);
+      break;
+    case 'thisMonth':
+      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      this.startDate = this.formatDate(firstDayThisMonth);
+      this.endDate = this.formatDate(today);
+      break;
+    case 'thisFinancialYear':
+      const financialYearStart = this.getFinancialYearStart(today);
+      this.startDate = this.formatDate(financialYearStart);
+      this.endDate = this.formatDate(today);
+      break;
+    case 'lastFinancialYear':
+      const lastFinancialYearStart = new Date(today.getFullYear() - 1, 3, 1);
+      const lastFinancialYearEnd = new Date(today.getFullYear(), 2, 31);
+      this.startDate = this.formatDate(lastFinancialYearStart);
+      this.endDate = this.formatDate(lastFinancialYearEnd);
+      break;
+  }
+  
+  this.applyFilters();
+  this.isDateDrawerOpen = false;
+}
+selectCustomRange(): void {
+  this.selectedRange = 'custom';
+  this.isCustomDate = true;
+  this.fromDate = '';
+  this.toDate = '';
+}
+
   loadLocations() {
     this.locationService.getLocations().subscribe(locations => {
       this.businessLocations = locations;
@@ -182,7 +254,28 @@ toggleSelection(id: string): void {
 isSelected(id: string): boolean {
   return this.selectedRequisitions.includes(id);
 }
+// Add these methods to your component class
+calculateTotalUnitPurchasePrice(): number {
+  return this.filteredRows.reduce((total, row) => {
+    if (row.items && row.items.length > 0) {
+      return total + row.items.reduce((itemTotal, item) => {
+        return itemTotal + (item.unitPurchasePrice || 0) * (item.requiredQuantity || 0);
+      }, 0);
+    }
+    return total;
+  }, 0);
+}
 
+calculateTotalPurchasePriceIncTax(): number {
+  return this.filteredRows.reduce((total, row) => {
+    if (row.items && row.items.length > 0) {
+      return total + row.items.reduce((itemTotal, item) => {
+        return itemTotal + (item.purchasePriceIncTax || 0) * (item.requiredQuantity || 0);
+      }, 0);
+    }
+    return total;
+  }, 0);
+}
 deleteSelectedRequisitions(): void {
   if (this.selectedRequisitions.length === 0) return;
   
@@ -330,6 +423,36 @@ deleteSelectedRequisitions(): void {
     });
   }
 
+applyCustomRange(): void {
+  if (this.fromDate && this.toDate) {
+    this.startDate = this.fromDate;
+    this.endDate = this.toDate;
+    this.applyFilters();
+    this.isDateDrawerOpen = false;
+  } else {
+    alert('Please select both from and to dates');
+  }
+  }
+  cancelCustomRange(): void {
+  this.isCustomDate = false;
+  this.selectedRange = '';
+}private formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+private getFinancialYearStart(date: Date): Date {
+  // Assuming financial year starts April 1st
+  const currentMonth = date.getMonth();
+  const currentYear = date.getFullYear();
+  
+  if (currentMonth < 3) { // April is month 3 (0-indexed)
+    return new Date(currentYear - 1, 3, 1);
+  } else {
+    return new Date(currentYear, 3, 1);
+  }
+}
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     this.searchTerms.next(target.value);
@@ -342,14 +465,7 @@ deleteSelectedRequisitions(): void {
 
 getPaginatedRows(): Requisition[] {
   const startIndex = (this.currentPage - 1) * this.entriesPerPage;
-  const paginatedRows = this.filteredRows.slice(startIndex, startIndex + this.entriesPerPage);
-  
-  // Reset allSelected if the page changes
-  if (this.allSelected && this.selectedRequisitions.length !== paginatedRows.length) {
-    this.allSelected = false;
-  }
-  
-  return paginatedRows;
+  return this.filteredRows.slice(startIndex, startIndex + this.entriesPerPage);
 }
 
   getFirstEntryIndex(): number {
@@ -422,32 +538,33 @@ approveRequisition(requisition: Requisition, event?: Event) {
   }
 }
 
-  previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+previousPage(): void {
+  if (this.currentPage > 1) {
+    this.currentPage--;
   }
+}
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-    }
+
+nextPage(): void {
+  if (this.currentPage < this.totalPages) {
+    this.currentPage++;
   }
+}
 
-  calculateTotalPages(): void {
-    this.totalPages = Math.max(1, Math.ceil(this.filteredRows.length / this.entriesPerPage));
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = 1;
-    }
-  }
-
-  onEntriesChange(): void {
-    this.calculateTotalPages();
+calculateTotalPages(): void {
+  this.totalPages = Math.max(1, Math.ceil(this.filteredRows.length / this.entriesPerPage));
+  if (this.currentPage > this.totalPages && this.totalPages > 0) {
     this.currentPage = 1;
   }
+}
+
+onEntriesChange(): void {
+  this.calculateTotalPages();
+  this.currentPage = 1;
+}
 
   applyFilters() {
-    this.filteredRows = this.rows.filter(row => {
+  this.filteredRows = this.rows.filter(row => {
       const searchTerm = this.searchTerm.toLowerCase();
       const matchesSearch = !this.searchTerm || 
         (row.referenceNo?.toLowerCase().includes(searchTerm) ||
@@ -470,25 +587,33 @@ approveRequisition(requisition: Requisition, event?: Event) {
       const matchesSupplier = this.selectedSupplier === 'All' || 
                             row.supplier === this.selectedSupplier;
   
-      // Date range filter
-      const matchesDateRange = !this.startDate && !this.endDate || 
-                             (new Date(row.date) >= new Date(this.startDate || '1970-01-01') && 
-                             new Date(row.date) <= new Date(this.endDate || '2100-12-31'));
-  
-      // Required by date filter
-      const matchesRequiredByDate = !this.requiredByDate || 
-                                  row.requiredByDate === this.requiredByDate;
-  
-      return matchesSearch && matchesLocation && matchesStatus && 
-             matchesSupplier && matchesDateRange && matchesRequiredByDate;
-    });
-  
-    this.calculateTotalPages();
-    this.currentPage = 1;
-    this.openActionDropdownId = null;
-  }
-  
-  resetFilters(): void {
+    // Date range filter
+    const matchesRequiredByDate = !this.requiredByDate || 
+                                row.requiredByDate === this.requiredByDate;
+
+    // Date range filter logic
+    let matchesDateRange = true;
+    if (this.startDate && this.endDate) {
+      const rowDate = new Date(row.date);
+      const start = new Date(this.startDate);
+      const end = new Date(this.endDate);
+      // Set time to 0 for comparison
+      rowDate.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
+      matchesDateRange = rowDate >= start && rowDate <= end;
+    }
+
+    return matchesSearch && matchesLocation && matchesStatus && 
+           matchesSupplier && matchesDateRange && matchesRequiredByDate;
+  });
+
+  this.calculateTotalPages();
+  this.currentPage = 1;
+  this.openActionDropdownId = null;
+}
+
+resetFilters(): void {
     this.selectedLocation = 'All';
     this.selectedStatus = 'All';
     this.selectedSupplier = 'All';
@@ -499,57 +624,85 @@ approveRequisition(requisition: Requisition, event?: Event) {
     this.applyFilters();
   }
 
-  exportCSV() {
-    const visibleColumns = this.columns.filter(col => col.visible);
-    const headers = visibleColumns.map(col => col.name);
-    
-    const data = this.filteredRows.map(row => 
-      visibleColumns.map(col => {
+ exportCSV() {
+  const visibleColumns = this.columns.filter(col => col.visible);
+  const headers = visibleColumns.map(col => col.name);
+  
+  const data = this.filteredRows.map(row => 
+    visibleColumns.map(col => {
+      if (col.field === 'items') {
+        return row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
+      }
+      if (col.field === 'totalQuantity') {
+        return this.calculateTotalRequiredQuantity(row.items);
+      }
+      return row[col.field as keyof Requisition] || '';
+    })
+  );
+
+  // Add totals row
+  const totalsRow: (string | number)[] = visibleColumns.map(col => {
+    if (col.field === 'unitPurchasePrice') {
+      return this.calculateTotalUnitPurchasePrice();
+    }
+    if (col.field === 'purchasePriceIncTax') {
+      return this.calculateTotalPurchasePriceIncTax();
+    }
+    return '';
+  });
+  totalsRow[0] = 'Totals:'; // Set the first column to "Totals"
+
+  let csvContent = "data:text/csv;charset=utf-8," 
+    + headers.join(',') + '\n'
+    + data.map(e => e.join(',')).join('\n')
+    + '\n' + totalsRow.join(',');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "purchase_requisitions.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+
+exportExcel() {
+  const visibleData = this.filteredRows.map(row => {
+    const newRow: any = {};
+    this.columns.forEach(col => {
+      if (col.visible) {
         if (col.field === 'items') {
-          return row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
+          newRow[col.name] = row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
+        } else if (col.field === 'totalQuantity') {
+          newRow[col.name] = this.calculateTotalRequiredQuantity(row.items);
+        } else {
+          newRow[col.name] = row[col.field as keyof Requisition] || '';
         }
-        if (col.field === 'totalQuantity') {
-          return this.calculateTotalRequiredQuantity(row.items);
-        }
-        return row[col.field as keyof Requisition] || '';
-      })
-    );
-
-    let csvContent = "data:text/csv;charset=utf-8," 
-      + headers.join(',') + '\n'
-      + data.map(e => e.join(',')).join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "purchase_requisitions.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-
-  exportExcel() {
-    const visibleData = this.filteredRows.map(row => {
-      const newRow: any = {};
-      this.columns.forEach(col => {
-        if (col.visible) {
-          if (col.field === 'items') {
-            newRow[col.name] = row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
-          } else if (col.field === 'totalQuantity') {
-            newRow[col.name] = this.calculateTotalRequiredQuantity(row.items);
-          } else {
-            newRow[col.name] = row[col.field as keyof Requisition] || '';
-          }
-        }
-      });
-      return newRow;
+      }
     });
-    
-    const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(visibleData);
-    const workbook: XLSX.WorkBook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
-    XLSX.writeFile(workbook, 'purchase_requisitions.xlsx');
-  }
+    return newRow;
+  });
+  
+  // Add totals row
+  const totalsRow: any = {};
+  this.columns.forEach(col => {
+    if (col.visible) {
+      if (col.field === 'unitPurchasePrice') {
+        totalsRow[col.name] = this.calculateTotalUnitPurchasePrice();
+      } else if (col.field === 'purchasePriceIncTax') {
+        totalsRow[col.name] = this.calculateTotalPurchasePriceIncTax();
+      } else if (col.field === 'referenceNo') {
+        totalsRow[col.name] = 'Totals:';
+      }
+    }
+  });
+  visibleData.push(totalsRow);
+  
+  const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(visibleData);
+  const workbook: XLSX.WorkBook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
+  XLSX.writeFile(workbook, 'purchase_requisitions.xlsx');
+}
 
   print() {
     const printDiv = document.createElement('div');
@@ -636,40 +789,62 @@ approveRequisition(requisition: Requisition, event?: Event) {
     return items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
   }
   
-  exportPDF() {
-    const doc = new jsPDF();
-    const title = 'Purchase Requisitions';
+exportPDF() {
+  const doc = new jsPDF();
+  const title = 'Purchase Requisitions';
 
-    const visibleColumns = this.getVisibleColumns();
-    const headers = [visibleColumns.map(col => col.name)];
+  const visibleColumns = this.getVisibleColumns();
+  const headers = [visibleColumns.map(col => col.name)];
 
-    const data = this.filteredRows.map(row =>
-      visibleColumns.map(col => {
-        if (col.field === 'items') {
-          return this.formatItemList(row.items);
-        }
-        if (col.field === 'totalQuantity') {
-          return this.calculateTotalRequiredQuantity(row.items).toString();
-        }
-        const value = row[col.field as keyof Requisition];
-        return value !== undefined && value !== null ? value.toString() : '';
-      })
-    );
+  const data = this.filteredRows.map(row =>
+    visibleColumns.map(col => {
+      if (col.field === 'items') {
+        return this.formatItemList(row.items);
+      }
+      if (col.field === 'totalQuantity') {
+        return this.calculateTotalRequiredQuantity(row.items).toString();
+      }
+      const value = row[col.field as keyof Requisition];
+      return value !== undefined && value !== null ? value.toString() : '';
+    })
+  );
 
-    doc.setFontSize(14);
-    doc.text(title, 14, 15);
+  // Add totals row
+  const totalsRow = visibleColumns.map(col => {
+    if (col.field === 'unitPurchasePrice') {
+      return this.calculateTotalUnitPurchasePrice().toString();
+    }
+    if (col.field === 'purchasePriceIncTax') {
+      return this.calculateTotalPurchasePriceIncTax().toString();
+    }
+    if (col.field === 'referenceNo') {
+      return 'Totals:';
+    }
+    return '';
+  });
+  data.push(totalsRow);
 
-    (doc as any).autoTable({
-      head: headers,
-      body: data,
-      startY: 25,
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9 }
-    });
+  doc.setFontSize(14);
+  doc.text(title, 14, 15);
 
-    doc.save('purchase_requisitions.pdf');
-  }
+  (doc as any).autoTable({
+    head: headers,
+    body: data,
+    startY: 25,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontSize: 9 },
+    // Style the totals row
+    didDrawCell: (data: any) => {
+      if (data.row.index === data.table.rows.length - 1) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+      }
+    }
+  });
+
+  doc.save('purchase_requisitions.pdf');
+}
 
 
   toggleFilters(): void {

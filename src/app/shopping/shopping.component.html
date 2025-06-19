@@ -1,4 +1,5 @@
 <div class="container-fluid mt-3">
+
   <div class="card">
     <div class="card-header bg-light">
       <div class="d-flex justify-content-between align-items-center">
@@ -6,14 +7,15 @@
         <div class="btn-group" role="group">
           <button class="btn btn-sm" 
                   [ngClass]="{'btn-primary': viewMode === 'purchases', 'btn-outline-primary': viewMode !== 'purchases'}"
-                  (click)="viewMode = 'purchases'">
+                  (click)="switchView('purchases')">
             Purchases
           </button>
           <button class="btn btn-sm" 
                   [ngClass]="{'btn-primary': viewMode === 'ledger', 'btn-outline-primary': viewMode !== 'ledger'}"
-                  (click)="viewMode = 'ledger'">
+                  (click)="switchView('ledger')">
             Ledger View
           </button>
+          
         </div>
       </div>
     </div>
@@ -45,10 +47,9 @@
             <tr *ngFor="let purchase of purchases" (click)="viewPurchaseDetails(purchase)" style="cursor: pointer;">
               <td>{{ (purchase.purchaseDate | date) || 'N/A' }}</td>
               <td>{{ purchase.referenceNo || 'N/A' }}</td>
-              <td>{{ purchase.supplier || 'N/A' }}</td>
-              <td>₹ {{ (purchase.grandTotal || purchase.purchaseTotal || 0)?.toFixed(2) }}</td>
-              <td>
-                <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">
+                <td>{{ purchase['supplier'] || 'N/A' }}</td>
+<td>₹ {{ (purchase.grandTotal || 0)?.toFixed(2) }}</td>              <td>
+                <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus || '')">
                   {{ purchase.purchaseStatus || 'N/A' }}
                 </span>
               </td>
@@ -75,8 +76,8 @@
               <th>Reference No</th>
               <th>Supplier</th>
               <th>Description</th>
-              <th>Debit (₹)</th>
               <th>Credit (₹)</th>
+              <th>Debit (₹)</th>
               <th>Balance (₹)</th>
               <th>Status</th>
             </tr>

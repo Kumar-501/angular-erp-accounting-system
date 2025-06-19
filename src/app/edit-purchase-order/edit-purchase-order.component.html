@@ -61,15 +61,7 @@
             </option>
           </select>
         </div>
-        <div class="col-md-6 form-group">
-          <label>Pay Term:</label>
-          <select formControlName="payTerm" class="form-control">
-            <option value="">Select Pay Term</option>
-            <option value="7">7 Days</option>
-            <option value="15">15 Days</option>
-            <option value="30">30 Days</option>
-          </select>
-        </div>
+     
       </div>
       <div class="row">
         <div class="col-md-6 form-group">
@@ -225,12 +217,12 @@
           <input type="number" formControlName="subtotalBeforeTax" class="form-control" readonly>
         </td>
         <td>
-          <select formControlName="taxPercent" class="form-control" (change)="calculateLineTotal(i)">
-            <option value="0">No Tax (0%)</option>
-            <option *ngFor="let tax of taxRates" [value]="tax.rate">
-              {{tax.name}} ({{tax.rate}}%)
-            </option>
-          </select>
+       <select formControlName="taxPercent" class="form-control" (change)="calculateLineTotal(i)">
+  <option value="0">No Tax (0%)</option>
+  <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === productsFormArray.at(i).get('taxPercent')?.value">
+    {{tax.name}} ({{tax.rate}}%)
+  </option>
+</select>
         </td>
         <td>
           <input type="number" formControlName="taxAmount" class="form-control" readonly>
@@ -273,46 +265,7 @@
 </div>
 
     <!-- Container 3: Shipping Details -->
-    <div class="container mb-4 p-3 border rounded">
-      <h4>Shipping Details</h4>
-      <div formGroupName="shippingDetails">
-        <div class="row">
-          <div class="col-md-6 form-group">
-            <label>Shipping Address:</label>
-            <input formControlName="shippingAddress" class="form-control" />
-          </div>
-          <div class="col-md-6 form-group">
-            <label>Shipping Charges:</label>
-            <input type="number" formControlName="shippingCharges" class="form-control" />
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-6 form-group">
-            <label>Shipping Status:</label>
-            <select formControlName="shippingStatus" class="form-control">
-              <option value="">Please Select</option>
-               <option>Pending</option>
-      <option>Processing</option>
-      <option>Shipped</option>
-      <option>Delivered</option>
-      <option>Cancelled</option>
-      <option>Onhold</option>
-      <option>Reached hub</option>
-      <option>Out for delivery</option>
-      <option>Returned</option>
-      <option>Packed</option>
-      <option>Ordered</option>
 
-
-            </select>
-          </div>
-          <div class="col-md-6 form-group">
-            <label>Delivered To:</label>
-            <input formControlName="deliveredTo" class="form-control" />
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Container 4: Documents and Notes -->
     <div class="container mb-4 p-3 border rounded">

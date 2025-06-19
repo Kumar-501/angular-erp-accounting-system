@@ -1,17 +1,11 @@
 <div class="container">
     <h2>Add Purchase</h2>
-    <div *ngIf="isLoadingFromPurchaseOrder" class="alert alert-info">
-      Creating purchase from Purchase Order: {{ purchaseOrderData?.referenceNo }}
-    </div>
+
   
     <form [formGroup]="purchaseForm" (ngSubmit)="savePurchase()">
-        <div *ngIf="requisitionData" class="alert alert-info mb-3">
-  Creating purchase from Requisition: <strong>{{ requisitionData.referenceNo }}</strong>
-</div>
 
-<div *ngIf="isLoadingFromPurchaseOrder" class="alert alert-info mb-3">
-  Creating purchase from Purchase Order: <strong>{{ purchaseOrderData?.referenceNo }}</strong>
-</div>
+
+
         <!-- Card 1: Purchase Order -->
         <div class="card mb-3">
             <div class="card-header">Purchase Order</div>
@@ -83,15 +77,16 @@
   <div class="col-md-6" *ngIf="!isLoadingFromPurchaseOrder">
   <div class="form-group">
     <label>Linked Purchase Order:</label>
-    <select formControlName="purchaseOrderId" class="form-control" 
-            (change)="onPurchaseOrderSelect($any($event.target).value)">
-      <option value="">None</option>
-      <option *ngFor="let order of filteredPurchaseOrders" [value]="order.id">
-        {{order.referenceNo}} 
-        <span *ngIf="order.supplierName">({{order.supplierName}})</span>
-        <span *ngIf="!order.supplierName && order.supplier">({{order.supplier}})</span>
-      </option>
-    </select>
+  <select formControlName="purchaseOrderId" class="form-control" 
+        (change)="onPurchaseOrderSelect($any($event.target).value)">
+  <option value="">None</option>
+  <option *ngFor="let order of filteredPurchaseOrders" [value]="order.id">
+    {{order.referenceNo}} 
+    <span *ngIf="order.supplierName">({{order.supplierName}})</span>
+    <span *ngIf="!order.supplierName && order.supplier">({{order.supplier}})</span>
+    <span *ngIf="order.isUsedForPurchase" class="text-muted">(Used)</span>
+  </option>
+</select>
   </div>
 </div>
 </div>
@@ -113,6 +108,17 @@
                         </select>
                       </div>
                     </div>
+                    <!-- Add this near your purchase status field -->
+<div class="col-md-6">
+  <div class="form-group">
+    <label>Payment Status:</label>
+    <select formControlName="paymentStatus" class="form-control" required>
+      <option value="due">Due</option>
+      <option value="partial">Partial</option>
+      <option value="paid">Paid</option>
+    </select>
+  </div>
+</div>
                     <div class="col-md-6">
                       <div class="form-group">
                         <label>Business Location:</label>
@@ -304,14 +310,14 @@
         <td class="d-none d-lg-table-cell">
           <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" readonly>
         </td>
-        <td class="d-none d-md-table-cell">
-          <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
-            <option value="0">No Tax</option>
-            <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === item.get('taxRate')?.value">
-              {{ tax.name }} ({{ tax.rate }}%)
-            </option>
-          </select>
-        </td>
+     <td class="d-none d-md-table-cell">
+  <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
+    <option value="0">No Tax</option>
+    <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === item.get('taxRate')?.value">
+      {{ tax.name }} ({{ tax.rate }}%)
+    </option>
+  </select>
+</td>
         <td class="d-none d-lg-table-cell">
           <input type="number" formControlName="taxAmount" class="form-control form-control-sm text-end" readonly>
         </td>

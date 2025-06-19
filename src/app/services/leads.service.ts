@@ -38,7 +38,9 @@ export interface Lead {
   lastName?: string;
   orderStatus?: string; 
   mobileExists?: boolean; 
-   isDuplicate?: boolean;
+  isDuplicate?: boolean;
+    department?: string;
+
   isReordered?: boolean;
   originalLeadId?: string; // For duplicate leads
   originalCustomerId?: string; // For reordered leads
@@ -51,7 +53,6 @@ export interface Lead {
   mobile?: string;
   alternateContact?: string;
   landline?: string;
-  department?: string;
   leadCategory?: string;
   dealStatus?: string;
   priority?: string;

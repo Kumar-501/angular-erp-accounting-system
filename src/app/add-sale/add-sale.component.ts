@@ -87,11 +87,11 @@ interface Medicine {
 }
 // Define the PrescriptionData interface
 interface PrescriptionData {
-  patientName: string; // Changed from 'any' to 'string' and made required
+  patientName: any;
   date: string;
   medicines: Medicine[];
-  patientAge?: string;
-  additionalNotes?: string;
+    patientAge?: string; // Add this line
+    additionalNotes?: string;
 }
 
 @Component({
@@ -140,11 +140,18 @@ productsCollection: any; // You should replace 'any' with the correct type
 // In your component class
 
 prescriptionData: PrescriptionData = {
-  medicines: [],
-  patientName: '', // Fixed: Changed from undefined to empty string
-  date: '',
-  patientAge: '',
-  additionalNotes: ''
+  medicines: [{
+    name: '',
+    dosage: '',
+    instructions: '',
+    ingredients: '',
+    pills: '',
+    powder: '',
+    time: '',
+    type: ''
+  }],
+  patientName: undefined,
+  date: ''
 };
 
 
@@ -965,6 +972,7 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
   // Type-specific details
   switch(medicine.type) {
     case 'kasayam':
+      const kasayamName = this.getEditableFieldContent(`kasayamName_${index}`) || medicine.name || '';
       const kasayamInstructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
       const kasayamQuantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
       const kasayamPowder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
@@ -972,65 +980,69 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       
       
       details += `
-        <p>കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. </p>
-        <p>ഗുളിക ${kasayamPills} പൊടി ചേർത്ത് ${kasayamPowder}</p>
+        <p>${kasayamName}കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. 
+        ഗുളിക . പൊടിച്ച്ചേർത്ത് ${kasayamPills} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
       `;
       break;
       
     case 'buligha':
+      const bulighaName = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
       const bulighaInstructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
-      const bulighaTime = this.getEditableFieldContent(`bulighaTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-      
+      const bulighaPowder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
       details += `
-        <p>ഗുളിക ${bulighaInstructions} ml. തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത്</p>
-        <p>നേരം ${bulighaTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${bulighaName}ഗുളിക ${bulighaInstructions} ml. എണ്ണംഎടുത്ത്
+         ${bulighaPowder} നേരംഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
       `;
       break;
       
     case 'bhasmam':
+      const bhasmamName = this.getEditableFieldContent(`bhasmamName_${index}`) || medicine.name || '';
       const bhasmamDosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
       const bhasmamQuantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
-      const bhasmamTime = this.getEditableFieldContent(`bhasmamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+      const bhasmamInstructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
+      const bhasmamPowder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
       
       details += `
-        <p>ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. തേൻ / ചെറുനാരങ്ങാനീർ ചേർത്ത്</p>
-        <p>നേരം ${bhasmamTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${bhasmamName} ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. ${bhasmamInstructions} ചേർത്ത് ${bhasmamPowder} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'krudham':
-      const krudhamTime = this.getEditableFieldContent(`krudhamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-      
+      const krudhamName = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
+      const krudhamInstructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
       details += `
-        <p>ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>നേരം ${krudhamTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${krudhamName} ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത ${krudhamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'suranam':
-      const suranamTime = this.getEditableFieldContent(`suranamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+      const suranamName = this.getEditableFieldContent(`suranamName_${index}`) || medicine.name || '';
+      const suranamInstructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
+      const suranamPowder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
+      const suranamDosage = this.getEditableFieldContent(`suranamDosage_${index}`) || medicine.dosage || '';
       
       details += `
-        <p>ചൂർണ്ണം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>നേരം ${suranamTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${suranamName}ചൂർണ്ണം ${suranamInstructions}ml. ടീ - സ്പൂൺ എടുത്ത്  ${suranamPowder} വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് ${suranamDosage} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'rasayanam':
-      const rasayanamTime = this.getEditableFieldContent(`rasayanamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+      const rasayanamName = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
+      const rasayanamInstructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
       
       details += `
-        <p>രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>നേരം ${rasayanamTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${rasayanamName} രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് ${rasayanamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'lagium':
-      const lagiumTime = this.getEditableFieldContent(`lagiumTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-      
+      const lagiumName = this.getEditableFieldContent(`lagiumName${index}`) || medicine.name || '';
+    
+      const lagiumInstructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
+      const lagiumDosage = this.getEditableFieldContent(`lagiumDosage_${index}`) || medicine.dosage || '';
+
       details += `
-        <p>ലേഹ്യം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>നേരം ${lagiumTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p>${lagiumName}ലേഹ്യം ${lagiumInstructions} ടീ - സ്പൂൺ എടുത്ത് നേരം ${lagiumDosage} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
@@ -1091,39 +1103,48 @@ private savePrescriptionData(): void {
     // Type-specific fields
     switch(medicine.type) {
       case 'kasayam':
-        medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
+         medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
         medicine.pills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
         medicine.quantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
         medicine.powder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
-        medicine.time = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.time = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || '';
         break;
         
       case 'buligha':
-        medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
         medicine.name = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
-        medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
+      medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
         break;
         
       case 'bhasmam':
-        medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
-        medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
-        medicine.time = this.getEditableFieldContent(`bhasmamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`bhasmamName_${index}`) || medicine.name || '';
+      medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
+      medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
+      medicine.instructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
         break;
         
       case 'krudham':
-        medicine.time = this.getEditableFieldContent(`krudhamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
         break;
         
       case 'suranam':
-        medicine.time = this.getEditableFieldContent(`suranamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`suranamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
+      medicine.dosage = this.getEditableFieldContent(`suranamDosage_${index}`) || medicine.dosage || '';
         break;
         
       case 'rasayanam':
-        medicine.time = this.getEditableFieldContent(`rasayanamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
         break;
         
       case 'lagium':
-        medicine.time = this.getEditableFieldContent(`lagiumTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+         medicine.name = this.getEditableFieldContent(`lagiumName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
+      medicine.dosage = this.getEditableFieldContent(`lagiumDosage_${index}`) || medicine.dosage || '';
         break;
     }
   });
@@ -2614,14 +2635,14 @@ loadCustomers(): Promise<void> {
  
   initializeForm(): void {
     this.saleForm = this.fb.group({
-      customer: [''],
+      customer: ['', Validators.required],
       customerName: [''],
-  invoiceNo: [''],
-    orderNo: [''],
-    customerPhone: [''],
+  invoiceNo: ['', Validators.required],
+    orderNo: ['', Validators.required],
+    customerPhone: ['', Validators.required],  // Make sure this exists
       transactionId: [''],
       productInterested: [''], // Add this line
-      status: ['Pending'], // Removed required validator
+      status: ['Pending', Validators.required], // Set default to 'Pending'
       paymentStatus: ['Due'],
     alternateContact: [''], // Add this line
    customerAge: [null],
@@ -2640,13 +2661,14 @@ loadCustomers(): Promise<void> {
       customerOccupation: [''],
       creditLimit: [0],
       otherData: [''],
-      paymentAccount: [''],
+      paymentAccount: ['', Validators.required],
+    prescriptions: [[]], // Optional (no Validators.required)
 
       typeOfService: [''],
       billingAddress: [''],
       shippingAddress: [''],
-      saleDate: [this.todayDate],
-      businessLocation: [''],
+      saleDate: [this.todayDate, Validators.required],
+      businessLocation: ['', Validators.required],
       invoiceScheme: [''],
       document: [null],
       discountType: ['Percentage'],
@@ -2658,13 +2680,13 @@ loadCustomers(): Promise<void> {
       deliveryPerson: [''],
       shippingDocuments: [null],
       totalPayable: [0],
-      paymentAmount: [0, [Validators.min(0)]],
+      paymentAmount: [0, [Validators.required, Validators.min(0)]],
       paidOn: [this.todayDate],
-      paymentMethod: [''],
+      paymentMethod: ['', Validators.required],
       paymentNote: [''],
       changeReturn: [0],
       balance: [0],
-      addedBy: ['']
+      addedBy: ['', Validators.required]
       
     });
 
@@ -3132,117 +3154,82 @@ calculateRoundOff(): void {
   this.calculateBalance();
 }
 
-// Helper function to clean undefined values from objects
-private cleanObjectForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
   
-  if (Array.isArray(obj)) {
-    return obj.map(item => this.cleanObjectForFirestore(item)).filter(item => item !== undefined);
-  }
-  
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = this.cleanObjectForFirestore(obj[key]);
-        if (value !== undefined) {
-          cleaned[key] = value;
-        }
-      }
-    }
-    return cleaned;
-  }
-  
-  return obj;
-}
-
-// Helper function to create a clean prescription object
-private createCleanPrescription(): any {
-  if (!this.prescriptions || this.prescriptions.length === 0) {
-    return null;
-  }
-
-  return this.prescriptions.map(prescription => ({
-    patientName: prescription.patientName || '',
-    patientAge: prescription.patientAge || '',
-    date: prescription.date || this.todayDate,
-    additionalNotes: prescription.additionalNotes || '',
-    medicines: (prescription.medicines || []).map(medicine => ({
-      name: medicine.name || '',
-      type: medicine.type || '',
-      dosage: medicine.dosage || '',
-      instructions: medicine.instructions || '',
-      time: medicine.time || '',
-      quantity: medicine.quantity || '',
-      pills: medicine.pills || '',
-      powder: medicine.powder || ''
-    }))
-  }));
-}
 
 async saveSale(): Promise<void> {
   try {
-    // Check if products exist
-    if (this.products.length === 0 &&
+    // Form validation
+    if (!this.saleForm.valid) {
+      console.log('Form validation errors:', this.saleForm.errors);
+      this.markFormGroupTouched(this.saleForm);
+
+      if (this.products.length === 0 &&
         !(this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0)) {
-      alert('Please add at least one product');
+        alert('Please add at least one product');
+        return;
+      }
+
+      Object.keys(this.saleForm.controls).forEach(key => {
+        const control = this.saleForm.get(key);
+        if (control?.invalid) {
+          console.log(`Invalid field: ${key}, Errors:`, control.errors);
+        }
+      });
       return;
     }
 
+    // Generate document numbers
     const invoiceNumber = await this.generateInvoiceNumber();
     const orderNumber = await this.generateOrderNumber();
-
-    // Calculate comprehensive tax amounts
-    const productTax = this.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
-    const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-      ? (this.defaultProduct.taxAmount || 0) 
-      : 0;
-    
-    const shippingTax = (this.saleForm.get('shippingCharges')?.value || 0) *
-      (this.saleForm.get('orderTax')?.value || 0) / 100;
-    const totalTax = productTax + defaultProductTax + shippingTax;
-
-    // Calculate tax breakdown
-    const cgstTotal = this.products.reduce((sum, p) => sum + (p.cgstAmount || 0), 0) + 
-                     (this.defaultProduct.cgstAmount || 0);
-    const sgstTotal = this.products.reduce((sum, p) => sum +  (p.sgstAmount || 0), 0) + 
-                     (this.defaultProduct.sgstAmount || 0);
-    const igstTotal = this.products.reduce((sum, p) => sum + (p.igstAmount || 0), 0) + 
-                     (this.defaultProduct.igstAmount || 0);
-
     this.saleForm.patchValue({
       invoiceNo: invoiceNumber,
       orderNo: orderNumber
     });
 
+    // Delete lead if converting from lead
     if (this.leadIdToDelete) {
       await this.leadService.deleteLead(this.leadIdToDelete);
       console.log('Lead deleted after sale creation');
     }
 
+    // Validate payment account
     const paymentAccountId = this.saleForm.get('paymentAccount')?.value;
-    const selectedPaymentAccount = paymentAccountId ? this.paymentAccounts.find(acc => acc.id === paymentAccountId) : null;
+    if (!paymentAccountId) {
+      alert('Please select a payment account');
+      return;
+    }
+    const selectedPaymentAccount = this.paymentAccounts.find(acc => acc.id === paymentAccountId);
+    if (!selectedPaymentAccount) {
+      alert('Selected payment account not found');
+      return;
+    }
 
+    // Validate customer
     const selectedCustomerId = this.saleForm.get('customer')?.value;
-    const selectedCustomer = selectedCustomerId ? this.customers.find(c => c.id === selectedCustomerId) : null;
-    const customerName = selectedCustomer?.displayName || 'Walk-in Customer';
+    if (!selectedCustomerId) {
+      alert('Please select a customer');
+      return;
+    }
+    const selectedCustomer = this.customers.find(c => c.id === selectedCustomerId);
+    const customerName = selectedCustomer?.displayName || 'Unknown Customer';
 
+    // Get location, service, and user details
     const selectedLocationId = this.saleForm.get('businessLocation')?.value;
-    const selectedLocation = selectedLocationId ? this.businessLocations.find(loc => loc.id === selectedLocationId) : null;
+    const selectedLocation = this.businessLocations.find(loc => loc.id === selectedLocationId);
     const locationName = selectedLocation?.name || '';
 
     const selectedServiceId = this.saleForm.get('typeOfService')?.value;
-    const selectedService = selectedServiceId ? this.serviceTypes.find(s => s.id === selectedServiceId) : null;
+    const selectedService = this.serviceTypes.find(s => s.id === selectedServiceId);
     const serviceName = selectedService?.name || '';
 
     const selectedUserId = this.saleForm.get('addedBy')?.value;
-    const selectedUser = selectedUserId ? this.users.find(u => u.id === selectedUserId) : null;
+    const selectedUser = this.users.find(u => u.id === selectedUserId);
     const userName = selectedUser?.displayName || selectedUser?.name || selectedUser?.email || 'System User';
 
-    const commissionPercent = selectedUserId ? await this.getAgentCommission(selectedUserId) : 0;
+    // Calculate commission
+    const commissionPercent = await this.getAgentCommission(selectedUserId);
 
+    // Prepare products data
     const productsToSave = [...this.products].map(product => ({
       id: product.id || '',
       name: product.name || '',
@@ -3265,6 +3252,7 @@ async saveSale(): Promise<void> {
       priceBeforeTax: product.priceBeforeTax || 0
     }));
 
+    // Add default product if exists
     if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
       productsToSave.push({
         id: '',
@@ -3289,6 +3277,52 @@ async saveSale(): Promise<void> {
       });
     }
 
+    if (productsToSave.length === 0) {
+      alert('Please add at least one product');
+      return;
+    }
+
+    // Calculate tax amounts
+    const productTax = this.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
+    const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
+      ? (this.defaultProduct.taxAmount || 0) 
+      : 0;
+    
+    const shippingTax = (this.saleForm.get('shippingCharges')?.value || 0) *
+      (this.saleForm.get('orderTax')?.value || 0) / 100;
+    const totalTax = productTax + defaultProductTax + shippingTax;
+
+    // Calculate tax breakdown
+    const cgstTotal = this.products.reduce((sum, p) => sum + (p.cgstAmount || 0), 0) + 
+                     (this.defaultProduct.cgstAmount || 0);
+    const sgstTotal = this.products.reduce((sum, p) => sum + (p.sgstAmount || 0), 0) + 
+                     (this.defaultProduct.sgstAmount || 0);
+    const igstTotal = this.products.reduce((sum, p) => sum + (p.igstAmount || 0), 0) + 
+                     (this.defaultProduct.igstAmount || 0);
+
+    // Prepare prescription data with proper fallbacks
+    const prescriptionsToSave = this.prescriptions.length > 0 
+      ? this.prescriptions.map(prescription => ({
+          patientName: prescription.patientName || customerName || 'Unknown Patient',
+          patientAge: prescription.patientAge || '',
+          date: prescription.date || this.todayDate,
+          medicines: prescription.medicines.map(medicine => ({
+            name: medicine.name || '',
+            type: medicine.type || '',
+            dosage: medicine.dosage || '',
+            instructions: medicine.instructions || '',
+            quantity: medicine.quantity || '',
+            powder: medicine.powder || '',
+            pills: medicine.pills || '',
+            time: medicine.time || ''
+          })),
+          additionalNotes: prescription.additionalNotes || '',
+          doctorName: this.currentUser,
+          createdAt: new Date()
+        }))
+      : null;
+
+    // Get lead ID if converting from lead
     let leadId: string | null = null;
     const navigation = this.router.getCurrentNavigation();
     const state = navigation?.extras?.state as { fromLead: boolean, leadData: any };
@@ -3308,16 +3342,14 @@ async saveSale(): Promise<void> {
       }
     }
 
-    // Create clean prescription data
-    const cleanPrescriptions = this.createCleanPrescription();
-
+    // Prepare sale data with all required fields
     const saleData: any = {
       ...this.saleForm.value,
       invoiceNo: invoiceNumber,
       orderNo: orderNumber,
-      prescriptions: cleanPrescriptions,
-      
-      // Comprehensive tax information
+      prescriptions: prescriptionsToSave,
+
+      // Tax information
       taxAmount: parseFloat(totalTax.toFixed(2)),
       taxDetails: {
         cgst: parseFloat(cgstTotal.toFixed(2)),
@@ -3328,37 +3360,48 @@ async saveSale(): Promise<void> {
       productTaxAmount: parseFloat((productTax + defaultProductTax).toFixed(2)),
       shippingTaxAmount: parseFloat(shippingTax.toFixed(2)),
       
+      // Payment information
       orderTax: this.saleForm.get('orderTax')?.value || 0,
-      paymentAccountId: selectedPaymentAccount?.id || '',
-      paymentAccountName: selectedPaymentAccount?.name || '',
-      paymentAccountType: selectedPaymentAccount?.accountType || '',
+      paymentAccountId: selectedPaymentAccount.id,
+      paymentAccountName: selectedPaymentAccount.name || '',
+      paymentAccountType: selectedPaymentAccount.accountType || '',
+      
+      // Service information
       ppServiceData: this.ppServiceData || null,
       hasPpService: !!this.ppServiceData,
-      prescription: cleanPrescriptions && cleanPrescriptions.length > 0 ? cleanPrescriptions[0] : null,
+      codData: this.codData || null,
+      hasCod: !!this.codData,
+      
+      // Status information
       status: this.saleForm.get('status')?.value || 'Pending',
       paymentStatus: this.saleForm.get('paymentStatus')?.value ||
         (this.saleForm.get('status')?.value === 'Pending' ? 'Due' : 'Paid'),
-      codData: this.codData || null,
-      hasCod: !!this.codData,
-      shippingDocuments: [],
-      customerId: selectedCustomerId || '',
+      
+      // Customer information
+      customerId: selectedCustomerId,
       customer: customerName,
-      businessLocationId: selectedLocationId || '',
+      businessLocationId: selectedLocationId,
       businessLocation: locationName,
       location: locationName,
-      transactionId: this.saleForm.get('transactionId')?.value || '',
-      typeOfService: selectedServiceId || '',
-      typeOfServiceName: serviceName,
+      
+      // Shipping information
+      shippingDocuments: [],
       shippingCharges: this.saleForm.get('shippingCharges')?.value || 0,
       shippingTotal: this.calculateShippingWithTax ? this.calculateShippingWithTax() :
         (this.saleForm.get('shippingCharges')?.value || 0),
+      
+      // Product information
+      products: productsToSave,
+      itemsTotal: this.itemsTotal || 0,
       subtotal: this.itemsTotal || 0,
       totalBeforeTax: (this.itemsTotal || 0) - totalTax,
       totalPayable: this.saleForm.get('totalPayable')?.value || 0,
-      products: productsToSave,
-      itemsTotal: this.itemsTotal || 0,
+      
+      // Commission information
       totalCommission: this.totalCommission || 0,
       commissionPercentage: commissionPercent || 0,
+      
+      // Metadata
       createdAt: new Date(),
       updatedAt: new Date(),
       convertedFromQuotation: this.isFromQuotation || false,
@@ -3366,31 +3409,25 @@ async saveSale(): Promise<void> {
       leadId: leadId || '',
       addedBy: selectedUserId || '',
       addedByDisplayName: userName,
-      interestedProductIds: this.selectedProductsForInterested.map(p => p.id || '') || []
+      interestedProductIds: this.selectedProductsForInterested.map(p => p.id || '') || [],
+      
+      // Additional fields
+      transactionId: this.saleForm.get('transactionId')?.value || '',
+      typeOfService: selectedServiceId || '',
+      typeOfServiceName: serviceName
     };
 
-    // Clean the entire sale data object to remove undefined values
-    const cleanSaleData = this.cleanObjectForFirestore(saleData);
-
-    console.log('Sending sale data with tax details:', cleanSaleData);
-
-    const saleId = await this.saleService.addSale(cleanSaleData);
-
-    // Save prescription separately if it exists
-    if (cleanPrescriptions && cleanPrescriptions.length > 0) {
-      try {
-        await this.saleService.savePrescription({
-          patientName: cleanPrescriptions[0].patientName || 'Unknown Patient',
-          date: this.todayDate,
-          medicines: cleanPrescriptions[0].medicines || [],
-          doctorName: this.currentUser,
-          createdAt: new Date(),
-        });
-      } catch (prescriptionError) {
-        console.error('Error saving prescription:', prescriptionError);
+    // Ensure no undefined values in the sale data
+    Object.keys(saleData).forEach(key => {
+      if (saleData[key] === undefined) {
+        saleData[key] = null;
       }
-    }
+    });
 
+    console.log('Sending sale data:', saleData);
+    const saleId = await this.saleService.addSale(saleData);
+
+    // Update lead status if converted from lead
     if (leadId) {
       try {
         await this.leadService.updateLead(leadId, {
@@ -3415,7 +3452,6 @@ async saveSale(): Promise<void> {
     alert(errorMessage);
   }
 }
-
 private async generateAndSetNumbers(): Promise<void> {
   try {
     // Generate invoice number first

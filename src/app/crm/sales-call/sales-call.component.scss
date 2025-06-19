@@ -68,7 +68,37 @@
     box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
   }
 }
+.status-cell select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  font-size: 0.9em;
+  cursor: pointer;
+}
 
+.status-cell select.pending {
+  background-color: #fff3cd;
+  color: #856404;
+  border-color: #ffeeba;
+}
+
+.status-cell select.completed {
+  background-color: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.status-cell select.follow-up {
+  background-color: #cce5ff;
+  color: #004085;
+  border-color: #b8daff;
+}
+
+.status-cell select.not-interested {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
 .assigned-cell {
   .unassigned {
     color: #999;
@@ -877,4 +907,48 @@
 
 .btn-reset:hover {
   text-decoration: underline;
+}.bulk-actions {
+  background-color: #f8f9fa;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #dee2e6;
+}
+
+.selected-count {
+  font-weight: bold;
+  color: #495057;
+}
+
+.bulk-action-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.bulk-status-dropdown,
+.bulk-assign-dropdown {
+  margin-right: 10px;
+}
+
+.btn-clear {
+  background-color: #f8f9fa;
+  border: 1px solid #dc3545;
+  color: #dc3545;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-clear:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+.dropdown-item {
+  cursor: pointer;
 }

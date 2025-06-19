@@ -1773,3 +1773,62 @@ th, td {
   border-color: #dee2e6;
 }
 
+.popup-container {
+  position: relative;
+  display: inline-block;
+}
+
+.action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: #f8f9fa;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: #e9ecef;
+}
+
+.popup-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 1000;
+  min-width: 200px;
+  padding: 8px 0;
+  margin: 2px 0 0;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+}
+
+.popup-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.popup-item:hover {
+  background-color: #f8f9fa;
+}
+
+.popup-item i {
+  width: 20px;
+  margin-right: 10px;
+  text-align: center;
+}
+
+.popup-item.text-danger {
+  color: #dc3545;
+}
+
+.popup-item.text-danger:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+}

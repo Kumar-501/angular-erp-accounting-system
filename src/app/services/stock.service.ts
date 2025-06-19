@@ -634,7 +634,7 @@ async getOpeningStockValue(date: Date): Promise<number> {
     // Handle different stock adjustment types
     switch (action) {
       case 'add':
-        updateData.currentStock = increment(quantity);
+        // updateData.currentStock = increment(quantity);
         updateData.totalQuantity = increment(quantity);
         break;
       case 'subtract':

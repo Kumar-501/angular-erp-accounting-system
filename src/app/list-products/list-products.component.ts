@@ -10,7 +10,7 @@ import 'jspdf-autotable';
 import { BrandsService } from '../services/brands.service';
 import { CategoriesService } from '../services/categories.service';
 import { TaxService } from '../services/tax.service';
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { EventEmitter } from '@angular/core';
 import { PurchaseService } from '../services/purchase.service';
 
@@ -23,11 +23,12 @@ import { PurchaseService } from '../services/purchase.service';
 export class ListProductsComponent implements OnInit {
   products: any[] = [];
   filteredProducts: any[] = [];
+  selectedStatus: string = ''; // Add this with other filter properties
   currentSortColumn: string = 'productName';
 isAscending: boolean = true;
   brands: any[] = [];
   taxRates: any[] = [];
-    selectedStatus: string = ''; // Add this line
+
 showInactiveProducts = false;
 filtersChanged = new EventEmitter<any>();
 fromDate: Date | null = null;
@@ -46,6 +47,7 @@ showFilterSidebar = false;
 selectedCategory = '';
 categories: any[] = [];
 
+currentActionPopup: string | null = null;
 
 showAddToLocationModal = false;
 selectedLocationForAdd: string = '';
@@ -117,6 +119,7 @@ filterOptions: {
   categoryId: string;
   taxId: string;
   locationId: string;
+  statusId: string; // Added statusId to the type definition
   fromDate: Date | null;
   toDate: Date | null;
 } = {
@@ -124,6 +127,7 @@ filterOptions: {
   categoryId: '',
   taxId: '',
   locationId: '',
+  statusId: '', // Added statusId to the initial value
   fromDate: null,
   toDate: null
 };
@@ -168,6 +172,7 @@ viewProductHistory(product: any): void {
 }
 
 closeAddToLocationModal(): void {
+  console.log('Closing modal, setting showAddToLocationModal to false');
   this.showAddToLocationModal = false;
   this.selectedLocationForAdd = '';
 }
@@ -212,6 +217,79 @@ sortBy(column: string): void {
   // Reset to first page when sorting changes
   this.currentPage = 1;
 }
+async toggleSellingStatus(productId: string, notForSelling: boolean): Promise<void> {
+  try {
+    this.isLoading = true;
+    await this.productService.updateProduct(productId, {
+      notForSelling: notForSelling
+    });
+    const message = notForSelling ? 'marked as not for selling' : 'marked as available for selling';
+    alert(`Product ${message} successfully`);
+    this.loadProducts(); // Refresh the list
+  } catch (error) {
+    console.error('Error toggling selling status:', error);
+    alert('Failed to update product status');
+  } finally {
+    this.isLoading = false;
+  }
+}async toggleBulkSellingStatus(): Promise<void> {
+  const selectedProducts = this.filteredProducts.filter(p => p.selected);
+  if (selectedProducts.length === 0) {
+    alert('No products selected');
+    return;
+  }
+
+  // Determine if we're marking as not for selling or available for selling
+  const allNotForSelling = selectedProducts.every(p => p.notForSelling);
+  const allForSelling = selectedProducts.every(p => !p.notForSelling);
+  
+  let action: string;
+  let newStatus: boolean;
+  
+  if (allNotForSelling) {
+    // All selected are not for selling, so we'll mark them as available
+    action = 'mark as available for selling';
+    newStatus = false;
+  } else if (allForSelling) {
+    // All selected are for selling, so we'll mark them as not for selling
+    action = 'mark as not for selling';
+    newStatus = true;
+  } else {
+    // Mixed selection - ask user what they want to do
+    const userChoice = confirm('You have selected both "Not for Selling" and regular products. Do you want to mark all as "Not for Selling"?');
+    action = userChoice ? 'mark as not for selling' : 'mark as available for selling';
+    newStatus = userChoice;
+  }
+
+  if (!confirm(`Are you sure you want to ${action} ${selectedProducts.length} selected products?`)) {
+    return;
+  }
+
+  try {
+    this.isLoading = true;
+    
+    // Update each selected product's notForSelling status
+    const updatePromises = selectedProducts.map(product => {
+      return this.productService.updateProduct(product.id, {
+        notForSelling: newStatus
+      });
+    });
+
+    await Promise.all(updatePromises);
+    alert(`${selectedProducts.length} products ${action} successfully`);
+    
+    // Clear selection
+    this.filteredProducts.forEach(p => p.selected = false);
+    
+    // Refresh the list
+    this.loadProducts();
+  } catch (error) {
+    console.error(`Error ${action} products:`, error);
+    alert(`Failed to ${action} products. Please try again.`);
+  } finally {
+    this.isLoading = false;
+  }
+}
 async addToLocation(): Promise<void> {
   if (!this.selectedLocationForAdd) {
     alert('Please select a location');
@@ -228,26 +306,53 @@ async addToLocation(): Promise<void> {
     this.isLoading = true;
     const location = this.locations.find(l => l.id === this.selectedLocationForAdd);
     
-    // Update each selected product
+    console.log('Updating products with location:', {
+      locationId: this.selectedLocationForAdd,
+      locationName: location?.name || 'Unknown Location'
+    });
+
     const updatePromises = selectedProducts.map(product => {
-      return this.productService.updateProduct(product.id, {
+      const updateData = {
         location: this.selectedLocationForAdd,
-        locationName: location?.name || 'Unknown Location'
-      });
+        locationName: location?.name || 'Unknown Location',
+        // Also update the locations array if you're using it
+        locations: [this.selectedLocationForAdd],
+        locationNames: [location?.name || 'Unknown Location']
+      };
+      console.log(`Updating product ${product.id}:`, updateData);
+      return this.productService.updateProduct(product.id, updateData);
     });
 
     await Promise.all(updatePromises);
+    console.log('Products updated successfully');
     alert(`${selectedProducts.length} products added to ${location?.name || 'selected location'}`);
-    this.closeAddToLocationModal();
     
     // Clear selection
     this.filteredProducts.forEach(p => p.selected = false);
+    
+    // Close the modal
+    this.closeAddToLocationModal();
+    
+    // Refresh the products list
+    this.loadProducts(); // This will reload all products with updated locations
+    
   } catch (error) {
     console.error('Error adding products to location:', error);
-    alert('Successfully changed location');
-  } finally {
-    this.isLoading = false;
+    
+  } 
   }
+  
+openActionPopup(product: any): void {
+  this.currentActionPopup = product.id;
+}
+
+closeActionPopup(): void {
+  this.currentActionPopup = null;
+}
+
+@HostListener('document:keydown.escape', ['$event'])
+onKeydownHandler(event: KeyboardEvent) {
+  this.closeActionPopup();
 }
 async removeFromLocation(): Promise<void> {
   const selectedProducts = this.filteredProducts.filter(p => p.selected);
@@ -290,27 +395,10 @@ async toggleProductActivation(): Promise<void> {
     return;
   }
 
-  // Determine if we're activating or deactivating
-  const allSelectedActive = selectedProducts.every(p => p.isActive);
-  const allSelectedInactive = selectedProducts.every(p => !p.isActive);
-  
-  let action: string;
-  let newStatus: boolean;
-  
-  if (allSelectedActive) {
-    // All selected are active, so we'll deactivate them
-    action = 'deactivate';
-    newStatus = false;
-  } else if (allSelectedInactive) {
-    // All selected are inactive, so we'll activate them
-    action = 'activate';
-    newStatus = true;
-  } else {
-    // Mixed selection - ask user what they want to do
-    const userChoice = confirm('You have selected both active and inactive products. Do you want to activate all selected products?');
-    action = userChoice ? 'activate' : 'deactivate';
-    newStatus = userChoice;
-  }
+  // Determine if we're activating or deactivating based on the first selected product
+  const firstSelected = selectedProducts[0];
+  const activate = !firstSelected.isActive;
+  const action = activate ? 'activate' : 'deactivate';
 
   if (!confirm(`Are you sure you want to ${action} ${selectedProducts.length} selected products?`)) {
     return;
@@ -322,8 +410,8 @@ async toggleProductActivation(): Promise<void> {
     // Update each selected product's active status
     const updatePromises = selectedProducts.map(product => {
       return this.productService.updateProduct(product.id, {
-        isActive: newStatus,
-        status: newStatus ? 'Active' : 'Inactive'
+        isActive: activate,
+        status: activate ? 'Active' : 'Inactive'
       });
     });
 
@@ -332,9 +420,12 @@ async toggleProductActivation(): Promise<void> {
     
     // Clear selection
     this.filteredProducts.forEach(p => p.selected = false);
+    
+    // Refresh the list
+    this.loadProducts();
   } catch (error) {
     console.error(`Error ${action}ing products:`, error);
-    alert(`successfully ${action}ing products.`);
+    alert(`Failed to ${action} products. Please try again.`);
   } finally {
     this.isLoading = false;
   }
@@ -358,12 +449,33 @@ async toggleProductActivation(): Promise<void> {
     this.showStockHistoryModal = true;
     this.loadEnhancedStockHistory(product.id);
   }
-
+getActivationButtonText(): string {
+  const selectedProducts = this.filteredProducts.filter(p => p.selected);
+  if (selectedProducts.length === 0) {
+    return 'Toggle Activation';
+  }
+  
+  // Check if all selected products are inactive
+  const allInactive = selectedProducts.every(p => !p.isActive);
+  if (allInactive) {
+    return 'Activate Selected';
+  }
+  
+  // Check if all selected products are active
+  const allActive = selectedProducts.every(p => p.isActive);
+  if (allActive) {
+    return 'Deactivate Selected';
+  }
+  
+  // Mixed selection
+  return 'Toggle Activation';
+}
   closeStockHistoryModal(): void {
     this.showStockHistoryModal = false;
     this.selectedProduct = null;
     this.stockHistory = [];
   }
+  
 
   // Enhanced stock history loading with more details
   async loadEnhancedStockHistory(productId: string): Promise<void> {
@@ -452,11 +564,21 @@ async toggleProductActivation(): Promise<void> {
     }
   }
 
-  getLocationName(locationId: string): string {
-    if (!locationId) return '-';
-    const location = this.locations.find(l => l.id === locationId);
-    return location ? location.name : 'Unknown Location';
+getLocationName(locationId: string): string {
+  if (!locationId) return '-';
+  
+  // First check if the product has locationNames array
+  if (this.selectedProduct?.locationNames?.length) {
+    const index = this.selectedProduct.locations.indexOf(locationId);
+    if (index >= 0 && this.selectedProduct.locationNames[index]) {
+      return this.selectedProduct.locationNames[index];
+    }
   }
+  
+  // Fallback to locations service
+  const location = this.locations.find(l => l.id === locationId);
+  return location ? location.name : 'Unknown Location';
+}
 
   loadLocations(): Promise<void> {
     return new Promise((resolve) => {
@@ -477,119 +599,23 @@ toggleInactiveProducts(): void {
 loadProducts(): void {
   this.productService.getProductsRealTime().subscribe((data: any[]) => {
     this.products = data.map(product => {
-      // Add expiry date formatting
-      product.formattedExpiryDate = product.expiryDate ? 
-        this.formatExpiryDate(product.expiryDate) : 'No expiry';
-
-      // Handle both old (location string) and new (locations array) formats
-      let locationNames = [];
-      let locationIds = [];
-
-      if (product.locations && Array.isArray(product.locations)) {
-        // New format with locations array
-        if (product.locations.length > 0 && typeof product.locations[0] === 'object') {
-          // Array of location objects
-          locationNames = product.locations.map((loc: any) => loc.name || 'Unknown Location');
-          locationIds = product.locations.map((loc: any) => loc.id);
-        } else {
-          // Array of location IDs
-          locationIds = product.locations;
-          if (product.locationNames && Array.isArray(product.locationNames)) {
-            locationNames = product.locationNames;
-          } else {
-            // Lookup location names from IDs
-            locationNames = locationIds.map((locId: string) => {
-              const location = this.locations.find(l => l.id === locId);
-              return location?.name || 'Unknown Location';
-            });
-          }
-        }
-      } else if (product.location) {
-        // Old format with single location
-        locationIds = [product.location];
-        if (product.locationName) {
-          locationNames = [product.locationName];
-        } else {
-          // Lookup location name from ID
-          const location = this.locations.find(l => l.id === product.location);
-          locationNames = [location?.name || 'Unknown Location'];
-        }
-      } else {
-        // No location data
-        locationIds = [''];
-        locationNames = ['No Location'];
-      }
-
-      // Add location info to product
-      product.locationNames = locationNames;
-      product.locationIds = locationIds;
-      product.primaryLocationName = locationNames[0] || 'No Location';
-      product.primaryLocationId = locationIds[0] || '';
-            product.alertQuantity = product.alertQuantity || 0;
-
-
-      // Maintain backward compatibility
-      product.location = product.primaryLocationId;
-      product.locationName = product.primaryLocationName;
-
-      // Map the created date from addedDate if available
-      product.createdDate = product.addedDate || product.createdDate || new Date();
-
-      // Ensure purchase prices are properly formatted
-      product.defaultPurchasePriceIncTax = product.defaultPurchasePriceIncTax || 0;
-      product.unitPurchasePrice = product.unitPurchasePrice || product.defaultPurchasePriceExcTax || 0;
-
-      // Ensure status is set
+      // Ensure isActive is properly set (default to true if undefined)
       if (product.isActive === undefined) {
         product.isActive = true;
       }
-
-      // Calculate selling price exc tax if not available
-      if (product.defaultSellingPriceExcTax === undefined) {
-        const taxPercentage = product.taxPercentage || 0;
-        if (product.defaultSellingPriceIncTax && product.sellingPriceTaxType === 'Inclusive') {
-          product.defaultSellingPriceExcTax = product.defaultSellingPriceIncTax / (1 + (taxPercentage / 100));
-        } else {
-          product.defaultSellingPriceExcTax = product.defaultSellingPriceIncTax || 0;
-        }
-      }
-
-      // Set status text
-      if (product.notForSelling) {
-        product.status = 'Not for Sale';
-      } else {
-        product.status = product.isActive ? 'Active' : 'Inactive';
-      }
-
-      // Ensure status is still set
+      
+      // Ensure status is set
       if (!product.status) {
         product.status = product.isActive ? 'Active' : 'Inactive';
       }
-
-      // Set current stock
-      const currentStock = product.totalQuantity !== undefined ?
-        product.totalQuantity :
-        (product.currentStock || 0);
-      product.currentStock = currentStock;
-
-      // Format display of stock by location
-      if (product.stockByLocation) {
-        product.displayStock = Object.entries(product.stockByLocation)
-          .map(([locId, qty]) => {
-            const loc = this.locations.find(l => l.id === locId);
-            return `${loc?.name || locId}: ${qty}`;
-          })
-          .join(', ');
-      } else {
-        product.displayStock = product.currentStock !== undefined ?
-          `${product.currentStock} (${product.locationName})` : '0.00';
-      }
-
+      
       // Format tax display
       if (product.applicableTax) {
         if (typeof product.applicableTax === 'string') {
+          // If tax is stored as string (name)
           product.displayTax = product.applicableTax;
         } else if (product.applicableTax.name) {
+          // If tax is stored as object
           product.displayTax = `${product.applicableTax.name} (${product.applicableTax.percentage}%)`;
         } else {
           product.displayTax = '-';
@@ -597,18 +623,14 @@ loadProducts(): void {
       } else {
         product.displayTax = '-';
       }
-
+      
       return product;
     });
-
-    // Store the original and filtered product lists
+    
     this.originalProducts = [...this.products];
     this.filteredProducts = [...this.products];
-  }, error => {
-    console.error('Error loading products:', error);
   });
 }
-
 // In list-products.component.ts
 
 applyLocationFilter(): void {
@@ -1068,7 +1090,7 @@ applyFilters(): void {
     }
     
     // Brand filter - enhanced to handle different data structures
-  if (this.selectedBrand) {
+    if (this.selectedBrand) {
       if (product.brandId === this.selectedBrand) {
         // Simple case where product has brandId that matches
       } else if (product.brand && typeof product.brand === 'object' && product.brand.id === this.selectedBrand) {
@@ -1079,7 +1101,9 @@ applyFilters(): void {
         return false; // Doesn't match the selected brand
       }
     }
-      if (this.selectedCategory) {
+    
+    // Category filter
+    if (this.selectedCategory) {
       if (product.categoryId === this.selectedCategory) {
         // Simple case where product has categoryId that matches
       } else if (product.category && typeof product.category === 'object' && product.category.id === this.selectedCategory) {
@@ -1091,7 +1115,6 @@ applyFilters(): void {
       }
     }
     
-    
     // Tax filter
     if (this.selectedTax) {
       if (typeof product.applicableTax === 'string') {
@@ -1099,6 +1122,19 @@ applyFilters(): void {
           return false;
         }
       } else if (product.applicableTax?.id !== this.selectedTax) {
+        return false;
+      }
+    }
+    
+    // Status filter - updated to handle isActive properly
+    if (this.selectedStatus) {
+      if (this.selectedStatus === 'active' && (!product.isActive || product.notForSelling)) {
+        return false;
+      }
+      if (this.selectedStatus === 'notForSelling' && !product.notForSelling) {
+        return false;
+      }
+      if (this.selectedStatus === 'inactive' && product.isActive) {
         return false;
       }
     }
@@ -1164,6 +1200,7 @@ applyFilters(): void {
   // Reapply sorting
   this.sortBy(this.currentSortColumn);
 }
+
 // Reset all filters
 resetFilters(): void {
   // Reset all filter values
@@ -1171,7 +1208,7 @@ resetFilters(): void {
   this.selectedCategory = '';
   this.selectedTax = '';
   this.selectedLocation = '';
-  this.selectedStatus = '';
+  this.selectedStatus = ''; // Added status filter reset
   this.searchText = '';
   
   // Reset date filter
@@ -1183,6 +1220,7 @@ resetFilters(): void {
     categoryId: '',
     taxId: '',
     locationId: '',
+    statusId: '', // Added status to filter options
     fromDate: null,
     toDate: null
   };

@@ -3,7 +3,6 @@ import { Firestore, collection, addDoc, query, onSnapshot, doc, updateDoc, delet
 import { Observable, from, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-
 export interface Supplier {
   postalCode?: string;
   address: string;
@@ -85,24 +84,6 @@ export class SupplierService {
       return { unsubscribe };
     });
   }
-   getSuppliersRealTime(): Observable<Supplier[]> {
-  const suppliersRef = collection(this.firestore, this.suppliersCollection);
-  return new Observable<Supplier[]>(observer => {
-    const unsubscribe = onSnapshot(suppliersRef, (snapshot) => {
-      const suppliers = snapshot.docs.map(doc => {
-        const data = doc.data() as Supplier;
-        const id = doc.id;
-        return { id, ...data };
-      });
-      observer.next(suppliers);
-    }, (error) => {
-      observer.error(error);
-    });
-    
-    return { unsubscribe };
-  });
-}
-
 // Add this method to supplier.service.ts
 getSupplierBalanceDue(supplierId: string): Observable<number> {
   const supplierDoc = doc(this.firestore, `${this.suppliersCollection}/${supplierId}`);
@@ -180,7 +161,16 @@ async updateSupplier(id: string, supplier: Partial<Supplier>): Promise<void> {
     const supplierDoc = doc(this.firestore, this.suppliersCollection, id);
     return deleteDoc(supplierDoc);
   }
+// supplier.service.ts
 
+async updateSupplierStatus(supplierId: string, status: 'Active' | 'Inactive'): Promise<void> {
+  const supplierDoc = doc(this.firestore, this.suppliersCollection, supplierId);
+  
+  return updateDoc(supplierDoc, { 
+    status,
+    updatedAt: new Date() 
+  });
+}
   // Get suppliers by contact type
   getSuppliersByContactType(contactType: string): Observable<Supplier[]> {
     const suppliersRef = collection(this.firestore, this.suppliersCollection);

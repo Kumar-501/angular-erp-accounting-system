@@ -20,17 +20,16 @@ export class User1Component implements OnInit {
   sortColumn: string = 'username';
   sortDirection: string = 'asc';
   showColumnVisibilityMenu: boolean = false;
-columns = [
-  { name: 'employeeId', displayName: 'Employee ID', visible: true },
-  { name: 'name', displayName: 'Name', visible: true },
-  { name: 'username', displayName: 'Username', visible: true },
-  { name: 'role', displayName: 'Role', visible: true },
-  { name: 'department', displayName: 'Department', visible: true },
-  { name: 'designation', displayName: 'Designation', visible: true },
-  { name: 'locations', displayName: 'Locations', visible: true },
-  { name: 'email', displayName: 'Email', visible: true },
-  { name: 'actions', displayName: 'Actions', visible: true }
-];
+  columns = [
+    { name: 'employeeId', displayName: 'Employee ID', visible: true },
+    { name: 'name', displayName: 'Name', visible: true },
+    { name: 'username', displayName: 'Username', visible: true },
+    { name: 'role', displayName: 'Role', visible: true },
+    { name: 'department', displayName: 'Department', visible: true },
+    { name: 'designation', displayName: 'Designation', visible: true },
+    { name: 'email', displayName: 'Email', visible: true },
+    { name: 'actions', displayName: 'Actions', visible: true }
+  ];
   
   // Filter properties
   showFilters: boolean = false;

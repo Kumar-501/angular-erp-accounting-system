@@ -67,8 +67,9 @@
             <td>{{ status.order }}</td>
             <td class="action-buttons">
               <button class="edit-btn" (click)="openEditPopup(status)">Edit</button>
-              <button class="delete-btn" (click)="deleteLeadStatus(status)">Delete</button>
-            </td>
+<button class="delete-btn" (click)="deleteLeadStatus(status)" [disabled]="isDeleting">
+  {{ isDeleting ? 'Deleting...' : 'Delete' }}
+</button>            </td>
           </tr>
         </tbody>
       </table>
@@ -118,9 +119,12 @@
               </div>
               
               <div class="button-group">
-                <button type="button" class="save-btn" [disabled]="leadStatusForm.invalid" (click)="saveLeadStatus()">
-                  {{ isEditing ? 'Update' : 'Save' }}
-                </button>
+  <!-- In your modal template -->
+<button type="button" class="save-btn" 
+        [disabled]="leadStatusForm.invalid || isSaving" 
+        (click)="saveLeadStatus()">
+  {{ isSaving ? 'Saving...' : (isEditing ? 'Update' : 'Save') }}
+</button>
                 <button type="button" class="cancel-btn" (click)="closePopup()">Cancel</button>
               </div>
             </form>

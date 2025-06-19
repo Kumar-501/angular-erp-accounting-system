@@ -13,6 +13,7 @@ import { UserService } from '../services/user.service';
 import { NgForm } from '@angular/forms';
 import { StockService } from '../services/stock.service';
 import { HostListener } from '@angular/core';
+import { AuthService } from '../auth.service';
 
 
 interface Location {
@@ -92,6 +93,8 @@ onClick(event: MouseEvent) {
     private categoriesService: CategoriesService,
     private brandsService: BrandsService,
 private skuGenerator: SkuGeneratorService,
+public authService: AuthService ,// Add AuthService to constructor
+
    private unitsService: UnitsService,
     private taxService: TaxService,
     private userService: UserService,
@@ -125,6 +128,8 @@ private skuGenerator: SkuGeneratorService,
     
     this.loadInitialData();
     this.loadTaxRates();
+      this.autofillCurrentUser();
+
     this.loadAvailableProducts();
     this.loadVariations();
     this.product.components = (this.product.components || []).filter((c: any) => c.productId);
@@ -160,6 +165,20 @@ private skuGenerator: SkuGeneratorService,
     }
   }
   // Add this method to your StockService class
+private autofillCurrentUser() {
+  const currentUser = this.authService.currentUserValue;
+  if (currentUser) {
+    this.product.addedBy = currentUser.uid;
+    this.product.addedByName = currentUser.displayName || currentUser.email;
+    
+    // If you want to show the selected user in the dropdown
+    this.selectedUser = {
+      id: currentUser.uid,
+      name: currentUser.displayName,
+      email: currentUser.email
+    };
+  }
+}
 
 filterLocations(event: Event) {
   const input = event.target as HTMLInputElement;
@@ -303,19 +322,18 @@ private getInitialProduct() {
     productName: '',
     sku: '',
     hsnCode: '',
- locations: [], 
-location: '',
+    locations: [], 
+    location: '',
     barcodeType: 'Code 128 (C128)',
     unit: '',
     addedBy: '',
-        expiryDate: null, // Add this line
-
+    expiryDate: null,
     addedByName: '',
-addedDate: new Date().toISOString().split('T')[0], // Just get the date part
+    addedDate: new Date().toISOString().split('T')[0],
     brand: '',
     category: '',
-      totalQuantity: 0,       // Total quantity in stock
-  lastNumber: '', 
+    totalQuantity: 0,
+    lastNumber: '',
     subCategory: '',
     manageStock: true,
     alertQuantity: null,
@@ -324,7 +342,7 @@ addedDate: new Date().toISOString().split('T')[0], // Just get the date part
     productBrochure: null,
     enableProductDescription: false,
     notForSelling: false,
-    notSellingProducts: [], // Add this new property
+    notSellingProducts: [],
     weight: null,
     length: null,
     breadth: null,
@@ -342,30 +360,29 @@ addedDate: new Date().toISOString().split('T')[0], // Just get the date part
     defaultPurchasePriceIncTax: null,
     defaultSellingPriceExcTax: null,
     defaultSellingPriceIncTax: null,
-    components: [], 
-    variations: []
+    components: [],
+    variations: [],
+    isActive: true, // Add this line to make products active by default
+    status: 'Active' // Add this line to set the status
   };
-   if (this.product.locations && this.product.locations.length > 0) {
-    this.selectedLocations = this.locations.filter(loc => 
-      this.product.locations.includes(loc.id)
-    );
-  }
-    this.filteredLocations = [...this.locations];
-
 }
 
-  private loadTaxRates() {
-    const subscription = this.taxService.getTaxRates().subscribe({
-      next: (rates) => {
-        this.taxRates = rates.filter(rate => !rate.forTaxGroupOnly);
-        console.log('Loaded tax rates:', this.taxRates);
-      },
-      error: (err) => {
-        console.error('Failed to fetch tax rates:', err);
-      }
-    });
-    this.subscriptions.push(subscription);
-  }
+private loadTaxRates() {
+  const subscription = this.taxService.getTaxRates().subscribe({
+    next: (rates) => {
+      // Make sure the rates have percentage values
+      this.taxRates = rates.filter(rate => !rate.forTaxGroupOnly).map(rate => ({
+        ...rate,
+        percentage: (rate.rate || 0) // Ensure percentage exists, use the correct property name
+      }));
+      console.log('Loaded tax rates:', this.taxRates);
+    },
+    error: (err) => {
+      console.error('Failed to fetch tax rates:', err);
+    }
+  });
+  this.subscriptions.push(subscription);
+}
   
   private loadAvailableProducts(): void {
     const subscription = this.productsService.getProductsRealTime().subscribe({
@@ -417,7 +434,7 @@ private async loadInitialData() {
   
 calculateFromMRP() {
   const taxPercentage = this.getTaxPercentage();
-  if (this.product.defaultSellingPriceIncTax !== null) {
+  if (this.product.defaultSellingPriceIncTax !== null && this.product.defaultSellingPriceIncTax !== undefined) {
     // Calculate price before tax from MRP
     this.product.defaultSellingPriceExcTax = 
       this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100);
@@ -432,6 +449,15 @@ calculateFromMRP() {
     // Round the values
     this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(this.product.defaultSellingPriceExcTax);
     this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(this.product.defaultSellingPriceIncTax);
+  }
+}
+
+calculateSellingPriceIncTax() {
+  const taxPercentage = this.getTaxPercentage();
+  if (this.product.defaultSellingPriceExcTax !== null && this.product.defaultSellingPriceExcTax !== undefined) {
+    // Calculate MRP by adding tax to selling price
+    const calculatedPrice = parseFloat(this.product.defaultSellingPriceExcTax) * (1 + taxPercentage / 100);
+    this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(calculatedPrice);
   }
 }
 
@@ -462,18 +488,18 @@ calculateTaxAmount(): number {
     });
   }
 
-getAvailableNotSellingProducts(): any[] {
-  if (!this.availableProducts) return [];
-  
-  // Filter out products that are already selected
-  const selectedProductIds = (this.product.notSellingProducts || []).map((item: any) => item.productId);
-  
-  return this.availableProducts.filter(product => 
-    !selectedProductIds.includes(product.id) && 
-    product.id !== this.product.id && // Don't include the current product being edited
-    (product.currentStock || 0) > 0 // Only show products with available stock
-  );
-}
+ getAvailableNotSellingProducts(): any[] {
+    if (!this.availableProducts) return [];
+    
+    // Filter out products that are already selected
+    const selectedProductIds = (this.product.notSellingProducts || []).map((item: any) => item.productId);
+    
+    return this.availableProducts.filter(product => 
+      !selectedProductIds.includes(product.id) && 
+      product.id !== this.product.id // Don't include the current product being edited
+      // Removed the stock check: && (product.currentStock || 0) > 0
+    );
+  }
 
 addNotSellingProduct(product: any) {
   if (!product || !product.selectedQuantity || product.selectedQuantity <= 0) return;
@@ -669,12 +695,7 @@ validateNotSellingQuantity(index: number): void {
     return new Promise((resolve) => {
       setTimeout(() => {
         this.subCategories = [
-          { name: 'Office Chairs', category: 'Furniture' },
-          { name: 'Dining Chairs', category: 'Furniture' },
-          { name: 'Smartphones', category: 'Electronics' },
-          { name: 'Laptops', category: 'Electronics' },
-          { name: 'General', category: 'Medicines' },
-          { name: 'Antibiotics', category: 'Drugs' }
+
         ];
         console.log('Loaded subcategories:', this.subCategories.length);
         resolve();
@@ -1001,14 +1022,7 @@ calculateSellingPrice() {
   }
 }
 
- calculateSellingPriceIncTax() {
-  const taxPercentage = this.getTaxPercentage();
-  if (this.product.defaultSellingPriceExcTax !== null) {
-    // Calculate MRP by adding tax to selling price
-    const calculatedPrice = parseFloat(this.product.defaultSellingPriceExcTax) * (1 + taxPercentage / 100);
-    this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(calculatedPrice);
-  }
-}
+
   
 
   calculatePurchasePriceExcTax() {
@@ -1167,9 +1181,15 @@ validateForm(): boolean {
     { field: 'productName', message: 'Product name is required' },
     { field: 'unit', message: 'Unit is required' },
     { field: 'barcodeType', message: 'Barcode type is required' },
-    { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' },
     { field: 'productType', message: 'Product type is required' }
   ];
+
+  // Only require selling price tax type if product is for selling
+  if (!this.product.notForSelling) {
+    requiredFields.push(
+      { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' }
+    );
+  }
 
   for (const { field, message } of requiredFields) {
     if (!this.product[field]) {
@@ -1182,6 +1202,15 @@ validateForm(): boolean {
   if (this.product.applicableTax === null || this.product.applicableTax === undefined) {
     alert('Applicable Tax is required');
     isValid = false;
+  }
+
+  // Skip price validation for not-for-selling products
+  if (!this.product.notForSelling) {
+    // Validate prices if product is for selling
+    if (!this.product.defaultSellingPriceExcTax && !this.product.defaultSellingPriceIncTax) {
+      alert('Either selling price (exc. tax) or MRP (inc. tax) is required');
+      isValid = false;
+    }
   }
 
   // Validate product type specific requirements
@@ -1201,15 +1230,30 @@ validateForm(): boolean {
       break;
       
     case 'Single':
-      // Validate pricing for single products
-      if (!this.product.defaultSellingPriceExcTax || !this.product.defaultSellingPriceIncTax) {
-        alert('Please enter selling prices');
-        isValid = false;
-      }
+      // No additional validation needed for single products
+      // Price validation is already handled above
       break;
   }
 
   return isValid;
+}
+
+onNotForSellingChange() {
+  if (this.product.notForSelling) {
+    // Initialize not selling products array if not exists
+    if (!this.product.notSellingProducts) {
+      this.product.notSellingProducts = [];
+    }
+    
+    // Clear pricing fields for not-for-selling products
+    this.product.defaultSellingPriceExcTax = null;
+    this.product.defaultSellingPriceIncTax = null;
+    this.product.marginPercentage = 0;
+  } else {
+    // Clear not selling products if unchecked
+    this.product.notSellingProducts = [];
+    this.selectedNotSellingProducts = [];
+  }
 }
 
 async saveAndAddOpeningStock() {

@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { TransactionsService } from './transactions.service';
+import { EndOfServiceService } from './end-of-service.service';
 
-describe('TransactionsService', () => {
-  let service: TransactionsService;
+describe('EndOfServiceService', () => {
+  let service: EndOfServiceService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(TransactionsService);
+    service = TestBed.inject(EndOfServiceService);
   });
 
   it('should be created', () => {

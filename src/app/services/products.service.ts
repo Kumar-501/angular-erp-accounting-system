@@ -20,7 +20,7 @@ import { Observable } from 'rxjs';
 import { SkuGeneratorService } from './sku-generator.service';
 
 // In products.service.ts or shared interfaces file
-interface Product {
+export interface Product {
   // Core identification
   id?: string;
   productName: string;
@@ -107,17 +107,15 @@ interface Product {
   }[];
 }
 
-// Define history entry interface
 interface HistoryEntry {
   id?: string;
   productId: string;
-  action: string; // 'add', 'update', 'stock_update', 'delete'
+  action: string;
   timestamp: any;
   user?: string;
   oldValue?: any;
   newValue?: any;
   note?: string;
-  
 }
 
 @Injectable({
@@ -411,14 +409,31 @@ private async deleteProductSubcollections(productId: string): Promise<void> {
 
 
 
-  private async addHistoryEntry(entry: HistoryEntry): Promise<void> {
-    try {
-      await addDoc(this.historyCollection, entry);
-    } catch (error) {
-      console.error('Error adding history entry:', error);
-      throw error;
+private async addHistoryEntry(entry: HistoryEntry): Promise<void> {
+  try {
+    // Clean the entry object to remove undefined values
+    const cleanedEntry: any = {
+      productId: entry.productId,
+      action: entry.action,
+      timestamp: entry.timestamp || serverTimestamp(),
+      user: entry.user || 'System',
+      note: entry.note || '',
+    };
+
+    // Only include oldValue and newValue if they're not undefined
+    if (entry.oldValue !== undefined) {
+      cleanedEntry.oldValue = entry.oldValue;
     }
+    if (entry.newValue !== undefined) {
+      cleanedEntry.newValue = entry.newValue;
+    }
+
+    await addDoc(this.historyCollection, cleanedEntry);
+  } catch (error) {
+    console.error('Error adding history entry:', error);
+    throw error;
   }
+}
 
   // Get product history
   getProductHistory(productId: string): Observable<HistoryEntry[]> {

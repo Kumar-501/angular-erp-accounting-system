@@ -52,7 +52,8 @@ export class LeadsComponent implements OnInit {
   filteredUsers: any[] = [];
 departments = ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'];
   filteredProducts: any[] = [];
-pageSizeOptions = [10, 25, 50, 100];  // Add this line
+  pageSizeOptions = [10, 25, 50, 100];  // Add this line
+  readonly PC_DEPARTMENTS = ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'];
   // ... other fields
   leadCategory?: string; // if you also track one main category
   categories?: string[]; // ✅ add this line
@@ -604,60 +605,84 @@ onDepartmentChange(event: Event): void {
     this.showDepartmentPopup = false;
     this.selectedLeadForDepartment = null;
   }
-  async saveDepartment(): Promise<void> {
-    if (this.departmentForm.invalid) {
-      this.departmentForm.markAllAsTouched();
-      return;
-    }
-  
-    const department = this.departmentForm.get('department')?.value;
-  
-    try {
-      if (this.selectedLeadForDepartment) {
-        // Update single lead
-        await this.leadService.updateLead(this.selectedLeadForDepartment.id, { department });
-        // Update local data
-        const lead = this.allLeads.find(l => l.id === this.selectedLeadForDepartment.id);
-        if (lead) {
-          lead.department = department;
+async saveDepartment(): Promise<void> {
+  if (this.departmentForm.invalid) {
+    this.departmentForm.markAllAsTouched();
+    return;
+  }
 
-        }
-      } else {
-        // Bulk update selected leads
-        const updatePromises = Array.from(this.selectedLeads).map(leadId => 
-          this.leadService.updateLead(leadId, { department })
-        );
-        await Promise.all(updatePromises);
-        
-        // Update local data
-        this.allLeads.forEach(lead => {
-          if (this.selectedLeads.has(lead.id)) {
-            lead.department = department;
-          }
-        });
-      }
+  const department = this.departmentForm.get('department')?.value;
+  const updateData: any = { 
+    department, 
+    // Explicitly preserve other fields
+    alternateContact: this.selectedLeadForDepartment?.alternateContact || '' 
+  };
 
-      this.closeDepartmentPopup();
-      this.applyFilters(); // Refresh the filtered data
-      
-      // Show success message
-      this.validationMessage = {
-        text: 'Department updated successfully',
-        type: 'success'
-      };
-      
-      setTimeout(() => {
-        this.validationMessage = null;
-      }, 3000);
-      
-    } catch (error) {
-      console.error('Error updating department:', error);
-      this.validationMessage = {
-        text: 'Error updating department. Please try again.',
-        type: 'error'
-      };
+  // If a user is selected, include assignment info
+  if (this.selectedUserId) {
+    const selectedUser = this.usersList.find(u => u.id === this.selectedUserId);
+    if (selectedUser) {
+      updateData.assignedTo = selectedUser.name;
+      updateData.assignedToId = selectedUser.id;
     }
   }
+
+  try {
+    if (this.selectedLeadForDepartment) {
+      // Update single lead
+      await this.leadService.updateLead(this.selectedLeadForDepartment.id, updateData);
+      // Update local data
+      const lead = this.allLeads.find(l => l.id === this.selectedLeadForDepartment.id);
+      if (lead) {
+        Object.assign(lead, updateData);
+      }
+    } else {
+      // Bulk update selected leads
+      const updatePromises = Array.from(this.selectedLeads).map(leadId => {
+        const lead = this.allLeads.find(l => l.id === leadId);
+        return this.leadService.updateLead(leadId, {
+          ...updateData,
+          alternateContact: lead?.alternateContact || '' // Preserve alternate contact
+        });
+      });
+      await Promise.all(updatePromises);
+      
+      // Update local data
+      this.allLeads.forEach(lead => {
+        if (this.selectedLeads.has(lead.id)) {
+          lead.department = department;
+          if (this.selectedUserId) {
+            const selectedUser = this.usersList.find(u => u.id === this.selectedUserId);
+            if (selectedUser) {
+              lead.assignedTo = selectedUser.name;
+              lead.assignedToId = selectedUser.id;
+            }
+          }
+        }
+      });
+    }
+
+    this.closeDepartmentPopup();
+    this.applyFilters();
+    
+    this.validationMessage = {
+      text: 'Department updated successfully',
+      type: 'success'
+    };
+    
+    setTimeout(() => {
+      this.validationMessage = null;
+    }, 3000);
+    
+  } catch (error) {
+    console.error('Error updating department:', error);
+    this.validationMessage = {
+      text: 'Error updating department. Please try again.',
+      type: 'error'
+    };
+  }
+}
+
   goToFirstPage(): void {
     this.currentPage = 1;
     this.updatePagination();
@@ -749,10 +774,13 @@ closeLifeStagePopup(): void {
       : 'Select products...';
   } 
   // Individual filter methods
-applySourceFilter(source: string): void {
+applySourceFilter(source: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.source = source;
+  this.activeDropdown = '';
   this.applyFilters();
 }
+  
 // Initialize the assign form
 private initAssignForm(): void {
   this.assignForm = this.fb.group({
@@ -762,39 +790,47 @@ private initAssignForm(): void {
 }
 
 
-applyLifeStageFilter(lifeStage: string): void {
+applyLifeStageFilter(lifeStage: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.lifeStage = lifeStage;
+  this.activeDropdown = '';
   this.applyFilters();
 }
-toggleDropdown(dropdownName: string): void {
-  if (this.activeDropdown === dropdownName) {
+toggleDropdown(dropdownName: string, event?: Event): void {
+  if (event) event.stopPropagation();
+  
+  this.activeDropdown = this.activeDropdown === dropdownName ? '' : dropdownName;
+}
+applyLeadStatusFilter(leadStatus: string, event?: Event): void {
+  if (event) event.stopPropagation();
+  this.filters.leadStatus = leadStatus;
+  this.activeDropdown = '';
+  this.applyFilters();
+}
+
+@HostListener('document:click', ['$event'])
+onDocumentClick(event: MouseEvent) {
+  if (!this.elementRef.nativeElement.contains(event.target)) {
     this.activeDropdown = '';
-  } else {
-    this.activeDropdown = dropdownName;
   }
 }
 
-applyLeadStatusFilter(leadStatus: string): void {
-  this.filters.leadStatus = leadStatus;
-  this.applyFilters();
-}
-  @HostListener('document:click', ['$event'])
-  onClickOutside(event: Event) {
-    if (!this.elementRef.nativeElement.contains(event.target)) {
-      this.shown = false;
-    }
-  }
   
 
-applyAssignedToFilter(assignedTo: string): void {
+applyAssignedToFilter(assignedTo: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.assignedTo = assignedTo;
+  this.activeDropdown = '';
   this.applyFilters();
 }
 
-applyDealStatusFilter(dealStatus: string): void {
+applyDealStatusFilter(dealStatus: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.dealStatus = dealStatus;
+  this.activeDropdown = '';
   this.applyFilters();
 }
+
 // In your component.ts file
 onProductCheckboxChange(event: any, product: any) {
   // Handle checkbox change here
@@ -878,12 +914,19 @@ onProductSelectAndAdd(productName: string) {
     }
   }
 }
-applyPriorityFilter(priority: string): void {
+applyPriorityFilter(priority: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.priority = priority;
+  this.activeDropdown = '';
   this.applyFilters();
 }
 
-applyDepartmentFilter(department: string): void {
+applyDepartmentFilter(department: string, event?: Event): void {
+  if (event) {
+    event.stopPropagation(); // Prevent event bubbling
+    this.activeDropdown = ''; // Close the dropdown
+  }
+
   const currentUserRole = this.authService.currentUserValue?.role || '';
   const currentUserDepartment = this.authService.currentUserValue?.department || '';
   
@@ -924,7 +967,7 @@ async assignSelectedLeads() {
   }
 
   try {
-    // Prepare update data
+    // Prepare update data - only include fields we want to change
     const updateData: any = {};
     
     // Only include assignedTo if a user is selected (for random assignment)
@@ -932,6 +975,7 @@ async assignSelectedLeads() {
       const selectedUser = this.availableUsers.find(u => u.id === this.selectedUserId);
       if (selectedUser) {
         updateData.assignedTo = selectedUser.name || selectedUser.email;
+        updateData.assignedToId = selectedUser.id;
       }
     }
     
@@ -940,23 +984,33 @@ async assignSelectedLeads() {
       updateData.lifeStage = this.selectedLifeStage;
     }
 
-    // Update all selected leads
-    const updatePromises = Array.from(this.selectedLeads).map(leadId => 
-      this.leadService.updateLead(leadId, updateData)
-    );
+    // Get all selected leads first
+    const leadsToUpdate = this.allLeads.filter(lead => this.selectedLeads.has(lead.id));
+    
+    // Update all selected leads with merged data
+    const updatePromises = leadsToUpdate.map(lead => {
+      // Create a new object with existing lead data and new updates
+      const mergedData = {
+        ...lead, // Spread all existing lead properties
+        ...updateData, // Override with new updates
+        updatedAt: new Date() // Add update timestamp
+      };
+      
+      return this.leadService.updateLead(lead.id, mergedData);
+    });
     
     await Promise.all(updatePromises);
     
     // Update local data
-    this.allLeads.forEach(lead => {
-      if (this.selectedLeads.has(lead.id)) {
-        if (updateData.assignedTo) {
-          lead.assignedTo = updateData.assignedTo;
-        }
-        if (updateData.lifeStage) {
-          lead.lifeStage = updateData.lifeStage;
-        }
+    leadsToUpdate.forEach(lead => {
+      if (updateData.assignedTo) {
+        lead.assignedTo = updateData.assignedTo;
+        lead.assignedToId = updateData.assignedToId;
       }
+      if (updateData.lifeStage) {
+        lead.lifeStage = updateData.lifeStage;
+      }
+      lead.updatedAt = new Date();
     });
 
     // Show success message
@@ -1009,6 +1063,7 @@ async assignSelectedLeads() {
   }
 
 // Method to update life stages
+// Method to update life stages
 async updateSelectedLifeStages(): Promise<void> {
   if (!this.selectedLifeStage || this.selectedLeadsForLifeStage.length === 0) {
     alert('Please select a life stage');
@@ -1016,9 +1071,23 @@ async updateSelectedLifeStages(): Promise<void> {
   }
 
   try {
-    const updatePromises = this.selectedLeadsForLifeStage.map(lead => 
-      this.leadService.updateLead(lead.id, { lifeStage: this.selectedLifeStage })
-    );
+    const updatePromises = this.selectedLeadsForLifeStage.map(lead => {
+      // Create update data that preserves all existing fields
+      const updateData = {
+        lifeStage: this.selectedLifeStage,
+        // Explicitly preserve other important fields
+        alternateContact: lead.alternateContact || '',
+        mobile: lead.mobile || '',
+        firstName: lead.firstName || '',
+        lastName: lead.lastName || '',
+        businessName: lead.businessName || '',
+        email: lead.email || '',
+        // Add any other fields you want to preserve
+        updatedAt: new Date()
+      };
+      
+      return this.leadService.updateLead(lead.id, updateData);
+    });
     
     await Promise.all(updatePromises);
     
@@ -1027,6 +1096,8 @@ async updateSelectedLifeStages(): Promise<void> {
       const foundLead = this.allLeads.find(l => l.id === lead.id);
       if (foundLead) {
         foundLead.lifeStage = this.selectedLifeStage;
+        // Ensure other fields are preserved in local data
+        foundLead.alternateContact = lead.alternateContact || '';
       }
     });
     
@@ -1051,6 +1122,7 @@ async updateSelectedLifeStages(): Promise<void> {
     };
   }
 }
+
 toggleSelectAll(event: Event) {
   const isChecked = (event.target as HTMLInputElement).checked;
   this.allSelected = isChecked;
@@ -1145,10 +1217,12 @@ filters = {
   adCode: '',
   // Add any other filter criteria you need
 };
-
+get showBulkActions(): boolean {
+  return this.currentUserRole !== 'Executive';
+}
 ngOnInit(): void {
   this.loadLeads();
- const currentUser = this.authService.currentUserValue;
+  const currentUser = this.authService.currentUserValue;
   this.currentUserRole = currentUser?.role || '';
   this.currentUserDepartment = currentUser?.department || '';
 
@@ -1189,7 +1263,8 @@ ngOnDestroy(): void {
 
 
 // Filter method
-applyOrderStatusFilter(status: '' | 'Reordered' | 'No Reordered') {
+applyOrderStatusFilter(status: '' | 'Reordered' | 'No Reordered', event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.orderStatus = status;
   this.activeDropdown = '';
   this.applyFilters();
@@ -1213,9 +1288,10 @@ private initializeProducts(): void {
       this.availableDistricts = [];
     }
   }
- // Add the filter method
-applyAdCodeFilter(adCode: string): void {
+applyAdCodeFilter(adCode: string, event?: Event): void {
+  if (event) event.stopPropagation();
   this.filters.adCode = adCode;
+  this.activeDropdown = '';
   this.applyFilters();
 }
  // Add these methods
@@ -1301,57 +1377,61 @@ removeInterestedProduct(product: Product): void {
     p => p.id !== product.id
   );
 }
-
-async openAssignModal(randomMode: boolean) {
+// Helper method to get common department among selected leads
+private getCommonDepartment(leads: any[]): string | null {
+  if (leads.length === 0) return null;
+  
+  const firstDept = leads[0].department;
+  if (leads.every(lead => lead.department === firstDept)) {
+    return firstDept;
+  }
+  return null;
+  }
+  
+async openAssignModal(randomMode: boolean): Promise<void> {
   this.randomAssignMode = randomMode;
   const currentUserRole = this.authService.currentUserValue?.role || '';
   const currentUserDepartment = this.authService.currentUserValue?.department || '';
 
   if (randomMode) {
     try {
-      // For supervisors, get random users from their department only
-      if (currentUserRole === 'Supervisor') {
-        this.availableUsers = await this.userService.getRandomUsersFromDepartment(
-          currentUserDepartment, 
-          3
+      // For random assignment, only show users from PC1-PC8 departments
+      this.availableUsers = this.usersList.filter(user => 
+        user.role === 'Executive' && 
+        user.department && 
+        user.department.match(/^PC[1-8]$/i) // Matches PC1 through PC8
+      );
+
+      // If current user is supervisor, filter to their department only
+      if (currentUserRole === 'Supervisor' && currentUserDepartment) {
+        this.availableUsers = this.availableUsers.filter(user => 
+          user.department === currentUserDepartment
         );
-      } else {
-        // For admins/managers, get random users from all departments
-        this.availableUsers = await this.userService.getRandomUsers(3);
       }
-      
+
+      // Randomly select 3 users if available
       if (this.availableUsers.length > 0) {
-        this.selectedUserId = this.availableUsers[0].id;
+        const randomUsers = [...this.availableUsers]
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 3);
+        this.availableUsers = randomUsers;
+        this.selectedUserId = randomUsers[0]?.id || '';
       }
     } catch (error) {
       console.error('Error getting random users:', error);
       return;
     }
   } else {
-    // For manual assignment, filter users based on role
+    // For manual assignment, show all executive users
     if (currentUserRole === 'Supervisor') {
-      this.availableUsers = this.usersList
-        .filter(user => 
-          user.role === 'Executive' && 
-          user.department === currentUserDepartment
-        )
-        .map(user => ({
-          id: user.id,
-          name: user.name,
-          email: user.email
-        }));
-    } else if (currentUserRole === 'Admin' || currentUserRole === 'Manager') {
-      // For admin/manager, show all executive users
-      this.availableUsers = this.usersList
-        .filter(user => user.role === 'Executive')
-        .map(user => ({
-          id: user.id,
-          name: user.name,
-          email: user.email
-        }));
+      this.availableUsers = this.usersList.filter(user => 
+        user.role === 'Executive' && 
+        user.department === currentUserDepartment
+      );
     } else {
-      // For other roles, show no users (or adjust as needed)
-      this.availableUsers = [];
+      this.availableUsers = this.usersList.filter(user => 
+        user.role === 'Executive'
+      );
     }
   }
   
@@ -1705,7 +1785,10 @@ loadUsers() {
     }
   });
 }
-onUserSelectionChange(userId: string): void {
+onUserSelectionChange(event: Event): void {
+  const selectElement = event.target as HTMLSelectElement;
+  const userId = selectElement.value;
+  
   if (!userId) {
     this.selectedUserDepartment = '';
     return;
@@ -1713,8 +1796,6 @@ onUserSelectionChange(userId: string): void {
   
   const selectedUser = this.usersList.find(user => user.id === userId);
   if (selectedUser) {
-    // Update the department field to match the selected user's department
-    this.leadForm.get('department')?.setValue(selectedUser.department);
     this.selectedUserDepartment = selectedUser.department;
   }
 }
@@ -2244,6 +2325,34 @@ async saveLead() {
       text: 'Error saving lead. Please try again.',
       type: 'error'
     };
+  }
+  }
+  onDepartmentSelect(event: Event): void {
+  const selectElement = event.target as HTMLSelectElement;
+  const department = selectElement.value;
+  
+  if (department) {
+    this.filterUsersByDepartment(department);
+  } else {
+    this.filteredUsers = [];
+  }
+  }
+private filterUsersByDepartment(department: string): void {
+  // Only allow filtering by PC departments
+  if (!this.PC_DEPARTMENTS.includes(department)) {
+    this.filteredUsers = [];
+    return;
+  }
+
+  this.filteredUsers = this.usersList.filter(user => 
+    user.department === department && 
+    user.role === 'Executive'
+  );
+  
+  if (this.filteredUsers.length === 1) {
+    this.selectedUserId = this.filteredUsers[0].id;
+  } else {
+    this.selectedUserId = '';
   }
 }
 selectAllFilteredLeads() {

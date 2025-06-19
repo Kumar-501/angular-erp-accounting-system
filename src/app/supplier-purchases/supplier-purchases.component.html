@@ -9,18 +9,22 @@
     <div class="card-body">
       <div class="row">
         <div class="col-md-6">
-          <div class="mb-3">
-            <label class="fw-bold text-secondary">Business Name:</label>
-            <p class="mb-1">{{ supplierDetails.businessName || 'N/A' }}</p>
-          </div>
-          <div class="mb-3">
-            <label class="fw-bold text-secondary">Contact Person:</label>
-            <p class="mb-1">{{ supplierDetails.firstName }} {{ supplierDetails.lastName }}</p>
-          </div>
+   <div class="mb-3">
+          <label class="fw-bold text-secondary">Business Name:</label>
+          <p class="mb-1">{{ supplierDetails.businessName || 'N/A' }}</p>
+        </div>
+        <div class="mb-3">
+          <label class="fw-bold text-secondary">Contact Name:</label>
+          <p class="mb-1">{{ supplierDetails.firstName }} {{ supplierDetails.lastName }}</p>
+        </div>
           <div class="mb-3">
             <label class="fw-bold text-secondary">Mobile:</label>
             <p class="mb-1">{{ supplierDetails.mobile || 'N/A' }}</p>
           </div>
+          <div class="mb-3">
+  <label class="fw-bold text-secondary">Alternate Contact:</label>
+  <p class="mb-1">{{ supplierDetails.alternateContact || 'N/A' }}</p>
+</div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
@@ -70,18 +74,17 @@
           </div>
         </div>
       </div>
-      <div class="col-md-6">
+      <!-- <div class="col-md-6">
         <label class="form-label">Location</label>
         <select class="form-select" [(ngModel)]="selectedLocation" (change)="onLocationChange()">
           <option value="all">All Locations</option>
           <option *ngFor="let loc of locations" [value]="loc.id">{{loc.name}}</option>
         </select>
-      </div>
+      </div> -->
     </div>
   </div>
 </div>
-  <!-- Navigation Tabs - Modernized -->
-  <ul class="nav nav-pills nav-fill mb-4 bg-white shadow-sm rounded p-2">
+  <!-- <ul class="nav nav-pills nav-fill mb-4 bg-white shadow-sm rounded p-2">
     <li class="nav-item">
       <a class="nav-link" [class.active]="activeTab === 'ledger'" (click)="changeTab('ledger')" [ngStyle]="{'background-color': activeTab === 'ledger' ? '#3d82bb' : ''}">
         <i class="fas fa-book me-1"></i> Ledger
@@ -89,12 +92,9 @@
     </li>
      <!-- In supplier-purchases.component.html -->
 <!-- Add a new tab for payments -->
-<li class="nav-item">
-  <a class="nav-link" [class.active]="activeTab === 'payments'" 
-     (click)="changeTab('payments'); loadPayments()">
-    <i class="fas fa-money-bill-wave me-1"></i> Payments
-  </a>
-</li>
+<!-- <li class="nav-item"> -->
+
+<!-- </li>
     <li class="nav-item">
       <a class="nav-link" [class.active]="activeTab === 'purchases'" (click)="changeTab('purchases')" [ngStyle]="{'background-color': activeTab === 'purchases' ? '#3d82bb' : ''}">
         <i class="fas fa-shopping-cart me-1"></i> Purchases
@@ -105,9 +105,9 @@
      (click)="changeTab('payments'); loadPayments()">
     <i class="fas fa-money-bill-wave me-1"></i> Payments
   </a>
-</li>
+</li> -->
 
-    <li class="nav-item">
+    <!-- <li class="nav-item">
       <a class="nav-link" [class.active]="activeTab === 'stock-report'" (click)="changeTab('stock-report')" [ngStyle]="{'background-color': activeTab === 'stock-report' ? '#3d82bb' : ''}">
         <i class="fas fa-boxes me-1"></i> Stock Report
       </a>
@@ -117,141 +117,94 @@
         <i class="fas fa-file-alt me-1"></i> Documents & Notes
       </a>
     </li>
-  </ul>
+  </ul> --> 
 
   <!-- Purchases Tab Content -->
+<!-- In supplier-purchases.component.html -->
 <div *ngIf="activeTab === 'purchases'">
   <div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-      <h5 class="mb-0" style="color: #3d82bb;">Purchase History</h5>
-      <div class="d-flex align-items-center">
-<div class="row mb-3">
-  <div class="col-md-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="row">
-          <div class="col-md-6">
-            <label class="form-label">Date Range</label>
-            <select class="form-select" [(ngModel)]="selectedDateFilter" (change)="onDateFilterChange()">
-              <option *ngFor="let option of dateFilterOptions" [value]="option.value">{{option.label}}</option>
-            </select>
-          </div>
-          <div class="col-md-6" *ngIf="showCustomDateRange">
-            <div class="input-group">
-              <input type="date" class="form-control" [(ngModel)]="fromDate">
-              <span class="input-group-text">to</span>
-              <input type="date" class="form-control" [(ngModel)]="toDate">
-              <button class="btn btn-primary" type="button" (click)="applyDateFilter()">Apply</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <label class="form-label">Location</label>
-        <select class="form-select" [(ngModel)]="selectedLocation" (change)="onLocationChange()">
-          <option value="all">All Locations</option>
-          <option *ngFor="let loc of locations" [value]="loc.id">{{loc.name}}</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</div>
-
-        <button class="btn" style="background-color: #3d82bb; color: white;" 
-                [routerLink]="['/add-purchase']" [queryParams]="{supplierId: supplierId}">
-          <i class="fas fa-plus me-1"></i> Add Purchase
+   
+      
+      <div class="btn-group" role="group" style="height: 41px;">
+        <button class="btn btn-sm" 
+                [ngClass]="{'btn-primary': viewMode === 'purchases', 'btn-outline-primary': viewMode !== 'purchases'}"
+                (click)="viewMode = 'purchases'">
+          Purchases
+        </button>
+        <button class="btn btn-sm" 
+                [ngClass]="{'btn-primary': viewMode === 'ledger', 'btn-outline-primary': viewMode !== 'ledger'}"
+                (click)="viewMode = 'ledger'; updateLedgerView()">
+          Ledger View
         </button>
       </div>
     </div>
-    <div class="card-body p-0">
-      <div *ngIf="isLoading" class="text-center py-4">
-        <div class="spinner-border" role="status" style="color: #3d82bb;">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-      </div>
 
-
+    <!-- Purchases View -->
+    <div *ngIf="viewMode === 'purchases'" class="card-body p-0">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Date</th>
+            <th>Reference</th>
+            <th>Total Amount</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let purchase of filteredPurchases">
+            <td>{{ purchase.purchaseDate | date }}</td>
+            <td>{{ purchase.referenceNo || 'N/A' }}</td>
+            <td>₹ {{ getSafeGrandTotal(purchase).toFixed(2) }}</td>
+            <td>
+              <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">
+                {{ purchase.purchaseStatus }}
+              </span>
+            </td>
+          
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <div class="card-footer bg-white text-end">
-      <div class="d-flex justify-content-between align-items-center">
-        <div>
-          <span class="text-muted">Showing {{ filteredPurchases.length }} of {{ purchases.length }} items</span>
-        </div>
-        <nav>
-          <ul class="pagination pagination-sm mb-0">
-            <li class="page-item" [class.disabled]="currentPage === 1">
-              <a class="page-link" href="#" (click)="previousPage()">Previous</a>
-            </li>
-            <li *ngFor="let page of getPageNumbers()" class="page-item" [class.active]="page === currentPage">
-              <a class="page-link" href="#" (click)="goToPage(page)" 
-                 [style.background-color]="page === currentPage ? '#3d82bb' : ''"
-                 [style.border-color]="page === currentPage ? '#3d82bb' : ''">{{ page }}</a>
-            </li>
-            <li class="page-item" [class.disabled]="currentPage === totalPages">
-              <a class="page-link" href="#" (click)="nextPage()">Next</a>
-            </li>
-          </ul>
-        </nav>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- In supplier-purchases.component.html -->
-<div *ngIf="activeTab === 'ledger'">
-  <div class="ledger-summary">
-    <div class="summary-item">
-      <span>Opening Balance:</span>
-<span>{{ accountSummary.openingBalance | currency:'INR':'symbol' }}</span>
-    </div>
-    <div class="summary-item">
-      <span>Total Purchases:</span>
-      <span>{{ accountSummary.totalPurchase | currency:'INR':'symbol'  }}</span>
-    </div>
-    <div class="summary-item">
-      <span>Total Payments:</span>
-      <span>{{ accountSummary.totalPaid | currency:'INR':'symbol'  }}</span>
-    </div>
-    <div class="summary-item highlight">
-      <span>Current Balance:</span>
-      <span>{{ accountSummary.balanceDue |currency:'INR':'symbol'  }}</span>
-    </div>
-  </div>
-
-  <table class="ledger-table">
-    <thead>
+<div *ngIf="viewMode === 'ledger'" class="table-responsive">
+  <table class="table table-hover">
+    <thead class="table-light">
       <tr>
         <th>Date</th>
-        <th>Reference</th>
-        <th>Type</th>
+        <th>Reference No</th>
+        <th>Supplier</th>
         <th>Description</th>
-        <th>Debit</th>
-        <th>Credit</th>
-        <th>Balance</th>
+        <th>Debit (₹)</th>
+        <th>Credit (₹)</th>
+        <th>Balance (₹)</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let transaction of filteredTransactions">
-        <td>{{ transaction.date }}</td>
-        <td>{{ transaction.reference }}</td>
-        <td>{{ transaction.type }}</td>
-        <td>{{ transaction.description }}</td>
-        <td>{{ transaction.type === 'Purchase' ? (transaction.debit |currency:'INR':'symbol' ) : '-' }}</td>
-        <td>{{ transaction.type === 'Payment' ? (transaction.credit | currency:'INR':'symbol' ) : '-' }}</td>
-        <td>{{ transaction.balance | currency:'INR':'symbol'  }}</td>
-      </tr>
-      <tr *ngIf="filteredTransactions.length === 0">
-        <td colspan="7">No transactions found</td>
+      <tr *ngFor="let entry of ledgerEntries" 
+          [class.clickable]="entry.purchase || entry.payment"
+          (click)="entry.purchase ? viewPurchaseDetails(entry.purchase) : viewPaymentDetails(entry.payment?.id)">
+        <td>{{ entry.date | date:'mediumDate' }}</td>
+        <td>{{ entry.referenceNo }}</td>
+        <td>{{ entry.supplier }}</td>
+        <td>{{ entry.description }}</td>
+        <td class="text-danger">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+        <td class="text-success">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+        <td [ngClass]="{'text-danger': entry.balance < 0, 'text-success': entry.balance >= 0}">
+          {{ entry.balance | currency:'INR':'symbol':'1.2-2' }}
+        </td>
+        <td>
+          <span class="badge" [ngClass]="getStatusClass(entry.status)">
+            {{ entry.status }}
+          </span>
+        </td>
       </tr>
     </tbody>
   </table>
 </div>
+  </div>
+</div>
 
-  <!-- Stock Report Tab Content -->
+
   <div *ngIf="activeTab === 'stock-report'">
     <div class="card shadow-sm">
               <div class="card shadow-sm h-100">
@@ -288,9 +241,6 @@
 
 
 
-  <div *ngIf="!paymentLoading && payments.length === 0" class="text-center py-4">
-    <p>No payments found</p>
-  </div>
 
   <div *ngIf="!paymentLoading && payments.length > 0" class="table-responsive">
     <table class="table table-striped">
@@ -438,9 +388,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Documents & Notes Tab Content -->
   <div *ngIf="activeTab === 'documents'">
     <div class="container-fluid p-3">
       <div class="card shadow-sm mb-4">
@@ -571,7 +518,7 @@
 
 
                       <!-- Inside your purchases table -->
-<td>
+<!-- <td>
   <button class="btn btn-sm btn-outline-info" 
           (click)="purchase && viewPayments(purchase)"
           title="View Payment History">
@@ -582,7 +529,7 @@
           title="Add Payment">
     <i class="fas fa-plus"></i>
   </button>
-</td>
+</td> -->
                     </tr>
                   </tbody>
                 </table>

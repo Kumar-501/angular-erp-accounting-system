@@ -136,8 +136,9 @@
     </div>
     <div class="modal-footer">
       <button class="close-btn" (click)="toggleAddModal()">Close</button>
-      <button class="save-btn" (click)="saveLifeStage()">Save</button>
-    </div>
+<button class="save-btn" (click)="saveLifeStage()" [disabled]="isSaving">
+  {{ isSaving ? 'Saving...' : 'Save' }}
+</button>    </div>
   </div>
 </div>
 
@@ -159,8 +160,9 @@
     </div>
     <div class="modal-footer">
       <button class="close-btn" (click)="toggleEditModal()">Close</button>
-      <button class="save-btn" (click)="updateLifeStage()">Save</button>
-    </div>
+<button class="save-btn" (click)="updateLifeStage()" [disabled]="isUpdating">
+  {{ isUpdating ? 'Updating...' : 'Save' }}
+</button>    </div>
   </div>
 </div>
 
@@ -175,8 +177,9 @@
     </div>
     <div class="modal-footer">
       <button class="close-btn" (click)="toggleDeleteModal()">Cancel</button>
-      <button class="delete-btn" (click)="deleteLifeStage()">Delete</button>
-    </div>
+<button class="delete-btn" (click)="deleteLifeStage()" [disabled]="isDeleting">
+  {{ isDeleting ? 'Deleting...' : 'Delete' }}
+</button>    </div>
   </div>
 </div>
 

@@ -16,30 +16,7 @@
       margin-top: 5%;
     }
     /* In list-accounts.component.scss or your styles file */
-.btn-delete {
-  background-color: #f44336;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin: 2px;
-  font-size: 12px;
-}
 
-.btn-delete:hover {
-  background-color: #d32f2f;
-}
-
-.btn-delete i {
-  margin-right: 5px;
-}
-
-.action-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
 .debit-amount {
   color: #dc3545; /* Red for debit */
   font-weight: bold;

@@ -51,7 +51,6 @@ import { PurchaseOrderViewComponent } from './purchase-order-view/purchase-order
 import { ViewPurchaseComponent } from './purchase/view-purchase/view-purchase.component';
 import { UsersComponent } from './users/users.component';
 import { AddUsersComponent } from './add-users/add-users.component';
-
 import { EditUserComponent } from './edit-user/edit-user.component';
 import { RolesTableComponent } from './roles-table/roles-table.component';
 import { SalesAgentsComponent } from './sales-agents/sales-agents.component';
@@ -167,8 +166,6 @@ import { LeadsReportComponent } from './leads-report/leads-report.component';
 import { LeadsReportsComponent } from './leads-reports/leads-reports.component';
 import { CustomerReportComponent } from './customer-report/customer-report.component';
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
-import { BalanceComponent } from './balance/balance.component';
-import { AccountBook1Component } from './account-book1/account-book1.component';
 
 const routes: Routes = [
 
@@ -191,7 +188,6 @@ const routes: Routes = [
 {path:'print-labels',component:PrintLabelsComponent},
 {path:'list-purchase',component:ListPurchaseComponent},
 {path:'purchase-return',component:PurchaseReturnComponent},
-{path:'accountbook1',component:AccountBook1Component},
 {path:'sales-order',component:SalesOrderComponent},
 { path: 'edit-gin-transfer/:id', component: EditGinTransferComponent},
 {path:'add-sale',component:AddSaleComponent},
@@ -303,7 +299,6 @@ const routes: Routes = [
 {path:'stock-report',component:StockReportComponent},
   { path: 'summary-report', component: SummaryReportComponent },
 {path:'product-sell',component:ProductSellComponent},
-{path:'balance',component:BalanceComponent},
 {path:'sale-summary',component:SaleSummaryComponent},
 {path: 'gin-transfer-view/:id', // Assuming 'id' is the GIN Transfer ID
     component: GinTransferViewComponent

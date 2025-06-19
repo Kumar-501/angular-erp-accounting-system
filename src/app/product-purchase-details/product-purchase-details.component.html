@@ -1,4 +1,5 @@
 <div class="container-fluid py-4">
+  <!-- Product Information Card -->
   <div class="card mb-4">
     <div class="card-header bg-light">
       <h5 class="mb-0">
@@ -32,46 +33,34 @@
               </div>
             </div>
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Current Stock:</div>
-              <div class="col-8">{{ product?.currentStock || '0' }}</div>
-            </div>
-            <div class="row mb-2">
               <div class="col-4 fw-medium">Selling Price:</div>
-              <div class="col-8">₹{{ product?.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</div>
+              <div class="col-8">{{ formatCurrency(product?.defaultSellingPriceExcTax || 0) }}</div>
             </div>
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
-            <h6 class="text-muted">Purchase & Sales Information</h6>
+            <h6 class="text-muted">Summary Statistics</h6>
             <hr class="mt-1">
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Purchase Price:</div>
-              <div class="col-8">₹{{ product?.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</div>
+              <div class="col-6 fw-medium">Total Purchased:</div>
+              <div class="col-6">{{ getTotalPurchasedQuantity() }} units</div>
             </div>
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Purchases:</div>
-              <div class="col-8">{{ purchases.length }}</div>
+              <div class="col-6 fw-medium">Total Sold:</div>
+              <div class="col-6">{{ getTotalSoldQuantity() }} units</div>
             </div>
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Purchased Qty:</div>
-              <div class="col-8">{{ getTotalPurchasedQuantity() }}</div>
+              <div class="col-6 fw-medium">Total Returned:</div>
+              <div class="col-6">{{ getTotalReturnedQuantity() }} units</div>
             </div>
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Avg Purchase Price:</div>
-              <div class="col-8">₹{{ getAveragePurchasePrice() | number:'1.2-2' }}</div>
+              <div class="col-6 fw-medium">Avg Purchase Price:</div>
+              <div class="col-6">{{ formatCurrency(getAveragePurchasePrice()) }}</div>
             </div>
             <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Sales:</div>
-              <div class="col-8">{{ sales.length }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Sold Qty:</div>
-              <div class="col-8">{{ getTotalSoldQuantity() }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Avg Sale Price:</div>
-              <div class="col-8">₹{{ getAverageSalePrice() | number:'1.2-2' }}</div>
+              <div class="col-6 fw-medium">Avg Sale Price:</div>
+              <div class="col-6">{{ formatCurrency(getAverageSalePrice()) }}</div>
             </div>
           </div>
         </div>
@@ -79,103 +68,210 @@
     </div>
   </div>
 
-  <div class="card mb-4">
-    <div class="card-header bg-light">
-      <h5 class="mb-0">
-        <i class="fas fa-file-invoice me-2"></i>
-        Purchase History
-      </h5>
-    </div>
-    <div class="card-body">
-      <div class="table-responsive">
-        <table class="table table-sm table-hover">
-          <thead class="table-light">
-            <tr>
-              <th>Date</th>
-              <th>Purchase #</th>
-              <th>Supplier</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let purchase of purchases">
-              <td>{{ purchase.purchaseDate | date:'shortDate' }}</td>
-              <td>{{ purchase.referenceNo || '-' }}</td>
-              <td>{{ purchase.supplierName || '-' }}</td>
-              <td>{{ getProductQuantityInPurchase(purchase) }}</td>
-              <td>₹{{ getProductUnitPriceInPurchase(purchase) | number:'1.2-2' }}</td>
-              <td>₹{{ getProductTotalInPurchase(purchase) | number:'1.2-2' }}</td>
-              <td>
-                <span class="badge" [ngClass]="{
-                  'bg-success': purchase.paymentStatus === 'Paid',
-                  'bg-warning': purchase.paymentStatus === 'Partial',
-                  'bg-danger': purchase.paymentStatus === 'Due'
-                }">
-                  {{ purchase.paymentStatus }}
-                </span>
-              </td>
-            </tr>
-            <tr *ngIf="purchases.length === 0">
-              <td colspan="8" class="text-center py-4 text-muted">
-                No purchase history found for this product
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- New Sales History Table -->
+  <!-- Tab Navigation -->
   <div class="card">
-    <div class="card-header bg-light">
-      <h5 class="mb-0">
-        <i class="fas fa-file-invoice-dollar me-2"></i>
-        Sales History
-      </h5>
+    <div class="card-header bg-light p-0">
+      <ul class="nav nav-tabs card-header-tabs" id="historyTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" 
+                  [class.active]="activeTab === 'purchases'"
+                  (click)="switchTab('purchases')"
+                  type="button">
+            <i class="fas fa-shopping-cart me-2"></i>
+            Purchase History ({{ purchases.length }})
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" 
+                  [class.active]="activeTab === 'sales'"
+                  (click)="switchTab('sales')"
+                  type="button">
+            <i class="fas fa-receipt me-2"></i>
+            Sales History ({{ sales.length }})
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" 
+                  [class.active]="activeTab === 'returns'"
+                  (click)="switchTab('returns')"
+                  type="button">
+            <i class="fas fa-undo me-2"></i>
+            Return History ({{ returns.length }})
+          </button>
+        </li>
+      </ul>
     </div>
+
     <div class="card-body">
-      <div class="table-responsive">
-        <table class="table table-sm table-hover">
-          <thead class="table-light">
-            <tr>
-              <th>Date</th>
-              <th>Invoice #</th>
-              <th>Customer</th>
-              <th>Quantity</th>
-              <th>Unit Price</th>
-              <th>Total</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let sale of sales">
-              <td>{{ sale.saleDate | date:'shortDate' }}</td>
-              <td>{{ sale.invoiceNo || '-' }}</td>
-              <td>{{ sale.customer || '-' }}</td>
-              <td>{{ getProductQuantityInSale(sale) }}</td>
-              <td>₹{{ getProductUnitPriceInSale(sale) | number:'1.2-2' }}</td>
-              <td>₹{{ getProductTotalInSale(sale) | number:'1.2-2' }}</td>
-              <td>
-                <span class="badge" [ngClass]="{
-                  'bg-success': sale.status === 'Completed',
-                  'bg-warning': sale.status === 'Pending',
-                  'bg-danger': sale.status === 'Cancelled'
-                }">
-                  {{ sale.status }}
-                </span>
-              </td>
-            </tr>
-            <tr *ngIf="sales.length === 0">
-              <td colspan="8" class="text-center py-4 text-muted">
-                No sales history found for this product
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Purchase History Tab -->
+      <div *ngIf="activeTab === 'purchases'">
+        <h5 class="opening-stock mb-3">
+          <i class="fas fa-info-circle me-2"></i>
+          Opening Stock: {{ product?.currentStock || '0' }}
+        </h5>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover purchase-history-table">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Purchase Ref</th>
+                <th>Supplier</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let purchase of purchases">
+                <td>{{ formatPurchaseDate(purchase.purchaseDate) }}</td>
+                <td>{{ purchase.referenceNo || '-' }}</td>
+                <td>{{ purchase.supplierName || purchase.supplier || '-' }}</td>
+                <td>{{ getProductQuantityInPurchase(purchase) }}</td>
+                <td>{{ formatCurrency(getProductUnitPriceInPurchase(purchase)) }}</td>
+                <td>{{ formatCurrency(getProductTotalInPurchase(purchase)) }}</td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusBadgeClass(purchase.paymentStatus)">
+                    {{ purchase.paymentStatus }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewPurchase(purchase.id)">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="purchases.length === 0">
+                <td colspan="8" class="text-center py-4 text-muted">
+                  <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+                  No purchase history found for this product
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Sales History Tab -->
+      <div *ngIf="activeTab === 'sales'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">
+            <i class="fas fa-chart-line me-2"></i>
+            Sales History
+          </h5>
+          <span class="badge bg-primary fs-6">{{ sales.length }} transactions</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Sale Date</th>
+                <th>Invoice No</th>
+                <th>Customer</th>
+                <th>Quantity Sold</th>
+                <th>Unit Price</th>
+                <th>Total Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let sale of sales">
+                <td>{{ formatPurchaseDate(sale.saleDate) }}</td>
+                <td>{{ sale.invoiceNo || '-' }}</td>
+                <td>{{ sale.customer || '-' }}</td>
+                <td>
+                  <span class="badge bg-success">
+                    {{ getProductQuantityInSale(sale) }} units
+                  </span>
+                </td>
+                <td>{{ formatCurrency(getProductUnitPriceInSale(sale)) }}</td>
+                <td>{{ formatCurrency(getProductTotalInSale(sale)) }}</td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusBadgeClass(sale.status)">
+                    {{ sale.status }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewSale(sale.id)">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="sales.length === 0">
+                <td colspan="8" class="text-center py-4 text-muted">
+                  <i class="fas fa-receipt fa-2x mb-2 d-block"></i>
+                  No sales history found for this product
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Returns History Tab -->
+      <div *ngIf="activeTab === 'returns'">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">
+            <i class="fas fa-undo me-2"></i>
+            Return History
+          </h5>
+          <span class="badge bg-warning text-dark fs-6">{{ returns.length }} returns</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Return Date</th>
+                <th>Original Invoice</th>
+                <th>Customer</th>
+                <th>Quantity Returned</th>
+                <th>Unit Price</th>
+                <th>Refund Amount</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let returnRecord of returns">
+                <td>{{ formatPurchaseDate(returnRecord.returnDate) }}</td>
+                <td>{{ returnRecord.invoiceNo || '-' }}</td>
+                <td>{{ returnRecord.customer || '-' }}</td>
+                <td>
+                  <span class="badge bg-warning text-dark">
+                    {{ getProductQuantityInReturn(returnRecord) }} units
+                  </span>
+                </td>
+                <td>{{ formatCurrency(getProductUnitPriceInReturn(returnRecord)) }}</td>
+                <td>{{ formatCurrency(getProductTotalInReturn(returnRecord)) }}</td>
+                <td>
+                  <span class="text-muted" [title]="returnRecord.returnReason">
+                    {{ (returnRecord.returnReason || '-') | slice:0:30 }}
+                    <span *ngIf="(returnRecord.returnReason || '').length > 30">...</span>
+                  </span>
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusBadgeClass(returnRecord.status)">
+                    {{ returnRecord.status }}
+                  </span>
+                </td>
+                <td>
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewReturn(returnRecord.id)">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="returns.length === 0">
+                <td colspan="9" class="text-center py-4 text-muted">
+                  <i class="fas fa-undo fa-2x mb-2 d-block"></i>
+                  No return history found for this product
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>

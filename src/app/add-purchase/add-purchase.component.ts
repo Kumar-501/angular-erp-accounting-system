@@ -44,10 +44,16 @@ interface Product {
   taxAmount: number;
   lineTotal: number;
   netCost: number;
+
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  isInterState?: boolean;
+
   productTax: number;
   profitMargin: number;
   sellingPrice: number;
-  taxRate: number;
+  taxRate?: number;
   commissionPercent?: number;
   commissionAmount?: number;
   currentStock: number;
@@ -342,12 +348,12 @@ addProductToTable(product: Product): void {
                        product.unitCost || 0],
     subtotal: [0],
     lineTotal: [0],
-    taxRate: [product.taxPercentage || product.taxRate || 0],
+    taxRate: [product.taxPercentage || product.taxRate || 0], // Initialize with product's tax rate
     taxAmount: [0],
     batchNumber: [product.batchNumber || ''],
     expiryDate: [product.expiryDate || ''],
     netCost: [0],
-    currentStock: [product.currentStock || product.totalQuantity || 0] // Show available stock
+    currentStock: [product.currentStock || product.totalQuantity || 0]
   });
 
   this.productsFormArray.push(productGroup);
@@ -369,7 +375,11 @@ addProductToTable(product: Product): void {
 
 loadPurchaseOrders(): void {
   this.purchaseOrderService.getOrders().subscribe(orders => {
-    this.purchaseOrders = orders.filter((order: any) => order.status !== 'Completed');
+    // Filter out completed orders and orders that have already been used
+    this.purchaseOrders = orders.filter((order: any) => 
+      order.status !== 'Completed' && !order.isUsedForPurchase
+    );
+    
     this.filteredPurchaseOrders = [...this.purchaseOrders]; // Initialize filtered list
     
     // If coming from a purchase order, filter for that supplier
@@ -470,14 +480,7 @@ updatePurchaseOrderDropdownState(): void {
     this.taxService.getTaxRates().subscribe(rates => {
       this.taxRates = rates;
 
-      if (!this.taxRates.some(rate => rate.name.includes('GST'))) {
-        this.taxRates.push(
-          { id: 'gst5', name: 'GST 5%', rate: 5, active: true, forTaxGroupOnly: false },
-          { id: 'gst12', name: 'GST 12%', rate: 12, active: true, forTaxGroupOnly: false },
-          { id: 'gst18', name: 'GST 18%', rate: 18, active: true, forTaxGroupOnly: false },
-          { id: 'gst28', name: 'GST 28%', rate: 28, active: true, forTaxGroupOnly: false }
-        );
-      }
+    
 
       this.taxRates.sort((a, b) => a.rate - b.rate);
     });
@@ -630,7 +633,45 @@ loadPurchaseOrderData(orderId: string): void {
     });
 }
 
-  addProductFromPurchaseOrder(product: any): void {
+// Updated method to fetch complete product details and tax rates
+async addProductFromPurchaseOrder(product: any): Promise<void> {
+  try {
+    // Fetch complete product details from the products service
+    const completeProduct = await this.productsService.getProductById(product.id || product.productId);
+    
+    // Use the complete product data if available, otherwise fall back to purchase order data
+    const taxRate = completeProduct?.taxPercentage || completeProduct?.taxPercentage || product.taxRate || 0;
+    const unitCost = product.unitCost || product.unitPrice || completeProduct?.defaultPurchasePriceIncTax || 0;
+    
+    const productGroup = this.fb.group({
+      productId: [product.id || product.productId || ''],
+      productName: [product.productName || completeProduct?.productName || '', Validators.required],
+      quantity: [product.quantity || 1, [Validators.required, Validators.min(1)]],
+      unitCost: [unitCost, [Validators.required, Validators.min(0)]],
+      discountPercent: [product.discountPercent || 0, [Validators.min(0), Validators.max(100)]],
+      unitCostBeforeTax: [{value: unitCost, disabled: true}],
+      netCost: [{value: 0, disabled: true}],
+      productTax: [{value: 0, disabled: true}],
+      subtotal: [{value: 0, disabled: true}],
+      taxAmount: [{value: 0, disabled: true}],
+      lineTotal: [{value: 0, disabled: true}],
+      profitMargin: [product.profitMargin || completeProduct?.marginPercentage || 0, [Validators.min(0)]],
+      sellingPrice: [{value: 0, disabled: true}],
+      batchNumber: [product.batchNumber || completeProduct?.batchNumber || ''],
+      expiryDate: [product.expiryDate || completeProduct?.expiryDate || ''],
+      taxRate: [taxRate], // Use the fetched tax rate
+      commissionPercent: [product.commissionPercent || 0, [Validators.min(0), Validators.max(100)]],
+      commissionAmount: [{value: 0, disabled: true}],
+      currentStock: [completeProduct?.currentStock || 0]
+    });
+
+    this.productsFormArray.push(productGroup);
+    this.calculateLineTotal(this.productsFormArray.length - 1);
+    
+  } catch (error) {
+    console.error('Error loading complete product details:', error);
+    
+    // Fallback to original method if product details can't be fetched
     const productGroup = this.fb.group({
       productId: [product.id || product.productId || ''],
       productName: [product.productName || '', Validators.required],
@@ -642,7 +683,7 @@ loadPurchaseOrderData(orderId: string): void {
       productTax: [{value: 0, disabled: true}],
       subtotal: [{value: 0, disabled: true}],
       taxAmount: [{value: 0, disabled: true}],
-      lineTotal: [{value: (product.quantity * product.unitCost) || 0, disabled: true}],
+      lineTotal: [{value: 0, disabled: true}],
       profitMargin: [product.profitMargin || 0, [Validators.min(0)]],
       sellingPrice: [{value: 0, disabled: true}],
       batchNumber: [product.batchNumber || ''],
@@ -655,44 +696,46 @@ loadPurchaseOrderData(orderId: string): void {
     this.productsFormArray.push(productGroup);
     this.calculateLineTotal(this.productsFormArray.length - 1);
   }
+}
 
-  prefillFormFromPurchaseOrder(orderData: any): void {
-    const supplierId = orderData.supplierId || '';
-    
-    this.purchaseForm.patchValue({
-      supplierId: supplierId,
-      supplierName: orderData.supplier || '',
-      purchaseOrder: orderData.referenceNo || '',
-      referenceNo: orderData.referenceNo || '',
-      businessLocation: orderData.businessLocation || '',
-      additionalNotes: orderData.notes || '',
-      shippingCharges: orderData.shippingCharges || 0,
-      invoicedDate: orderData.invoicedDate || '',
-      receivedDate: orderData.receivedDate || '',
-      invoiceNo: orderData.invoiceNo || '',
-      purchaseTaxId: orderData.purchaseTaxId || ''
-    });
+async prefillFormFromPurchaseOrder(orderData: any): Promise<void> {
+  const supplierId = orderData.supplierId || '';
+  
+  this.purchaseForm.patchValue({
+    supplierId: supplierId,
+    supplierName: orderData.supplier || '',
+    purchaseOrder: orderData.referenceNo || '',
+    referenceNo: orderData.referenceNo || '',
+    businessLocation: orderData.businessLocation || '',
+    additionalNotes: orderData.notes || '',
+    shippingCharges: orderData.shippingCharges || 0,
+    invoicedDate: orderData.invoicedDate || '',
+    receivedDate: orderData.receivedDate || '',
+    invoiceNo: orderData.invoiceNo || '',
+    purchaseTaxId: orderData.purchaseTaxId || ''
+  });
 
-    this.purchaseForm.get('referenceNo')?.enable();
-    
-    while (this.productsFormArray.length !== 0) {
-      this.productsFormArray.removeAt(0);
-    }
-    
-    if (orderData.products && orderData.products.length > 0) {
-      orderData.products.forEach((product: any) => {
-        this.addProductFromPurchaseOrder(product);
-      });
-    } else {
-      this.addProduct();
-    }
-    
-    if (supplierId) {
-      this.onSupplierChange(supplierId);
-    }
-    
-    this.calculateTotals();
+  this.purchaseForm.get('referenceNo')?.enable();
+  
+  while (this.productsFormArray.length !== 0) {
+    this.productsFormArray.removeAt(0);
   }
+  
+  if (orderData.products && orderData.products.length > 0) {
+    // Process products sequentially to ensure proper loading
+    for (const product of orderData.products) {
+      await this.addProductFromPurchaseOrder(product);
+    }
+  } else {
+    this.addProduct();
+  }
+  
+  if (supplierId) {
+    this.onSupplierChange(supplierId);
+  }
+  
+  this.calculateTotals();
+}
 
   navigateToAddSupplier(): void {
     this.router.navigate(['/suppliers']);
@@ -742,6 +785,8 @@ addProduct(): void {
     purchaseStatus: ['Received', Validators.required],
     businessLocation: ['', Validators.required],
     payTerm: [''],
+        paymentStatus: ['due'], // Add this line for payment status
+
     purchaseOrder: [''],
     purchaseOrderId: [''],
     document: [null],
@@ -752,7 +797,7 @@ addProduct(): void {
     shippingCharges: [0, [Validators.min(0)]],
     products: this.fb.array([], Validators.required), // Add validation for at least one product
     purchaseTotal: [0],
-    paymentAmount: [0, [Validators.required, Validators.min(0.01)]], // Ensure payment > 0
+    paymentAmount: [0, [Validators.required, Validators.min(0.0)]], // Ensure payment > 0
     paidOn: [new Date().toISOString().substring(0, 10), Validators.required],
     paymentMethod: ['', Validators.required],
     paymentAccount: ['', Validators.required], // Make payment account required
@@ -785,15 +830,24 @@ addProduct(): void {
     this.purchaseForm.get('invoiceNo')?.setValue(invNumber);
   }
 
-  calculatePaymentBalance(): void {
-    const totalPayable = this.purchaseForm.get('totalPayable')?.value || 0;
-    const paymentAmount = this.purchaseForm.get('paymentAmount')?.value || 0;
-    const balance = Math.max(0, totalPayable - paymentAmount);
-    
-    this.purchaseForm.patchValue({
-      balance: balance
-    });
+calculatePaymentBalance(): void {
+  const totalPayable = this.purchaseForm.get('totalPayable')?.value || 0;
+  const paymentAmount = this.purchaseForm.get('paymentAmount')?.value || 0;
+  const balance = Math.max(0, totalPayable - paymentAmount);
+  
+  // Update payment status based on amounts
+  let paymentStatus = 'due';
+  if (paymentAmount >= totalPayable) {
+    paymentStatus = 'paid';
+  } else if (paymentAmount > 0) {
+    paymentStatus = 'partial';
   }
+
+  this.purchaseForm.patchValue({
+    balance: balance,
+    paymentStatus: paymentStatus
+  });
+}
 
   get productsFormArray(): FormArray {
     return this.purchaseForm.get('products') as FormArray;
@@ -813,13 +867,15 @@ async onProductSelect(index: number) {
   const productFormGroup = this.productsFormArray.at(index);
   const productId = productFormGroup.get('productId')?.value;
   
-if (productId) {
+  if (productId) {
     try {
       const product = await this.productsService.getProductById(productId);
       if (product) {
+        // Set the tax rate from the product data
+        const taxRate = product.taxPercentage || 0;
+        
         productFormGroup.patchValue({
           productName: product.productName,
-          
           sku: product.sku,
           hsnCode: product.hsnCode,
           unit: product.unit,
@@ -831,11 +887,19 @@ if (productId) {
                       product.unitSellingPrice || 
                       0,
           currentStock: product.currentStock || 0,
-          taxRate: product.taxPercentage || 0,
+          taxRate: taxRate, // Set the tax rate here
           unitCostBeforeTax: product.defaultPurchasePriceExcTax || 0,
-          batchNumber: product.batchNumber || ''
+          batchNumber: product.batchNumber || '',
+          expiryDate: product.expiryDate || ''
         });
-        
+
+        // If the product has a tax rate, find the corresponding tax rate object
+        if (taxRate > 0) {
+          const selectedTax = this.taxRates.find(t => t.rate === taxRate);
+          if (selectedTax) {
+            productFormGroup.get('taxRate')?.setValue(selectedTax.rate);
+          }
+        }
 
         if (product.defaultPurchasePriceExcTax && product.defaultSellingPriceExcTax) {
           const marginPercentage = ((product.defaultSellingPriceExcTax - product.defaultPurchasePriceExcTax) / 
@@ -891,29 +955,30 @@ calculateLineTotal(index: number): void {
   const discountPercent = productFormGroup.get('discountPercent')?.value || 0;
   const taxRate = productFormGroup.get('taxRate')?.value || 0;
   
-  // Calculate price for one unit (including tax)
-  const unitPriceBeforeDiscount = unitCost;
-  const discountAmountPerUnit = unitPriceBeforeDiscount * (discountPercent / 100);
-  const unitPriceAfterDiscount = unitPriceBeforeDiscount - discountAmountPerUnit;
-  const taxAmountPerUnit = unitPriceAfterDiscount * (taxRate / 100);
-  const unitPriceWithTax = unitPriceAfterDiscount + taxAmountPerUnit;
+  // Calculate discounted price
+  const discountAmount = unitCost * (discountPercent / 100);
+  const discountedPrice = unitCost - discountAmount;
   
-  // Calculate totals
-  const subtotalBeforeTax = quantity * unitPriceAfterDiscount;
-  const totalTaxAmount = quantity * taxAmountPerUnit;
-  const lineTotal = quantity * unitPriceWithTax;
+  // Calculate subtotal before tax
+  const subtotalBeforeTax = quantity * discountedPrice;
   
+  // Calculate tax amount
+  const taxAmount = subtotalBeforeTax * (taxRate / 100);
+  
+  // Calculate line total (subtotal + tax)
+  const lineTotal = subtotalBeforeTax + taxAmount;
+
+  // Update form values with proper rounding
   productFormGroup.patchValue({
-    unitCostBeforeTax: unitPriceAfterDiscount,
-    subtotal: subtotalBeforeTax,
-    taxAmount: totalTaxAmount,
-    lineTotal: lineTotal,
-    netCost: unitPriceWithTax // This will show the price for 1 unit with tax
+    unitCostBeforeTax: parseFloat(discountedPrice.toFixed(2)),
+    subtotal: parseFloat(subtotalBeforeTax.toFixed(2)),
+    taxAmount: parseFloat(taxAmount.toFixed(2)),
+    lineTotal: parseFloat(lineTotal.toFixed(2)),
+    netCost: parseFloat(discountedPrice.toFixed(2))
   }, {emitEvent: false});
   
-  this.updateTotals();
+  this.calculateTotals();
 }
-
   calculateSellingPrice(index: number): void {
     const productGroup = this.productsFormArray.at(index);
     const unitCostBeforeTax = parseFloat(productGroup.get('unitCostBeforeTax')?.value) || 0;
@@ -928,31 +993,36 @@ calculateLineTotal(index: number): void {
     });
   }
 
-  calculateTotals(): void {
-    this.totalItems = this.productsFormArray.length;
-    
-    let productsTotal = 0;
+ calculateTotals(): void {
+  this.totalItems = this.productsFormArray.length;
+  
+  let productsTotal = 0;
+  let totalTax = 0;
 
-    this.productsFormArray.controls.forEach(productGroup => {
-      productsTotal += (parseFloat(productGroup.get('lineTotal')?.value) || 0);
-    });
+  this.productsFormArray.controls.forEach(productGroup => {
+    productsTotal += (parseFloat(productGroup.get('lineTotal')?.value) || 0);
+    totalTax += (parseFloat(productGroup.get('taxAmount')?.value) || 0);
+  });
 
-    const shippingCharges = parseFloat(this.purchaseForm.get('shippingCharges')?.value) || 0;
-    this.netTotalAmount = productsTotal + shippingCharges;
+  const shippingCharges = parseFloat(this.purchaseForm.get('shippingCharges')?.value) || 0;
+  this.netTotalAmount = parseFloat((productsTotal + shippingCharges).toFixed(2));
+  this.totalTax = parseFloat(totalTax.toFixed(2));
 
-    const roundedTotal = Math.round(this.netTotalAmount);
-    const roundOffAmount = roundedTotal - this.netTotalAmount;
+  // Calculate rounded total and round off amount
+  const roundedTotal = Math.round(this.netTotalAmount);
+  const roundOffAmount = parseFloat((roundedTotal - this.netTotalAmount).toFixed(2));
 
-    this.purchaseForm.patchValue({
-      purchaseTotal: this.netTotalAmount,
-      totalPayable: roundedTotal,
-      paymentAmount: roundedTotal,
-      roundOffAmount: roundOffAmount.toFixed(2),
-      roundedTotal: roundedTotal.toFixed(2)
-    });
+  this.purchaseForm.patchValue({
+    purchaseTotal: this.netTotalAmount,
+    totalPayable: roundedTotal,
+    paymentAmount: roundedTotal,
+    roundOffAmount: roundOffAmount,
+    roundedTotal: roundedTotal,
+    totalTax: this.totalTax  // Make sure to update the total tax in the form
+  });
 
-    this.calculatePaymentBalance();
-  }
+  this.calculatePaymentBalance();
+}
 
   loadBusinessLocations(): void {
     this.locationService.getLocations().subscribe(
@@ -1050,6 +1120,12 @@ async savePurchase() {
   try {
     const formValue = this.purchaseForm.getRawValue();
     
+    if (formValue.purchaseOrderId) {
+      await this.purchaseOrderService.markOrderAsUsed(formValue.purchaseOrderId);
+      // Refresh the purchase orders list
+      this.loadPurchaseOrders();
+    }
+    
     // Get supplier name
     const supplierName = this.selectedSupplier ? 
       this.getSupplierDisplayName(this.selectedSupplier) : 
@@ -1075,8 +1151,7 @@ async savePurchase() {
       unitCostBeforeTax: Number(product.unitCostBeforeTax) || 0,
       subtotal: Number(product.subtotal) || 0,
       taxAmount: Number(product.taxAmount) || 0,
-          supplierId: formValue.supplierId, // Use the form control value
-
+      supplierId: formValue.supplierId, // Use the form control value
       lineTotal: Number(product.lineTotal) || 0,
       taxRate: Number(product.taxRate) || 0,
       batchNumber: product.batchNumber || '',
@@ -1085,28 +1160,49 @@ async savePurchase() {
     }));
     
     // Calculate totals
- const subtotal = products.reduce((sum: number, p: any) => sum + p.subtotal, 0);
-  const totalTax = products.reduce((sum: number, p: any) => sum + p.taxAmount, 0);
-  const shippingCharges = Number(formValue.shippingCharges) || 0;
-  const totalAmount = subtotal + totalTax + shippingCharges;
-  const roundedTotal = Math.round(totalAmount);
-  const roundOffAmount = roundedTotal - totalAmount;
+    const subtotal = this.productsFormArray.value.reduce(
+      (sum: number, p: any) => sum + (parseFloat(p.subtotal) || 0), 0);
+    const totalTax = this.productsFormArray.value.reduce(
+      (sum: number, p: any) => sum + (parseFloat(p.taxAmount) || 0), 0);
+    const shippingCharges = Number(formValue.shippingCharges) || 0;
+    const totalAmount = subtotal + totalTax + shippingCharges;
+    const roundedTotal = Math.round(totalAmount);
+    const roundOffAmount = roundedTotal - totalAmount;
+    const grandTotal = subtotal + totalTax + shippingCharges;
     
-    // Prepare purchase data with payment account details
+    // Calculate payment status based on amounts
+    let calculatedPaymentStatus = 'due';
+    const paymentAmount = Number(formValue.paymentAmount) || 0;
+    
+    if (paymentAmount >= grandTotal) {
+      calculatedPaymentStatus = 'paid';
+    } else if (paymentAmount > 0) {
+      calculatedPaymentStatus = 'partial';
+    }
+    
+    // Use the selected payment status or calculated one
+    const paymentStatus = formValue.paymentStatus || calculatedPaymentStatus;
+    
+    // Prepare purchase data with payment account details and payment status
     const purchaseData = {
       supplierId: this.selectedSupplier?.id || '',
       supplierName: supplierName,
       referenceNo: formValue.referenceNo,
       purchaseDate: new Date(formValue.purchaseDate),
-          totalTax: totalTax, // Add this line to store the total tax
-
+      totalTax: totalTax, // Add this line to store the total tax
+      grandTotal: grandTotal,
+      cgst: this.calculateCGST(totalTax, formValue.isInterState),
+      sgst: this.calculateSGST(totalTax, formValue.isInterState),
+      igst: this.calculateIGST(totalTax, formValue.isInterState),
+      taxRate: this.getHighestTaxRate(),
       purchaseStatus: formValue.purchaseStatus,
+      paymentStatus: paymentStatus, // Added payment status
       businessLocation: formValue.businessLocation,
       address: formValue.address || '',
       products: products,
       shippingCharges: shippingCharges,
       purchaseTotal: totalAmount,
-      paymentAmount: Number(formValue.paymentAmount) || 0,
+      paymentAmount: paymentAmount,
       paidOn: new Date(formValue.paidOn),
       paymentMethod: formValue.paymentMethod,
       paymentAccount: paymentAccount, // Enhanced with full account details
@@ -1151,6 +1247,28 @@ selectSupplier(supplier: Supplier): void {
   
   // Update the purchase order dropdown state
   this.updatePurchaseOrderDropdownState();
+  }
+  private calculateCGST(totalTax: number, isInterState: boolean): number {
+  return isInterState ? 0 : parseFloat((totalTax / 2).toFixed(2));
+}
+
+private calculateSGST(totalTax: number, isInterState: boolean): number {
+  return isInterState ? 0 : parseFloat((totalTax / 2).toFixed(2));
+}
+
+private calculateIGST(totalTax: number, isInterState: boolean): number {
+  return isInterState ? parseFloat(totalTax.toFixed(2)) : 0;
+}
+
+private getHighestTaxRate(): number {
+  let highestRate = 0;
+  this.productsFormArray.controls.forEach(control => {
+    const rate = control.get('taxRate')?.value || 0;
+    if (rate > highestRate) {
+      highestRate = rate;
+    }
+  });
+  return highestRate;
 }
   private markFormGroupTouched(formGroup: FormGroup) {
     Object.values(formGroup.controls).forEach(control => {

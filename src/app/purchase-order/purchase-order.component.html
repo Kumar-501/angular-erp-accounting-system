@@ -215,17 +215,59 @@
     <tbody>
       <tr *ngFor="let order of filteredOrders.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage); trackBy: trackByFn">
         <td>
-          <div class="action-dropdown">
-            <button class="action-button" (click)="toggleActionMenu(order.id, $event)">Actions</button>
-            <div class="action-menu" *ngIf="activeActionMenu === order.id">
-              <button (click)="viewOrder(order)">View</button>
-              <button (click)="editOrder(order)">Edit</button>
-              <button (click)="printOrder(order)">Print</button>
-              <button (click)="downloadPdf(order)">Download PDF</button>
-              <button (click)="deleteOrder(order)">Delete</button>
-              <button (click)="openStatusModal(order, 'statusModal')">Edit Shipping Status</button>
-            </div>
-          </div>
+      <!-- Replace the existing dropdown with this button -->
+<button class="action-button" (click)="openActionPopup(order, $event)">Actions</button>
+
+<!-- Action Popup -->
+<div class="action-popup-overlay" *ngIf="currentActionPopup === order.id" (click)="closeActionPopup()">
+  <div class="action-popup" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h4>Order #{{order.referenceNo}}</h4>
+      <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+    </div>
+    
+    <div class="popup-body">
+      <div class="action-item" (click)="viewOrder(order); closeActionPopup()">
+        <i class="fas fa-eye text-info"></i>
+        <span>View</span>
+      </div>
+      
+      <div class="action-item" (click)="editOrder(order); closeActionPopup()">
+        <i class="fas fa-edit text-primary"></i>
+        <span>Edit</span>
+      </div>
+      
+      <div class="action-item" (click)="printOrder(order); closeActionPopup()">
+        <i class="fas fa-print text-secondary"></i>
+        <span>Print</span>
+      </div>
+      
+      <div class="action-item" (click)="downloadPdf(order); closeActionPopup()">
+        <i class="fas fa-file-pdf text-danger"></i>
+        <span>Download PDF</span>
+      </div>
+      
+      <div class="action-item" (click)="addPurchaseForOrder(order, $event); closeActionPopup()">
+        <i class="fas fa-cart-plus text-success"></i>
+        <span>Add Purchase</span>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="action-item" (click)="openStatusModal(order, 'statusModal'); closeActionPopup()">
+        <i class="fas fa-truck text-warning"></i>
+        <span>Edit Shipping Status</span>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="action-item text-danger" (click)="deleteOrder(order); closeActionPopup()">
+        <i class="fas fa-trash"></i>
+        <span>Delete</span>
+      </div>
+    </div>
+  </div>
+</div>
         </td>
         <td *ngIf="columns[0].visible">{{ order.date | date }}</td>
         <td *ngIf="columns[1].visible">{{ order.referenceNo }}</td>      

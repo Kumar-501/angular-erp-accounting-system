@@ -9,6 +9,7 @@ import { SourceService } from '../../services/source.service';
 export class SourcesComponent implements OnInit {
   // To toggle form visibility
   showForm = false;
+  isSaving = false; // Add this to your component class
 // Add these properties for column visibility
 showColumnVisibility = false;
 columns = [
@@ -83,39 +84,46 @@ updateVisibleColumns(): void {
       source.description.toLowerCase().includes(searchTerm)
     );
   }
-
-  // Save the new source to Firestore
-  onSave(): void {
-    if (this.source.name && this.source.description) {
-      if (this.isEditMode) {
-        this.sourceService.updateSource(this.source.id, {
-          name: this.source.name,
-          description: this.source.description
-        }).then(() => {
-          console.log('Source updated!');
-          this.loadSources();  // Reload the sources after updating
-          this.resetForm();  // Reset the form after saving
-          this.toggleForm();  // Close the form
-        }).catch((error) => {
-          console.error('Error updating source: ', error);
-        });
-      } else {
-        this.sourceService.addSource({
-          name: this.source.name,
-          description: this.source.description
-        }).then(() => {
-          console.log('Source added!');
-          this.loadSources();  // Reload the sources after adding a new one
-          this.resetForm();  // Reset the form after saving
-          this.toggleForm();  // Close the form
-        }).catch((error) => {
-          console.error('Error adding source: ', error);
-        });
-      }
+onSave(): void {
+  // Prevent multiple saves
+  if (this.isSaving) return;
+  
+  if (this.source.name && this.source.description) {
+    this.isSaving = true; // Disable the button
+    
+    if (this.isEditMode) {
+      this.sourceService.updateSource(this.source.id, {
+        name: this.source.name,
+        description: this.source.description
+      }).then(() => {
+        console.log('Source updated!');
+        this.loadSources();
+        this.resetForm();
+        this.toggleForm();
+      }).catch((error) => {
+        console.error('Error updating source: ', error);
+      }).finally(() => {
+        this.isSaving = false; // Re-enable the button
+      });
     } else {
-      alert('Please fill in all fields!');
+      this.sourceService.addSource({
+        name: this.source.name,
+        description: this.source.description
+      }).then(() => {
+        console.log('Source added!');
+        this.loadSources();
+        this.resetForm();
+        this.toggleForm();
+      }).catch((error) => {
+        console.error('Error adding source: ', error);
+      }).finally(() => {
+        this.isSaving = false; // Re-enable the button
+      });
     }
+  } else {
+    alert('Please fill in all fields!');
   }
+}
 
   // Edit a source
   onEdit(source: any): void {

@@ -219,13 +219,13 @@
             <label for="enableDescription">Enable Product description, IMEI or Serial Number <span class="info-icon">i</span></label>
           </div>
         </div>
-        <div class="form-group">
-          <div class="checkbox-group">
-            <input type="checkbox" id="notForSelling" [(ngModel)]="product.notForSelling" name="notForSelling">
-            <label for="notForSelling">Not for selling <span class="info-icon">i</span></label>
-          </div>
-        </div>
-      </div>
+       <div class="form-group">
+    <div class="checkbox-group">
+      <input type="checkbox" id="notForSelling" [(ngModel)]="product.notForSelling" name="notForSelling"
+             (change)="onNotForSellingChange()">
+      <label for="notForSelling">Not for selling <span class="info-icon" title="This product won't appear in sales screens">i</span></label>
+    </div>
+  </div></div>
 
       <div class="form-row">
         <div class="form-group">
@@ -283,24 +283,27 @@
     <!-- Product Type Section -->
     <div class="container">
       <div class="form-row">
-        <div class="form-group">
-          <label class="required">Applicable Tax:</label>
-          <select [(ngModel)]="product.applicableTax" name="applicableTax" required 
-                  (change)="onTaxChange()"
-                  [class.invalid]="productFormSubmitted && !product.applicableTax">
-            <option value="" disabled selected>Select Tax</option>
-            <option [ngValue]="'None'">None</option>
-            <option *ngFor="let tax of taxRates" [ngValue]="tax">
-              {{ tax.name }} ({{ tax.percentage }}%)
-            </option>
-          </select>
-          <div *ngIf="productFormSubmitted && !product.applicableTax" class="error-message">
-            Applicable Tax is required
-          </div>
-          <div *ngIf="product.taxPercentage > 0" class="tax-info">
-            Current tax rate: {{ product.taxPercentage }}%
-          </div>
-        </div>
+    <!-- Applicable Tax Dropdown -->
+<!-- Applicable Tax Dropdown -->
+<div class="form-group">
+  <label class="required">Applicable Tax:</label>
+  <select [(ngModel)]="product.applicableTax" name="applicableTax" required 
+          (change)="onTaxChange()"
+          [class.invalid]="productFormSubmitted && !product.applicableTax">
+    <option value="" disabled selected>Select Tax</option>
+    <option [ngValue]="'None'">None</option>
+    <!-- Change this line to properly display the percentage -->
+    <option *ngFor="let tax of taxRates" [ngValue]="tax">
+      {{ tax.name }} ({{ tax.percentage }}%)
+    </option>
+  </select>
+  <div *ngIf="productFormSubmitted && !product.applicableTax" class="error-message">
+    Applicable Tax is required
+  </div>
+  <div *ngIf="product.taxPercentage > 0" class="tax-info">
+    Current tax rate: {{ product.taxPercentage }}%
+  </div>
+</div>
         <div class="form-group">
           <label class="required">Selling Price Tax Type:</label>
           <select [(ngModel)]="product.sellingPriceTaxType" name="sellingPriceTaxType" required (change)="calculateTax()">
@@ -415,16 +418,23 @@
         </div>
       </div>
 
-      <!-- Added By Field -->
-      <div class="form-group">
-        <label>Added By:</label>
-        <select [(ngModel)]="selectedUser" name="addedBy" (change)="onUserSelect(selectedUser)">
-          <option value="">Select User</option>
-          <option *ngFor="let user of users" [ngValue]="user">
-            {{ user.name || user.email }}
-          </option>
-        </select>
-      </div>
+ <!-- Replace the existing Added By form group with this: -->
+<div class="form-group">
+  <label>Added By:</label>
+  <div *ngIf="authService.currentUserValue; else userSelect">
+    <input type="text" class="form-control" 
+           [value]="authService.currentUserValue.displayName || authService.currentUserValue.email"
+           readonly>
+  </div>
+  <ng-template #userSelect>
+    <select [(ngModel)]="selectedUser" name="addedBy" (change)="onUserSelect(selectedUser)">
+      <option value="">Select User</option>
+      <option *ngFor="let user of users" [ngValue]="user">
+        {{ user.name || user.email }}
+      </option>
+    </select>
+  </ng-template>
+</div>
       <br>
 
       <!-- Variant Selection (for Variant type) -->
@@ -569,40 +579,36 @@
               </td>
               
               <!-- Selling Price Column -->
-              <td>
-                <div class="form-group">
-                  <label class="required">Exc. Tax:</label>
-                  <input type="number" step="0.01" placeholder="0.00"
-                         [(ngModel)]="product.defaultSellingPriceExcTax" 
-                         name="defaultSellingPriceExcTax"
-                         (change)="calculateSellingPriceIncTax()" required>
-                  <div *ngIf="productFormSubmitted && !product.defaultSellingPriceExcTax" class="error-message">
-                    Selling Price (Exc. Tax) is required
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label class="required">Inc. Tax (MRP):</label>
-                  <input type="number" step="0.01" placeholder="0.00"
-                         [(ngModel)]="product.defaultSellingPriceIncTax" 
-                         name="defaultSellingPriceIncTax"
-                         (change)="calculateFromMRP()" required>
-                  <div *ngIf="productFormSubmitted && !product.defaultSellingPriceIncTax" class="error-message">
-                    Selling Price (Inc. Tax) is required
-                  </div>
-                  <!-- Tax breakdown section -->
-                  <div class="tax-breakdown" *ngIf="product.taxPercentage > 0 && product.defaultSellingPriceIncTax">
-                    <div class="tax-info-row">
-                      <span>Tax ({{ product.taxPercentage }}%):</span>
-                      <span>{{ calculateTaxAmount() | currency:'INR' }}</span>
-                    </div>
-                    <div class="tax-info-row">
-                      <span>Price before tax:</span>
-                      <span>{{ product.defaultSellingPriceExcTax | currency:'INR' }}</span>
-                    </div>
-                  </div>
-                </div>
-              </td>
-              
+          <!-- Selling Price Column -->
+<td>
+  <div class="form-group">
+    <label>Exc. Tax:</label> <!-- Changed from required -->
+    <input type="number" step="0.01" placeholder="0.00"
+           [(ngModel)]="product.defaultSellingPriceExcTax" 
+           name="defaultSellingPriceExcTax"
+           (change)="calculateSellingPriceIncTax()">
+    <!-- Removed error message div -->
+  </div>
+  <div class="form-group">
+    <label>Inc. Tax (MRP):</label> <!-- Changed from required -->
+    <input type="number" step="0.01" placeholder="0.00"
+           [(ngModel)]="product.defaultSellingPriceIncTax" 
+           name="defaultSellingPriceIncTax"
+           (change)="calculateFromMRP()">
+    <!-- Removed error message div -->
+    <!-- Tax breakdown section remains -->
+    <div class="tax-breakdown" *ngIf="product.taxPercentage > 0 && product.defaultSellingPriceIncTax">
+      <div class="tax-info-row">
+        <span>Tax ({{ product.taxPercentage }}%):</span>
+        <span>{{ calculateTaxAmount() | currency:'INR' }}</span>
+      </div>
+      <div class="tax-info-row">
+        <span>Price before tax:</span>
+        <span>{{ product.defaultSellingPriceExcTax | currency:'INR' }}</span>
+      </div>
+    </div>
+  </div>
+</td>
               <!-- Margin Column -->
               <td>
                 <div class="form-group">

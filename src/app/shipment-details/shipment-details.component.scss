@@ -1,129 +1,262 @@
-/* Shipment Details Page */
+/* Shipment Details Page - Clean & Modern CSS */
+
+/* Base styles */
 .shipment-details-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+/* Header section */
+.shipment-details-page h2 {
+  color: #2c3e50;
+  font-weight: 600;
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+/* Back button styling */
+.back-btn {
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  background: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.back-btn:hover {
+  background-color: #6c757d;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.2);
+}
+
+.back-btn i {
+  margin-right: 6px;
+}
+
+/* Loading spinner */
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+}
+
+/* Card styling */
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important;
+  border: none;
+  padding: 20px;
+}
+
+.card-header h5 {
+  font-weight: 600;
+  font-size: 1.25rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.card-body {
+  padding: 30px;
+  background: white;
+}
+
+/* Form labels and text */
+.form-label {
+  color: #495057;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 5px;
+}
+
+.card-body p {
+  color: #2c3e50;
+  font-size: 1rem;
+  margin-bottom: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f3f4;
+  font-weight: 500;
+}
+
+.card-body .mb-3:last-child p {
+  border-bottom: none;
+}
+
+/* Payment status badges */
+.badge {
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bg-success {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+}
+
+.bg-warning {
+  background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%) !important;
+  color: #212529 !important;
+}
+
+.bg-danger {
+  background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%) !important;
+}
+
+/* Table styling */
+.table-responsive {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.table {
+  margin-bottom: 0;
+  font-size: 0.95rem;
+}
+
+.table thead th {
+  background: linear-gradient(135deg, #495057 0%, #343a40 100%);
+  color: white;
+  border: none;
+  padding: 15px 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-size: 0.85rem;
+}
+
+.table tbody td, .table tfoot td {
+  padding: 12px;
+  vertical-align: middle;
+  border-top: 1px solid #e9ecef;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: #f8f9fa;
+}
+
+.table tbody tr:hover {
+  background-color: #e3f2fd;
+  transition: background-color 0.2s ease;
+}
+
+/* Footer row styling */
+.table tfoot tr {
+  background-color: #f8f9fa;
+}
+
+.table tfoot td {
+  border-top: 2px solid #dee2e6;
+  font-weight: 600;
+  color: #495057;
+}
+
+.table tfoot tr:last-child td {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: white;
+  font-size: 1.1rem;
+}
+
+/* No products message */
+td[colspan="5"] {
+  text-align: center;
+  color: #6c757d;
+  font-style: italic;
+  padding: 30px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .shipment-details-page {
+    padding: 15px;
+  }
+  
+  .card-body {
     padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    color: #333;
-    margin-top: 5%;
   }
   
-  /* Header section */
-  .shipment-details-page .d-flex.justify-content-between {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 15px;
-    margin-bottom: 25px;
+  .d-flex.justify-content-between {
+    flex-direction: column;
+    gap: 15px;
   }
   
-  .shipment-details-page h2 {
-    font-size: 24px;
-    font-weight: 600;
-    color: #2c3e50;
-    margin: 0;
+  .d-flex.align-items-center {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 10px;
   }
   
-  /* Buttons */
-  .shipment-details-page .btn {
-    font-size: 14px;
-    padding: 6px 12px;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-  }
-  
-  .shipment-details-page .btn-outline-secondary {
-    border-color: #6c757d;
-    color: #6c757d;
-  }
-  
-  .shipment-details-page .btn-outline-secondary:hover {
-    background-color: #6c757d;
-    color: white;
-  }
-  
-  .shipment-details-page .btn-outline-primary {
-    border-color: #3498db;
-    color: #3498db;
-  }
-  
-  .shipment-details-page .btn-outline-primary:hover {
-    background-color: #3498db;
-    color: white;
-  }
-  
-  /* Back button icon */
-  .shipment-details-page .back-btn i {
-    margin-right: 5px;
-  }
-  
-  /* Details section */
-  .shipment-details-page .row.mb-3 {
-    background-color: #f8f9fa;
-    padding: 20px;
-    border-radius: 5px;
-    margin-bottom: 25px !important;
-  }
-  
-  .shipment-details-page p {
+  .back-btn {
     margin-bottom: 10px;
-    font-size: 15px;
-    line-height: 1.5;
   }
   
-  .shipment-details-page strong {
-    font-weight: 600;
-    color: #2c3e50;
-    display: inline-block;
-    width: 130px;
+  .table {
+    font-size: 0.85rem;
   }
   
-  /* Table styling */
-  .shipment-details-page .table-responsive {
-    border-radius: 5px;
-    overflow: hidden;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  .table thead th,
+  .table tbody td,
+  .table tfoot td {
+    padding: 8px 6px;
+  }
+}
+
+@media (max-width: 576px) {
+  .shipment-details-page h2 {
+    font-size: 1.5rem;
   }
   
-  .shipment-details-page .table {
-    width: 100%;
+  .card-header h5 {
+    font-size: 1.1rem;
+  }
+  
+  .col-md-6 {
     margin-bottom: 20px;
-    background-color: white;
   }
-  
-  .shipment-details-page .table thead th {
-    background-color: #3498db;
-    color: white;
-    font-weight: 500;
-    padding: 12px 15px;
-    text-align: left;
-  }
-  
-  .shipment-details-page .table tbody td {
-    padding: 12px 15px;
-    vertical-align: middle;
-    border-top: 1px solid #dee2e6;
-  }
-  
-  .shipment-details-page .table tbody tr:nth-child(even) {
-    background-color: #f8f9fa;
-  }
-  
-  .shipment-details-page .table tbody tr:hover {
-    background-color: #f1f8fe;
-  }
-  
-  /* Responsive adjustments */
-  @media (max-width: 768px) {
-    .shipment-details-page .row.mb-3 {
-      padding: 15px;
-    }
-    
-    .shipment-details-page strong {
-      width: 110px;
-    }
-    
-    .shipment-details-page .table thead th,
-    .shipment-details-page .table tbody td {
-      padding: 8px 10px;
-      font-size: 14px;
-    }
-  }
+}
+
+/* Animation for loading */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+  animation: fadeIn 0.6s ease-out;
+}
+
+/* Currency formatting enhancement */
+.table tfoot .fw-bold {
+  font-size: 1.05rem;
+}
+
+/* Enhanced hover effects */
+.table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.table tbody tr:hover td {
+  transform: scale(1.002);
+}

@@ -237,6 +237,107 @@ export class SaleService {
     private productsService: ProductsService,
     private papa: Papa
   ) {}
+
+  // NEW: Get sales history for a specific product
+  getSalesByProductId(productId: string): Observable<Sale[]> {
+    return new Observable<Sale[]>(observer => {
+      const salesRef = collection(this.firestore, 'sales');
+      const q = query(
+        salesRef,
+        where('status', '==', 'Completed'),
+        orderBy('saleDate', 'desc')
+      );
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const sales: Sale[] = [];
+        
+        querySnapshot.docs.forEach(doc => {
+          const saleData = doc.data() as Sale;
+          const sale = {
+            ...saleData,
+            id: doc.id,
+            saleDate: this.convertTimestampToDate(saleData.saleDate)
+          };
+          
+          // Check if this sale contains the product we're looking for
+          const hasProduct = sale.products?.some(product => 
+            product.productId === productId ||
+            (product as any).id === productId ||
+            (product as any).product_id === productId
+          );
+          
+          if (hasProduct) {
+            sales.push(sale);
+          }
+        });
+        
+        observer.next(sales);
+      }, (error) => {
+        console.error('Error fetching sales by product ID:', error);
+        observer.error(error);
+      });
+
+      return () => unsubscribe();
+    });
+  }
+
+  // NEW: Get return history for a specific product
+  getReturnsByProductId(productId: string): Observable<Return[]> {
+    return new Observable<Return[]>(observer => {
+      const returnsRef = collection(this.firestore, 'returns');
+      const q = query(returnsRef, orderBy('returnDate', 'desc'));
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const returns: Return[] = [];
+        
+        querySnapshot.docs.forEach(doc => {
+          const returnData = doc.data() as Return;
+          const returnRecord = {
+            ...returnData,
+            id: doc.id,
+            returnDate: this.convertTimestampToDate(returnData.returnDate)
+          };
+          
+          // Check if this return contains the product we're looking for
+          const hasProduct = returnRecord.returnedItems?.some(item => 
+            item.productId === productId || 
+            (item as any).id === productId ||
+            (item as any).product_id === productId
+          );
+          
+          if (hasProduct) {
+            returns.push(returnRecord);
+          }
+        });
+        
+        observer.next(returns);
+      }, (error) => {
+        console.error('Error fetching returns by product ID:', error);
+        observer.error(error);
+      });
+
+      return () => unsubscribe();
+    });
+  }
+
+  // ENHANCED: Get product details from sale
+  getProductDetailsFromSale(sale: Sale, productId: string): any {
+    return sale.products?.find(product => 
+      product.productId === productId || 
+      (product as any).id === productId ||
+      (product as any).product_id === productId
+    );
+  }
+
+  // ENHANCED: Get product details from return
+  getProductDetailsFromReturn(returnRecord: Return, productId: string): any {
+    return returnRecord.returnedItems?.find(item => 
+      item.productId === productId || 
+      (item as any).id === productId ||
+      (item as any).product_id === productId
+    );
+  }
+
 notifySalesUpdated() {
   this.salesUpdated.next();
 }
@@ -1145,33 +1246,136 @@ getShippedSales(): Observable<any[]> {
     }
   }
 
-  async getSalesByProductId(productId: string): Promise<Sale[]> {
-    try {
+  getSalesByContactNumber(contactNumber: string): Observable<SalesOrder[]> {
+    return new Observable<SalesOrder[]>(observer => {
       const salesRef = collection(this.firestore, 'sales');
       const q = query(
         salesRef,
-        where('status', '==', 'Completed')
+        where('customerPhone', '==', contactNumber),
+        orderBy('saleDate', 'desc')
       );
 
-      const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => {
-        const sale = doc.data() as Sale;
-        const productData = sale.products?.find(p => p.productId === productId);
-        
-        return {
-          ...sale,
-          id: doc.id,
-          saleDate: this.convertTimestampToDate(sale.saleDate),
-          products: sale.products?.map(p => ({
-            ...p,
-            quantity: p.quantity || 0,
-            unitPrice: p.unitPrice || 0,
-            lineTotal: p.lineTotal || (p.quantity * p.unitPrice) || 0
-          })) || []
-        };
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const sales = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id,
+            ...data,
+            saleDate: this.convertTimestampToDate(data['saleDate']),
+            paidOn: this.convertTimestampToDate(data['paidOn']),
+            createdAt: this.convertTimestampToDate(data['createdAt']),
+            updatedAt: this.convertTimestampToDate(data['updatedAt'])
+          } as SalesOrder;
+        });
+        observer.next(sales);
+      }, (error) => {
+        observer.error(error);
       });
+
+      return () => unsubscribe();
+    });
+  }
+private async updateOriginalSaleAfterReturn(
+  saleId: string, 
+  returnedItems: any[],
+  markAsReturned: boolean = false
+): Promise<void> {
+  try {
+    const saleDoc = doc(this.firestore, 'sales', saleId);
+    const saleSnapshot = await getDoc(saleDoc);
+    
+    if (!saleSnapshot.exists()) {
+      throw new Error('Original sale not found');
+    }
+    
+    const saleData = saleSnapshot.data() as SalesOrder;
+    
+    // Update product quantities
+    const updatedProducts = saleData.products?.map(product => {
+      const returnedItem = returnedItems.find(item => 
+        (item.productId || item.id) === (product.id || product.productId)
+      );
+      
+      if (returnedItem) {
+        const newQuantity = product.quantity - returnedItem.quantity;
+        return {
+          ...product,
+          quantity: Math.max(0, newQuantity),
+          subtotal: Math.max(0, newQuantity) * product.unitPrice
+        };
+      }
+      return product;
+    }).filter(product => product.quantity > 0);
+    
+    // Calculate new totals
+    const newSubtotal = updatedProducts?.reduce((sum, product) => sum + product.subtotal, 0) || 0;
+    const newTotal = newSubtotal + (saleData.tax || 0) + (saleData.shippingCost || 0);
+    
+    const updateData: any = {
+      products: updatedProducts,
+      subtotal: newSubtotal,
+      total: newTotal,
+      updatedAt: new Date(),
+      hasReturns: true,
+      lastReturnDate: new Date()
+    };
+    
+    // Mark as returned if all items were returned or explicitly requested
+    if (markAsReturned || updatedProducts?.length === 0) {
+      updateData.status = 'Returned';
+    }
+    
+    await updateDoc(saleDoc, updateData);
+    console.log('Original sale updated after return');
+    
+  } catch (error) {
+    console.error('Error updating original sale after return:', error);
+    throw error;
+  }
+}
+  private async restoreProductStockForReturn(returnData: Return): Promise<void> {
+    try {
+      const batch = writeBatch(this.firestore);
+
+      for (const item of returnData.returnedItems) {
+        let product;
+        if (item.productId) {
+          product = await this.productsService.getProductById(item.productId);
+        }
+        if (!product && item.name) {
+          product = await this.productsService.getProductByName(item.name);
+        }
+
+        if (product && product.id) {
+          const newStock = (product.currentStock || 0) + item.quantity;
+          
+          const productDoc = doc(this.firestore, `products/${product.id}`);
+          batch.update(productDoc, {
+            currentStock: newStock,
+            updatedAt: new Date()
+          });
+
+          const stockHistoryRef = collection(this.firestore, 'stock_movements');
+          batch.set(doc(stockHistoryRef), {
+            productId: product.id,
+            returnId: returnData.id,
+            action: 'return',
+            quantity: item.quantity,
+            locationId: 'default',
+            oldStock: product.currentStock || 0,
+            newStock: newStock,
+            reference: returnData.invoiceNo || `return-${returnData.id}`,
+            timestamp: new Date(),
+            notes: `Stock returned from sale ${returnData.invoiceNo}`
+          });
+        }
+      }
+
+      await batch.commit();
+      this.stockUpdatedSource.next();
+      console.log('Product stock restored for return');
     } catch (error) {
-      console.error('Error getting sales by product:', error);
+      console.error('Error restoring product stock for return:', error);
       throw error;
     }
   }
@@ -1364,140 +1568,6 @@ async updateSale(saleId: string, updateData: any): Promise<void> {
     throw new Error(`Failed to update sale record: ${error}`);
   }
 }
-
-  getSalesByContactNumber(contactNumber: string): Observable<SalesOrder[]> {
-    return new Observable<SalesOrder[]>(observer => {
-      const salesRef = collection(this.firestore, 'sales');
-      const q = query(
-        salesRef,
-        where('customerPhone', '==', contactNumber),
-        orderBy('saleDate', 'desc')
-      );
-
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const sales = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return { 
-            id: doc.id,
-            ...data,
-            saleDate: this.convertTimestampToDate(data['saleDate']),
-            paidOn: this.convertTimestampToDate(data['paidOn']),
-            createdAt: this.convertTimestampToDate(data['createdAt']),
-            updatedAt: this.convertTimestampToDate(data['updatedAt'])
-          } as SalesOrder;
-        });
-        observer.next(sales);
-      }, (error) => {
-        observer.error(error);
-      });
-
-      return () => unsubscribe();
-    });
-  }
-private async updateOriginalSaleAfterReturn(
-  saleId: string, 
-  returnedItems: any[],
-  markAsReturned: boolean = false
-): Promise<void> {
-  try {
-    const saleDoc = doc(this.firestore, 'sales', saleId);
-    const saleSnapshot = await getDoc(saleDoc);
-    
-    if (!saleSnapshot.exists()) {
-      throw new Error('Original sale not found');
-    }
-    
-    const saleData = saleSnapshot.data() as SalesOrder;
-    
-    // Update product quantities
-    const updatedProducts = saleData.products?.map(product => {
-      const returnedItem = returnedItems.find(item => 
-        (item.productId || item.id) === (product.id || product.productId)
-      );
-      
-      if (returnedItem) {
-        const newQuantity = product.quantity - returnedItem.quantity;
-        return {
-          ...product,
-          quantity: Math.max(0, newQuantity),
-          subtotal: Math.max(0, newQuantity) * product.unitPrice
-        };
-      }
-      return product;
-    }).filter(product => product.quantity > 0);
-    
-    // Calculate new totals
-    const newSubtotal = updatedProducts?.reduce((sum, product) => sum + product.subtotal, 0) || 0;
-    const newTotal = newSubtotal + (saleData.tax || 0) + (saleData.shippingCost || 0);
-    
-    const updateData: any = {
-      products: updatedProducts,
-      subtotal: newSubtotal,
-      total: newTotal,
-      updatedAt: new Date(),
-      hasReturns: true,
-      lastReturnDate: new Date()
-    };
-    
-    // Mark as returned if all items were returned or explicitly requested
-    if (markAsReturned || updatedProducts?.length === 0) {
-      updateData.status = 'Returned';
-    }
-    
-    await updateDoc(saleDoc, updateData);
-    console.log('Original sale updated after return');
-    
-  } catch (error) {
-    console.error('Error updating original sale after return:', error);
-    throw error;
-  }
-}
-  private async restoreProductStockForReturn(returnData: Return): Promise<void> {
-    try {
-      const batch = writeBatch(this.firestore);
-
-      for (const item of returnData.returnedItems) {
-        let product;
-        if (item.productId) {
-          product = await this.productsService.getProductById(item.productId);
-        }
-        if (!product && item.name) {
-          product = await this.productsService.getProductByName(item.name);
-        }
-
-        if (product && product.id) {
-          const newStock = (product.currentStock || 0) + item.quantity;
-          
-          const productDoc = doc(this.firestore, `products/${product.id}`);
-          batch.update(productDoc, {
-            currentStock: newStock,
-            updatedAt: new Date()
-          });
-
-          const stockHistoryRef = collection(this.firestore, 'stock_movements');
-          batch.set(doc(stockHistoryRef), {
-            productId: product.id,
-            returnId: returnData.id,
-            action: 'return',
-            quantity: item.quantity,
-            locationId: 'default',
-            oldStock: product.currentStock || 0,
-            newStock: newStock,
-            reference: returnData.invoiceNo || `return-${returnData.id}`,
-            timestamp: new Date(),
-            notes: `Stock returned from sale ${returnData.invoiceNo}`
-          });
-        }
-      }
-
-      await batch.commit();
-      this.stockUpdatedSource.next();
-      console.log('Product stock restored for return');
-    } catch (error) {
-      console.error('Error restoring product stock for return:', error);
-      throw error;
-    }
-  }
 
   private salesRefresh = new BehaviorSubject<void>(undefined);
   refreshSalesList(): Promise<void> {

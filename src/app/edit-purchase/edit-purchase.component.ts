@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, FormArray } from '@angular/forms';
+import { FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { PurchaseService } from '../services/purchase.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { SupplierService } from '../services/supplier.service';
@@ -7,6 +7,8 @@ import { LocationService } from '../services/location.service';
 import { ProductsService } from '../services/products.service';
 import { AuthService } from '../auth.service';
 import { UserService } from '../services/user.service';
+import { TaxRate } from '../tax/tax.model';
+import { TaxService } from '../services/tax.service';
 
 interface Supplier {
   id: string;
@@ -58,11 +60,15 @@ interface Product {
   styleUrls: ['./edit-purchase.component.scss']
 })
 export class EditPurchaseComponent implements OnInit {
+  [x: string]: any;
   purchaseForm!: FormGroup;
   suppliers: Supplier[] = [];
   businessLocations: any[] = [];
   selectedSupplier: Supplier | null = null;
   totalItems = 0;
+  selectedProducts: Set<number> = new Set<number>();
+taxRates: TaxRate[] = [];
+
   netTotalAmount = 0;
   totalTax = 0;
   searchTerm: string = '';
@@ -74,7 +80,6 @@ showSearchResults: boolean = false;
   currentUser: any = null;
   isLoading = true;
   originalPurchaseData: any = null;
-  taxRates = [0, 5, 10, 12, 18, 28];
 
   constructor(
     private fb: FormBuilder,
@@ -85,7 +90,9 @@ showSearchResults: boolean = false;
     private productsService: ProductsService,
     private route: ActivatedRoute,
     private authService: AuthService,
-    private userService: UserService
+    private userService: UserService,
+      private taxService: TaxService,
+
   ) {}
 
   ngOnInit(): void {
@@ -95,7 +102,8 @@ showSearchResults: boolean = false;
     this.loadProducts();
     this.getCurrentUser();
     this.loadUsers();
-    
+      this.loadTaxRates(); // Add this line
+
     this.route.paramMap.subscribe(params => {
       this.purchaseId = params.get('id');
       if (this.purchaseId) {
@@ -125,6 +133,49 @@ onSearchInput(event: any): void {
     this.searchResults = [];
     this.showSearchResults = false;
   }
+  }
+  toggleProductSelection(index: number): void {
+  if (this.selectedProducts.has(index)) {
+    this.selectedProducts.delete(index);
+  } else {
+    this.selectedProducts.add(index);
+  }
+}
+
+isProductSelected(index: number): boolean {
+  return this.selectedProducts.has(index);
+}
+deleteSelectedProducts(): void {
+  if (this.selectedProducts.size === 0) {
+    alert('Please select at least one product to delete');
+    return;
+  }
+
+  if (confirm(`Are you sure you want to delete ${this.selectedProducts.size} selected products?`)) {
+    const indexesToDelete = Array.from(this.selectedProducts).sort((a, b) => b - a);
+    
+    indexesToDelete.forEach(index => {
+      this.productsFormArray.removeAt(index);
+    });
+    
+    this.selectedProducts.clear();
+    this.calculateTotals();
+  }
+}loadTaxRates(): void {
+  this['taxService'].getTaxRates().subscribe((rates: TaxRate[]) => {
+    this.taxRates = rates;
+
+    if (!this.taxRates.some(rate => rate.name.includes('GST'))) {
+      this.taxRates.push(
+        { id: 'gst5', name: 'GST 5%', rate: 5, active: true, forTaxGroupOnly: false },
+        { id: 'gst12', name: 'GST 12%', rate: 12, active: true, forTaxGroupOnly: false },
+        { id: 'gst18', name: 'GST 18%', rate: 18, active: true, forTaxGroupOnly: false },
+        { id: 'gst28', name: 'GST 28%', rate: 28, active: true, forTaxGroupOnly: false }
+      );
+    }
+
+    this.taxRates.sort((a, b) => a.rate - b.rate);
+  });
 }
 handleKeyDown(event: KeyboardEvent): void {
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -150,7 +201,19 @@ onSearchFocus(): void {
   if (this.searchTerm.length > 1) {
     this.showSearchResults = true;
   }
+  }
+  toggleSelectAll(event: any): void {
+  const isChecked = event.target.checked;
+  
+  if (isChecked) {
+    this.productsFormArray.controls.forEach((_, index) => {
+      this.selectedProducts.add(index);
+    });
+  } else {
+    this.selectedProducts.clear();
+  }
 }
+
 
 onSearchBlur(): void {
   setTimeout(() => {
@@ -242,63 +305,61 @@ addProductToTable(product: Product): void {
       });
   }
 
-  prefillForm(purchaseData: any): void {
-    const supplierId = purchaseData.supplierId || '';
-    
-    this.purchaseForm.patchValue({
-      supplierId: supplierId,
-      supplierName: purchaseData.supplierName || '',
-      address: purchaseData.address || '',
-      referenceNo: purchaseData.referenceNo || '',
-      purchaseDate: this.formatDateForInput(purchaseData.purchaseDate),
-      purchaseStatus: purchaseData.purchaseStatus || '',
-      businessLocation: purchaseData.businessLocation || '',
-      payTerm: purchaseData.payTerm || '',
-      additionalNotes: purchaseData.additionalNotes || '',
-      shippingCharges: purchaseData.shippingCharges || 0,
-      paymentAmount: purchaseData.paymentAmount || 0,
-      paidOn: this.formatDateForInput(purchaseData.paidOn || purchaseData.purchaseDate),
-      paymentMethod: purchaseData.paymentMethod || '',
-      paymentNote: purchaseData.paymentNote || '',
-      balance: purchaseData.balance || 0,
-      totalPayable: purchaseData.totalPayable || 0,
-      roundOffAmount: purchaseData.roundOffAmount || 0,
-      roundedTotal: purchaseData.roundedTotal || 0,
-      invoiceNo: purchaseData.invoiceNo || '',
-      invoicedDate: this.formatDateForInput(purchaseData.invoicedDate),
-      receivedDate: this.formatDateForInput(purchaseData.receivedDate),
-      addedBy: purchaseData.addedBy || {
-        id: this.currentUser?.uid || '',
-        unitCostBeforeTax: [0],
-subtotal: [0],
-taxAmount: [0],
-lineTotal: [0],
-sellingPrice: [0],
-        name: this.currentUser?.displayName || this.currentUser?.email || '',
-        email: this.currentUser?.email || ''
-      },
-      assignedTo: purchaseData.assignedTo || this.currentUser?.uid || ''
-    });
-    
-    // Clear existing products
-    while (this.productsFormArray.length !== 0) {
-      this.productsFormArray.removeAt(0);
-    }
-    
-    // Add products from purchase
-    if (purchaseData.products && purchaseData.products.length > 0) {
-      purchaseData.products.forEach((product: any) => {
-        this.addProductFromPurchase(product);
-      });
-    }
-    
-    // Set supplier details if available
-    if (supplierId) {
-      this.onSupplierChange(supplierId);
-    }
-    
-    this.calculateTotals();
+prefillForm(purchaseData: any): void {
+  const supplierId = purchaseData.supplierId || '';
+  
+  this.purchaseForm.patchValue({
+    supplierId: supplierId,
+    supplierName: purchaseData.supplierName || '',
+    address: purchaseData.address || '',
+    referenceNo: purchaseData.referenceNo || '',
+    paymentDue: purchaseData.paymentDue || 0,  // Make sure this is included
+    balance: purchaseData.paymentDue || 0,     // Prefill balance with paymentDue
+    purchaseDate: this.formatDateForInput(purchaseData.purchaseDate),
+    purchaseStatus: purchaseData.purchaseStatus || '',
+    businessLocation: purchaseData.businessLocation || '',
+    payTerm: purchaseData.payTerm || '',
+    additionalNotes: purchaseData.additionalNotes || '',
+    shippingCharges: purchaseData.shippingCharges || 0,
+    paymentAmount: purchaseData.paymentAmount || 0,
+    paidOn: this.formatDateForInput(purchaseData.paidOn || purchaseData.purchaseDate),
+    paymentMethod: purchaseData.paymentMethod || '',
+    paymentNote: purchaseData.paymentNote || '',
+    totalPayable: purchaseData.totalPayable || 0,
+    roundOffAmount: purchaseData.roundOffAmount || 0,
+    roundedTotal: purchaseData.roundedTotal || 0,
+    invoiceNo: purchaseData.invoiceNo || '',
+    invoicedDate: this.formatDateForInput(purchaseData.invoicedDate),
+    receivedDate: this.formatDateForInput(purchaseData.receivedDate),
+    addedBy: purchaseData.addedBy || {
+      id: this.currentUser?.uid || '',
+      name: this.currentUser?.displayName || this.currentUser?.email || '',
+      email: this.currentUser?.email || ''
+    },
+    assignedTo: purchaseData.assignedTo || this.currentUser?.uid || ''
+  });
+  
+  // Clear existing products
+  while (this.productsFormArray.length !== 0) {
+    this.productsFormArray.removeAt(0);
   }
+  
+  // Add products from purchase
+  if (purchaseData.products && purchaseData.products.length > 0) {
+    purchaseData.products.forEach((product: any) => {
+      this.addProductFromPurchase(product);
+    });
+  }
+  
+  // Set supplier details if available
+  if (supplierId) {
+    this.onSupplierChange(supplierId);
+  }
+  
+  // Calculate totals after loading all products
+  this.calculateTotals();
+}
+
 
   formatDateForInput(date: any): string {
     if (!date) return '';
@@ -320,26 +381,30 @@ sellingPrice: [0],
     }
   }
 
-  addProductFromPurchase(product: any): void {
-    const productGroup = this.fb.group({
-      productId: [product.productId || product.id || ''],
-      productName: [product.productName || ''],
-      quantity: [product.quantity || 1],
-      unitCost: [product.unitCost || 0],
-      discountPercent: [product.discountPercent || 0],
-      unitCostBeforeTax: [{value: product.unitCostBeforeTax || product.unitCost || 0, disabled: true}],
-      subtotal: [{value: product.subtotal || 0, disabled: true}],
-      taxAmount: [{value: product.taxAmount || 0, disabled: true}],
-      lineTotal: [{value: product.lineTotal || (product.quantity * product.unitCost) || 0, disabled: true}],
-      profitMargin: [product.profitMargin || 0],
-      sellingPrice: [{value: product.sellingPrice || 0, disabled: true}],
-      batchNumber: [product.batchNumber || product.lotNumber || ''],
-      expiryDate: [product.expiryDate || ''],
-      taxRate: [product.taxRate || 0]
-    });
+addProductFromPurchase(product: any): void {
+  const productGroup = this.fb.group({
+    productId: [product.productId || product.id || ''],
+    productName: [product.productName || ''],
+    quantity: [product.quantity || 1],
+    unitCost: [product.unitCost || 0],
+    discountPercent: [product.discountPercent || 0],
+    unitCostBeforeTax: [product.unitCostBeforeTax || product.unitCost || 0],
+    subtotal: [product.subtotal || 0],
+    taxAmount: [product.taxAmount || 0],
+    lineTotal: [product.lineTotal || (product.quantity * product.unitCost) || 0],
+    profitMargin: [product.profitMargin || 0],
+    sellingPrice: [product.sellingPrice || 0],
+    batchNumber: [product.batchNumber || product.lotNumber || ''],
+    expiryDate: [product.expiryDate || ''],
+    taxRate: [product.taxRate || 0]  // Make sure taxRate is included here
+  });
 
-    this.productsFormArray.push(productGroup);
-  }
+  this.productsFormArray.push(productGroup);
+  
+  // Calculate line total for this product to ensure tax is included
+  const index = this.productsFormArray.length - 1;
+  this.calculateLineTotal(index);
+}
 
 loadProducts(): void {
   this.productsService.getProductsRealTime().subscribe((products: any[]) => {
@@ -362,6 +427,8 @@ loadProducts(): void {
       supplierId: [''],
       supplierName: [''],
       address: [''],
+    paymentDue: [0],
+    balance: [0],
       referenceNo: [''],
       purchaseDate: [new Date().toISOString().substring(0, 10)],
       purchaseStatus: [''],
@@ -380,7 +447,6 @@ loadProducts(): void {
       paymentMethod: [''],
       paymentAccount: [''],
       paymentNote: [''],
-      balance: [0],
       totalPayable: [0],
       roundOffAmount: [0],
       roundedTotal: [0],
@@ -414,40 +480,40 @@ loadProducts(): void {
     this.router.navigate(['/suppliers']);
   }
 
-  calculatePaymentBalance(): void {
-    const totalPayable = this.purchaseForm.get('totalPayable')?.value || 0;
-    const paymentAmount = this.purchaseForm.get('paymentAmount')?.value || 0;
-    const balance = Math.max(0, totalPayable - paymentAmount);
-    
-    this.purchaseForm.patchValue({
-      balance: balance
-    });
-  }
+calculatePaymentBalance(): void {
+  const totalPayable = this.purchaseForm.get('totalPayable')?.value || 0;
+  const paymentAmount = this.purchaseForm.get('paymentAmount')?.value || 0;
+  const paymentDue = Math.max(0, totalPayable - paymentAmount);
+  
+  this.purchaseForm.patchValue({
+    balance: paymentDue.toFixed(2),
+    paymentDue: paymentDue.toFixed(2)
+  });
+}
 
   get productsFormArray(): FormArray {
     return this.purchaseForm.get('products') as FormArray;
   }
 
+// Update the addProduct method to match the add purchase component
 addProduct(): void {
   const productGroup = this.fb.group({
-    productId: [''],
+    productId: ['', Validators.required],
     productName: [''],
-    quantity: [1],
-    unitCost: [0],
-    discountPercent: [0],
+    quantity: [1, [Validators.required, Validators.min(1)]],
+    unitCost: [0, [Validators.required, Validators.min(0.01)]],
+    discountPercent: [0, [Validators.min(0), Validators.max(100)]],
     unitCostBeforeTax: [0],
     subtotal: [0],
-    taxAmount: [0],
     lineTotal: [0],
-    sellingPrice: [0],
-    profitMargin: [0],
+    netCost: [0],
+    taxRate: [0],
+    taxAmount: [0],
     batchNumber: [''],
-    expiryDate: [''],
-    taxRate: [0]
+    expiryDate: ['']
   });
 
   this.productsFormArray.push(productGroup);
-  this.calculateTotals();
 }
 
   onProductSelect(index: number, event: Event): void {
@@ -481,7 +547,7 @@ calculateLineTotal(index: number): void {
   const quantity = productGroup.get('quantity')?.value || 0;
   const unitCost = productGroup.get('unitCost')?.value || 0;
   const discountPercent = productGroup.get('discountPercent')?.value || 0;
-  const taxRate = productGroup.get('taxRate')?.value || 0;
+  const taxRate = productGroup.get('taxRate')?.value || 0; // Default to 0 if not set
 
   const discountedPrice = unitCost * (1 - (discountPercent / 100));
   const subtotal = quantity * discountedPrice;
@@ -493,7 +559,7 @@ calculateLineTotal(index: number): void {
     subtotal: subtotal.toFixed(2),
     taxAmount: taxAmount.toFixed(2),
     lineTotal: lineTotal.toFixed(2)
-  }, { emitEvent: false }); // Add emitEvent: false to prevent infinite loops
+  }, { emitEvent: false });
 
   this.calculateSellingPrice(index);
   this.calculateTotals();
@@ -513,35 +579,41 @@ calculateLineTotal(index: number): void {
     });
   }
 
-  calculateTotals(): void {
-    this.totalItems = this.productsFormArray.length;
-    
-    let productsTotal = 0;
-    let totalTax = 0;
+calculateTotals(): void {
+  this.totalItems = this.productsFormArray.length;
+  
+  let productsTotal = 0;
+  let totalTax = 0;
 
-    this.productsFormArray.controls.forEach(productGroup => {
-      productsTotal += (parseFloat(productGroup.get('lineTotal')?.value) || 0);
-      totalTax += (parseFloat(productGroup.get('taxAmount')?.value) || 0);
-    });
+  this.productsFormArray.controls.forEach(productGroup => {
+    productsTotal += (parseFloat(productGroup.get('lineTotal')?.value) || 0);
+    totalTax += (parseFloat(productGroup.get('taxAmount')?.value) || 0);
+  });
 
-    const shippingCharges = parseFloat(this.purchaseForm.get('shippingCharges')?.value) || 0;
-    this.netTotalAmount = productsTotal + shippingCharges;
-    this.totalTax = totalTax;
+  const shippingCharges = parseFloat(this.purchaseForm.get('shippingCharges')?.value) || 0;
+  this.netTotalAmount = productsTotal + shippingCharges;
+  this.totalTax = totalTax;
 
-    // Calculate rounded total and round off amount
-    const roundedTotal = Math.round(this.netTotalAmount);
-    const roundOffAmount = roundedTotal - this.netTotalAmount;
+  // Calculate rounded total and round off amount
+  const roundedTotal = Math.round(this.netTotalAmount);
+  const roundOffAmount = roundedTotal - this.netTotalAmount;
 
-    this.purchaseForm.patchValue({
-      purchaseTotal: this.netTotalAmount,
-      totalPayable: roundedTotal,
-      paymentAmount: roundedTotal,
-      roundOffAmount: roundOffAmount.toFixed(2),
-      roundedTotal: roundedTotal.toFixed(2)
-    });
+  // Get the current payment amount or default to 0
+  const paymentAmount = parseFloat(this.purchaseForm.get('paymentAmount')?.value) || 0;
+  
+  // Calculate the new balance (paymentDue)
+  const paymentDue = Math.max(0, this.netTotalAmount - paymentAmount);
 
-    this.calculatePaymentBalance();
-  }
+  this.purchaseForm.patchValue({
+    purchaseTotal: this.netTotalAmount,
+    totalPayable: roundedTotal,
+    roundOffAmount: roundOffAmount.toFixed(2),
+    roundedTotal: roundedTotal.toFixed(2),
+    totalTax: totalTax,
+    paymentDue: paymentDue.toFixed(2),  // Update paymentDue
+    balance: paymentDue.toFixed(2)      // Also update balance to match
+  });
+}
 
   loadBusinessLocations(): void {
     this.locationService.getLocations().subscribe(
@@ -615,6 +687,8 @@ updatePurchase() {
           taxAmount: Number(product.taxAmount) || 0,
           lineTotal: Number(product.lineTotal) || 0,
           taxRate: Number(product.taxRate) || 0,
+                paymentDue: Number(formData.paymentDue) || 0,
+
           batchNumber: product.batchNumber || '',
           expiryDate: product.expiryDate || ''
         };

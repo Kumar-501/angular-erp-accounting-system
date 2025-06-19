@@ -29,33 +29,42 @@
     <div class="filter-controls">
     
      <div class="header-actions" style="  margin-left: 200px;">
-      <button class="bulk-select-btn" (click)="selectAllFilteredLeads()" [disabled]="filteredLeads.length === 0">
-  Bulk Select Leads
+  <button *ngIf="currentUserRole !== 'Executive'" 
+          class="bulk-select-btn" 
+          (click)="selectAllFilteredLeads()" 
+          [disabled]="filteredLeads.length === 0">
+    Bulk Select Leads
+  </button>
+
+<div style="display: none;">Current Role: {{currentUserRole}}</div>
+
+<button *ngIf="currentUserRole  !== 'Executive'" 
+        class="random-assign-btn" 
+        (click)="openAssignModal(false)" 
+        [disabled]="selectedLeads.size === 0">
+  Random Assign Leads
 </button>
-
-
-
-
-
-      <button class="random-assign-btn" (click)="openAssignModal(true)" [disabled]="selectedLeads.size === 0">
-        Random Assign Leads
-      </button>
-      <button class="assign-btn" (click)="openAssignModal(false)" [disabled]="selectedLeads.size === 0">
-        Assign Leads
-      </button>
-      <button class="assign-btn" (click)="openLifeStagePopup()" [disabled]="selectedLeads.size === 0">
-        Update Life Stage
-      </button>
-      <button 
-    [class.disabled]="selectedLeads.size === 0" 
-    [disabled]="selectedLeads.size === 0"
-    class="bulk-assign-btn" 
-    (click)="selectedLeads.size > 0 && openDepartmentPopup()">
+     <button *ngIf="currentUserRole !== 'Executive'" 
+          class="assign-btn" 
+          (click)="openAssignModal(false)" 
+          [disabled]="selectedLeads.size === 0">
+    Assign Leads
+  </button>
+    <button class="assign-btn" 
+          (click)="openLifeStagePopup()" 
+          [disabled]="selectedLeads.size === 0">
+    Update Life Stage
+  </button>
+  <button *ngIf="currentUserRole !== 'Executive'"
+          [class.disabled]="selectedLeads.size === 0" 
+          [disabled]="selectedLeads.size === 0"
+          class="bulk-assign-btn" 
+          (click)="selectedLeads.size > 0 && openDepartmentPopup()">
     Assign Department to Selected
   </button>
-   <button class="add-btn" [routerLink]="['/crm/lead-add']">
-  <span class="icon">+</span> Add Lead
-</button>
+  <button class="add-btn" [routerLink]="['/crm/lead-add']">
+    <span class="icon">+</span> Add Lead
+  </button>
     
     </div>
     
@@ -147,13 +156,12 @@
             <span class="sort-icon" *ngIf="sortColumn === 'mobile'">
               {{ sortDirection === 'asc' ? '▲' : '▼' }}
             </span>
-          </th>
-                    <th *ngIf="isColumnVisible('alternateContact')" (click)="sortTable('alternateContact')">
-            Alternate Contact
-            <span class="sort-icon" *ngIf="sortColumn === 'alternateContact'">
-              {{ sortDirection === 'asc' ? '▲' : '▼' }}
-            </span>
-          </th>
+     <th *ngIf="isColumnVisible('alternateContact')" (click)="sortTable('alternateContact')">
+  Alternate Contact
+  <span class="sort-icon" *ngIf="sortColumn === 'alternateContact'">
+    {{ sortDirection === 'asc' ? '▲' : '▼' }}
+  </span>
+</th>
 
           <th *ngIf="isColumnVisible('lifeStage')" (click)="sortTable('lifeStage')">
             Life Stage
@@ -232,16 +240,22 @@
           </td>
           <td *ngIf="isColumnVisible('createdAt')">{{ lead.createdAt | date:'short' }}</td>
           <td *ngIf="isColumnVisible('contactId')">{{ lead.contactId || '-' }}</td>
-          <td *ngIf="isColumnVisible('fullName')" class="name-cell">
-            <div class="name-wrapper">
-              <div class="name-line">
-                {{ lead.firstName || lead.businessName || '-' }}
-                <span *ngIf="lead.isReordered" class="reordered-badge">Reordered</span>
-                <span *ngIf="lead.isDuplicate" class="duplicate-badge">Duplicate Lead</span>
-              </div>
-             
-            </div>
-          </td>
+     <td *ngIf="isColumnVisible('fullName')" class="name-cell">
+  <div class="name-wrapper">
+    <div class="name-line">
+      <!-- Show business name if it exists (for non-individual contacts) -->
+      <span *ngIf="lead.businessName">{{ lead.businessName }}</span>
+      
+      <!-- Show first + last name if no business name (for individual contacts) -->
+      <span *ngIf="!lead.businessName">
+        {{ lead.firstName || '' }} {{ lead.lastName || '' }}
+      </span>
+      
+      <span *ngIf="lead.isReordered" class="reordered-badge">Reordered</span>
+      <span *ngIf="lead.isDuplicate" class="duplicate-badge">Duplicate Lead</span>
+    </div>
+  </div>
+</td>
           <td *ngIf="isColumnVisible('leadCategory')">
   <div class="category-tags">
     <ng-container *ngIf="lead.leadCategory">
@@ -263,8 +277,7 @@
             {{ lead.addedBy?.userName || lead.addedBy || '-' }}
           </td>
           <td *ngIf="isColumnVisible('mobile')">{{ lead.mobile || '-' }}</td>
-                    <td *ngIf="isColumnVisible('alternateContact')">{{ lead.alternateContact || '-' }}</td>
-
+<td *ngIf="isColumnVisible('alternateContact')">{{ lead.alternateContact || '-' }}</td>
           <td *ngIf="isColumnVisible('lifeStage')" (click)="openLifeStagePopup(lead)">
             <span class="lifestage-badge" [ngClass]="getLifeStageClass(lead.lifeStage)">
               {{ lead.lifeStage || '-' }}
@@ -331,197 +344,198 @@
 
 
     <!-- Filter Sidebar - Updated to match the second image -->
-    <div class="filter-sidebar" [class.active]="showFilterSidebar">
-      <div class="sidebar-header">
-        <h3>Filters</h3>
-        <button class="close-sidebar" (click)="toggleFilterSidebar()">&times;</button>
-      </div>
-      
-      <div class="sidebar-content">
-        
-        
-<div class="date-range-picker">
-  <div class="date-input">
-    <label for="fromDate">From:</label>
-    <input type="date" id="fromDate" #fromDateInput
-           [value]="filters.fromDate" 
-           (change)="applyFromDateFilter(fromDateInput.value)"
-           placeholder="Select date">
+  <div class="filter-sidebar" [class.active]="showFilterSidebar">
+  <div class="sidebar-header">
+    <h3>Filters</h3>
+    <button class="close-sidebar" (click)="toggleFilterSidebar()">&times;</button>
   </div>
-  <div class="date-input">
-    <label for="toDate">To:</label>
-    <input type="date" id="toDate" #toDateInput
-           [value]="filters.toDate" 
-           (change)="applyToDateFilter(toDateInput.value)"
-           placeholder="Select date">
-  </div>
-  <button class="clear-date-btn" (click)="clearDateFilter()">
-    Clear Dates
-  </button>
-</div>
-        <!-- Source Filter -->
-        <div class="filter-group">
-          <h4>Source:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.source || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('source')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'source'">
-              <div class="dropdown-option" (click)="applySourceFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let source of sources" 
-                   (click)="applySourceFilter(source.name)">
-                {{source.name}}
-              </div>
-            </div>
-          </div>
-        </div>
-<!-- Inside your filter-sidebar div, add this filter group -->
-<!-- Inside your filter-sidebar div, add this filter group -->
-<div class="filter-group">
-  <h4>Ad Code:</h4>
-  <div class="filter-input-container">
-    <input type="text" class="filter-input" 
-           [value]="filters.adCode || 'All'" 
-           readonly
-           (click)="toggleDropdown('adCode')">
-    <div class="dropdown-options" *ngIf="activeDropdown === 'adCode'">
-      <div class="dropdown-option" (click)="applyAdCodeFilter('')">All</div>
-      <div class="dropdown-option" *ngFor="let code of leadStatuses" 
-           (click)="applyAdCodeFilter(code.leadStatus)">
-        {{code.leadStatus}}
+  
+  <div class="sidebar-content">
+    <div class="date-range-picker">
+      <div class="date-input">
+        <label for="fromDate">From:</label>
+        <input type="date" id="fromDate" #fromDateInput
+               [value]="filters.fromDate" 
+               (change)="applyFromDateFilter(fromDateInput.value)"
+               placeholder="Select date">
       </div>
+      <div class="date-input">
+        <label for="toDate">To:</label>
+        <input type="date" id="toDate" #toDateInput
+               [value]="filters.toDate" 
+               (change)="applyToDateFilter(toDateInput.value)"
+               placeholder="Select date">
+      </div>
+      <button class="clear-date-btn" (click)="clearDateFilter()">
+        Clear Dates
+      </button>
     </div>
-  </div>
-</div>
-        <!-- Life Stage Filter -->
-        <div class="filter-group">
-          <h4>Life Stage:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.lifeStage || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('lifeStage')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'lifeStage'">
-              <div class="dropdown-option" (click)="applyLifeStageFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let stage of lifeStages" 
-                   (click)="applyLifeStageFilter(stage.name)">
-                {{stage.name}}
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Lead Status Filter -->
-        <div class="filter-group">
-          <h4>Lead Status:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.leadStatus || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('leadStatus')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'leadStatus'">
-              <div class="dropdown-option" (click)="applyLeadStatusFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let status of leadStatuses" 
-                   (click)="applyLeadStatusFilter(status.leadStatus)">
-                {{status.leadStatus}}
-              </div>
-            </div>
+    <!-- Source Filter -->
+    <div class="filter-group">
+      <h4>Source:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.source || 'All'" 
+               readonly
+               (click)="toggleDropdown('source', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'source'">
+          <div class="dropdown-option" (click)="applySourceFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let source of sources" 
+               (click)="applySourceFilter(source.name, $event)">
+            {{source.name}}
           </div>
-        </div>
-
-        <!-- Assigned to Filter -->
-        <!-- Assigned to Filter -->
-        <div class="filter-group">
-          <h4>Assigned to:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.assignedTo || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('assignedTo')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'assignedTo'">
-              <div class="dropdown-option" (click)="applyAssignedToFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let user of usersList" 
-                   (click)="applyAssignedToFilter(user.name)">
-                {{user.name}}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Deal Status Filter -->
-        <div class="filter-group">
-          <h4>Deal Status:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.dealStatus || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('dealStatus')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'dealStatus'">
-              <div class="dropdown-option" (click)="applyDealStatusFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let status of dealStatuses" 
-                   (click)="applyDealStatusFilter(status)">
-                {{status}}
-              </div>
-            </div>
-          </div>
-        </div>
-       
-
-        <!-- Priority Filter -->
-        <div class="filter-group">
-          <h4>Priority:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.priority || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('priority')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'priority'">
-              <div class="dropdown-option" (click)="applyPriorityFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let priority of priorities" 
-                   (click)="applyPriorityFilter(priority)">
-                {{priority}}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Department Filter -->
-        <div class="filter-group">
-          <h4>Department:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.department || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('department')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'department'">
-              <div class="dropdown-option" (click)="applyDepartmentFilter('')">All</div>
-              <div class="dropdown-option" *ngFor="let dept of departments" 
-                   (click)="applyDepartmentFilter(dept)">
-                {{dept}}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="filter-group">
-          <h4>Order Status:</h4>
-          <div class="filter-input-container">
-            <input type="text" class="filter-input" 
-                   [value]="filters.orderStatus || 'All'" 
-                   readonly
-                   (click)="toggleDropdown('orderStatus')">
-            <div class="dropdown-options" *ngIf="activeDropdown === 'orderStatus'">
-              <div class="dropdown-option" (click)="applyOrderStatusFilter('')">All</div>
-              <div class="dropdown-option" (click)="applyOrderStatusFilter('Reordered')">Reordered</div>
-              <div class="dropdown-option" (click)="applyOrderStatusFilter('No Reordered')">No Reordered</div>
-            </div>
-          </div>
-        </div>
-        <div class="filter-actions">
-          <button class="clear-btn" (click)="clearAllFilters()">Clear All Filters</button>
         </div>
       </div>
     </div>
+
+    <!-- Ad Code Filter -->
+    <div class="filter-group">
+      <h4>Ad Code:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.adCode || 'All'" 
+               readonly
+               (click)="toggleDropdown('adCode', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'adCode'">
+          <div class="dropdown-option" (click)="applyAdCodeFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let code of leadStatuses" 
+               (click)="applyAdCodeFilter(code.leadStatus, $event)">
+            {{code.leadStatus}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Life Stage Filter -->
+    <div class="filter-group">
+      <h4>Life Stage:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.lifeStage || 'All'" 
+               readonly
+               (click)="toggleDropdown('lifeStage', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'lifeStage'">
+          <div class="dropdown-option" (click)="applyLifeStageFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let stage of lifeStages" 
+               (click)="applyLifeStageFilter(stage.name, $event)">
+            {{stage.name}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lead Status Filter -->
+    <div class="filter-group">
+      <h4>Lead Status:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.leadStatus || 'All'" 
+               readonly
+               (click)="toggleDropdown('leadStatus', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'leadStatus'">
+          <div class="dropdown-option" (click)="applyLeadStatusFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let status of leadStatuses" 
+               (click)="applyLeadStatusFilter(status.leadStatus, $event)">
+            {{status.leadStatus}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assigned to Filter -->
+    <div class="filter-group">
+      <h4>Assigned to:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.assignedTo || 'All'" 
+               readonly
+               (click)="toggleDropdown('assignedTo', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'assignedTo'">
+          <div class="dropdown-option" (click)="applyAssignedToFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let user of usersList" 
+               (click)="applyAssignedToFilter(user.name, $event)">
+            {{user.name}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deal Status Filter -->
+    <div class="filter-group">
+      <h4>Deal Status:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.dealStatus || 'All'" 
+               readonly
+               (click)="toggleDropdown('dealStatus', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'dealStatus'">
+          <div class="dropdown-option" (click)="applyDealStatusFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let status of dealStatuses" 
+               (click)="applyDealStatusFilter(status, $event)">
+            {{status}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Priority Filter -->
+    <div class="filter-group">
+      <h4>Priority:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.priority || 'All'" 
+               readonly
+               (click)="toggleDropdown('priority', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'priority'">
+          <div class="dropdown-option" (click)="applyPriorityFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let priority of priorities" 
+               (click)="applyPriorityFilter(priority, $event)">
+            {{priority}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Department Filter -->
+    <div class="filter-group">
+      <h4>Department:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.department || 'All'" 
+               readonly
+               (click)="toggleDropdown('department', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'department'">
+          <div class="dropdown-option" (click)="applyDepartmentFilter('', $event)">All</div>
+          <div class="dropdown-option" *ngFor="let dept of departments" 
+               (click)="applyDepartmentFilter(dept, $event)">
+            {{dept}}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Status Filter -->
+    <div class="filter-group">
+      <h4>Order Status:</h4>
+      <div class="filter-input-container">
+        <input type="text" class="filter-input" 
+               [value]="filters.orderStatus || 'All'" 
+               readonly
+               (click)="toggleDropdown('orderStatus', $event)">
+        <div class="dropdown-options" *ngIf="activeDropdown === 'orderStatus'">
+          <div class="dropdown-option" (click)="applyOrderStatusFilter('', $event)">All</div>
+          <div class="dropdown-option" (click)="applyOrderStatusFilter('Reordered', $event)">Reordered</div>
+          <div class="dropdown-option" (click)="applyOrderStatusFilter('No Reordered', $event)">No Reordered</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-actions">
+      <button class="clear-btn" (click)="clearAllFilters()">Clear All Filters</button>
+    </div>
+  </div>
+</div>
 
     <!-- Overlay -->
     <div class="sidebar-overlay" [class.active]="showFilterSidebar" (click)="toggleFilterSidebar()"></div>
@@ -1067,19 +1081,27 @@ Add this to show the department of selected user -->
 
 
 <!-- Lead Assignment Modal HTML -->
+<!-- Update the assign modal -->
 <div class="lead-assignment-modal" *ngIf="showAssignModal">
   <div class="modal-overlay"></div>
   <div class="modal-container">
     <div class="modal-content">
       <h3 class="modal-title">{{ randomAssignMode ? 'Randomly Assign Leads' : 'Assign Leads' }}</h3>
       
+      <div class="form-group" *ngIf="selectedUserDepartment">
+        <label>Department:</label>
+        <input type="text" class="form-control" [value]="selectedUserDepartment" readonly>
+      </div>
+
       <div class="form-group">
         <label for="userSelect">Select User to Assign:</label>
-        <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control">
-          <option *ngFor="let user of availableUsers" [value]="user.id">
-            {{ user.name || user.email }}
-          </option>
-        </select>
+    <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control" 
+        (change)="onUserSelectionChange($event)">
+  <option value="">Select User</option>
+  <option *ngFor="let user of availableUsers" [value]="user.id">
+    {{ user.name || user.email }} ({{ user.department || 'No Dept' }})
+  </option>
+</select>
       </div>
 
       <div class="form-group">
@@ -1158,6 +1180,7 @@ Add this to show the department of selected user -->
 </div>
 
 <!-- Department Popup -->
+<!-- Update the department popup in the HTML -->
 <div *ngIf="showDepartmentPopup" class="popup-overlay">
   <div class="popup-container">
     <div class="popup-box">
@@ -1165,9 +1188,19 @@ Add this to show the department of selected user -->
       <form [formGroup]="departmentForm" (ngSubmit)="saveDepartment()">
         <div class="form-group">
           <label>Department</label>
-          <select formControlName="department" class="form-control">
+          <select formControlName="department" class="form-control" (change)="onDepartmentSelect($event)">
             <option value="">Select Department</option>
             <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+          </select>
+        </div>
+        
+        <div class="form-group" *ngIf="departmentForm.get('department')?.value">
+          <label>Assign To</label>
+          <select class="form-control" [(ngModel)]="selectedUserId" [ngModelOptions]="{standalone: true}">
+            <option value="">Select User (Optional)</option>
+            <option *ngFor="let user of filteredUsers" [value]="user.id">
+              {{user.name}} ({{user.username || user.email}})
+            </option>
           </select>
         </div>
         

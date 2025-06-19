@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, HostListener, Inject, OnInit } from '@angular/core';
 import { CustomerService } from '../services/customer.service';
 import { SupplierService } from '../services/supplier.service';
 import { UserService } from '../services/user.service';
@@ -37,6 +37,7 @@ interface Customer {
   state?: string;
   country?: string;
   zipCode?: string;
+  district?: string; // Add this
   prefix?: string;
   middleName?: string;
   dob?: Date;
@@ -61,6 +62,8 @@ export class CustomersComponent implements OnInit {
   customerData: Partial<Customer> = {};
   lifestage?: string;
   adcode?: string;
+  currentActionPopup: string | null = null;
+
   selectedCustomers: string[] = []; // Array to store selected customer IDs
 allSelected = false; 
   gender?: 'Male' | 'Female' | 'Other' | '';
@@ -68,18 +71,46 @@ allSelected = false;
   // Add these properties
 adCodes: any[] = [];
 leadStatuses: any[] = [];
+// Add these to your component class
+states = ['Tamil Nadu', 'Kerala'];
+districts: string[] = [];
+tamilNaduDistricts = [
+  'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 
+  'Dharmapuri', 'Dindigul', 'Erode', 'Kallakurichi', 'Kancheepuram', 
+  'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai', 'Nagapattinam',
+  'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram',
+  'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 
+  'Theni', 'Thoothukudi', 'Tiruchirappalli', 'Tirunelveli', 'Tirupathur',
+  'Tiruppur', 'Tiruvallur', 'Tiruvannamalai', 'Tiruvarur', 'Vellore',
+  'Viluppuram', 'Virudhunagar'
+];
+
+keralaDistricts = [
+  'Alappuzha', 'Ernakulam', 'Idukki', 'Kannur', 'Kasaragod',
+  'Kollam', 'Kottayam', 'Kozhikode', 'Malappuram', 'Palakkad',
+  'Pathanamthitta', 'Thiruvananthapuram', 'Thrissur', 'Wayanad'
+];
+
+
+
 lifeStages: any[] = [];
   customersList: Customer[] = [];
   filteredCustomers: Customer[] = [];
   editingCustomerId: string | null = null;
   assignedUsers: {id: string, username: string}[] = [];
   showFilterSidebar = false;
+popupPosition = {
+  top: '0',
+  left: '0'
+};
 
   // Add these properties to your component class
 showColumnVisibilityMenu = false;
 allColumns = [
   { name: 'Action', displayName: 'Action', visible: true },
   { name: 'Contact ID', displayName: 'Contact ID', visible: true },
+  // In your allColumns array
+{ name: 'District', displayName: 'District', visible: true },
   { name: 'Prefix', displayName: 'Prefix', visible: true },
   { name: 'First Name', displayName: 'First Name', visible: true },
   { name: 'Middle Name', displayName: 'Middle Name', visible: true },
@@ -146,7 +177,6 @@ allColumns = [
   sortColumn = 'businessName';
   sortDirection = 'asc';
   searchTerm = '';
-  states: string[] = ['Tamil Nadu', 'Kerala', 'Karnataka', 'Andhra Pradesh', 'Maharashtra'];
 
 
   constructor(
@@ -176,6 +206,20 @@ toggleSelectAll(): void {
     this.selectedCustomers = this.paginatedCustomers.map(c => c.id || '');
   } else {
     this.selectedCustomers = [];
+  }
+}
+getAdCodeDisplay(adcode: any): string {
+  if (!adcode) return '';
+  return typeof adcode === 'object' ? adcode.name : adcode;
+}
+onStateChange(): void {
+  if (this.customerData.state === 'Tamil Nadu') {
+    this.districts = this.tamilNaduDistricts;
+  } else if (this.customerData.state === 'Kerala') {
+    this.districts = this.keralaDistricts;
+  } else {
+    this.districts = [];
+    this.customerData.district = '';
   }
 }
 toggleCustomerSelection(customerId: string): void {
@@ -215,6 +259,35 @@ async deleteSelectedCustomers(): Promise<void> {
       alert('Error deleting customers. Please try again.');
     }
   }
+  }
+  openActionPopup(customer: Customer): void {
+  this.currentActionPopup = customer.id || null;
+}
+
+closeActionPopup(): void {
+  this.currentActionPopup = null;
+}
+updateCustomerStatus(customer: Customer, status: 'Active' | 'Inactive'): void {
+  if (!customer.id) return;
+  
+  this.customerService.updateCustomer(customer.id, { status })
+    .then(() => {
+      customer.status = status;
+      // Optional: Show success message
+    })
+    .catch(error => {
+      console.error('Error updating status:', error);
+    });
+}
+getLeadStatusText(adcodeId: string): string {
+  if (!adcodeId) return '';
+  const foundStatus = this.leadStatuses.find(status => status.id === adcodeId);
+  return foundStatus ? foundStatus.leadStatus : '';
+}
+
+@HostListener('document:keydown.escape', ['$event'])
+onKeydownHandler(event: KeyboardEvent) {
+  this.closeActionPopup();
 }
   getAdCodeName(adcodeId: string | undefined): string {
     if (!adcodeId) return '';

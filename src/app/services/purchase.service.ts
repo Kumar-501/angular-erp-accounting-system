@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { PurchaseItem } from '../models/purchase-item.model';
 
 export interface Purchase {
+  [x: string]: any;
   id?: string;
   supplierId: string;
   supplierName: string;
@@ -160,37 +161,23 @@ private calculatePaymentStatus(paymentAmount: number, totalAmount: number): stri
   return 'due';
 }
 async getPurchasesByDateRange(startDate: Date, endDate: Date): Promise<Purchase[]> {
-  const q = query(
-    collection(this.firestore, 'purchases'),
-    where('purchaseDate', '>=', startDate),
-    where('purchaseDate', '<=', endDate)
-  );
-  
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
+  try {
+    const q = query(
+      this.purchasesCollection,
+      where('purchaseDate', '>=', startDate),
+      where('purchaseDate', '<=', endDate)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
       id: doc.id,
-      supplierId: data['supplierId'] || '',
-      supplierName: data['supplierName'] || '',
-      referenceNo: data['referenceNo'] || '',
-      purchaseDate: data['purchaseDate']?.toDate(),
-      purchaseStatus: data['purchaseStatus'] || 'received',
-      businessLocation: data['businessLocation'] || '',
-      purchaseTotal: data['purchaseTotal'] || 0,
-      paymentAmount: data['paymentAmount'] || 0,
-      paymentMethod: data['paymentMethod'] || '',
-      paymentStatus: data['paymentStatus'] || 'due',
-      products: data['products'] || [],
-      grandTotal: data['grandTotal'] || data['purchaseTotal'] || 0,
-      paymentDue: data['paymentDue'] || 0,
-      addedBy: data['addedBy'] || 'system',
-      // Include other required fields from Purchase interface
-      ...data // Spread the rest of the data
-    } as Purchase;
-  });
+      ...doc.data() as Purchase
+    }));
+  } catch (error) {
+    console.error('Error fetching purchases by date range:', error);
+    throw error;
+  }
 }
-
   async getPaymentAccounts(): Promise<PaymentAccount[]> {
     try {
       const snapshot = await getDocs(this.paymentAccountsCollection);
@@ -299,7 +286,8 @@ getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
 
     return () => unsubscribe();
   });
-}  async getPurchaseById(id: string): Promise<Purchase> {
+  }
+  async getPurchaseById(id: string): Promise<Purchase> {
     try {
       const purchaseRef = doc(this.firestore, 'purchases', id);
       const purchaseSnap = await getDoc(purchaseRef);
@@ -314,6 +302,7 @@ getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
       throw error;
     }
   }
+  
 
   async getPurchasesByProductId(productId: string): Promise<Purchase[]> {
     try {

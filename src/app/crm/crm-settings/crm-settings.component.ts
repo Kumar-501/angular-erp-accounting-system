@@ -11,8 +11,12 @@ import { LeadStatusService } from '../../services/lead-status.service';
 export class CrmSettingsComponent implements OnInit {
   leadStatuses: any[] = [];
   filteredStatuses: any[] = [];
+  isDeleting = false;
+
   showPopup = false;
   leadStatusForm: FormGroup;
+  // Add this property to your component class
+isSaving = false;
   isLoading = false;
   isEditing = false;
   currentStatusId: string | null = null;
@@ -80,66 +84,78 @@ export class CrmSettingsComponent implements OnInit {
     this.showPopup = false;
   }
 
-  saveLeadStatus(): void {
-    if (this.leadStatusForm.valid) {
-      const formData = this.leadStatusForm.value;
-      
-      // Map the form data to match the expected structure in the service
-      const payloadData = {
-        leadStatus: formData.addCode, // Map addCode back to leadStatus for the API
-        description: formData.description,
-        order: formData.order,
-        isActive: formData.isActive,
-        isDefault: formData.isDefault
-      };
-      
-      this.isLoading = true;
+saveLeadStatus(): void {
+  // Prevent multiple saves
+  if (this.isSaving) return;
+  
+  if (this.leadStatusForm.valid) {
+    const formData = this.leadStatusForm.value;
+    
+    // Map the form data to match the expected structure in the service
+    const payloadData = {
+      leadStatus: formData.addCode, // Map addCode back to leadStatus for the API
+      description: formData.description,
+      order: formData.order,
+      isActive: formData.isActive,
+      isDefault: formData.isDefault
+    };
+    
+    this.isSaving = true;
+    this.isLoading = true;
 
-      if (this.isEditing && this.currentStatusId) {
-        // Update existing lead status
-        this.leadStatusService.updateLeadStatus(this.currentStatusId, payloadData).then(
-          () => {
-            this.showPopup = false;
-            this.isLoading = false;
-            this.loadLeadStatuses(); // Refresh the table
-          },
-          error => {
-            console.error('Error updating lead status:', error);
-            this.isLoading = false;
-          }
-        );
-      } else {
-        // Add new lead status
-        this.leadStatusService.addLeadStatus(payloadData).then(
-          () => {
-            this.showPopup = false;
-            this.isLoading = false;
-            this.loadLeadStatuses(); // Refresh the table
-          },
-          error => {
-            console.error('Error adding code:', error);
-            this.isLoading = false;
-          }
-        );
-      }
-    }
-  }
-
-  deleteLeadStatus(status: any): void {
-    if (confirm('Are you sure you want to delete this lead status?')) {
-      this.isLoading = true;
-      this.leadStatusService.deleteLeadStatus(status.id).then(
+    if (this.isEditing && this.currentStatusId) {
+      // Update existing lead status
+      this.leadStatusService.updateLeadStatus(this.currentStatusId, payloadData).then(
         () => {
+          this.showPopup = false;
           this.isLoading = false;
+          this.isSaving = false;
           this.loadLeadStatuses(); // Refresh the table
         },
         error => {
-          console.error('Error deleting lead status:', error);
+          console.error('Error updating lead status:', error);
           this.isLoading = false;
+          this.isSaving = false;
+        }
+      );
+    } else {
+      // Add new lead status
+      this.leadStatusService.addLeadStatus(payloadData).then(
+        () => {
+          this.showPopup = false;
+          this.isLoading = false;
+          this.isSaving = false;
+          this.loadLeadStatuses(); // Refresh the table
+        },
+        error => {
+          console.error('Error adding code:', error);
+          this.isLoading = false;
+          this.isSaving = false;
         }
       );
     }
   }
+}
+deleteLeadStatus(status: any): void {
+  if (this.isDeleting) return;
+  
+  if (confirm('Are you sure you want to delete this lead status?')) {
+    this.isDeleting = true;
+    this.isLoading = true;
+    this.leadStatusService.deleteLeadStatus(status.id).then(
+      () => {
+        this.isLoading = false;
+        this.isDeleting = false;
+        this.loadLeadStatuses(); // Refresh the table
+      },
+      error => {
+        console.error('Error deleting lead status:', error);
+        this.isLoading = false;
+        this.isDeleting = false;
+      }
+    );
+  }
+}
 
   searchLeadStatuses(): void {
     if (!this.searchTerm) {

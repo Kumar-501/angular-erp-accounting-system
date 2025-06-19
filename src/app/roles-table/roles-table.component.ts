@@ -35,27 +35,21 @@ Math: any;
     }
   }
 
-// Modify the loadRoles method to ensure fresh data is always loaded
-private loadRoles(): void {
-  this.isLoading = true;
-  this.rolesSubscription = this.rolesService.getRoles().subscribe({
-    next: (roles) => {
-      this.roles = roles;
-      this.filteredRoles = this.filterRoles();
-      this.currentPage = 1;
-      this.isLoading = false;
-    },
-    error: (error) => {
-      console.error('Error loading roles:', error);
-      this.isLoading = false;
-    }
-  });
-}
-
-// Add this method to refresh the table when returning from edit
-ionViewWillEnter() {
-  this.loadRoles();
-}
+  private loadRoles(): void {
+    this.isLoading = true;
+    this.rolesSubscription = this.rolesService.getRoles().subscribe({
+      next: (roles) => {
+        this.roles = roles;
+        this.filteredRoles = this.filterRoles();
+        this.currentPage = 1;
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading roles:', error);
+        this.isLoading = false;
+      }
+    });
+  }
 
   editRole(role: Role) {
     if (role.id) {

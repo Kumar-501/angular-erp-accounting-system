@@ -11,8 +11,8 @@ import 'jspdf-autotable';
 import { Router } from '@angular/router';
 import { LocationService } from '../services/location.service';
 import { AccountService } from '../services/account.service';
-import { Subscription } from 'rxjs';
-
+import { HostListener } from '@angular/core';
+import { Input } from '@angular/core';
 
 interface Supplier {
   id?: string;
@@ -26,6 +26,7 @@ interface Supplier {
   isIndividual?: boolean;
   email?: string;
   mobile?: string;
+  
   landline?: string;
   alternateContact?: string;
   assignedTo?: string;
@@ -39,6 +40,7 @@ interface Supplier {
   advanceBalance?: number;
   grandTotal?: number;
   paymentDue?: number;
+  
 
   addressLine1?: string;
   addressLine2?: string;
@@ -63,23 +65,40 @@ interface Supplier {
   address:string;
 }
 
+import { ViewChild, ElementRef, Renderer2 } from '@angular/core';
+
 @Component({
   selector: 'app-suppliers',
   templateUrl: './suppliers.component.html',
   styleUrls: ['./suppliers.component.scss']
 })
 export class SuppliersComponent implements OnInit {
+handleAction(arg0: string,_t151: Supplier) {
+throw new Error('Method not implemented.');
+}
+  isDropdownOpen = false;
+  currentActionPopup: string | null = null;
+
+  @ViewChild('actionsDropdown', { static: false }) actionsDropdown!: ElementRef;
+  @ViewChild('dropdownMenu', { static: false }) dropdownMenu!: ElementRef; // Add this line
+  @ViewChild('dropdownElement', { static: false }) dropdownElement!: ElementRef;
+
 // Add these methods to your component
 onPaymentMethodChange(): void {
   // You can add logic here if needed
 }
-  private suppliersSubscription!: Subscription;
 
   showForm = false;
     searchText: string = '';
   showMoreInfo = false;
   isIndividual = true;
-searchTimeout: any = null;
+  currentOpenDropdown: string | null = null;
+  entriesPerPage: number = 10; // Default to 10
+
+  searchTimeout: any = null;
+  dropdownOpen = false;
+
+  clickInsideDropdown = false;
   supplierData: Partial<Supplier> = {};
   suppliersList: Supplier[] = [];
   filteredSuppliers: Supplier[] = [];
@@ -88,16 +107,19 @@ searchTimeout: any = null;
   statesList: string[] = []; 
   paymentAccounts: any[] = [];
 showPaymentForm = false;
-selectedFileName = '';
+  selectedFileName = '';
+  
 selectedFile: File | null = null;
-currentPaymentPurchase: any = null;
+  currentPaymentPurchase: any = null;
 paymentSummary = {
   totalPurchase: 0,
   totalPaid: 0,
   totalPurchaseDue: 0,
   openingBalance: 0,
+  
   openingBalanceDue: 0
 };
+
 
   // In your component class
 get combinedAddress(): string {
@@ -164,10 +186,9 @@ filterOptions = {
   openingBalance: false,
   assignedTo: '',
   status: '',
-  state: '',
-      fromDate: '',
-    toDate: '',
-    
+  state: '',  // This was already there
+  fromDate: '',
+  toDate: '',
 };
 
   
@@ -175,13 +196,11 @@ filterOptions = {
   paymentForm: FormGroup;
   // Changed entriesPerPage default value to 4
   
-  entriesPerPage = 4;
   currentPage = 1;
   totalPages = 1;
   sortColumn = 'businessName';
   sortDirection = 'asc';
   searchTerm = '';
-
   constructor(
     private supplierService: SupplierService,
     private accountService: AccountService,
@@ -191,10 +210,9 @@ filterOptions = {
     private fb: FormBuilder,
     private paymentService: PaymentService, // Add PaymentService injection
     private router: Router,
-    private locationService: LocationService
-
-
-
+    private locationService: LocationService,
+    private elementRef: ElementRef,
+    private renderer: Renderer2
   ) {
     this.supplierForm = this.fb.group({
       contactId: [''],
@@ -236,6 +254,26 @@ filterOptions = {
       paymentAccount: ['', Validators.required]
     });
   }
+// Add these methods to handle dropdown toggling
+toggleDropdown(supplierId: string): void {
+  if (this.currentOpenDropdown === supplierId) {
+    this.currentOpenDropdown = null;
+  } else {
+    this.currentOpenDropdown = supplierId;
+  }
+}
+
+closeDropdown(): void {
+  this.currentOpenDropdown = null;
+}
+
+@HostListener('document:click', ['$event'])
+onDocumentClick(event: MouseEvent): void {
+  const clickedInside = this.elementRef.nativeElement.contains(event.target);
+  if (!clickedInside) {
+    this.closeDropdown();
+  }
+}
   onShippingStateChange(): void {
   const selectedState = this.supplierForm.get('shippingState')?.value;
   this.filteredShippingDistricts = selectedState ? this.stateDistricts[selectedState] : [];
@@ -253,7 +291,31 @@ goToShopping(supplier: Supplier): void {
       queryParams: { supplierId: supplier.id }
     });
   }
+  }
+  // In your component
+// In your component
+openDropdown(supplierId: string) {
+  this.renderer.appendChild(document.body, this.dropdownElement.nativeElement);
+  // Position dropdown near the button
 }
+  closeAllDropdowns(): void {
+    if (this.currentOpenDropdown) {
+      this.updateDropdownDisplay(this.currentOpenDropdown, false);
+      this.currentOpenDropdown = null;
+    }
+  }
+   private updateDropdownDisplay(supplierId: string, show: boolean): void {
+    const dropdown = document.getElementById(`dropdownMenu_${supplierId}`);
+    if (dropdown) {
+      if (show) {
+        dropdown.classList.add('show');
+        dropdown.style.display = 'block';
+      } else {
+        dropdown.classList.remove('show');
+        dropdown.style.display = 'none';
+      }
+    }
+  }
 
 get customerFullName(): string {
   const form = this.supplierForm.value;
@@ -262,7 +324,8 @@ get customerFullName(): string {
   } else {
     return form.businessName || '';
   }
-}
+  }
+  
   // In your component
 toggleStatus(supplier: Supplier): void {
   const newStatus = supplier.status === 'Active' ? 'Inactive' : 'Active';
@@ -296,8 +359,6 @@ toggleStatus(supplier: Supplier): void {
       this.loadStates(); // Add this line
  this.paymentForm.valueChanges.subscribe(val => {
     if (this.currentPaymentSupplier?.id) {
-            this.suppliersSubscription.unsubscribe();
-
       localStorage.setItem(
         `paymentInProgress_${this.currentPaymentSupplier.id}`,
         JSON.stringify(val)
@@ -310,24 +371,21 @@ toggleDateDrawer(): void {
   this.isDateDrawerOpen = !this.isDateDrawerOpen;
 }
 
-  loadSuppliers(): void {
-    this.suppliersSubscription = this.supplierService.getSuppliersRealTime().subscribe(
-      (suppliers: Supplier[]) => {
-        this.suppliersList = suppliers.map(supplier => ({
-          ...supplier,
-          createdAt: supplier.createdAt ? new Date(supplier.createdAt) : new Date(),
-          status: supplier.status === 'Active' || supplier.status === 'Inactive' 
-            ? supplier.status 
-            : undefined
-        }));
-        this.applyFilters();
-      },
-      error => {
-        console.error('Error loading suppliers:', error);
-      }
-    );
-  }
+loadSuppliers(): void {
+  this.supplierService.getSuppliers().subscribe((suppliers: any[]) => {
+    this.suppliersList = suppliers.map(supplier => ({
+      ...supplier,
+      // Ensure createdAt is a Date object
+      createdAt: supplier.createdAt ? new Date(supplier.createdAt) : new Date(),
 
+      // ✅ Normalize the status to match 'Active' | 'Inactive' | undefined
+      status: supplier.status === 'Active' || supplier.status === 'Inactive'
+        ? supplier.status
+        : undefined
+    }));
+    this.applyFilters();
+  });
+  }
 viewPurchaseData(supplier: Supplier): void {
   if (supplier.id) {
     this.router.navigate(['/purchase-data'], { 
@@ -356,16 +414,7 @@ closePaymentForm(): void {
 }
 
   
-loadStates(): void {
-  this.supplierService.getSuppliers().subscribe(suppliers => {
-    // Get unique states from suppliers and sort them
-    this.statesList = [...new Set(
-      suppliers
-        .map(s => s.state)
-        .filter((state): state is string => !!state && state.trim() !== '')
-    )].sort((a, b) => a.localeCompare(b));
-  });
-}
+
 
 getAssignedUserName(userId: string): string {
   if (!userId) return '';
@@ -388,39 +437,33 @@ loadAssignedUsers(): void {
 applyFilters(): void {
   let filtered = [...this.suppliersList];
   
-  // Existing search term filter
-if (this.searchTerm) {
+  // Search term filter (now includes zipCode)
+  if (this.searchTerm) {
     const term = this.searchTerm.toLowerCase();
     filtered = filtered.filter(supplier => 
       (supplier.businessName?.toLowerCase().includes(term)) || 
-        (supplier.firstName?.toLowerCase().includes(term)) ||
-        (supplier.lastName?.toLowerCase().includes(term)) ||
-        (supplier.email?.toLowerCase().includes(term)) ||
-        (supplier.mobile?.toLowerCase().includes(term)) ||
-        (supplier.contactId?.toLowerCase().includes(term)) ||
-        (supplier.landline?.toLowerCase().includes(term)) ||
-        (supplier.alternateContact?.toLowerCase().includes(term)) ||
-        (supplier.taxNumber?.toLowerCase().includes(term)) ||
-        (supplier.city?.toLowerCase().includes(term)) ||
-        (supplier.state?.toLowerCase().includes(term)) ||
-        (supplier.country?.toLowerCase().includes(term)) ||
-        (supplier.addressLine1?.toLowerCase().includes(term)) ||
-        (supplier.addressLine2?.toLowerCase().includes(term))
+      (supplier.firstName?.toLowerCase().includes(term)) ||
+      (supplier.lastName?.toLowerCase().includes(term)) ||
+      (supplier.email?.toLowerCase().includes(term)) ||
+      (supplier.mobile?.toLowerCase().includes(term)) ||
+      (supplier.contactId?.toLowerCase().includes(term)) ||
+      (supplier.landline?.toLowerCase().includes(term)) ||
+      (supplier.alternateContact?.toLowerCase().includes(term)) ||
+      (supplier.taxNumber?.toLowerCase().includes(term)) ||
+      (supplier.city?.toLowerCase().includes(term)) ||
+      (supplier.state?.toLowerCase().includes(term)) ||
+      (supplier.country?.toLowerCase().includes(term)) ||
+      (supplier.addressLine1?.toLowerCase().includes(term)) ||
+      (supplier.addressLine2?.toLowerCase().includes(term)) ||
+      (supplier.zipCode?.toString().includes(term)) // Add this line for zip code search
     );
-  }  filtered.sort((a, b) => {
-    const valA = a[this.sortColumn as keyof Supplier] || '';
-    const valB = b[this.sortColumn as keyof Supplier] || '';
-    
-    if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
-    if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-  
-  this.filteredSuppliers = filtered;
-  this.totalPages = Math.ceil(this.filteredSuppliers.length / this.entriesPerPage);
-  this.currentPage = Math.min(this.currentPage, this.totalPages);
+  }
 
-  
+  // State filter
+  if (this.filterOptions.state) {
+    filtered = filtered.filter(supplier => supplier.state === this.filterOptions.state);
+  }
+
   // Date range filter
   if (this.filterOptions.fromDate) {
     const fromDate = new Date(this.filterOptions.fromDate);
@@ -439,7 +482,7 @@ if (this.searchTerm) {
     });
   }
   
-  // Existing checkbox filters
+  // Other filters (purchaseDue, purchaseReturn, etc.)
   if (this.filterOptions.purchaseDue) {
     filtered = filtered.filter(supplier => supplier.purchaseDue && supplier.purchaseDue > 0);
   }
@@ -454,19 +497,6 @@ if (this.searchTerm) {
   
   if (this.filterOptions.openingBalance) {
     filtered = filtered.filter(supplier => supplier.openingBalance && supplier.openingBalance > 0);
-  }
-  
-  // Dropdown filters
-  if (this.filterOptions.assignedTo) {
-    filtered = filtered.filter(supplier => supplier.assignedTo === this.filterOptions.assignedTo);
-  }
-  
-  if (this.filterOptions.status) {
-    filtered = filtered.filter(supplier => supplier.status === this.filterOptions.status);
-  }
-  
-  if (this.filterOptions.state) {
-    filtered = filtered.filter(supplier => supplier.state === this.filterOptions.state);
   }
   
   // Sorting
@@ -584,7 +614,16 @@ filterByDate(range: string) {
   this.isDateDrawerOpen = false;
   this.applyFilters();
 }
-
+loadStates(): void {
+  this.supplierService.getSuppliers().subscribe(suppliers => {
+    // Get unique states from suppliers and sort them
+    this.statesList = [...new Set(
+      suppliers
+        .map(s => s.state)
+        .filter((state): state is string => !!state && state.trim() !== '')
+    )].sort((a, b) => a.localeCompare(b));
+  });
+}
 // Helper function to format date as YYYY-MM-DD
 private formatDate(date: Date): string {
   const year = date.getFullYear();
@@ -658,46 +697,74 @@ sortBy(column: string): void {
   this.applyFilters();
 }
 get paginatedSuppliers(): Supplier[] {
+  if (this.filteredSuppliers.length === 0) {
+    return [];
+  }
   const start = (this.currentPage - 1) * this.entriesPerPage;
   const end = start + this.entriesPerPage;
   return this.filteredSuppliers.slice(start, end);
 }
 
-  prevPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+
+
+prevPage(): void {
+  if (this.currentPage > 1 && this.filteredSuppliers.length > 0) {
+    this.currentPage--;
+  }
+}
+
+nextPage(): void {
+  if (this.currentPage < this.totalPages && this.filteredSuppliers.length > 0) {
+    this.currentPage++;
+  }
+}
+// suppliers.component.ts
+
+updateSupplierStatus(supplier: Supplier, status: 'Active' | 'Inactive'): void {
+  if (!supplier.id) {
+    console.error('Supplier ID is missing');
+    return;
   }
 
-  nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-    }
-  }
-
-  toggleForm(): void {
-    this.showForm = !this.showForm;
-    if (this.showForm && !this.editingSupplierId) {
-      const contactId = this.generateContactId();
-      this.supplierForm.patchValue({ contactId });
-    }
-    if (!this.showForm) {
-      this.resetForm();
-    }
-  }
-
-  resetForm(): void {
-    this.supplierForm.reset({
-      contactType: 'Supplier',
-      openingBalance: 0,
-      payTerm: 0
+  this.supplierService.updateSupplierStatus(supplier.id, status)
+    .then(() => {
+      supplier.status = status; // Update local state
+      this.showSnackbar(`Status updated to ${status}`, 'success');
+    })
+    .catch(error => {
+      console.error('Error updating status:', error);
+      this.showSnackbar('Error updating status', 'error');
     });
-    this.supplierData = {};
-    this.editingSupplierId = null;
-    this.showMoreInfo = false;
-    this.isIndividual = true;
-    this.clearValidationErrors();
+}
+toggleForm(): void {
+  this.showForm = !this.showForm;
+  if (this.showForm && !this.editingSupplierId) {
+    const contactId = this.generateContactId();
+    const currentDateTime = new Date().toISOString().slice(0, 16); // Get current date/time in correct format
+    this.supplierForm.patchValue({ 
+      contactId,
+      createdAt: currentDateTime // Always set current date/time for new suppliers
+    });
   }
+  if (!this.showForm) {
+    this.resetForm();
+  }
+}
+
+resetForm(): void {
+  const currentDateTime = new Date().toISOString().slice(0, 16);
+  this.supplierForm.reset({
+    contactType: 'Supplier',
+    openingBalance: 0,
+    payTerm: 0,
+    createdAt: currentDateTime // Include current date/time in reset
+  });
+  this.supplierData = {};
+  this.editingSupplierId = null;
+  this.showMoreInfo = false;
+  this.isIndividual = true;
+  this.clearValidationErrors();
+}
 
   clearValidationErrors(): void {
     this.validationErrors = {
@@ -753,53 +820,52 @@ validatePhoneNumber(field: string): boolean {
   this.validationErrors[field as keyof typeof this.validationErrors] = '';
   return true;
 }
-  saveSupplier(): void {
-    // Validate all phone fields
+saveSupplier(): void {
+  // Validate all phone fields
   const isMobileValid = this.validatePhoneNumber('mobile');
   const isLandlineValid = this.validatePhoneNumber('landline');
   const isAlternateValid = this.validatePhoneNumber('alternateContact');
     
-    if (!isMobileValid || !isLandlineValid || !isAlternateValid) {
-      return;
-    }
+  if (!isMobileValid || !isLandlineValid || !isAlternateValid) {
+    return;
+  }
     
-    if (this.isIndividual && !this.supplierForm.get('firstName')?.value) {
-      alert('First Name is required for individuals');
-      return;
-    }
+  if (this.isIndividual && !this.supplierForm.get('firstName')?.value) {
+    alert('First Name is required for individuals');
+    return;
+  }
     
-    if (!this.isIndividual && !this.supplierForm.get('businessName')?.value) {
-      alert('Business Name is required for businesses');
-      return;
-    }
+  if (!this.isIndividual && !this.supplierForm.get('businessName')?.value) {
+    alert('Business Name is required for businesses');
+    return;
+  }
     
-    if (!this.supplierForm.get('mobile')?.value) {
-      alert('Mobile number is required');
-      return;
-    }
-    
-    // Update supplierData from form values
-    this.supplierData = {
-      ...this.supplierForm.value,
-      isIndividual: this.isIndividual,
-          createdAt: new Date(this.supplierForm.value.createdAt)
-
-    };
-    
-      this.supplierData = {
+  if (!this.supplierForm.get('mobile')?.value) {
+    alert('Mobile number is required');
+    return;
+  }
+  
+  // Ensure createdAt is properly set
+  let createdAt = this.supplierForm.get('createdAt')?.value;
+  if (!createdAt) {
+    createdAt = new Date().toISOString().slice(0, 16); // Fallback to current date/time
+    this.supplierForm.patchValue({ createdAt });
+  }
+  
+  // Update supplierData from form values
+  this.supplierData = {
     ...this.supplierForm.value,
-        isIndividual: this.isIndividual,
-        district: this.supplierForm.value.district || null, // Add this line
-
-    createdAt: new Date(this.supplierForm.value.createdAt) // Ensure this is a Date object
+    isIndividual: this.isIndividual,
+    district: this.supplierForm.value.district || null,
+    createdAt: new Date(createdAt) // Ensure this is a Date object
   };
   
-    if (this.editingSupplierId) {
-      this.updateExistingSupplier();
-    } else {
-      this.addNewSupplier();
-    }
+  if (this.editingSupplierId) {
+    this.updateExistingSupplier();
+  } else {
+    this.addNewSupplier();
   }
+}
 
   addNewSupplier(): void {
     if (!this.supplierData.contactId) {
@@ -888,7 +954,7 @@ validatePhoneNumber(field: string): boolean {
     }
   }
 
-editSupplier(supplier: Supplier): void {
+ editSupplier(supplier: any): void {
   // Convert createdAt to the correct format for datetime-local input
   let createdAtFormatted = '';
   if (supplier.createdAt) {
@@ -941,6 +1007,10 @@ editSupplier(supplier: Supplier): void {
   if (supplier.taxNumber || supplier.addressLine1 || supplier.openingBalance) {
     this.showMoreInfo = true;
   }
+    this.closeDropdown();
+        this.dropdownOpen = false;
+
+
 }
 onFileSelected(event: Event): void {
   const input = event.target as HTMLInputElement;
@@ -1017,6 +1087,8 @@ async addPayment(supplier: Supplier): Promise<void> {
       unsubscribe();
     }
   });
+      this.dropdownOpen = false;
+
 }
 
 async submitPayment(): Promise<void> {
@@ -1167,6 +1239,10 @@ this.purchaseService['refreshPurchases']();
           alert('Error deleting supplier. Please try again.');
         });
     }
+    this.closeDropdown();
+        this.dropdownOpen = false;
+
+
   }
 generateReferenceNumber(): string {
   return 'PAY-' + new Date().getTime().toString().slice(-6);
@@ -1392,7 +1468,18 @@ closeLedgerView(): void {
   this.selectedSupplierForLedger = null;
 }
 
+openActionPopup(supplier: Supplier): void {
+  this.currentActionPopup = supplier.id || null;
+}
 
+closeActionPopup(): void {
+  this.currentActionPopup = null;
+}
+
+@HostListener('document:keydown.escape', ['$event'])
+onKeydownHandler(event: KeyboardEvent) {
+  this.closeActionPopup();
+}
 
 
 // In suppliers.component.ts
@@ -1400,6 +1487,8 @@ viewPurchases(supplier: Supplier): void {
   if (supplier.id) {
     this.router.navigate(['/suppliers', supplier.id, 'purchases']);
   }
+      this.dropdownOpen = false;
+
 }
 viewStockReport(supplier: Supplier): void {
   if (supplier.id) {
@@ -1407,6 +1496,8 @@ viewStockReport(supplier: Supplier): void {
       queryParams: { tab: 'stock-report' } 
     });
   }
+      this.dropdownOpen = false;
+
 }
 
 viewDocuments(supplier: Supplier): void {
@@ -1415,6 +1506,8 @@ viewDocuments(supplier: Supplier): void {
       queryParams: { tab: 'documents' } 
     });
   }
+      this.dropdownOpen = false;
+
 }
   exportPDF(): void {
     console.log('Exporting to PDF:', this.filteredSuppliers);

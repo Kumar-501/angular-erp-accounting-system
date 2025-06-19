@@ -1,107 +1,37 @@
-/* Main card styling to match your list view */
-.card {
-  border: none;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-  margin-top: 10%;
-  
-  .card-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-    margin-top: 8%;
+.purchase-details {
+  th {
+    width: 40%;
+    font-weight: 500;
   }
-}
 
-/* Table styling to match your existing tables */
-.table {
-  margin-bottom: 1rem;
-  
-  &.table-sm {
-    th, td {
-      padding: 0.5rem;
-    }
-  }
-  
-  &.table-borderless {
-    th, td, tr {
-      border: none;
-    }
-  }
-  
-  thead.table-light {
+  .table-active {
     background-color: #f8f9fa;
   }
-}
 
-/* Button styling to match your existing buttons */
-.btn {
-  &-outline-secondary {
-    border-color: #dee2e6;
-    
- 
-  }
-  
-  &-sm {
+  .status-badge {
     padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
     font-size: 0.875rem;
-  }
-}
+    font-weight: 500;
 
-/* Responsive spacing */
-.mb-3 {
-  margin-bottom: 1rem !important;
-}
+    &.status-active {
+      background-color: #d1e7dd;
+      color: #0f5132;
+    }
 
-.mb-4 {
-  margin-bottom: 1.5rem !important;
-}
+    &.status-inactive {
+      background-color: #fff3cd;
+      color: #664d03;
+    }
 
-/* Loading spinner styling */
-.spinner-border {
-  width: 3rem;
-  height: 3rem;
-  border-width: 0.25em;
-}
+    &.status-partial {
+      background-color: #cfe2ff;
+      color: #084298;
+    }
 
-/* Text colors */
-.text-primary {
-  color: #0d6efd !important;
-}
-
-.text-danger {
-  color: #dc3545 !important;
-}
-
-/* Responsive layout */
-@media (max-width: 768px) {
-  .row {
-    flex-direction: column;
-    
-    > div {
-      width: 100%;
-      margin-bottom: 1rem;
+    &.status-unknown {
+      background-color: #e2e3e5;
+      color: #41464b;
     }
   }
-}
-
-/* Snackbar styling (matches your existing) */
-.snackbar-success {
-  background-color: #4caf50 !important;
-  color: white !important;
-}
-
-.snackbar-error {
-  background-color: #f44336 !important;
-  color: white !important;
-}
-
-/* Back button styling */
-.back-button {
-  i {
-    margin-right: 0.5rem;
-  }
-}
-
-/* Ensure consistent currency display */
-.currency {
-  font-family: monospace;
 }

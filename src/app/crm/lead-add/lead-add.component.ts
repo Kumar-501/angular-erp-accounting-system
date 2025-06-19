@@ -38,6 +38,7 @@ export class LeadAddComponent implements OnInit {
   selectedProducts: any[] = [];
   searchQuery = '';
 showSearchDropdown = false;
+isSaving = false;
 
 searchResults: any[] = [];
    filteredUsers: any[] = [];
@@ -106,7 +107,7 @@ onContactTypeChange(isIndividual: boolean) {
   // Don't clear values, just update validators
   if (isIndividual) {
     this.leadForm.get('firstName')?.setValidators([Validators.required]);
-    this.leadForm.get('lastName')?.setValidators([Validators.required]);
+    this.leadForm.get('lastName')?.setValidators([]);
     this.leadForm.get('gender')?.clearValidators();
     this.leadForm.get('dateOfBirth')?.clearValidators();
     this.leadForm.get('businessName')?.clearValidators();
@@ -535,7 +536,7 @@ handleDuplicateResponse(continueAnyway: boolean) {
    landline: ['', [Validators.pattern(/^[0-9]{10}$/)]],
    email: ['', [Validators.email]], // Made email mandatory
    department: [''],
-   leadStatus: [''],
+   leadStatus: ['', Validators.required],
    leadCategory: [''],
    dealStatus: [''],
    priority: [''],
@@ -1290,7 +1291,7 @@ private initializeForm() {
     prefix: [''],
     firstName: ['', [Validators.required]], // Add required validator
     middleName: [''],
-    lastName: ['', [Validators.required]], // Add required validator
+    lastName: ['',],
 gender: ['', []], // Add required validator
     dateOfBirth: ['', []], // Add required validator
     age: [''],
@@ -1298,8 +1299,9 @@ gender: ['', []], // Add required validator
     mobile: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
     alternateContact: ['', [Validators.pattern(/^[0-9]{10}$/)]],
     landline: ['', [Validators.pattern(/^[0-9]{10}$/)]],
-    email: ['', [Validators.email]],
+    email: ['', []],
     department: [''],
+    
     leadStatus: [''],
     leadCategory: [''],
     leadStatusNote: [''],
@@ -2124,7 +2126,20 @@ onStateChange() {
      this.showFollowUpForm = false;
      this.selectedLeadForFollowUp = null;
    }
-   
+   closeForm() {
+  this.showForm = false;
+  this.editingLeadId = null;
+  this.leadForm.reset({
+    contactType: 'Lead',
+    isIndividual: true,
+    status: 'New',
+    source: this.sources.length > 0 ? this.sources[0].name : '',
+    lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
+    addedBy: this.authService.getCurrentUserName()
+  });
+  this.selectedProducts = [];
+  this.availableDistricts = [];
+}
    updateValidators() {
      if (this.isIndividualType) {
        this.f['firstName'].setValidators([Validators.required]);
@@ -2367,6 +2382,13 @@ prefillFromExistingCustomer(customer: any) {
 async saveLead() {
   this.leadForm.markAllAsTouched();
 
+
+  // Prevent multiple saves
+  if (this.isSaving) return;
+  
+  this.isSaving = true;
+  this.leadForm.markAllAsTouched();
+
   if (this.leadForm.invalid) {
     const invalidFields = [];
     for (const controlName in this.leadForm.controls) {
@@ -2376,22 +2398,24 @@ async saveLead() {
       }
     }
 
-    this.validationMessage = {
+   this.validationMessage = {
       text: `Please fill all required fields correctly. Missing: ${invalidFields.join(', ')}`,
       type: 'error'
     };
+    this.isSaving = false;
     return;
   }
-
   const formData = this.leadForm.value;
   const mobile = formData.mobile;
 
+  // Validate mobile number format
   // Validate mobile number format
   if (!/^[0-9]{10}$/.test(mobile)) {
     this.validationMessage = {
       text: 'Mobile number must be exactly 10 digits',
       type: 'error'
     };
+    this.isSaving = false;
     return;
   }
 
@@ -2479,15 +2503,26 @@ async saveLead() {
       }
     }
 
+    // Close the form immediately after successful save
+    this.showForm = false;
+    this.editingLeadId = null;
+    this.leadForm.reset({
+      contactType: 'Lead',
+      isIndividual: true,
+      status: 'New',
+      source: this.sources.length > 0 ? this.sources[0].name : '',
+      lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
+      addedBy: this.authService.getCurrentUserName()
+    });
+    this.selectedProducts = [];
+    this.availableDistricts = [];
+
     // Navigate to leads page after successful save
     this.router.navigate(['/crm/leads']);
     
-    // Reset form and reload data after a short delay
+    // Reload data after a short delay
     setTimeout(() => {
       this.loadLeads();
-      if (!this.editingLeadId) {
-        this.toggleForm();
-      }
     }, 2000);
 
   } catch (error) {

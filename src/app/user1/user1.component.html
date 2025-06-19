@@ -1,7 +1,6 @@
 <div class="container">
   <div class="header">
     <h1>Users</h1>
-    <span class="manage-link">Manage users</span>
   </div>
   
   <div class="users-panel">
@@ -113,9 +112,6 @@
           <th *ngIf="columns[5].visible" (click)="sortUsers('designation')">
             Designation <i [class]="getSortIconClass('designation')"></i>
           </th>
-            <th *ngIf="columns[6].visible" (click)="sortUsers('locations')">
-        Locations <i [class]="getSortIconClass('locations')"></i>
-      </th>
           <th *ngIf="columns[6].visible" (click)="sortUsers('email')">
             Email <i [class]="getSortIconClass('email')"></i>
           </th>
@@ -131,13 +127,6 @@
           <td *ngIf="columns[3].visible">{{ user.role }}</td>
           <td *ngIf="columns[4].visible">{{ user.department || '-' }}</td>
           <td *ngIf="columns[5].visible">{{ user.designation || '-' }}</td>
-          
-<td *ngIf="columns[6].visible">
-  <span *ngIf="user.allLocations">All Locations</span>
-  <span *ngIf="!user.allLocations">
-    {{ user.locationNames ? user.locationNames.join(', ') : '-' }}
-  </span>
-</td>
           <td *ngIf="columns[6].visible">{{ user.email }}</td>
           <td *ngIf="columns[7].visible" class="action-buttons">
             <button class="btn btn-edit" (click)="editUser(user.id)">

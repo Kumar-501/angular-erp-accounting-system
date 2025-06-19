@@ -291,6 +291,7 @@ body {
 .table-responsive {
   overflow-x: auto;
   margin-bottom: 20px;
+  max-height: fit-content;
 }
 
 .suppliers-table {
@@ -313,6 +314,7 @@ body {
   cursor: pointer;
   position: sticky;
   top: 0;
+  z-index: 2;
 }
 
 .suppliers-table th:hover {
@@ -575,72 +577,233 @@ textarea:focus {
   background-color: #003a99;
 }
 
-/* Dropdown Actions in Table */
-.dropdown {
+/* Dropdown container */
+.action-dropdown {
   position: relative;
   display: inline-block;
 }
 
-.btn-dropdown {
-  background-color:white;
-  border: 1px solid #a1e9f3;
-  border-radius: 10px;
-  padding: 3px 12px;
-  font-size: 15px;
-  cursor: pointer;
-  color: #80e6f3;
-  font-weight: bold;
-}
-.btn-dropdown:hover{
-  background-color: #0dbcd3;
-  color: black;
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: white;
-  min-width: 160px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-  z-index: 1;
-  border-radius: 4px;
-}
-
-
-.dropdown:hover .dropdown-content {
-  display: block;
-}
-
-.dropdown-content a {
-  color: #333;
-  padding: 10px 15px;
-  text-decoration: none;
-  display: block;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.dropdown-content a:hover {
-  background-color: #f5f5f5;
-}
-
-/* Payment Form Styles */
-.radio-group {
-  display: flex;
-  gap: 15px;
-  margin-top: 5px;
-}
-
-.radio-group label {
+/* Action button styling */
+.action-btn {
   display: flex;
   align-items: center;
-  font-size: 14px;
+  gap: 8px;
+  padding: 6px 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  color: #212529;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.radio-group input[type="radio"] {
-  margin-right: 5px;
+.action-btn:hover {
+  background-color: #e9ecef;
+  border-color: #ced4da;
 }
+
+/* Status dot indicator */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.active {
+  background-color: #28a745; /* Green for active */
+}
+
+.status-dot.inactive {
+  background-color: #dc3545; /* Red for inactive */
+}
+
+/* Dropdown menu */
+.action-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  min-width: 160px;
+  padding: 8px 0;
+  margin: 2px 0 0;
+  font-size: 14px;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+  margin-left: 50%;
+}
+.action-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+ 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.action-popup {
+ background-color: white;
+    border-radius: 8px;
+    width: 191px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    height: 350px;
+    margin-left: -756px;
+}
+
+.popup-header {
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #6c757d;
+    
+    &:hover {
+      color: #495057;
+    }
+  }
+}
+
+.popup-body {
+  padding: 8px 0;
+}
+
+.action-item {
+  padding: 3px 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f8f9fa;
+  }
+  
+  i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+  }
+  
+  &.text-danger {
+    color: #dc3545;
+    
+    &:hover {
+      background-color: rgba(220, 53, 69, 0.1);
+    }
+  }
+}
+
+.divider {
+  height: 1px;
+  background-color: #e9ecef;
+  margin: 8px 0;
+}
+
+.status-section {
+  padding: 8px 16px;
+  
+  h5 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #6c757d;
+  }
+}
+
+.status-option {
+  display: flex;
+  align-items: center;
+  padding: 0px 0;
+  
+  input {
+    margin-right: 8px;
+  }
+  
+  label {
+    cursor: pointer;
+  }
+}
+
+.action-dropdown-menu.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Dropdown items */
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  color: #212529;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #16181b;
+}
+
+.dropdown-item.text-danger {
+  color: #dc3545;
+}
+
+.dropdown-item.text-danger:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Icons */
+.dropdown-item i {
+  width: 16px;
+  text-align: center;
+}
+
+.icon-edit { color: #17a2b8; }
+.icon-delete { color: #dc3545; }
+.icon-payment { color: #28a745; }
+.icon-view { color: #6c757d; }
+.icon-purchases { color: #007bff; }
+.icon-history { color: #6f42c1; }
+
+/* Divider */
+.dropdown-divider {
+  height: 1px;
+  margin: 8px 0;
+  background-color: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Status section */
+.status-section {
+  padding: 6px 16px;
+}
+
 
 .amount-summary {
   background-color: #f9f9f9;

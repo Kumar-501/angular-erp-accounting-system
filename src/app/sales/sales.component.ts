@@ -262,33 +262,9 @@ maxCommission: number | null = null;
     
   }
   
-  
-getTotalTaxableValueForPrint(): number {
-  if (!this.selectedSale?.products) return 0;
-  return this.selectedSale.products.reduce((sum: number, product: any) => 
-    sum + (product.unitPrice * product.quantity - (product.discount || 0)), 0);
-}
 
-getTotalCGSTForPrint(): number {
-  if (!this.selectedSale?.products) return 0;
-  return this.selectedSale.products.reduce((sum: number, product: any) => 
-    sum + (product.cgstAmount || (product.unitPrice * product.quantity - (product.discount || 0)) * 0.09), 0);
-}
+/* Removed duplicate getTotalCGSTForPrint() */
 
-getTotalSGSTForPrint(): number {
-  if (!this.selectedSale?.products) return 0;
-  return this.selectedSale.products.reduce((sum: number, product: any) => 
-    sum + (product.sgstAmount || (product.unitPrice * product.quantity - (product.discount || 0)) * 0.09), 0);
-}
-
-getGrandTotalForPrint(): number {
-  if (!this.selectedSale) return 0;
-  const subtotal = this.selectedSale.products?.reduce((sum: number, product: any) => 
-    sum + (product.subtotal || 0), 0) || 0;
-  const shipping = this.selectedSale.shippingCharges || 0;
-  const shippingTax = shipping * 0.18;
-  return subtotal + shipping + shippingTax;
-}
 
 
 calculateCreditBalances(): void {
@@ -469,7 +445,12 @@ loadSales(): void {
   
   this.subscriptions.push(subscription);
 }
-  
+// In sales.component.ts
+viewProductSales(productId: string, productName: string): void {
+  this.router.navigate(['/product-purchase-details', productId], {
+    state: { productName: productName }
+  });
+}  
 clearProductFilter(): void {
   this.filters.productId = '';
   this.productFilterName = '';
@@ -896,79 +877,27 @@ getPaymentMethodSummary(): {method: string, count: number}[] {
 generateInvoice(sale: any): void {
   this.selectedSale = sale;
   
-  // Calculate shipping with tax (18% GST on shipping)
-  const shippingBeforeTax = sale.shippingCharges || 0;
-  const shippingTax = shippingBeforeTax * 0.18; // 18% GST
-  const shippingWithTax = shippingBeforeTax + shippingTax;
+  // Simple calculation - Grand Total = Amount Paid + Balance Due
+  const amountPaid = sale.paymentAmount || 0;
+  const balanceDue = sale.balance || 0;
+  const grandTotal = amountPaid + balanceDue;
 
-  // Define interface for tax item
-  interface TaxItem {
-    name: string;
-    amount: number;
-    rate: number;
-  }
-
-  // Process products with calculated tax values (18% GST)
+  // Calculate product subtotals (without tax breakdown)
   const processedProducts = (sale.products || []).map((product: any) => {
-    // Calculate taxable value (price after discount)
     const unitPrice = product.unitPrice || product.price || 0;
     const quantity = product.quantity || 1;
-    const discountAmount = product.discount || 0;
-    const discountPercent = discountAmount > 0 ? 
-      (discountAmount / (unitPrice * quantity)) * 100 : 0;
-    
-    const taxableValue = (unitPrice * quantity) - discountAmount;
-    
-    // Using 18% GST (9% CGST + 9% SGST)
-    const taxRate = 18; // 18% GST
-    const cgstRate = taxRate / 2; // 9%
-    const sgstRate = taxRate / 2; // 9%
-    const cgstAmount = taxableValue * (cgstRate / 100);
-    const sgstAmount = taxableValue * (sgstRate / 100);
-    const subtotal = taxableValue + cgstAmount + sgstAmount;
+    const subtotal = unitPrice * quantity;
     
     return {
       ...product,
-      name: product.name || product.productName || 'Product',
-      quantity: quantity,
-      unitPrice: unitPrice,
-      discount: discountAmount,
-      discountPercent: discountPercent,
-      taxableValue: parseFloat(taxableValue.toFixed(2)),
-      cgstAmount: parseFloat(cgstAmount.toFixed(2)),
-      sgstAmount: parseFloat(sgstAmount.toFixed(2)),
-      cgstRate: cgstRate,
-      sgstRate: sgstRate,
-      taxType: 'GST',
-      subtotal: parseFloat(subtotal.toFixed(2))
+      unitPrice,
+      quantity,
+      subtotal
     };
   });
 
-  // Calculate totals with proper typing
-  const totalTaxableValue = processedProducts.reduce((sum: number, p: any) => sum + p.taxableValue, 0);
-  const totalCGST = processedProducts.reduce((sum: number, p: any) => sum + p.cgstAmount, 0);
-  const totalSGST = processedProducts.reduce((sum: number, p: any) => sum + p.sgstAmount, 0);
-  const subtotal = processedProducts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
-  const grandTotal = subtotal + shippingWithTax;
-
-  // Define taxes with proper typing
-  const taxes: TaxItem[] = [
-    {
-      name: 'CGST',
-      amount: totalCGST,
-      rate: 9
-    },
-    {
-      name: 'SGST',
-      amount: totalSGST,
-      rate: 9
-    },
-    {
-      name: 'Shipping Tax',
-      amount: shippingTax,
-      rate: 18
-    }
-  ];
+  // Calculate product subtotal sum
+  const productsSubtotal = processedProducts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
 
   this.invoiceData = {
     invoiceNo: sale.invoiceNo || 'N/A',
@@ -985,18 +914,42 @@ generateInvoice(sale: any): void {
       mobile: sale.customerPhone || 'N/A'
     },
     products: processedProducts,
-    shippingCharge: shippingWithTax,
-    shippingTax: shippingTax,
-    taxes: taxes,
-    totalTaxableValue: totalTaxableValue,
+    shippingCharge: sale.shippingCharges || 0,
+    shippingTax: sale.shippingTaxAmount || ((sale.shippingCharges || 0) * (sale.orderTax || 0) / 100),
+    totalTaxableValue: productsSubtotal + (sale.shippingCharges || 0),
+    taxes: this.calculateTaxes(sale),
     total: grandTotal
   };
 
   this.invoiceModal.show();
 }
-private calculateTaxableValue(product: any): number {
-  const priceBeforeTax = (product.unitPrice * product.quantity) - (product.discount || 0);
-  return parseFloat(priceBeforeTax.toFixed(2));
+
+getTotalTaxableValueForPrint(): number {
+  if (!this.selectedSale?.products) return 0;
+  
+  // Calculate product taxable values (price * quantity - discount)
+  return this.selectedSale.products.reduce((sum: number, product: any) => {
+    const price = product.unitPrice || product.price || 0;
+    const quantity = product.quantity || 1;
+    const discount = product.discount || 0;
+    return sum + (price * quantity - discount);
+  }, 0);
+}
+
+getTotalCGSTForPrint(): number {
+  const taxableValue = this.getTotalTaxableValueForPrint();
+  return taxableValue * 0.025; // 2.5% CGST
+}
+
+getTotalSGSTForPrint(): number {
+  const taxableValue = this.getTotalTaxableValueForPrint();
+  return taxableValue * 0.025; // 2.5% SGST
+}
+
+getGrandTotalForPrint(): number {
+  // Use the actual total from the sale record
+  return this.selectedSale?.totalPayable || 
+         (this.selectedSale?.paymentAmount || 0) + (this.selectedSale?.balance || 0);
 }
 
 private calculateAllTaxes(products: any[], shippingTax: number): any[] {

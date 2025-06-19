@@ -11,7 +11,10 @@ export class LifeStageComponent implements OnInit {
   lifeStages: any[] = [];
   filteredLifeStages: any[] = [];
   paginatedLifeStages: any[] = [];
-  
+  // Add these properties to your component class
+isSaving = false;
+isUpdating = false;
+isDeleting = false;
   // Pagination
   entriesPerPage: number = 25;
   currentPage: number = 1;
@@ -186,61 +189,76 @@ export class LifeStageComponent implements OnInit {
     this.showColumnModal = true;
   }
 
-  // CRUD operations
-  saveLifeStage(): void {
-    if (this.newLifeStage.name && this.newLifeStage.description) {
-      this.lifeStageService.addLifeStage({
-        name: this.newLifeStage.name,
-        description: this.newLifeStage.description
-      }).then(() => {
-        this.loadLifeStages();
-        this.toggleAddModal();
-      }).catch(error => {
-        console.error("Error adding life stage: ", error);
-        alert("Failed to add life stage. Please try again.");
-      });
-    } else {
-      alert("Please fill in all required fields.");
-    }
+saveLifeStage(): void {
+  if (this.isSaving) return;
+  
+  if (this.newLifeStage.name && this.newLifeStage.description) {
+    this.isSaving = true;
+    this.lifeStageService.addLifeStage({
+      name: this.newLifeStage.name,
+      description: this.newLifeStage.description
+    }).then(() => {
+      this.loadLifeStages();
+      this.toggleAddModal();
+    }).catch(error => {
+      console.error("Error adding life stage: ", error);
+      alert("Failed to add life stage. Please try again.");
+    }).finally(() => {
+      this.isSaving = false;
+    });
+  } else {
+    alert("Please fill in all required fields.");
   }
+}
 
   editLifeStage(stage: any): void {
     this.editingLifeStage = { ...stage };
     this.showEditModal = true;
   }
 
-  updateLifeStage(): void {
-    if (this.editingLifeStage && this.editingLifeStage.name && this.editingLifeStage.description) {
-      const { id, ...updateData } = this.editingLifeStage;
-      
-      this.lifeStageService.updateLifeStage(id, updateData).then(() => {
-        this.loadLifeStages();
-        this.toggleEditModal();
-      }).catch(error => {
-        console.error("Error updating life stage: ", error);
-        alert("Failed to update life stage. Please try again.");
-      });
-    } else {
-      alert("Please fill in all required fields.");
-    }
+ updateLifeStage(): void {
+  if (this.isUpdating) return;
+  
+  if (this.editingLifeStage && this.editingLifeStage.name && this.editingLifeStage.description) {
+    const { id, ...updateData } = this.editingLifeStage;
+    this.isUpdating = true;
+    
+    this.lifeStageService.updateLifeStage(id, updateData).then(() => {
+      this.loadLifeStages();
+      this.toggleEditModal();
+    }).catch(error => {
+      console.error("Error updating life stage: ", error);
+      alert("Failed to update life stage. Please try again.");
+    }).finally(() => {
+      this.isUpdating = false;
+    });
+  } else {
+    alert("Please fill in all required fields.");
   }
+}
+
 
   confirmDelete(stage: any): void {
     this.stageToDelete = stage;
     this.showDeleteModal = true;
   }
 
-  deleteLifeStage(): void {
-    if (this.stageToDelete && this.stageToDelete.id) {
-      this.lifeStageService.deleteLifeStage(this.stageToDelete.id).then(() => {
-        this.loadLifeStages();
-        this.toggleDeleteModal();
-      }).catch(error => {
-        console.error("Error deleting life stage: ", error);
-        alert("Failed to delete life stage. Please try again.");
-      });
-    }
+deleteLifeStage(): void {
+  if (this.isDeleting) return;
+  
+  if (this.stageToDelete && this.stageToDelete.id) {
+    this.isDeleting = true;
+    this.lifeStageService.deleteLifeStage(this.stageToDelete.id).then(() => {
+      this.loadLifeStages();
+      this.toggleDeleteModal();
+    }).catch(error => {
+      console.error("Error deleting life stage: ", error);
+      alert("Failed to delete life stage. Please try again.");
+    }).finally(() => {
+      this.isDeleting = false;
+    });
   }
+}
 
   // Export functions
   exportToCsv(): void {

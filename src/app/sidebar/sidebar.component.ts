@@ -36,18 +36,18 @@ export class SidebarComponent implements OnInit {
       isExpanded: false,
       subItems: [
         { name: 'Suppliers', route: '/suppliers', roles: ['admin', 'manager','costing executives','accounts hod','accounts executives', 'auditing executives'] },
-                { name: 'Ledger', route: '/shopping', roles: ['admin', 'manager','accounts executives', 'executive',,] },
+                // { name: 'Ledger', route: '/shopping', roles: ['admin', 'manager','accounts executives', 'executive',,] },
 
         { name: 'Customers', route: '/customers', roles: ['admin', 'accounts hod','manager','accounts executives', 'costing executives','executive','sales hod', 'supervisor'] },
         // { name: 'Customer Groups', route: '/customer-group', roles: ['admin', 'manager','supervisor'] },
  
-         { name: 'paycash details', route: '/paycash-details', roles: ['admin', ] },
+        //  { name: 'paycash details', route: '/paycash-details', roles: ['admin', ] },
 
  
  
         { name: 'Import Contacts', route: '/import-contacts', roles: ['admin','accounts hod','accounts hod','accounts executives', 'costing executives','sales hod','executive','supervisor'] }
       ],
-      roles: ['admin', 'manager',  'supervisor','accounts executives','sales hod','costing executives','executive','auditing executives']
+      roles: ['admin', 'manager',  'supervisor','accounts executives','sales hod','accounts hod','costing executives','executive','auditing executives']
     },
 
 
@@ -165,7 +165,6 @@ export class SidebarComponent implements OnInit {
         { name: 'List Accounts', route: '/list-accounts', roles: ['admin','accounts hod', 'auditing executives', 'accounts executives','accountant','supervisor'] },
         { name: 'Balance Sheet', route: '/balance-sheet', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
         { name: 'Trial Balance', route: '/trial-balance', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
-       { name: 'Cash Flow', route: '/cash-flow', roles: ['admin', 'auditing executives','accounts hod','accounts executives', 'accountant','supervisor'] },
 
        
         { name: 'Profit and Loss Report', route: '/profit-loss', roles: ['admin', 'manager', 'accounts hod','accountant','supervisor'] },

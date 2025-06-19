@@ -171,6 +171,7 @@ loadTransactions(supplierId: string): void {
 
   // Load purchases
   this.purchaseService.getPurchasesBySupplier(supplierId).subscribe((purchases: Purchase[]) => {
+    console.log('Fetched purchases:', purchases);
     purchases.forEach(purchase => {
       if (purchase.purchaseDate) {
         // Add purchase transaction
@@ -180,7 +181,7 @@ loadTransactions(supplierId: string): void {
           description: 'Purchase',
           reference: purchase.reference || 'PUR-' + purchase.id?.substring(0, 5),
           type: 'Purchase',
-          location: purchase.location || 'Main',
+          location: (purchase as any).location || (purchase as any).businessLocation || 'Main',
           paymentStatus: purchase.paymentStatus || 'Pending',
           debit: purchase.grandTotal || 0,
           credit: 0,
@@ -191,33 +192,42 @@ loadTransactions(supplierId: string): void {
 
         this.currentBalance += purchase.grandTotal || 0;
         this.accountSummary.totalPurchase += purchase.grandTotal || 0;
-
-        // Add payment if any
-        if (purchase.paymentAmount && purchase.paymentAmount > 0) {
-          this.transactions.push({
-            date: purchaseDate,
-            description: 'Payment',
-            reference: 'PAY-' + purchase.id?.substring(0, 5),
-            type: 'Payment',
-            location: purchase.location || 'Main',
-            paymentStatus: 'Completed',
-            debit: 0,
-            credit: purchase.paymentAmount,
-            balance: this.currentBalance - purchase.paymentAmount,
-            paymentMethod: purchase.paymentMethod || 'Cash',
-            others: ''
-          });
-
-          this.currentBalance -= purchase.paymentAmount;
-          this.accountSummary.totalPaid += purchase.paymentAmount;
-        }
       }
     });
 
-    // Update final balance
-    this.accountSummary.balanceDue = this.currentBalance;
-    this.filteredTransactions = [...this.transactions];
-    this.loading = false;
+    // Now fetch all payments for this supplier and add as credit transactions
+    this.paymentService.getSupplierPayments(supplierId).subscribe((payments: any[]) => {
+      console.log('Fetched payments:', payments);
+      payments.forEach(payment => {
+        const paymentDate = new Date(payment.paymentDate);
+        this.transactions.push({
+          date: paymentDate,
+          description: 'Payment',
+          reference: payment.referenceNo || 'PAY-' + payment.id?.substring(0, 5),
+          type: 'Payment',
+          location: payment.location || 'Main',
+          paymentStatus: payment.status || 'Completed',
+          debit: 0,
+          credit: payment.amount || 0,
+          balance: this.currentBalance - (payment.amount || 0),
+          paymentMethod: payment.paymentMethod || 'Cash',
+          others: payment.notes || ''
+        });
+        this.currentBalance -= payment.amount || 0;
+        this.accountSummary.totalPaid += payment.amount || 0;
+      });
+
+      // Update final balance
+      this.accountSummary.balanceDue = this.currentBalance;
+      // Sort transactions by date
+      this.transactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+      this.filteredTransactions = [...this.transactions];
+      this.loading = false;
+    }, error => {
+      console.error('Error fetching payments:', error);
+    });
+  }, error => {
+    console.error('Error fetching purchases:', error);
   });
 }
 
