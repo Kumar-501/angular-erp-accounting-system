@@ -1,6 +1,6 @@
 // holiday.service.ts
 import { Injectable } from '@angular/core';
-import { Firestore, collection, addDoc, onSnapshot } from '@angular/fire/firestore';
+import { Firestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from '@angular/fire/firestore';
 import { Observable, of } from 'rxjs';  // Import Observable and of
 
 @Injectable({
@@ -13,6 +13,15 @@ export class HolidayService {
   addHoliday(data: any) {
     const holidaysCollection = collection(this.firestore, 'holidays');
     return addDoc(holidaysCollection, data);
+  }
+  updateHoliday(id: string, data: any) {
+    const holidayDoc = doc(this.firestore, 'holidays', id);
+    return updateDoc(holidayDoc, data);
+  }
+
+  deleteHoliday(id: string) {
+    const holidayDoc = doc(this.firestore, 'holidays', id);
+    return deleteDoc(holidayDoc);
   }
 
   // Get holidays

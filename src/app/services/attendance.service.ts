@@ -19,7 +19,6 @@ export interface Shift {
   holiday: string;
   id?: string;
 }
-
 export interface Attendance {
   employee: string;
   clockInTime: string;
@@ -28,9 +27,20 @@ export interface Attendance {
   ipAddress: string;
   clockInNote: string;
   clockOutNote: string;
+  location?: {
+    latitude: string;
+    longitude: string;
+    address: string;
+  };
+  clockOutLocation?: {
+    latitude: string;
+    longitude: string;
+    address: string;
+  };
+  imageUrl?: string;
+  clockOutImageUrl?: string;
   id?: string;
 }
-
 @Injectable({
   providedIn: 'root',
 })
@@ -71,6 +81,27 @@ export class AttendanceService {
     const attendanceRef = doc(this.firestore, 'attendance', id);
     return updateDoc(attendanceRef, attendanceData);
   }
+  deleteAttendance(id: string) {
+  if (!id) return Promise.reject('No ID provided');
+  const attendanceRef = doc(this.firestore, 'attendance', id);
+  return deleteDoc(attendanceRef);
+}
+uploadImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // In a real app, you would upload to a server here
+    // For demo purposes, we'll create a data URL
+    
+    const reader = new FileReader();
+    reader.onload = (event: any) => {
+      // Return the data URL
+      resolve(event.target.result);
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
   getAttendanceRealTime(): Observable<Attendance[]> {
     const attendanceRef = collection(this.firestore, 'attendance');

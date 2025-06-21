@@ -34,3 +34,390 @@ button {
 button:hover {
   background: #5548c2;
 }
+/* Clean Table Styling with Full Data Visibility */
+
+/* Table Container */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: #fff;
+}
+
+/* Main Table Styling */
+.table {
+  min-width: 1600px; /* Increased for responsive columns */
+  margin-bottom: 0;
+  font-size: 14px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* For bordered tables */
+.table-bordered {
+  border: 1px solid #dee2e6;
+}
+
+.table-bordered th,
+.table-bordered td {
+  border: 1px solid #e9ecef;
+}
+
+/* Table Hover Effects */
+.table-hover tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* Table Header - Simple, Clean, No Effects */
+.table thead th,
+.table-success th {
+  background-color: #e9ecef;
+  color: #495057;
+  font-weight: 600;
+  padding: 12px 8px;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+/* Table Body */
+.table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+  background-color: #ffffff;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.table tbody td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  border: 1px solid #e9ecef;
+  white-space: nowrap;
+  color: #495057;
+}
+
+/* Form Controls - Ensuring Full Content Visibility */
+.form-control, .form-control-sm {
+  min-width: 100px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background-color: #fff;
+}
+
+.form-control:focus, .form-control-sm:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Form Select */
+.form-select, .form-select-sm {
+  min-width: 100px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.form-select:focus, .form-select-sm:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Specific Column Widths for Data Visibility - Responsive Table */
+.table th:nth-child(1), .table td:nth-child(1) { width: 40px; } /* Checkbox */
+.table th:nth-child(2), .table td:nth-child(2) { width: 60px; } /* S.NO */
+.table th:nth-child(3), .table td:nth-child(3) { min-width: 250px; } /* Product Name */
+.table th:nth-child(4), .table td:nth-child(4) { width: 80px; } /* Qty */
+.table th:nth-child(5), .table td:nth-child(5) { width: 120px; } /* Unit Price */
+.table th:nth-child(6), .table td:nth-child(6) { width: 100px; } /* Discount % */
+.table th:nth-child(7), .table td:nth-child(7) { width: 120px; } /* Unit Cost */
+.table th:nth-child(8), .table td:nth-child(8) { width: 120px; } /* Tax Rate */
+.table th:nth-child(9), .table td:nth-child(9) { width: 100px; } /* Tax Amt */
+.table th:nth-child(10), .table td:nth-child(10) { width: 140px; } /* Net Cost */
+.table th:nth-child(11), .table td:nth-child(11) { width: 100px; } /* Batch No */
+.table th:nth-child(12), .table td:nth-child(12) { width: 110px; } /* Expiry */
+.table th:nth-child(13), .table td:nth-child(13) { width: 100px; } /* Subtotal */
+.table th:nth-child(14), .table td:nth-child(14) { width: 120px; } /* Total */
+.table th:nth-child(15), .table td:nth-child(15) { width: 60px; } /* Actions */
+
+/* Responsive Display Classes */
+@media (max-width: 575.98px) {
+  .d-none { display: none !important; }
+  .d-sm-table-cell { display: table-cell !important; }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .d-sm-table-cell { display: table-cell !important; }
+  .d-sm-inline { display: inline !important; }
+}
+
+@media (max-width: 767.98px) {
+  .d-md-table-cell { display: none !important; }
+}
+
+@media (min-width: 768px) {
+  .d-md-table-cell { display: table-cell !important; }
+}
+
+@media (max-width: 991.98px) {
+  .d-lg-table-cell { display: none !important; }
+}
+
+@media (min-width: 992px) {
+  .d-lg-table-cell { display: table-cell !important; }
+}
+
+/* Product Select Dropdown */
+select.form-control, select.form-control-sm, .form-select {
+  min-width: 180px;
+  max-width: 200px;
+}
+
+select.form-control option, select.form-control-sm option, .form-select option {
+  padding: 4px;
+  font-size: 13px;
+}
+
+/* Input Groups for Discount */
+.input-group {
+  display: flex;
+  width: 100%;
+}
+
+.input-group .form-select {
+  min-width: 100px;
+  max-width: 110px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.input-group .form-control {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  min-width: 70px;
+}
+
+/* Number Inputs */
+input[type="number"].form-control, input[type="number"].form-control-sm {
+  min-width: 80px;
+}
+
+/* Text Inputs */
+input[type="text"].form-control, input[type="text"].form-control-sm {
+  min-width: 90px;
+}
+
+/* Date Inputs */
+input[type="date"].form-control, input[type="date"].form-control-sm {
+  min-width: 120px;
+}
+
+/* Net Cost Display */
+.table td:nth-child(10) div {
+  font-weight: 600;
+  color: #495057;
+}
+
+.table td:nth-child(10) small {
+  font-size: 11px;
+  color: #6c757d;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Total Column */
+.table td:nth-child(14) div {
+  font-weight: 700;
+  color: #28a745;
+  font-size: 15px;
+}
+
+/* Buttons */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+/* Empty State */
+.empty-row td {
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+}
+
+.empty-row i {
+  color: #adb5bd;
+}
+
+.empty-row p {
+  color: #6c757d;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+/* Footer */
+.table tfoot td {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-top: 2px solid #e9ecef;
+  font-weight: 600;
+  padding: 15px 8px;
+  color: #495057;
+}
+
+.table tfoot .fw-bold {
+  color: #28a745;
+  font-size: 16px;
+}
+
+/* Checkboxes */
+.form-check-input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+    min-width: 900px; /* Reduced for mobile */
+  }
+  
+  .form-control, .form-control-sm {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  
+  .table th, .table td {
+    padding: 8px 6px;
+  }
+  
+  /* Adjust column widths for mobile */
+  .table th:nth-child(3), .table td:nth-child(3) { min-width: 180px; }
+  .table th:nth-child(10), .table td:nth-child(10) { width: 120px; }
+}
+
+@media (max-width: 576px) {
+  .table {
+    min-width: 700px; /* Further reduced for small screens */
+  }
+  
+  .table th, .table td {
+    padding: 6px 4px;
+  }
+}
+
+/* Ensure no text overflow or hiding */
+.table td, .table th {
+  overflow: visible;
+  text-overflow: initial;
+  white-space: nowrap;
+}
+
+/* Select dropdown full width within cell */
+.table td select {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Input fields full width within cell */
+.table td input {
+  width: 100%;
+}
+
+/* Input groups in table cells */
+.table td .input-group {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Read-only fields styling */
+.form-control[readonly], .form-control-sm[readonly] {
+  background-color: #f8f9fa;
+  color: #495057;
+  border-color: #e9ecef;
+}
+
+/* Currency display */
+.text-end {
+  text-align: right !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+/* Additional padding for better readability */
+.table-hover tbody tr:hover td {
+  background-color: #f8f9fa;
+}
+
+/* Scrollbar styling for webkit browsers */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

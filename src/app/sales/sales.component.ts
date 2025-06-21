@@ -183,6 +183,7 @@ maxCommission: number | null = null;
   
   totalPaymentAmount: number = 0;
   totalBalance: number = 0;
+  totalTotalPayable: number = 0; // Add total for Total Payable
   
   // Add sorting variables
   sortField: string = '';
@@ -196,26 +197,25 @@ maxCommission: number | null = null;
   columns: Column[] = [
     { field: 'customer', header: 'Customer', visible: true },
     { field: 'saleDate', header: 'Sale Date', visible: true },
-    
     { field: 'invoiceNo', header: 'Invoice No', visible: true },
     { field: 'products', header: 'Products', visible: true },
     { field: 'status', header: 'Status', visible: true },
+    { field: 'paymentStatus', header: 'Payment Status', visible: true }, // Added
+    { field: 'paymentMethod', header: 'Payment Method', visible: true }, // Added
+    { field: 'paymentAccountName', header: 'Payment Account', visible: true }, // Added
+    { field: 'paymentAmount', header: 'Payment Amount', visible: true },
+    { field: 'balance', header: 'Balance (Due)', visible: true }, // Renamed header for clarity
+    { field: 'totalPayable', header: 'Total Payable', visible: true }, // Added
     { field: 'commissionPercentage', header: 'Commission %', visible: true },
     { field: 'shippingStatus', header: 'Shipping Status', visible: true },
-    { field: 'paymentAmount', header: 'Payment Amount', visible: true },
-    { field: 'balance', header: 'Balance', visible: true },
-    { field: 'typeOfService', header: 'Type of Service', visible: true }, 
-    { field: 'customerPhone', header: 'Contact', visible: true }, // Add this
-    { field: 'billingAddress', header: 'Billing Address', visible: true }, // Add this line
+    { field: 'shippingCharges', header: 'Shipping Charges', visible: true }, // Added
+    { field: 'billingAddress', header: 'Billing Address', visible: true },
+    { field: 'shippingAddress', header: 'Shipping Address', visible: true }, // Added
     { field: 'shippingDetails', header: 'Shipping Details', visible: true },
-       { field: 'paymentDue', header: 'Payment Due', visible: true },
-    { field: 'balanceAmount', header: 'Balance Amount', visible: true },
-  
-
-
-
-    // Add this line
-
+    { field: 'typeOfService', header: 'Type of Service', visible: true }, 
+    { field: 'customerPhone', header: 'Contact', visible: true },
+    { field: 'addedByDisplayName', header: 'Added By', visible: true }, // Added
+    { field: 'businessLocation', header: 'Business Location', visible: true }, // Added
   ];
 
   constructor(private saleService: SaleService,
@@ -249,7 +249,11 @@ maxCommission: number | null = null;
     this.loadSales();
   });
     this.salesSubscription = this.saleService.listenForSales().subscribe((salesData) => {
-      this.sales = salesData.filter(sale => sale.status === 'Completed');
+      // Filter for 'Completed' status initially, or adjust based on requirements
+      // The provided Firestore data shows 'Pending', so maybe remove this filter?
+      // Let's keep it for now based on the original code, but note the discrepancy.
+      // If you want to show all sales regardless of status, remove the filter below.
+      this.sales = salesData.filter(sale => sale.status === 'Completed'); 
       
       this.sales = this.sales.map(sale => ({
         ...sale,
@@ -264,7 +268,6 @@ maxCommission: number | null = null;
   
 
 /* Removed duplicate getTotalCGSTForPrint() */
-
 
 
 calculateCreditBalances(): void {
@@ -383,59 +386,28 @@ loadSales(): void {
   this.loading = true;
   this.error = null;
 
-  const subscription = this.saleService.listenForSales().subscribe({
+  // Use the service method that handles filtering by allowed locations
+  const subscription = this.saleService.listenForSales(this.filters, this.userAllowedLocations).subscribe({
     next: (sales) => {
-      // Automatically filter by user's locations
-      if (this.userAllowedLocations.length > 0) {
-        this.filteredSales = sales.filter(sale => 
-          this.userAllowedLocations.includes(sale.location) || 
-          this.userAllowedLocations.includes(sale.businessLocation)
+      // Apply product filter if exists (client-side as service filter is basic)
+      let filteredSales = sales;
+      if (this.filters.productId) {
+        filteredSales = filteredSales.filter(sale => 
+          sale.products?.some((product: any) => product.id === this.filters.productId)
         );
-      } else {
-        // If no locations restricted, show all sales
-        this.filteredSales = [...sales];
       }
-         if (this.userAllowedLocations.length > 0) {
-      this.filters.locations = this.userAllowedLocations;
-    }
-    
-    const subscription = this.saleService.listenForSales(this.filters).subscribe({
-      next: (sales) => {
-        // Apply product filter if exists
-        if (this.filters.productId) {
-          sales = sales.filter(sale => 
-            sale.products?.some((product: any) => product.id === this.filters.productId)
-          );
-        }
-        
-        // Additional location filter (client-side as backup)
-        if (this.userAllowedLocations.length > 0) {
-          sales = sales.filter(sale => 
-            this.userAllowedLocations.includes(sale.businessLocation)
-          );
-        }
-        
-        this.sales = sales;
-        this.applyFiltersAndSort();
-        this.calculateStatistics();
-        this.calculateTotals();
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading sales:', error);
-        this.error = 'Failed to load sales data';
-        this.loading = false;
-      }
-    });
-    
-    this.subscriptions.push(subscription);
-  
-  
-      this.totalEntries = this.filteredSales.length;
+      
+      // Ensure products array exists for each sale
+      this.sales = filteredSales.map(sale => ({
+        ...sale,
+        products: sale.products || []
+      }));
+      
+      this.applyFiltersAndSort(); // Apply date, search, and sidebar filters
+      this.calculateStatistics();
       this.calculateTotals();
       this.loading = false;
     },
-    
     error: (error) => {
       console.error('Error loading sales:', error);
       this.error = 'Failed to load sales data';
@@ -476,12 +448,13 @@ toggleFilterSidebar(): void {
     if (this.salesSubscription) {
       this.salesSubscription.unsubscribe();
     }
+    this.subscriptions.forEach(sub => sub.unsubscribe()); // Unsubscribe from all subscriptions
   }
   // In sales.component.ts
 
 
 private calculatePaymentStatus(sale: any): string {
-  if (sale.paymentAmount >= sale.total) return 'Paid';
+  if (sale.paymentAmount >= sale.totalPayable) return 'Paid';
   if (sale.paymentAmount > 0) return 'Partial';
   return 'Due';
 }
@@ -499,10 +472,10 @@ calculateTotals(): void {
     sum + (sale.balance ? Number(sale.balance) : 0), 0);
     
   this.totalShippingCharge = currentPageData.reduce((sum, sale) => 
-    sum + (sale.shippingCharge ? Number(sale.shippingCharge) : 0), 0);
+    sum + (sale.shippingCharges ? Number(sale.shippingCharges) : 0)); // Use shippingCharges
     
   this.totalCommission = currentPageData.reduce((sum, sale) => 
-    sum + (sale.commissionPercentage ? Number(sale.commissionPercentage) : 0), 0);
+    sum + (sale.totalCommission ? Number(sale.totalCommission) : 0)); // Use totalCommission if available, otherwise calculate from products
     
   this.totalDueAmount = currentPageData.reduce((sum, sale) => {
     const status = this.calculatePaymentStatus(sale);
@@ -511,6 +484,10 @@ calculateTotals(): void {
     }
     return sum;
   }, 0);
+
+  // Calculate total for Total Payable
+  this.totalTotalPayable = currentPageData.reduce((sum, sale) =>
+    sum + (sale.totalPayable ? Number(sale.totalPayable) : 0), 0);
 }
   applyQuickDateFilter(): void {
   if (!this.quickDateFilter) {
@@ -880,23 +857,39 @@ generateInvoice(sale: any): void {
   // Simple calculation - Grand Total = Amount Paid + Balance Due
   const amountPaid = sale.paymentAmount || 0;
   const balanceDue = sale.balance || 0;
-  const grandTotal = amountPaid + balanceDue;
+  const grandTotal = sale.totalPayable || (amountPaid + balanceDue); // Use totalPayable if available
 
   // Calculate product subtotals (without tax breakdown)
   const processedProducts = (sale.products || []).map((product: any) => {
     const unitPrice = product.unitPrice || product.price || 0;
     const quantity = product.quantity || 1;
-    const subtotal = unitPrice * quantity;
-    
+    const subtotal = product.subtotal || (unitPrice * quantity); // Use subtotal if available
+
+    // Include tax details if available in the product object
+    const cgstAmount = product.cgstAmount || 0;
+    const sgstAmount = product.sgstAmount || 0;
+    const igstAmount = product.igstAmount || 0;
+    const taxType = product.taxType || 'None';
+    const taxRate = product.taxRate || 0;
+    const discount = product.discount || 0;
+    const taxableValue = product.taxableValue || (unitPrice * quantity - discount);
+
     return {
       ...product,
       unitPrice,
       quantity,
-      subtotal
+      subtotal,
+      cgstAmount,
+      sgstAmount,
+      igstAmount,
+      taxType,
+      taxRate,
+      discount,
+      taxableValue
     };
   });
 
-  // Calculate product subtotal sum
+  // Calculate product subtotal sum (sum of line totals including tax)
   const productsSubtotal = processedProducts.reduce((sum: number, p: any) => sum + p.subtotal, 0);
 
   this.invoiceData = {
@@ -916,8 +909,8 @@ generateInvoice(sale: any): void {
     products: processedProducts,
     shippingCharge: sale.shippingCharges || 0,
     shippingTax: sale.shippingTaxAmount || ((sale.shippingCharges || 0) * (sale.orderTax || 0) / 100),
-    totalTaxableValue: productsSubtotal + (sale.shippingCharges || 0),
-    taxes: this.calculateTaxes(sale),
+    totalTaxableValue: sale.totalBeforeTax || productsSubtotal, // Use totalBeforeTax if available
+    taxes: this.calculateTaxes(sale), // Use the updated calculateTaxes method
     total: grandTotal
   };
 
@@ -925,29 +918,35 @@ generateInvoice(sale: any): void {
 }
 
 getTotalTaxableValueForPrint(): number {
-  if (!this.selectedSale?.products) return 0;
-  
-  // Calculate product taxable values (price * quantity - discount)
-  return this.selectedSale.products.reduce((sum: number, product: any) => {
-    const price = product.unitPrice || product.price || 0;
-    const quantity = product.quantity || 1;
-    const discount = product.discount || 0;
-    return sum + (price * quantity - discount);
-  }, 0);
+  // This method seems to be for a different print logic than generateInvoice
+  // Let's keep it as is or align it with invoiceData.totalTaxableValue
+  return this.selectedSale?.totalBeforeTax || 
+         this.selectedSale?.products?.reduce((sum: number, product: any) => {
+           const price = product.unitPrice || product.price || 0;
+           const quantity = product.quantity || 1;
+           const discount = product.discount || 0;
+           return sum + (price * quantity - discount);
+         }, 0) || 0;
 }
 
 getTotalCGSTForPrint(): number {
-  const taxableValue = this.getTotalTaxableValueForPrint();
-  return taxableValue * 0.025; // 2.5% CGST
+   // This method seems to be for a different print logic than generateInvoice
+   // Let's keep it as is or align it with invoiceData.taxes
+   // Assuming a fixed 2.5% CGST for demonstration, adjust based on actual tax details in sale.taxDetails
+   const cgstAmount = this.selectedSale?.taxDetails?.cgst || 0;
+   return cgstAmount;
 }
 
 getTotalSGSTForPrint(): number {
-  const taxableValue = this.getTotalTaxableValueForPrint();
-  return taxableValue * 0.025; // 2.5% SGST
+   // This method seems to be for a different print logic than generateInvoice
+   // Let's keep it as is or align it with invoiceData.taxes
+   // Assuming a fixed 2.5% SGST for demonstration, adjust based on actual tax details in sale.taxDetails
+   const sgstAmount = this.selectedSale?.taxDetails?.sgst || 0;
+   return sgstAmount;
 }
 
 getGrandTotalForPrint(): number {
-  // Use the actual total from the sale record
+  // Use the actual totalPayable from the sale record if available
   return this.selectedSale?.totalPayable || 
          (this.selectedSale?.paymentAmount || 0) + (this.selectedSale?.balance || 0);
 }
@@ -958,30 +957,37 @@ private calculateAllTaxes(products: any[], shippingTax: number): any[] {
   // Calculate product taxes
   const productTaxes = products.reduce((acc, product) => {
     if (product.taxType === 'GST') {
-      acc.cgst += product.cgstAmount;
-      acc.sgst += product.sgstAmount;
+      acc.cgst += product.cgstAmount || 0;
+      acc.sgst += product.sgstAmount || 0;
     } else if (product.taxType === 'IGST') {
-      acc.igst += product.igstAmount;
+      acc.igst += product.igstAmount || 0;
     }
     return acc;
   }, { cgst: 0, sgst: 0, igst: 0 });
   
   // Add product taxes to the list
   if (productTaxes.cgst > 0) {
+    // Find a product with GST to get the rate, or use a default/average
+    const gstProduct = products.find(p => p.taxType === 'GST');
+    const cgstRate = gstProduct?.cgstRate || (gstProduct?.taxRate ? gstProduct.taxRate / 2 : 9); // Default to 9% if rate not found
     taxes.push({
-      name: `CGST @${products.find(p => p.taxType === 'GST')?.cgstRate || 9}%`,
+      name: `CGST @${cgstRate}%`,
       amount: parseFloat(productTaxes.cgst.toFixed(2))
     });
   }
   if (productTaxes.sgst > 0) {
+     const gstProduct = products.find(p => p.taxType === 'GST');
+     const sgstRate = gstProduct?.sgstRate || (gstProduct?.taxRate ? gstProduct.taxRate / 2 : 9); // Default to 9% if rate not found
     taxes.push({
-      name: `SGST @${products.find(p => p.taxType === 'GST')?.sgstRate || 9}%`,
+      name: `SGST @${sgstRate}%`,
       amount: parseFloat(productTaxes.sgst.toFixed(2))
     });
   }
   if (productTaxes.igst > 0) {
+     const igstProduct = products.find(p => p.taxType === 'IGST');
+     const igstRate = igstProduct?.igstRate || (igstProduct?.taxRate || 18); // Default to 18% if rate not found
     taxes.push({
-      name: `IGST @${products.find(p => p.taxType === 'IGST')?.igstRate || 18}%`,
+      name: `IGST @${igstRate}%`,
       amount: parseFloat(productTaxes.igst.toFixed(2))
     });
   }
@@ -989,7 +995,7 @@ private calculateAllTaxes(products: any[], shippingTax: number): any[] {
   // Add shipping tax if applicable
   if (shippingTax > 0) {
     taxes.push({
-      name: `Shipping Tax @${this.selectedSale.orderTax || 0}%`,
+      name: `Shipping Tax @${this.selectedSale?.orderTax || 0}%`,
       amount: parseFloat(shippingTax.toFixed(2))
     });
   }
@@ -1011,36 +1017,67 @@ private calculateShippingTax(sale: any): any[] {
   return [];
 }
 
-// Update the calculateTaxes method to include shipping tax
+// Update the calculateTaxes method to include shipping tax and use taxDetails if available
 private calculateTaxes(sale: any): any[] {
   const taxes = [];
-  const taxRate = sale.orderTax || 0;
   
-  // Product taxes
-  if (taxRate > 0) {
-    taxes.push({
-      name: `Tax @${taxRate}%`,
-      amount: sale.taxAmount || 0
-    });
+  // Use taxDetails map if available
+  if (sale.taxDetails) {
+    if (sale.taxDetails.cgst > 0) {
+       // Try to find a product with GST to get the rate, or use a default/average
+       const gstProduct = sale.products?.find((p:any) => p.taxType === 'GST');
+       const cgstRate = gstProduct?.cgstRate || (gstProduct?.taxRate ? gstProduct.taxRate / 2 : 9); // Default to 9%
+      taxes.push({
+        name: `CGST @${cgstRate}%`,
+        amount: parseFloat(sale.taxDetails.cgst.toFixed(2))
+      });
+    }
+    if (sale.taxDetails.sgst > 0) {
+        const gstProduct = sale.products?.find((p:any) => p.taxType === 'GST');
+        const sgstRate = gstProduct?.sgstRate || (gstProduct?.taxRate ? gstProduct.taxRate / 2 : 9); // Default to 9%
+      taxes.push({
+        name: `SGST @${sgstRate}%`,
+        amount: parseFloat(sale.taxDetails.sgst.toFixed(2))
+      });
+    }
+    if (sale.taxDetails.igst > 0) {
+        const igstProduct = sale.products?.find((p:any) => p.taxType === 'IGST');
+        const igstRate = igstProduct?.igstRate || (igstProduct?.taxRate || 18); // Default to 18%
+      taxes.push({
+        name: `IGST @${igstRate}%`,
+        amount: parseFloat(sale.taxDetails.igst.toFixed(2))
+      });
+    }
+  } else {
+     // Fallback if taxDetails map is not available, use total taxAmount
+     if (sale.taxAmount > 0) {
+        taxes.push({
+           name: `Tax @${sale.orderTax || 0}%`,
+           amount: parseFloat(sale.taxAmount.toFixed(2))
+        });
+     }
   }
-  
-  // Shipping tax if applicable
+
+  // Add shipping tax if applicable
   const shippingTax = sale.shippingTaxAmount || 
-                     ((sale.shippingCharges || 0) * taxRate / 100);
+                     ((sale.shippingCharges || 0) * (sale.orderTax || 0) / 100);
   if (shippingTax > 0) {
     taxes.push({
-      name: `Shipping Tax @${taxRate}%`,
-      amount: shippingTax
+      name: `Shipping Tax @${sale.orderTax || 0}%`,
+      amount: parseFloat(shippingTax.toFixed(2))
     });
   }
   
   return taxes;
 }
 private calculateTotal(sale: any): number {
-  const subtotal = sale.products?.reduce((sum: number, product: any) => 
-    sum + (product.subtotal || (product.unitPrice * product.quantity)), 0) || 0;
-  const shipping = sale.shippingCost || sale.shippingCharges || 0;
-  return subtotal + shipping;
+  // Use totalPayable if available, otherwise calculate
+  return sale.totalPayable || 
+         (sale.products?.reduce((sum: number, product: any) => 
+            sum + (product.subtotal || (product.unitPrice * product.quantity)), 0) || 0)
+         + (sale.shippingCost || sale.shippingCharges || 0)
+         + (sale.taxAmount || 0) // Include total tax amount if not broken down
+         + (sale.shippingTaxAmount || 0); // Include shipping tax amount
 }
 
 printGeneratedInvoice(): void {
@@ -1124,16 +1161,8 @@ async updateSaleStatus(sale: any, newStatus: string): Promise<void> {
       alert(`Sale status updated to ${newStatus}`);
       
       // Refresh the sales list to show updated quantities
-      this.salesSubscription = this.saleService.listenForSales().subscribe((salesData) => {
-        this.sales = salesData.filter(sale => sale.status === 'Completed');
-        this.sales = this.sales.map(sale => ({
-          ...sale,
-          products: sale.products || []
-        }));
-        this.filteredSales = [...this.sales];
-        this.totalEntries = this.filteredSales.length;
-        this.calculateTotals();
-      });
+      // Re-subscribe or trigger loadSales()
+      this.loadSales(); // Call loadSales to refresh data
     }
   } catch (error) {
     console.error('Error updating sale status:', error);
@@ -1146,6 +1175,8 @@ async updateSaleStatus(sale: any, newStatus: string): Promise<void> {
       try {
         await this.saleService.deleteSale(saleId);
         alert('Sale deleted successfully!');
+        // Refresh the sales list
+        this.loadSales(); // Call loadSales to refresh data
       } catch (error) {
         console.error('Error deleting sale:', error);
         alert('Error deleting sale. Please try again.');
@@ -1158,28 +1189,64 @@ async updateSaleStatus(sale: any, newStatus: string): Promise<void> {
   }
 
 applyFilters(): void {
-  // If search term is empty, reset to original data
-  if (!this.searchTerm) {
-    this.filteredSales = [...this.sales];
-    this.totalEntries = this.filteredSales.length;
-    this.currentPage = 1;
-    this.calculateTotals();
-    return;
+  let filtered = [...this.sales]; // Start with the full sales list
+
+  // Apply search term filter
+  const term = this.searchTerm.toLowerCase();
+  if (term) {
+    filtered = filtered.filter(sale =>
+      (sale.customer?.toLowerCase()?.includes(term) ||
+      sale.invoiceNo?.toLowerCase()?.includes(term) ||
+      sale.paymentStatus?.toLowerCase()?.includes(term) || // Added paymentStatus search
+      sale.paymentMethod?.toLowerCase()?.includes(term) || // Added paymentMethod search
+      sale.shippingStatus?.toLowerCase()?.includes(term) || // Added shippingStatus search
+      sale.addedByDisplayName?.toLowerCase()?.includes(term) || // Added Added By search
+      sale.businessLocation?.toLowerCase()?.includes(term) || // Added Location search
+      this.getProductNames(sale.products).toLowerCase().includes(term))
+    );
   }
 
-  // Apply other filters if needed
-  let filtered = [...this.sales];
-  
-  const term = this.searchTerm.toLowerCase();
-  filtered = filtered.filter(sale =>
-    (sale.customer?.toLowerCase()?.includes(term) ||
-    sale.invoiceNo?.toLowerCase()?.includes(term) ||
-    this.getProductNames(sale.products).toLowerCase().includes(term))
-  );
-  
+  // Apply sidebar filters
+  if (this.statusFilter) {
+    filtered = filtered.filter(sale => sale.status === this.statusFilter);
+  }
+  if (this.paymentMethodFilter) {
+    filtered = filtered.filter(sale => sale.paymentMethod === this.paymentMethodFilter);
+  }
+  if (this.shippingStatusFilter) {
+    filtered = filtered.filter(sale => sale.shippingStatus === this.shippingStatusFilter);
+  }
+  if (this.addedByFilter) {
+    filtered = filtered.filter(sale => (sale.addedByDisplayName || sale.addedBy) === this.addedByFilter);
+  }
+  if (this.locationFilter) {
+    filtered = filtered.filter(sale => (sale.businessLocation || sale.location) === this.locationFilter);
+  }
+  if (this.minCommission !== null) {
+    filtered = filtered.filter(sale => (sale.commissionPercentage || 0) >= this.minCommission!);
+  }
+  if (this.maxCommission !== null) {
+    filtered = filtered.filter(sale => (sale.commissionPercentage || 0) <= this.maxCommission!);
+  }
+
+  // Apply date range filter
+  if (this.startDate && this.endDate) {
+    const start = new Date(this.startDate);
+    const end = new Date(this.endDate);
+    // Set time to start/end of day for inclusive range
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+
+    filtered = filtered.filter(sale => {
+      const saleDate = new Date(sale.saleDate);
+      return saleDate >= start && saleDate <= end;
+    });
+  }
+
+
   this.filteredSales = filtered;
   this.totalEntries = this.filteredSales.length;
-  this.currentPage = 1;
+  this.currentPage = 1; // Reset to first page after filtering
   this.calculateTotals();
 }
 
@@ -1245,6 +1312,8 @@ resetColumnVisibility(): void {
             break;
           case 'paymentAmount':
           case 'balance':
+          case 'totalPayable': // Added totalPayable
+          case 'shippingCharges': // Added shippingCharges
           case 'commissionPercentage':
             valueA = Number(a[this.sortField] || 0);
             valueB = Number(b[this.sortField] || 0);
@@ -1254,6 +1323,7 @@ resetColumnVisibility(): void {
             valueB = this.getProductsDisplayText(b.products || []);
             break;
           default:
+            // Default to string comparison for other fields
             valueA = a[this.sortField]?.toString().toLowerCase() || '';
             valueB = b[this.sortField]?.toString().toLowerCase() || '';
         }
@@ -1324,25 +1394,45 @@ resetColumnVisibility(): void {
     }
   }
 
+  // Helper method to format currency (copied from product-purchase-details)
+  formatCurrency(amount: number | string | undefined | null): string {
+    const numAmount = Number(amount || 0);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2
+    }).format(numAmount);
+  }
+
+
   exportCSV(): void {
-    const headers = ['S.No', 'Customer', 'Sale Date', 'Invoice No', 'Products', 'Status', 
-      'Commission %', 'Shipping Status', 'Payment Amount', 'Balance', 'Billing Address']; // 
+    // Define headers based on visible columns or all columns you want to export
+    const headers = this.columns.map(col => col.header);
     
     const data = this.filteredSales.map((sale, index) => {
-      return {
-        'S.No': index + 1,
-        'Customer': sale.customer || 'N/A',
-        'Sale Date': sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
-        'Invoice No': sale.invoiceNo || 'N/A',
-        'Products': this.getProductsDisplayText(sale.products),
-        'Status': sale.status || 'N/A',
-        'Commission %': sale.commissionPercentage || 0,
-        'Shipping Status': sale.shippingStatus || 'N/A',
-        'Billing Address': sale.billingAddress || 'N/A' ,// Add this line
-
-        'Payment Amount': sale.paymentAmount !== undefined ? `$${Number(sale.paymentAmount).toFixed(2)}` : '$0.00',
-        'Balance': sale.balance !== undefined ? `$${Number(sale.balance).toFixed(2)}` : '$0.00'
-      };
+      const rowData: any = {};
+      this.columns.forEach(col => {
+        switch (col.field) {
+          case 'S.No':
+            rowData[col.header] = index + 1;
+            break;
+          case 'saleDate':
+            rowData[col.header] = sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A';
+            break;
+          case 'products':
+            rowData[col.header] = this.getProductsDisplayText(sale.products);
+            break;
+          case 'paymentAmount':
+          case 'balance':
+          case 'totalPayable':
+          case 'shippingCharges':
+            rowData[col.header] = this.formatCurrency(sale[col.field]);
+            break;
+          default:
+            rowData[col.header] = sale[col.field] ?? 'N/A';
+        }
+      });
+      return rowData;
     });
 
     const csv = this.convertToCSV(data, headers);
@@ -1376,9 +1466,9 @@ async completeSale(sale: any): Promise<void> {
         referenceNo: sale.invoiceNo,
         date: sale.saleDate || new Date().toISOString(),
         incomeFor: 'Sales',
-        totalAmount: sale.total || sale.paymentAmount,
+        totalAmount: sale.totalPayable || sale.total || sale.paymentAmount, // Use totalPayable
         paymentAmount: sale.paymentAmount,
-        paidOn: sale.saleDate || new Date().toISOString(),
+        paidOn: sale.paidOn || sale.saleDate || new Date().toISOString(), // Use paidOn if available
         paymentMethod: sale.paymentMethod || 'Cash',
         paymentAccount: sale.paymentAccount,
         addedBy: sale.addedBy || 'System',
@@ -1392,7 +1482,7 @@ async completeSale(sale: any): Promise<void> {
       // Record the transaction in the account service
       const transactionData = {
         accountId: sale.paymentAccount,
-        date: new Date(sale.saleDate || new Date()),
+        date: new Date(sale.paidOn || sale.saleDate || new Date()), // Use paidOn
         description: `Sale: ${sale.invoiceNo}`,
         paymentMethod: sale.paymentMethod || 'Cash',
         paymentDetails: sale.invoiceNo,
@@ -1400,7 +1490,7 @@ async completeSale(sale: any): Promise<void> {
         addedBy: sale.addedByDisplayName || sale.addedBy || 'System',
         debit: 0,
         credit: sale.paymentAmount,
-        balance: 0,
+        balance: 0, // Balance will be calculated by the account service
         hasDocument: false,
         type: 'sale',
         source: 'sale',
@@ -1415,16 +1505,16 @@ async completeSale(sale: any): Promise<void> {
       // If it's a partial payment, record the remaining balance as due
       if (sale.balance > 0) {
         const dueTransaction = {
-          accountId: sale.paymentAccount,
-          date: new Date(sale.saleDate || new Date()),
+          accountId: sale.paymentAccount, // Or a dedicated Accounts Receivable account
+          date: new Date(sale.saleDate || new Date()), // Use saleDate for the original due date
           description: `Sale Due: ${sale.invoiceNo}`,
-          paymentMethod: 'Account Receivable',
+          paymentMethod: 'Account Receivable', // Indicate it's a receivable
           paymentDetails: sale.invoiceNo,
           note: 'Pending payment for sale',
           addedBy: sale.addedByDisplayName || sale.addedBy || 'System',
           debit: 0,
-          credit: sale.balance,
-          balance: 0,
+          credit: sale.balance, // The amount still due
+          balance: 0, // Balance will be calculated by the account service
           hasDocument: false,
           type: 'receivable',
           source: 'sale',
@@ -1432,9 +1522,12 @@ async completeSale(sale: any): Promise<void> {
           referenceNo: sale.invoiceNo,
           customer: sale.customer,
           invoiceNo: sale.invoiceNo,
-          paymentStatus: 'Due'
+          paymentStatus: 'Due' // Explicitly mark as Due
         };
         
+        // You might want to add this to a specific Accounts Receivable account
+        // instead of the paymentAccount. Adjust accountId accordingly.
+        // For now, adding to the paymentAccount for simplicity based on original code.
         await this.accountService.addTransaction(sale.paymentAccount, dueTransaction);
       }
     }
@@ -1442,12 +1535,7 @@ async completeSale(sale: any): Promise<void> {
     alert('Sale completed and payment recorded successfully!');
     
     // Refresh the sales list
-    this.salesSubscription = this.saleService.listenForSales().subscribe((salesData) => {
-      this.sales = salesData.filter(sale => sale.status === 'Completed');
-      this.filteredSales = [...this.sales];
-      this.totalEntries = this.filteredSales.length;
-      this.calculateTotals();
-    });
+    this.loadSales(); // Call loadSales to refresh data
   } catch (error) {
     console.error('Error completing sale:', error);
     alert('Error completing sale: ' + (error as Error).message);
@@ -1456,31 +1544,45 @@ async completeSale(sale: any): Promise<void> {
   
   private convertToCSV(data: any[], headers: string[]): string {
     const headerString = headers.join(',');
-    const rowStrings = data.map(row => 
-      headers.map(fieldName => 
-        `"${(row[fieldName] ?? '').toString().replace(/"/g, '""')}"`
-      ).join(',')
-    );
+    const rowStrings = data.map(row => {
+      headers.map(fieldName => {
+        const value = row[fieldName] ?? '';
+        // Handle values that might contain commas or quotes
+        return `"${String(value).replace(/"/g, '""')}"`;
+      }).join(',')
+    });
     
     return [headerString, ...rowStrings].join('\n');
   }
 
   exportExcel(): void {
-    const headers = ['S.No', 'Customer', 'Sale Date', 'Invoice No', 'Products', 'Status', 'Commission %', 'Shipping Status', 'Payment Amount', 'Balance'];
+    // Define headers based on visible columns or all columns you want to export
+    const headers = this.columns.map(col => col.header);
     
     const data = this.filteredSales.map((sale, index) => {
-      return [
-        index + 1,
-        sale.customer || 'N/A',
-        sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
-        sale.invoiceNo || 'N/A',
-        this.getProductsDisplayText(sale.products),
-        sale.status || 'N/A',
-        sale.commissionPercentage || 0,
-        sale.shippingStatus || 'N/A',
-        sale.paymentAmount !== undefined ? `$${Number(sale.paymentAmount).toFixed(2)}` : '$0.00',
-        sale.balance !== undefined ? `$${Number(sale.balance).toFixed(2)}` : '$0.00'
-      ];
+      const rowData: any[] = [];
+      this.columns.forEach(col => {
+        switch (col.field) {
+          case 'S.No':
+            rowData.push(index + 1);
+            break;
+          case 'saleDate':
+            rowData.push(sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A');
+            break;
+          case 'products':
+            rowData.push(this.getProductsDisplayText(sale.products));
+            break;
+          case 'paymentAmount':
+          case 'balance':
+          case 'totalPayable':
+          case 'shippingCharges':
+             rowData.push(this.formatCurrency(sale[col.field])); // Format for display in PDF
+            break;
+          default:
+            rowData.push(sale[col.field] ?? 'N/A');
+        }
+      });
+      return rowData;
     });
 
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
@@ -1523,21 +1625,33 @@ async completeSale(sale: any): Promise<void> {
   }
 
   exportPDF(): void {
-    const headers = ['S.No', 'Customer', 'Sale Date', 'Invoice No', 'Products', 'Status', 'Commission %', 'Shipping Status', 'Payment Amount', 'Balance'];
+    // Define headers based on visible columns or all columns you want to export
+    const headers = this.columns.map(col => col.header);
     
     const data = this.filteredSales.map((sale, index) => {
-      return [
-        index + 1,
-        sale.customer || 'N/A',
-        sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A',
-        sale.invoiceNo || 'N/A',
-        this.getProductsDisplayText(sale.products),
-        sale.status || 'N/A',
-        sale.commissionPercentage || 0,
-        sale.shippingStatus || 'N/A',
-        sale.paymentAmount !== undefined ? `$${Number(sale.paymentAmount).toFixed(2)}` : '$0.00',
-        sale.balance !== undefined ? `$${Number(sale.balance).toFixed(2)}` : '$0.00'
-      ];
+      const rowData: any[] = [];
+      this.columns.forEach(col => {
+        switch (col.field) {
+          case 'S.No':
+            rowData.push(index + 1);
+            break;
+          case 'saleDate':
+            rowData.push(sale.saleDate ? new Date(sale.saleDate).toLocaleDateString() : 'N/A');
+            break;
+          case 'products':
+            rowData.push(this.getProductsDisplayText(sale.products));
+            break;
+          case 'paymentAmount':
+          case 'balance':
+          case 'totalPayable':
+          case 'shippingCharges':
+             rowData.push(this.formatCurrency(sale[col.field])); // Format for display in PDF
+            break;
+          default:
+            rowData.push(sale[col.field] ?? 'N/A');
+        }
+      });
+      return rowData;
     });
 
     const doc = new jsPDF({ orientation: 'landscape' });

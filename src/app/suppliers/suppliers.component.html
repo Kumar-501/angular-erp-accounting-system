@@ -6,7 +6,7 @@
   <!-- Add this below your content-header section -->
 <!-- Your existing content header section -->
 
-<!-- Add a filter button that toggles the filters section -->
+<!-- Add a filter button that toggles athe filters section -->
 <!-- Add this right after the opening <div class="suppliers-container"> -->
 <div class="filter-overlay" [class.show]="isFilterVisible" (click)="toggleFilters()"></div>
 
@@ -166,6 +166,11 @@
         <th (click)="sortBy('state')">State</th>
         <th (click)="sortBy('country')">Country</th>
         <th (click)="sortBy('zipCode')">Zip Code</th>
+<th (click)="sortBy('paymentDue')">Payment Due</th>
+<th (click)="sortBy('paymentAmount')">Paid Amount</th>
+<th (click)="sortBy('totalPurchases')">Total Purchases</th>
+<th (click)="sortBy('paymentDue')">Payment Due</th>
+
         <th (click)="sortBy('contactType')">Contact Type</th>
       </tr>
     </thead>
@@ -198,6 +203,7 @@
                   <i class="fa fa-trash icon-delete"></i> 
                   <span>Delete</span>
                 </div>
+   
                 
                 <div class="action-item" [routerLink]="['/suppliers', supplier.id]" (click)="closeActionPopup()">
                   <i class="fa fa-eye icon-view"></i> 
@@ -208,6 +214,8 @@
                   <i class="fa fa-list-alt icon-purchases"></i> 
                   <span>Purchases</span>
                 </div>
+                <!-- Inside the action-popup div in suppliers.component.html -->
+
 <!--                 
                 <div class="action-item" (click)="viewPaymentHistory(supplier); closeActionPopup()">
                   <i class="fa fa-history icon-history"></i> 
@@ -299,9 +307,14 @@
 
         <!-- Zip Code -->
         <td>{{ supplier.zipCode }}</td>
-
-        <!-- Contact Type -->
-        <td>{{ supplier.contactType }}</td>
+<td>₹ {{ supplier.paymentDue || '0.00' }}</td>
+<td>₹ {{ supplier.paymentAmount || '0.00' }}</td>
+<td>₹ {{ supplier.totalPurchases || '0.00' }}</td>
+<td>
+  <button class="btn-pay-due" (click)="payDue(supplier)" [disabled]="!supplier.paymentDue || supplier.paymentDue <= 0">
+    Pay ₹{{ supplier.paymentDue || 0 }}
+  </button>
+</td>        <td>{{ supplier.contactType }}</td>
       </tr>
 
       <!-- No Data Row -->
@@ -319,7 +332,6 @@
   <button [disabled]="currentPage >= totalPages || filteredSuppliers.length === 0" (click)="nextPage()" class="btn-page">Next</button>
 </div>
   </div>
-  
   
   <!-- Supplier Form Modal -->
   <div class="modal" [class.show]="showForm">
@@ -622,34 +634,52 @@
         </form>
       </div>
     </div>
-  </div>
+  </div>
 </div>
 
-<!-- Add this at the bottom of your list-purchase.component.html -->
 <div class="modal" [class.show]="showPaymentForm">
   <div class="modal-content payment-modal">
     <div class="modal-header">
-      <h2>Add Payment</h2>
+      <h2>Record Payment</h2>
       <span class="close" (click)="closePaymentForm()">&times;</span>
     </div>
     
     <div class="modal-body">
       <form [formGroup]="paymentForm">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Supplier:</label>
-            <input type="text" formControlName="supplierName" readonly>
-          </div>
-          
-          <div class="form-group">
-            <label>Reference No:</label>
-            <input type="text" formControlName="referenceNo" readonly>
-          </div>
+        <div class="form-group">
+          <label>Supplier:</label>
+          <input type="text" class="form-control" formControlName="supplierName" readonly>
         </div>
-        
+<div class="form-group">
+  <label>Payment Account:*</label>
+  <select class="form-control" formControlName="paymentAccount" required>
+    <option value="">Select Payment Account</option>
+    <option *ngFor="let account of paymentAccounts" [ngValue]="account"
+            [disabled]="account.openingBalance <= 0">
+      {{account.name}} ({{account.accountNumber}}) - ₹{{account.openingBalance | number:'1.2-2'}}
+    </option>
+  </select>
+  
+  <!-- Loading state -->
+  <div *ngIf="paymentAccountsLoading" class="loading-text">
+    <i class="fas fa-spinner fa-spin"></i> Loading payment accounts...
+  </div>
+  
+  <!-- Empty state -->
+  <div *ngIf="!paymentAccountsLoading && paymentAccounts.length === 0" class="no-accounts">
+    <i class="fas fa-exclamation-circle"></i> No payment accounts available
+    <button (click)="loadPaymentAccounts()" class="btn btn-link">Retry</button>
+  </div>
+  
+  <!-- Validation error -->
+  <div *ngIf="paymentForm.get('paymentAccount')?.invalid && paymentForm.get('paymentAccount')?.touched" 
+       class="error-message">
+    <i class="fas fa-exclamation-circle"></i> Please select a payment account
+  </div>
+</div>
         <div class="form-group">
           <label>Payment Method:*</label>
-          <select formControlName="paymentMethod" (change)="onPaymentMethodChange()">
+          <select class="form-control" formControlName="paymentMethod" required>
             <option value="Cash">Cash</option>
             <option value="Bank Transfer">Bank Transfer</option>
             <option value="Cheque">Cheque</option>
@@ -657,80 +687,51 @@
           </select>
         </div>
         
-        <div class="form-group" *ngIf="paymentAccounts.length > 0">
-          <label>Payment Account:*</label>
-          <select formControlName="paymentAccount" required>
-            <option value="">Select Account</option>
-            <option *ngFor="let account of paymentAccounts" [value]="account.id">
-              {{ account.name }} ({{ account.accountNumber || 'No Account Number' }})
-            </option>
-          </select>
+        <div class="form-group">
+          <label>Reference No:</label>
+          <input type="text" class="form-control" formControlName="reference">
         </div>
         
-        <div class="amount-summary">
+        <div class="payment-summary">
           <div class="summary-row">
-            <span>Total Purchase:</span>
-            <span>₹ {{ paymentSummary.totalPurchase || '0.00' }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Opening Balance:</span>
-            <span>₹ {{ paymentSummary.openingBalance || '0.00' }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Total Owed:</span>
+            <span>Grand Total:</span>
             <span>₹ {{ (paymentSummary.totalPurchase + paymentSummary.openingBalance) || '0.00' }}</span>
           </div>
           <div class="summary-row">
-            <span>Already Paid:</span>
+            <span>Paid Amount:</span>
             <span>₹ {{ paymentSummary.totalPaid || '0.00' }}</span>
           </div>
           <div class="summary-row highlight">
             <span>Balance Due:</span>
-            <span>₹ {{ ((paymentSummary.totalPurchase + paymentSummary.openingBalance) - paymentSummary.totalPaid) || '0.00' }}</span>
-          </div>
-          <div class="summary-row highlight" *ngIf="paymentForm.get('amount')?.value > 0">
-            <span>Remaining Balance:</span>
-            <span>₹ {{ calculateRemainingBalance(paymentForm.get('amount')?.value) | number:'1.2-2' }}</span>
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>Amount:*</label>
-            <input type="number" formControlName="amount" step="0.01" min="0" 
-                   [max]="paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue" required>
-          </div>
-          
-          <div class="form-group">
-            <label>Paid on:*</label>
-            <input type="datetime-local" formControlName="paidDate" required>
+            <span>₹ {{ (paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue) || '0.00' }}</span>
           </div>
         </div>
         
         <div class="form-group">
-          <label>Reference Number:</label>
-            <input type="text" formControlName="reference" [value]="generateReferenceNumber()" readonly>
+          <label>Amount:*</label>
+          <input type="number" class="form-control" formControlName="amount" 
+                 [max]="paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue"
+                 required>
+        </div>
+        
+        <div class="form-group">
+          <label>Payment Date:*</label>
+          <input type="datetime-local" class="form-control" formControlName="paidDate" required>
         </div>
         
         <div class="form-group">
           <label>Payment Note:</label>
-          <textarea formControlName="paymentNote" rows="3"></textarea>
-        </div>
-        
-        <div class="form-group">
-          <label>Attachment:</label>
-          <div class="file-upload">
-            <input type="file" id="paymentAttachment" (change)="onFileSelected($event)" accept=".pdf,.jpg,.jpeg,.png">
-            <label for="paymentAttachment" class="btn-upload">
-              <i class="fa fa-upload"></i> Choose File
-            </label>
-            <span class="file-name">{{ selectedFileName || 'No file chosen' }}</span>
-          </div>
+          <textarea class="form-control" formControlName="paymentNote" rows="3"></textarea>
         </div>
         
         <div class="form-actions">
-          <button type="button" class="btn-cancel" (click)="closePaymentForm()">Cancel</button>
-          <button type="submit" class="btn-save" (click)="submitPayment()">Save Payment</button>
+          <button type="button" class="btn btn-cancel" (click)="closePaymentForm()">Cancel</button>
+          <button type="button" class="btn btn-primary" (click)="submitPayment()" 
+                  [disabled]="paymentForm.invalid || paymentAccountsLoading">
+            <span *ngIf="paymentAccountsLoading" class="spinner-border spinner-border-sm" 
+                  role="status" aria-hidden="true"></span>
+            Save Payment
+          </button>
         </div>
       </form>
     </div>

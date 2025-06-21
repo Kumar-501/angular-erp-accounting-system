@@ -13,7 +13,11 @@ import autoTable from 'jspdf-autotable';
 export class BrandsComponent implements OnInit {
   brands: Brand[] = [];
   filteredBrands: Brand[] = [];
+  isDeleting: boolean = false;
+
   showPopup = false;
+  // In your component class
+isSaving: boolean = false;
   isEditing = false;
   brand: Brand = { id: '', name: '', description: '' };
   
@@ -124,27 +128,38 @@ export class BrandsComponent implements OnInit {
     }
   }
 
-  addOrUpdateBrand() {
-    if (this.isEditing && this.brand.id) {
-      this.brandsService.updateBrand(this.brand.id, {
-        name: this.brand.name,
-        description: this.brand.description
-      }).then(() => {
-        alert('Brand updated successfully!');
-        this.closePopup();
-        this.loadBrands();
-      }).catch(error => console.error('Error updating brand', error));
-    } else if (!this.isEditing) {
-      this.brandsService.addBrand({
-        name: this.brand.name,
-        description: this.brand.description
-      }).then(() => {
-        alert('Brand added successfully!');
-        this.closePopup();
-        this.loadBrands();
-      }).catch(error => console.error('Error adding brand', error));
-    }
+addOrUpdateBrand() {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
+  if (!this.brand.name) {
+    alert('Brand name is required');
+    return;
   }
+
+  this.isSaving = true;
+
+  const saveOperation = this.isEditing && this.brand.id
+    ? this.brandsService.updateBrand(this.brand.id, {
+        name: this.brand.name,
+        description: this.brand.description
+      })
+    : this.brandsService.addBrand({
+        name: this.brand.name,
+        description: this.brand.description
+      });
+
+  saveOperation.then(() => {
+    const message = this.isEditing ? 'Brand updated successfully!' : 'Brand added successfully!';
+    alert(message);
+    this.closePopup();
+    this.loadBrands();
+  }).catch(error => {
+    console.error('Error saving brand', error);
+    alert('Error saving brand. Please try again.');
+  }).finally(() => {
+    this.isSaving = false;
+  });
+}
 
   editBrand(brand: Brand) {
     if (brand.id) {
@@ -154,15 +169,22 @@ export class BrandsComponent implements OnInit {
     }
   }
 
-  deleteBrand(id: string | undefined) {
-    if (id && confirm('Are you sure you want to delete this brand?')) {
-      this.brandsService.deleteBrand(id).then(() => {
-        alert('Brand deleted successfully!');
-        this.loadBrands();
-      }).catch(error => console.error('Error deleting brand', error));
-    }
-  }
+deleteBrand(id: string | undefined) {
+  if (this.isDeleting || !id) return;
+  
+  if (!confirm('Are you sure you want to delete this brand?')) return;
 
+  this.isDeleting = true;
+  this.brandsService.deleteBrand(id).then(() => {
+    alert('Brand deleted successfully!');
+    this.loadBrands();
+  }).catch(error => {
+    console.error('Error deleting brand', error);
+    alert('Error deleting brand. Please try again.');
+  }).finally(() => {
+    this.isDeleting = false;
+  });
+}
   openPopup() {
     this.brand = { id: '', name: '', description: '' };
     this.isEditing = false;

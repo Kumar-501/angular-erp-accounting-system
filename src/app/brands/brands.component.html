@@ -78,9 +78,15 @@
               <button class="edit-btn" (click)="editBrand(brand)">
                 <i class="fa fa-edit"></i> Edit
               </button>
-              <button class="delete-btn" (click)="deleteBrand(brand.id)">
-                <i class="fa fa-trash"></i> Delete
-              </button>
+         <button 
+  class="delete-btn" 
+  (click)="deleteBrand(brand.id)"
+  [disabled]="isDeleting"
+>
+  <i class="fa fa-trash"></i> 
+  <span *ngIf="!isDeleting">Delete</span>
+  <span *ngIf="isDeleting">Deleting...</span>
+</button>
             </td>
           </tr>
         </tbody>
@@ -119,8 +125,14 @@
     </div>
     
     <div class="button-group">
-      <button class="save-btn" (click)="addOrUpdateBrand()">Save</button>
-      <button class="close-btn" (click)="closePopup()">Close</button>
+<button 
+  class="save-btn" 
+  (click)="addOrUpdateBrand()"
+  [disabled]="isSaving || !brand.name"
+>
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>      <button class="close-btn" (click)="closePopup()">Close</button>
     </div>
   </div>
 </div>

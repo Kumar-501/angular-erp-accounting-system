@@ -5,18 +5,22 @@ import { UserService } from '../services/user.service';
 import { Purchase, PurchaseService } from '../services/purchase.service'; // Add PurchaseService import
 import { FormGroup, FormBuilder, Validators } from '@angular/forms';
 import { PaymentService } from '../services/payment.service';
-import { getDoc } from 'firebase/firestore';import * as XLSX from 'xlsx';
+import { collection, getDoc, getDocs, or, query, where } from 'firebase/firestore';import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
+
 import 'jspdf-autotable';
 import { Router } from '@angular/router';
+
 import { LocationService } from '../services/location.service';
 import { AccountService } from '../services/account.service';
 import { HostListener } from '@angular/core';
 import { Input } from '@angular/core';
+import { Firestore } from '@angular/fire/firestore';
 
 interface Supplier {
   id?: string;
-  
+    totalPurchases?: number;
+
   paymentAmount?: number; // Add this property
 
   contactId?: string;
@@ -26,6 +30,7 @@ interface Supplier {
   isIndividual?: boolean;
   email?: string;
   mobile?: string;
+    paymentDue?: number;
   
   landline?: string;
   alternateContact?: string;
@@ -39,7 +44,6 @@ interface Supplier {
   purchaseReturn?: number;
   advanceBalance?: number;
   grandTotal?: number;
-  paymentDue?: number;
   
 
   addressLine1?: string;
@@ -73,6 +77,7 @@ import { ViewChild, ElementRef, Renderer2 } from '@angular/core';
   styleUrls: ['./suppliers.component.scss']
 })
 export class SuppliersComponent implements OnInit {
+payCash: any;
 handleAction(arg0: string,_t151: Supplier) {
 throw new Error('Method not implemented.');
 }
@@ -88,12 +93,29 @@ onPaymentMethodChange(): void {
   // You can add logic here if needed
 }
 
+
+  paymentAccounts: any[] = [];
+  paymentAccountsLoading = false;
+// Add these properties
+showPaymentForm = false;
+selectedFile: File | null = null;
+currentPaymentSupplier: Supplier | null = null;
+paymentSummary = {
+  totalPurchase: 0,
+  totalPaid: 0,
+  totalPurchaseDue: 0,
+  openingBalance: 0,
+  openingBalanceDue: 0
+};
+
+
   showForm = false;
     searchText: string = '';
   showMoreInfo = false;
   isIndividual = true;
   currentOpenDropdown: string | null = null;
   entriesPerPage: number = 10; // Default to 10
+  isLoading = false;
 
   searchTimeout: any = null;
   dropdownOpen = false;
@@ -105,20 +127,10 @@ onPaymentMethodChange(): void {
   assignedUsers: {id: string, username: string}[] = []; 
   editingSupplierId: string | null = null;
   statesList: string[] = []; 
-  paymentAccounts: any[] = [];
-showPaymentForm = false;
   selectedFileName = '';
   
-selectedFile: File | null = null;
+// selectedFile: File | null = null; // <-- REMOVE this duplicate line
   currentPaymentPurchase: any = null;
-paymentSummary = {
-  totalPurchase: 0,
-  totalPaid: 0,
-  totalPurchaseDue: 0,
-  openingBalance: 0,
-  
-  openingBalanceDue: 0
-};
 
 
   // In your component class
@@ -138,7 +150,6 @@ get combinedAddress(): string {
   }
   
   filteredShippingDistricts: string[] = [];
-  currentPaymentSupplier: Supplier | null = null;
   showLedgerView = false;  // Add this property
   selectedSupplierForLedger: Supplier | null = null;
   isFilterVisible = false;
@@ -212,7 +223,9 @@ filterOptions = {
     private router: Router,
     private locationService: LocationService,
     private elementRef: ElementRef,
-    private renderer: Renderer2
+    private renderer: Renderer2,
+      private firestore: Firestore // Add this line
+
   ) {
     this.supplierForm = this.fb.group({
       contactId: [''],
@@ -243,16 +256,16 @@ filterOptions = {
       contactType: ['Supplier']
     });
 
-    this.paymentForm = this.fb.group({
-      supplierName: ['', Validators.required],
-      businessName: [''],
-      paymentMethod: ['Cash', Validators.required],
-      paymentNote: [''],
-      reference: [''],
-      paidDate: [new Date().toISOString().slice(0, 16), Validators.required],
-      amount: [0, [Validators.required, Validators.min(0.01)]],
-      paymentAccount: ['', Validators.required]
-    });
+this.paymentForm = this.fb.group({
+  supplierName: ['', Validators.required],
+  businessName: [''],
+  paymentMethod: ['Cash', Validators.required],
+  paymentNote: [''],
+  reference: [''],
+  paidDate: [new Date().toISOString().slice(0, 16), Validators.required],
+  amount: [0, [Validators.required, Validators.min(0.01)]],
+  paymentAccount: [null, Validators.required] // Changed from string to object
+});
   }
 // Add these methods to handle dropdown toggling
 toggleDropdown(supplierId: string): void {
@@ -370,22 +383,48 @@ toggleStatus(supplier: Supplier): void {
 toggleDateDrawer(): void {
   this.isDateDrawerOpen = !this.isDateDrawerOpen;
 }
-
 loadSuppliers(): void {
   this.supplierService.getSuppliers().subscribe((suppliers: any[]) => {
-    this.suppliersList = suppliers.map(supplier => ({
-      ...supplier,
-      // Ensure createdAt is a Date object
-      createdAt: supplier.createdAt ? new Date(supplier.createdAt) : new Date(),
-
-      // ✅ Normalize the status to match 'Active' | 'Inactive' | undefined
-      status: supplier.status === 'Active' || supplier.status === 'Inactive'
-        ? supplier.status
-        : undefined
-    }));
+    this.suppliersList = suppliers;
+    
+    // For each supplier, ensure payment data is calculated
+    this.suppliersList.forEach(supplier => {
+      if (supplier.id) {
+        this.purchaseService.getPurchasesBySupplier(supplier.id).subscribe(purchases => {
+          const totalPurchase = purchases.reduce((sum, purchase) => 
+            sum + (purchase.grandTotal || purchase.purchaseTotal || 0), 0);
+          const totalPaid = purchases.reduce((sum, purchase) => 
+            sum + (purchase.paymentAmount || 0), 0);
+          
+          // Update supplier object
+          supplier.totalPurchases = totalPurchase;
+          supplier.paymentAmount = totalPaid;
+          supplier.paymentDue = totalPurchase - totalPaid;
+          
+          this.applyFilters(); // Refresh the filtered list
+        });
+      }
+    });
+    
     this.applyFilters();
   });
+}
+// suppliers.component.ts
+
+async refreshSupplierPayments(): Promise<void> {
+  this.isLoading = true;
+  try {
+    for (const supplier of this.suppliersList) {
+      if (supplier.id) {
+        await this.supplierService.syncSupplierPaymentData(supplier.id);
+      }
+    }
+    this.loadSuppliers();
+  } catch (error) {
+    console.error('Error refreshing supplier payments:', error);
+    this.isLoading = false;
   }
+}
 viewPurchaseData(supplier: Supplier): void {
   if (supplier.id) {
     this.router.navigate(['/purchase-data'], { 
@@ -394,23 +433,28 @@ viewPurchaseData(supplier: Supplier): void {
   }
 }
 
-// Add this method to toggle filter visibility
 toggleFilters(): void {
   this.isFilterVisible = !this.isFilterVisible;
 }
-
-
+calculateSupplierPaymentDue(supplierId: string): Promise<number> {
+  return new Promise((resolve) => {
+    this.purchaseService.getPurchasesBySupplier(supplierId).subscribe(purchases => {
+      const totalPurchase = purchases.reduce((sum, purchase) => 
+        sum + (purchase.grandTotal || purchase.purchaseTotal || 0), 0);
+      const totalPaid = purchases.reduce((sum, purchase) => 
+        sum + (purchase.paymentAmount || 0), 0);
+      resolve(totalPurchase - totalPaid);
+    });
+  });
+}
 closePaymentForm(): void {
   this.showPaymentForm = false;
-  this.selectedFileName = '';
-  this.selectedFile = null;
   this.paymentForm.reset({
     paymentMethod: 'Cash',
-    paymentAccount: this.paymentAccounts.length > 0 ? this.paymentAccounts[0].id : '',
-    reference: this.generateReferenceNumber(),
     paidDate: new Date().toISOString().slice(0, 16),
     amount: 0
   });
+  this.currentPaymentSupplier = null;
 }
 
   
@@ -682,20 +726,17 @@ applyCustomRange(): void {
     this.toggleDateDrawer(); // Close drawer after applying
   }
 }
-// In your component class
 sortBy(column: string): void {
   if (this.sortColumn === column) {
-    // Toggle direction if same column clicked again
     this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
   } else {
-    // New column, default to ascending
     this.sortColumn = column;
     this.sortDirection = 'asc';
   }
-  
-  // Apply the sorting
+
   this.applyFilters();
 }
+
 get paginatedSuppliers(): Supplier[] {
   if (this.filteredSuppliers.length === 0) {
     return [];
@@ -1021,7 +1062,7 @@ onFileSelected(event: Event): void {
 }
 
 calculateRemainingBalance(amountPaid: number): number {
-  if (!this.currentPaymentPurchase) return 0;
+  if (!this.currentPaymentSupplier) return 0;
   
   const totalOwed = (this.paymentSummary.totalPurchase + this.paymentSummary.openingBalance) || 0;
   const alreadyPaid = this.paymentSummary.totalPaid || 0;
@@ -1029,6 +1070,11 @@ calculateRemainingBalance(amountPaid: number): number {
   
   return Math.max(balanceDue - amountPaid, 0);
 }
+
+generateReferenceNumber(): string {
+  return 'PAY-' + new Date().getTime().toString().slice(-6);
+}
+
   // Add showSnackbar method
   showSnackbar(message: string, type: 'success' | 'error'): void {
     const snackbar = document.createElement('div');
@@ -1060,171 +1106,96 @@ calculateRemainingBalance(amountPaid: number): number {
 async addPayment(supplier: Supplier): Promise<void> {
   this.currentPaymentSupplier = supplier;
   
-  // Use callback pattern instead of Observable
-  const unsubscribe = this.accountService.getAccounts((accounts: any[]) => {
-    this.paymentAccounts = accounts;
-    
-    // Calculate payment summary
-    this.paymentSummary = {
-      totalPurchase: 0, // You may need to load purchases to calculate this
-      totalPaid: 0,
-      totalPurchaseDue: 0,
-      openingBalance: supplier?.openingBalance || 0,
-      openingBalanceDue: supplier?.openingBalance || 0
-    };
-    
-    // Initialize form
-    this.paymentForm.patchValue({
-      supplierName: supplier?.businessName || `${supplier?.firstName} ${supplier?.lastName || ''}`.trim(),
-      amount: supplier?.openingBalance || 0,
-      reference: this.generateReferenceNumber()
-    });
-    
-    this.showPaymentForm = true;
-    
-    // Clean up the subscription if needed
-    if (unsubscribe) {
-      unsubscribe();
-    }
+  // Calculate payment due
+  const paymentDue = await this.calculateSupplierPaymentDue(supplier.id || '');
+  const openingBalance = supplier.openingBalance || 0;
+  const totalDue = paymentDue + openingBalance;
+  
+  // Initialize form
+  this.paymentForm.patchValue({
+    supplierName: supplier.businessName || `${supplier.firstName} ${supplier.lastName || ''}`.trim(),
+    amount: totalDue > 0 ? totalDue : 0,
+    reference: this.generateReferenceNumber()
   });
-      this.dropdownOpen = false;
-
+  
+  // Update payment summary
+  this.paymentSummary = {
+    totalPurchase: paymentDue + (supplier.paymentAmount || 0),
+    totalPaid: supplier.paymentAmount || 0,
+    totalPurchaseDue: paymentDue,
+    openingBalance: openingBalance,
+    openingBalanceDue: openingBalance
+  };
+  
+  this.showPaymentForm = true;
 }
 
 async submitPayment(): Promise<void> {
-  if (this.paymentForm.invalid || !this.currentPaymentSupplier) {
+  if (this.paymentForm.invalid || !this.currentPaymentSupplier?.id) {
+    this.paymentForm.markAllAsTouched();
     return;
   }
-  
+
   try {
-    const supplierId = this.currentPaymentSupplier.id!;
-    const supplierName = this.currentPaymentSupplier.businessName ||
-      `${this.currentPaymentSupplier.firstName} ${this.currentPaymentSupplier.lastName || ''}`.trim();
-    
     const paymentData = {
-      supplierId,
-      supplierName,
+      supplierId: this.currentPaymentSupplier.id,
+      supplierName: this.paymentForm.value.supplierName,
       amount: this.paymentForm.value.amount,
       paymentDate: new Date(this.paymentForm.value.paidDate),
       paymentMethod: this.paymentForm.value.paymentMethod,
       paymentNote: this.paymentForm.value.paymentNote,
       reference: this.paymentForm.value.reference,
-      document: this.selectedFileName,
       paymentAccount: this.paymentForm.value.paymentAccount,
       type: 'supplier'
     };
 
-    // 1. Save payment record
-    const paymentId = await this.paymentService.addSupplierPayment(paymentData);
+    // 1. Record the payment
+    await this.paymentService.addPayment(paymentData);
 
-    // 2. Update supplier balance
-     await this.supplierService.updateSupplierBalance(
-      this.currentPaymentPurchase.supplierId, 
-      paymentData.amount, 
-      true, // isPayment
-      false // updateOpeningBalance
+    // 2. Update the supplier's balance
+    await this.supplierService.updateSupplierBalance(
+      this.currentPaymentSupplier.id,
+      paymentData.amount,
+      true // isPayment
     );
-    // 3. Record the transaction in the account book
-    await this.accountService.recordTransaction(
-      paymentData.paymentAccount,
-      {
+
+    // 3. Update the payment account balance
+    if (paymentData.paymentAccount?.id) {
+      await this.accountService.updateAccountBalance(
+        paymentData.paymentAccount.id,
+        -paymentData.amount // Negative because it's an expense
+      );
+
+      // Record transaction in the account
+      await this.accountService.recordTransaction(paymentData.paymentAccount.id, {
         amount: paymentData.amount,
         type: 'expense',
         date: paymentData.paymentDate,
-        description: `Payment to supplier ${supplierName}`,
         reference: paymentData.reference,
-        category: 'Supplier Payments'
-      }
-    );
-
-    // 4. Update the account balance
- await this.accountService.updateAccountBalance(
-      paymentData.paymentAccount,
-      -paymentData.amount // Negative amount for debit
-    );
-    this.loadPurchases();
-    this.closePaymentForm();
-
-    // 5. Get all purchases for this supplier that have outstanding balances
-    const purchases = await this.purchaseService.getPurchasesBySupplier(supplierId).toPromise();
-    
-    if (purchases && purchases.length > 0) {
-      let remainingAmount = paymentData.amount;
-      
-      // Sort purchases by date (oldest first) to apply payments chronologically
-      const sortedPurchases = [...purchases].sort((a, b) => {
-        const dateA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
-        const dateB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
-        return dateA - dateB;
+        relatedDocId: this.currentPaymentSupplier.id,
+        description: `Payment to supplier ${paymentData.supplierName}`,
+        paymentMethod: paymentData.paymentMethod
       });
-
-      // Apply payment to each purchase until payment amount is exhausted
-      for (const purchase of sortedPurchases) {
-        if (remainingAmount <= 0) break;
-        
-        if (!purchase.id) {
-          console.warn('Purchase without ID found, skipping:', purchase);
-          continue;
-        }
-        
-        const paymentDue = purchase.paymentDue || 0;
-        
-        if (paymentDue > 0) {
-          const paymentAmount = Math.min(remainingAmount, paymentDue);
-          
-          // Update purchase with payment
-          await this.purchaseService.updatePurchase(purchase.id, {
-            paymentAmount: (purchase.paymentAmount || 0) + paymentAmount,
-            paymentDue: paymentDue - paymentAmount,
-            paymentStatus: (paymentDue - paymentAmount) <= 0 ? 'Paid' : 'Partial',
-            updatedAt: new Date()
-          });
-          
-          remainingAmount -= paymentAmount;
-        }
-      }
-
-      // If there's remaining amount after paying all purchases, apply to opening balance
-      if (remainingAmount > 0) {
-        await this.supplierService.updateSupplierBalance(
-          supplierId,
-          remainingAmount,
-          true, // isPayment
-          true // updateOpeningBalance
-        );
-      }
-    } else {
-      // No purchases - apply entire amount to opening balance
-      await this.supplierService.updateSupplierBalance(
-        supplierId,
-        paymentData.amount,
-        true, // isPayment
-        true // updateOpeningBalance
-      );
     }
 
-    // Clean up and refresh
-    localStorage.removeItem(`paymentInProgress_${supplierId}`);
-    this.showSnackbar('Payment processed successfully!', 'success');
+    // 4. Refresh data
+    this.loadSuppliers();
+    this.showSnackbar('Payment recorded successfully!', 'success');
     this.closePaymentForm();
-    this.loadSuppliers(); // Refresh supplier list
-    
-    // Also refresh purchases if we're on the purchases page
-    if (this.router.url.includes('/list-purchase')) {
-this.purchaseService['refreshPurchases']();
-    }
-    
+
   } catch (error) {
     console.error('Error processing payment:', error);
     this.showSnackbar('Error processing payment', 'error');
   }
 }
 
+
   viewPaymentHistory(supplier: Supplier): void {
   if (supplier.id) {
     this.router.navigate(['/suppliers', supplier.id, 'payments']);
-  }
-}
+  }}
+
+
   deleteSupplier(id?: string): void {
     if (!id) return;
     
@@ -1244,9 +1215,7 @@ this.purchaseService['refreshPurchases']();
 
 
   }
-generateReferenceNumber(): string {
-  return 'PAY-' + new Date().getTime().toString().slice(-6);
-}
+
 
   generateContactId(): string {
     const existingIds = this.suppliersList
@@ -1273,6 +1242,8 @@ generateReferenceNumber(): string {
         'Opening Balance': supplier.openingBalance || 0,
         'Purchase Due': supplier.purchaseDue || 0,
         'Purchase Return': supplier.purchaseReturn || 0,
+        'Paid Amount': supplier.paymentAmount || 0,
+  'Payment Due': supplier.paymentDue || 0,
         'Advance Balance': supplier.advanceBalance || 0,
         'Status': supplier.status || '',
         'Assigned To': supplier.assignedTo || '',
@@ -1335,6 +1306,9 @@ generateReferenceNumber(): string {
         'Tax Number': supplier.taxNumber || '',
         'Opening Balance': supplier.openingBalance || 0,
         'Purchase Due': supplier.purchaseDue || 0,
+          'Paid Amount': `₹ ${supplier.paymentAmount || '0.00'}`,
+  'Payment Due': `₹ ${supplier.paymentDue || '0.00'}`,
+
         'Purchase Return': supplier.purchaseReturn || 0,
         'Advance Balance': supplier.advanceBalance || 0,
         'Status': supplier.status || '',
@@ -1362,65 +1336,44 @@ generateReferenceNumber(): string {
     }
   }
 
-
-async payCash(supplier: Supplier): Promise<void> {
+async payDue(supplier: Supplier): Promise<void> {
   this.currentPaymentSupplier = supplier;
   
-  // Check if there's a saved payment in progress for this supplier
-  const savedPayment = localStorage.getItem(`paymentInProgress_${supplier.id}`);
+  // Calculate payment due
+  const paymentDue = await this.calculateSupplierPaymentDue(supplier.id || '');
+  const openingBalance = supplier.openingBalance || 0;
+  const totalDue = paymentDue + openingBalance;
   
-  // Load payment accounts
-  const unsubscribe = this.accountService.getAccounts((accounts: any[]) => {
-    this.paymentAccounts = accounts.filter((account: { accountHead: { value: string | string[]; }; }) => 
-      account.accountHead?.value?.includes('Asset') ||
-      account.accountHead?.value?.includes('Cash') ||
-      account.accountHead?.value?.includes('Bank')
-    );
-    
-    // Calculate total payment due from all purchases for this supplier
-    this.purchaseService.getPurchasesBySupplier(supplier.id || '').subscribe((purchases: Purchase[]) => {
-      // Calculate total purchase amount and total paid amount
-      const totalPurchase = purchases.reduce((sum, purchase) => sum + (purchase.grandTotal || purchase.purchaseTotal || 0), 0);
-      const totalPaid = purchases.reduce((sum, purchase) => sum + (purchase.paymentAmount || 0), 0);
-      
-      // Calculate opening balance (from supplier record)
-      const openingBalance = supplier.openingBalance || 0;
-      
-      // Calculate total balance due (opening balance + purchases - payments)
-      const totalBalanceDue = openingBalance + totalPurchase - totalPaid;
-      
-      // Generate payment reference
-      const refNumber = 'PAY-' + new Date().getTime().toString().slice(-6);
-      
-      // Initialize form with saved payment data or default values
-      this.paymentForm.reset({
-        supplierName: supplier.isIndividual 
-          ? `${supplier.firstName} ${supplier.lastName || ''}`.trim()
-          : supplier.businessName,
-        businessName: supplier.businessName || '',
-        paymentMethod: savedPayment ? JSON.parse(savedPayment).paymentMethod : 'Cash',
-        paymentAccount: savedPayment ? JSON.parse(savedPayment).paymentAccount : 
-                       this.paymentAccounts.length > 0 ? this.paymentAccounts[0].id : '',
-        reference: refNumber,
-        paidDate: savedPayment ? JSON.parse(savedPayment).paidDate : new Date().toISOString().slice(0, 16),
-        amount: savedPayment ? JSON.parse(savedPayment).amount : 
-                totalBalanceDue > 0 ? totalBalanceDue : 0,
-        paymentNote: savedPayment ? JSON.parse(savedPayment).paymentNote : ''
-      });
-      
-      // Update payment summary for display
-      this.paymentSummary = {
-        totalPurchase: totalPurchase,
-        totalPaid: totalPaid,
-        totalPurchaseDue: totalPurchase - totalPaid,
-        openingBalance: openingBalance,
-        openingBalanceDue: openingBalance
-      };
-      
-      this.showPaymentForm = true;
-    });
+  // Initialize form
+  this.paymentForm.patchValue({
+    supplierName: supplier.businessName || `${supplier.firstName} ${supplier.lastName || ''}`.trim(),
+    amount: totalDue > 0 ? totalDue : 0,
+    reference: this.generateReferenceNumber(),
+    paidDate: new Date().toISOString().slice(0, 16)
   });
+  
+  // Update payment summary
+  this.paymentSummary = {
+    totalPurchase: paymentDue + (supplier.paymentAmount || 0),
+    totalPaid: supplier.paymentAmount || 0,
+    totalPurchaseDue: paymentDue,
+    openingBalance: openingBalance,
+    openingBalanceDue: openingBalance
+  };
+  
+  this.showPaymentForm = true;
+  await this.loadPaymentAccounts(); // Load accounts when opening the form
 }
+
+  loadPaymentAccounts(): void {
+    this.paymentAccountsLoading = true;
+    this.accountService.getAccounts((accounts: any[]) => {
+      this.paymentAccounts = accounts;
+      this.paymentAccountsLoading = false;
+    });
+  }
+
+
 receiveCash(supplier: Supplier): void {
   console.log('Receive Cash from supplier:', supplier);
   // Implement your receive cash logic here

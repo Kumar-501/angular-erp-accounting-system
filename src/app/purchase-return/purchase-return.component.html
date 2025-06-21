@@ -81,6 +81,7 @@
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
+              
               <th (click)="sort('paymentStatus')">
                 Payment Status
                 <span *ngIf="sortColumn === 'paymentStatus'">

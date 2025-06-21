@@ -124,16 +124,20 @@ onSearchInput(event: any): void {
   
   if (this.searchTerm.length > 1) {
     this.searchResults = this.productsList.filter(product => 
-      product.productName.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-      (product.sku && product.sku.toLowerCase().includes(this.searchTerm.toLowerCase())) ||
-      (product.barcode && product.barcode.toLowerCase().includes(this.searchTerm.toLowerCase()))
+      // Only include products that are NOT marked for not selling
+      (product.notForSelling !== true) && 
+      (
+        product.productName.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
+        (product.sku && product.sku.toLowerCase().includes(this.searchTerm.toLowerCase())) ||
+        (product.barcode && product.barcode.toLowerCase().includes(this.searchTerm.toLowerCase()))
+      )
     );
     this.showSearchResults = true;
   } else {
     this.searchResults = [];
     this.showSearchResults = false;
   }
-  }
+}
   toggleProductSelection(index: number): void {
   if (this.selectedProducts.has(index)) {
     this.selectedProducts.delete(index);

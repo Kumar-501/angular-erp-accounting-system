@@ -1,25 +1,19 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { ProductsService } from '../services/products.service';
+import { NewProductsService } from '../services/new-products.service';
 import { CategoriesService } from '../services/categories.service';
 import { BrandsService } from '../services/brands.service';
 import { UnitsService } from '../services/units.service';
 import { TaxService } from '../services/tax.service';
 import { VariationsService } from '../services/variations.service';
+import { FileUploadService } from '../services/file-upload.service';
 import { Subscription } from 'rxjs';
 import { SkuGeneratorService } from '../services/sku-generator.service';
 import { Router, ActivatedRoute } from '@angular/router';
-import { LocationService } from '../services/location.service';
 import { UserService } from '../services/user.service';
 import { NgForm } from '@angular/forms';
-import { StockService } from '../services/stock.service';
 import { HostListener } from '@angular/core';
 import { AuthService } from '../auth.service';
-
-
-interface Location {
-  id: string;
-  name: string;
-}
 
 @Component({
   selector: 'app-add-product',
@@ -28,53 +22,41 @@ interface Location {
 })
 export class AddProductComponent implements OnInit, OnDestroy {
   @ViewChild('productForm') productForm!: NgForm;
-  
+
   product: any = this.getInitialProduct();
   users: any[] = [];
-  
   selectedUser: any = null;
-searchNotSellingProducts = '';
-filteredNotSellingProducts: any[] = [];
-selectedNotSellingProducts: any[] = [];
-filteredLocations: any[] = [];
-selectedLocations: any[] = [];
-searchQuery: string = '';
+  
+  searchNotSellingProducts = '';
+  filteredNotSellingProducts: any[] = [];
+  selectedNotSellingProducts: any[] = [];
+  searchQuery: string = '';
   availableProducts: any[] = [];
   availableVariations: any[] = [];
   selectedVariations: any[] = [];
   variantCombinations: any[] = [];
   searchNotSellingProductsQuery: string = '';
-showDropdown = false;
-@HostListener('document:click', ['$event'])
-onClick(event: MouseEvent) {
-  const target = event.target as HTMLElement;
-  const isInsideDropdown = target.closest('.searchable-multiselect');
+  showDropdown = false;
   
-  if (!isInsideDropdown) {
-    this.showDropdown = false;
-  }
-}
-  locations: any[] = [];
-  allCategories: any[] = []; // To store all categories including subcategories
+  allCategories: any[] = [];
   categories: any[] = [];
   productFormSubmitted: boolean = false;
-
   brands: any[] = [];
   units: any[] = [];
   selectedNotSellingProduct: any = null;
-
   subCategories: any[] = [];
   filteredSubCategories: any[] = [];
   products: any[] = [];
   taxRates: any[] = [];
-  private roundToWholeNumber(value: number): number {
-    return Math.round(value);
-  }
-
   
-  roundToTwoDecimals(value: number): number {
-    return Math.round(value * 100) / 100;
-  }
+  // File upload properties
+  selectedImageFile: File | null = null;
+  selectedBrochureFile: File | null = null;
+  imagePreview: string | null = null;
+  brochureInfo: any = null;
+  isUploadingImage = false;
+  isUploadingBrochure = false;
+
   categoryTaxMapping: { [key: string]: string } = {
     'medicines': '10',
     'drugs': '12',
@@ -88,25 +70,31 @@ onClick(event: MouseEvent) {
 
   private subscriptions: Subscription[] = [];
 
+  @HostListener('document:click', ['$event'])
+  onClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    const isInsideDropdown = target.closest('.searchable-multiselect');
+
+    if (!isInsideDropdown) {
+      this.showDropdown = false;
+    }
+  }
+
   constructor(
     private productsService: ProductsService,
+    private newProductsService: NewProductsService,
     private categoriesService: CategoriesService,
     private brandsService: BrandsService,
-private skuGenerator: SkuGeneratorService,
-public authService: AuthService ,// Add AuthService to constructor
-
-   private unitsService: UnitsService,
+    private skuGenerator: SkuGeneratorService,
+    public authService: AuthService,
+    private unitsService: UnitsService,
     private taxService: TaxService,
     private userService: UserService,
     private variationsService: VariationsService,
-    private locationService: LocationService,
+    private fileUploadService: FileUploadService,
     private router: Router,
-    private route: ActivatedRoute,
-    private stockService: StockService // Properly typed as StockService
-
-    
-    
-  ) {}
+    private route: ActivatedRoute
+  ) { }
 
   ngOnInit() {
     this.subscriptions.push(
@@ -125,154 +113,266 @@ public authService: AuthService ,// Add AuthService to constructor
         }
       })
     );
-    
+
     this.loadInitialData();
     this.loadTaxRates();
-      this.autofillCurrentUser();
-
+    this.autofillCurrentUser();
     this.loadAvailableProducts();
     this.loadVariations();
     this.product.components = (this.product.components || []).filter((c: any) => c.productId);
 
-    // Handle duplicated product from router state
     const navigation = this.router.getCurrentNavigation();
     const duplicatedProduct = navigation?.extras?.state?.['duplicateProduct'];
-    
+
     if (duplicatedProduct) {
       this.product = {
         ...this.getInitialProduct(),
         ...duplicatedProduct
       };
-      
-      // If it's a combination product, ensure components are properly set
+
       if (this.product.productType === 'Combination' && this.product.components) {
         this.product.components = [...this.product.components];
       }
-      
-      // If it's a variant product, ensure variations are properly set
+
       if (this.product.productType === 'Variant' && this.product.variations) {
         this.variantCombinations = [...this.product.variations];
-        // Initialize selected variations based on the duplicated product
         this.initializeSelectedVariationsFromCombinations();
       }
-      
-      this.isEditing = false; // Ensure we're creating a new product
-      
-      // Filter subcategories based on the duplicated product's category
+
+      this.isEditing = false;
+
       if (this.product.category) {
         setTimeout(() => this.filterSubCategories(), 500);
       }
     }
   }
-  // Add this method to your StockService class
-private autofillCurrentUser() {
-  const currentUser = this.authService.currentUserValue;
-  if (currentUser) {
-    this.product.addedBy = currentUser.uid;
-    this.product.addedByName = currentUser.displayName || currentUser.email;
-    
-    // If you want to show the selected user in the dropdown
-    this.selectedUser = {
-      id: currentUser.uid,
-      name: currentUser.displayName,
-      email: currentUser.email
+
+  ngOnDestroy() {
+    this.subscriptions.forEach(sub => sub.unsubscribe());
+  }
+
+  private getInitialProduct() {
+    return {
+      productName: '',
+      sku: '',
+      hsnCode: '',
+      barcodeType: 'Code 128 (C128)',
+      unit: '',
+      addedByDocId: '',
+      expiryDate: null,
+      addedByName: '',
+      addedDate: new Date().toISOString().split('T')[0],
+      brand: '',
+      category: '',
+      lastNumber: '',
+      subCategory: '',
+      productDescription: '',
+      productImage: null,
+      productImageBase64: null,
+      productImageThumbnail: null,
+      productBrochure: null,
+      productBrochureBase64: null,
+      enableProductDescription: false,
+      notForSelling: false,
+      notSellingProducts: [],
+      weight: null,
+      length: null,
+      breadth: null,
+      height: null,
+      customField1: '',
+      customField2: '',
+      customField3: '',
+      customField4: '',
+      applicableTax: 'None',
+      taxPercentage: 0,
+      sellingPriceTaxType: 'Inclusive',
+      productType: 'Single',
+      marginPercentage: 0,
+      defaultPurchasePriceExcTax: null,
+      defaultPurchasePriceIncTax: null,
+      defaultSellingPriceExcTax: null,
+      defaultSellingPriceIncTax: null,
+      components: [],
+      variations: [],
+      isActive: true,
+      status: 'Active'
     };
   }
-}
 
-filterLocations(event: Event) {
-  const input = event.target as HTMLInputElement;
-  this.searchQuery = input.value.toLowerCase();
-  this.showDropdown = true; // Show dropdown when typing
-  
-  if (!this.searchQuery) {
-    this.filteredLocations = [...this.locations];
-  } else {
-    this.filteredLocations = this.locations.filter(location =>
-      location.name.toLowerCase().includes(this.searchQuery)
-    );
-  }
-}
-  
-// Update the toggleLocationSelection method
-toggleLocationSelection(location: any) {
-  const index = this.selectedLocations.findIndex(l => l.id === location.id);
-  
-  if (index >= 0) {
-    this.selectedLocations.splice(index, 1);
-  } else {
-    this.selectedLocations.push({...location});
-  }
-  
-  this.updateProductLocations();
-  this.showDropdown = false; // Close dropdown after selection
-  }
-  updateProductLocations() {
-  // Update the product with both location IDs and names
-  this.product.locations = this.selectedLocations.map(loc => loc.id);
-  this.product.locationNames = this.selectedLocations.map(loc => loc.name);
-  
-  // For backward compatibility, also set the primary location
-  if (this.selectedLocations.length > 0) {
-    this.product.location = this.selectedLocations[0].id;
-    this.product.locationName = this.selectedLocations[0].name;
-  } else {
-    this.product.location = '';
-    this.product.locationName = '';
-  }
-}
+  // File upload methods
+  async onFileSelected(event: Event, type: 'image' | 'brochure') {
+    const input = event.target as HTMLInputElement;
+    if (!input?.files || input.files.length === 0) return;
 
-removeLocation(location: any) {
-  this.toggleLocationSelection(location);
-}
+    const file = input.files[0];
 
-isLocationSelected(locationId: string): boolean {
-  return this.selectedLocations.some(l => l.id === locationId);
-}
+    try {
+      if (type === 'image') {
+        await this.handleImageUpload(file);
+      } else {
+        await this.handleBrochureUpload(file);
+      }
+    } catch (error) {
+      console.error(`Error uploading ${type}:`, error);
+      alert(`Failed to upload ${type}. Please try again.`);
+    }
+  }
 
+  private async handleImageUpload(file: File) {
+    // Validate file
+    const allowedImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!this.fileUploadService.validateFileType(file, allowedImageTypes)) {
+      alert('Please select a valid image file (JPEG, PNG, GIF, WebP)');
+      return;
+    }
+
+    if (!this.fileUploadService.validateFileSize(file, 5)) {
+      alert('Image file size must be less than 5MB');
+      return;
+    }
+
+    this.isUploadingImage = true;
+
+    try {
+      // Convert to base64
+      const base64String = await this.fileUploadService.convertFileToBase64(file);
+      
+      // Generate thumbnail
+      const thumbnail = await this.fileUploadService.generateImageThumbnail(file, 150, 150);
+
+      // Store in product
+      this.selectedImageFile = file;
+      this.product.productImageBase64 = base64String;
+      this.product.productImageThumbnail = thumbnail;
+      this.product.productImage = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      };
+      this.imagePreview = base64String;
+
+    } finally {
+      this.isUploadingImage = false;
+    }
+  }
+
+  private async handleBrochureUpload(file: File) {
+    // Validate file
+    const allowedBrochureTypes = [
+      'application/pdf',
+      'text/csv',
+      'application/zip',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/jpg',
+      'image/png'
+    ];
+
+    if (!this.fileUploadService.validateFileType(file, allowedBrochureTypes)) {
+      alert('Please select a valid file type (.pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png)');
+      return;
+    }
+
+    if (!this.fileUploadService.validateFileSize(file, 5)) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    this.isUploadingBrochure = true;
+
+    try {
+      // Convert to base64
+      const base64String = await this.fileUploadService.convertFileToBase64(file);
+
+      // Store in product
+      this.selectedBrochureFile = file;
+      this.product.productBrochureBase64 = base64String;
+      this.product.productBrochure = {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      };
+
+      this.brochureInfo = {
+        name: file.name,
+        size: this.fileUploadService.formatFileSize(file.size),
+        type: file.type
+      };
+
+    } finally {
+      this.isUploadingBrochure = false;
+    }
+  }
+
+  removeImage() {
+    this.selectedImageFile = null;
+    this.product.productImageBase64 = null;
+    this.product.productImageThumbnail = null;
+    this.product.productImage = null;
+    this.imagePreview = null;
+
+    // Reset the file input
+    const imageInput = document.getElementById('productImage') as HTMLInputElement;
+    if (imageInput) {
+      imageInput.value = '';
+    }
+  }
+
+  removeBrochure() {
+    this.selectedBrochureFile = null;
+    this.product.productBrochureBase64 = null;
+    this.product.productBrochure = null;
+    this.brochureInfo = null;
+
+    // Reset the file input
+    const brochureInput = document.getElementById('productBrochure') as HTMLInputElement;
+    if (brochureInput) {
+      brochureInput.value = '';
+    }
+  }
+
+  // All other existing methods remain the same...
+  private autofillCurrentUser() {
+    const currentUser = this.authService.currentUserValue;
+    if (currentUser) {
+      this.product.addedByDocId = currentUser.uid;
+      this.product.addedByName = currentUser.displayName || currentUser.email;
+      this.selectedUser = {
+        id: currentUser.uid,
+        name: currentUser.displayName,
+        email: currentUser.email
+      };
+    }
+  }
 
   filterNotSellingProducts() {
-  if (!this.searchNotSellingProducts.trim()) {
-    this.filteredNotSellingProducts = this.getAvailableNotSellingProducts();
-    return;
-  }
-  
-  const query = this.searchNotSellingProducts.toLowerCase().trim();
-  this.filteredNotSellingProducts = this.getAvailableNotSellingProducts().filter(product => 
-    product.productName.toLowerCase().includes(query) ||
-    product.sku.toLowerCase().includes(query)
-  );
-}
-toggleDropdown(event: Event) {
-  event.stopPropagation(); // Prevent the document click handler from closing it immediately
-  this.showDropdown = !this.showDropdown;
-  
-  // If opening, make sure filteredLocations is populated
-  if (this.showDropdown && this.filteredLocations.length === 0) {
-    this.filteredLocations = [...this.locations];
-  }
-}
+    if (!this.searchNotSellingProducts.trim()) {
+      this.filteredNotSellingProducts = this.getAvailableNotSellingProducts();
+      return;
+    }
 
-// Modify your HostListener to properly handle clicks outside
+    const query = this.searchNotSellingProducts.toLowerCase().trim();
+    this.filteredNotSellingProducts = this.getAvailableNotSellingProducts().filter(product =>
+      product.productName.toLowerCase().includes(query) ||
+      product.sku.toLowerCase().includes(query)
+    );
+  }
 
-onNotSellingQuantityChange(product: any) {
-  if (product.selectedQuantity > product.currentStock) {
-    product.selectedQuantity = product.currentStock;
-    alert(`Quantity cannot exceed available stock (${product.currentStock})`);
+  onNotSellingQuantityChange(product: any) {
+    if (product.selectedQuantity < 1) {
+      product.selectedQuantity = 1;
+    }
   }
-  
-  if (product.selectedQuantity < 1) {
-    product.selectedQuantity = 1;
-  }
-}
 
   private initializeSelectedVariationsFromCombinations() {
     if (!this.variantCombinations.length) return;
-    
-    // We'll need to set this up once variations are loaded
+
     setTimeout(() => {
       const valuesByVariationIndex = new Map();
-      
+
       this.variantCombinations.forEach(combo => {
         combo.values.forEach((value: string, index: number) => {
           if (!valuesByVariationIndex.has(index)) {
@@ -281,14 +381,13 @@ onNotSellingQuantityChange(product: any) {
           valuesByVariationIndex.get(index).add(value);
         });
       });
-      
-      // Rebuild selectedVariations based on the combinations
+
       this.selectedVariations = Array.from(valuesByVariationIndex.keys()).map(index => {
         const variationValues = Array.from(valuesByVariationIndex.get(index));
-        const matchingVariation = this.availableVariations.find(v => 
+        const matchingVariation = this.availableVariations.find(v =>
           variationValues.every(val => v.values.includes(val))
         );
-        
+
         if (matchingVariation) {
           return {
             id: matchingVariation.id,
@@ -301,89 +400,33 @@ onNotSellingQuantityChange(product: any) {
     }, 1000);
   }
 
-  ngOnDestroy() {
-    // Unsubscribe from all subscriptions
-    this.subscriptions.forEach(sub => sub.unsubscribe());
+  formatExpiryDate(dateString: string | null): string {
+    if (!dateString) return 'No expiry date';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   }
-formatExpiryDate(dateString: string | null): string {
-  if (!dateString) return 'No expiry date';
-  
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return 'Invalid date';
-  
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
-}
-private getInitialProduct() {
-  return {
-    productName: '',
-    sku: '',
-    hsnCode: '',
-    locations: [], 
-    location: '',
-    barcodeType: 'Code 128 (C128)',
-    unit: '',
-    addedBy: '',
-    expiryDate: null,
-    addedByName: '',
-    addedDate: new Date().toISOString().split('T')[0],
-    brand: '',
-    category: '',
-    totalQuantity: 0,
-    lastNumber: '',
-    subCategory: '',
-    manageStock: true,
-    alertQuantity: null,
-    productDescription: '',
-    productImage: null,
-    productBrochure: null,
-    enableProductDescription: false,
-    notForSelling: false,
-    notSellingProducts: [],
-    weight: null,
-    length: null,
-    breadth: null,
-    height: null,
-    customField1: '',
-    customField2: '',
-    customField3: '',
-    customField4: '',
-    applicableTax: 'None',
-    taxPercentage: 0,
-    sellingPriceTaxType: 'Inclusive',
-    productType: 'Single',
-    marginPercentage: 25.0,
-    defaultPurchasePriceExcTax: null,
-    defaultPurchasePriceIncTax: null,
-    defaultSellingPriceExcTax: null,
-    defaultSellingPriceIncTax: null,
-    components: [],
-    variations: [],
-    isActive: true, // Add this line to make products active by default
-    status: 'Active' // Add this line to set the status
-  };
-}
 
-private loadTaxRates() {
-  const subscription = this.taxService.getTaxRates().subscribe({
-    next: (rates) => {
-      // Make sure the rates have percentage values
-      this.taxRates = rates.filter(rate => !rate.forTaxGroupOnly).map(rate => ({
-        ...rate,
-        percentage: (rate.rate || 0) // Ensure percentage exists, use the correct property name
-      }));
-      console.log('Loaded tax rates:', this.taxRates);
-    },
-    error: (err) => {
-      console.error('Failed to fetch tax rates:', err);
-    }
-  });
-  this.subscriptions.push(subscription);
-}
-  
+  private loadTaxRates() {
+    const subscription = this.taxService.getTaxRates().subscribe({
+      next: (rates) => {
+        this.taxRates = rates.filter(rate => !rate.forTaxGroupOnly).map(rate => ({
+          ...rate,
+          percentage: (rate.rate || 0)
+        }));
+        console.log('Loaded tax rates:', this.taxRates);
+      },
+      error: (err) => {
+        console.error('Failed to fetch tax rates:', err);
+      }
+    });
+    this.subscriptions.push(subscription);
+  }
+
   private loadAvailableProducts(): void {
     const subscription = this.productsService.getProductsRealTime().subscribe({
       next: (products) => {
@@ -397,30 +440,22 @@ private loadTaxRates() {
     this.subscriptions.push(subscription);
   }
 
-private async loadInitialData() {
-  try {
-    this.isLoading = true;
-    await Promise.all([
-      this.loadCategories(),
-      this.loadBrands(),
-      this.loadUsers(),
-      this.loadLocations(),
-      this.loadUnits(),
-      this.loadSubCategories(),
-    ]);
-    
-    // Initialize selected locations if editing
-    if (this.isEditing && this.product.locations && this.product.locations.length > 0) {
-      this.selectedLocations = this.locations.filter(loc => 
-        this.product.locations.some((pl: any) => pl.id === loc.id)
-      );
+  private async loadInitialData() {
+    try {
+      this.isLoading = true;
+      await Promise.all([
+        this.loadCategories(),
+        this.loadBrands(),
+        this.loadUsers(),
+        this.loadUnits(),
+        this.loadSubCategories(),
+      ]);
+    } catch (error) {
+      console.error('Error loading initial data:', error);
+    } finally {
+      this.isLoading = false;
     }
-  } catch (error) {
-    console.error('Error loading initial data:', error);
-  } finally {
-    this.isLoading = false;
   }
-}
 
   addComponent() {
     if (!this.product.components) {
@@ -431,51 +466,56 @@ private async loadInitialData() {
       quantity: 1
     });
   }
-  
-calculateFromMRP() {
-  const taxPercentage = this.getTaxPercentage();
-  if (this.product.defaultSellingPriceIncTax !== null && this.product.defaultSellingPriceIncTax !== undefined) {
-    // Calculate price before tax from MRP
-    this.product.defaultSellingPriceExcTax = 
-      this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100);
-    
-    // Calculate margin based on purchase price
-    if (this.product.defaultPurchasePriceExcTax) {
-      const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
-      const sellingPrice = parseFloat(this.product.defaultSellingPriceExcTax);
-      this.product.marginPercentage = this.roundToTwoDecimals(((sellingPrice - cost) / cost) * 100);
+
+  calculateFromMRP() {
+    const taxPercentage = this.getTaxPercentage();
+    if (this.product.defaultSellingPriceIncTax !== null && this.product.defaultSellingPriceIncTax !== undefined) {
+      this.product.defaultSellingPriceExcTax =
+        this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100);
+
+      if (this.product.defaultPurchasePriceExcTax) {
+        const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
+        const sellingPrice = parseFloat(this.product.defaultSellingPriceExcTax);
+        this.product.marginPercentage = this.roundToTwoDecimals(((sellingPrice - cost) / cost) * 100);
+      }
+
+      this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(this.product.defaultSellingPriceExcTax);
+      this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(this.product.defaultSellingPriceIncTax);
     }
-    
-    // Round the values
-    this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(this.product.defaultSellingPriceExcTax);
-    this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(this.product.defaultSellingPriceIncTax);
   }
-}
 
-calculateSellingPriceIncTax() {
-  const taxPercentage = this.getTaxPercentage();
-  if (this.product.defaultSellingPriceExcTax !== null && this.product.defaultSellingPriceExcTax !== undefined) {
-    // Calculate MRP by adding tax to selling price
-    const calculatedPrice = parseFloat(this.product.defaultSellingPriceExcTax) * (1 + taxPercentage / 100);
-    this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(calculatedPrice);
+  calculateSellingPriceIncTax() {
+    const taxPercentage = this.getTaxPercentage();
+    if (this.product.defaultSellingPriceExcTax !== null && this.product.defaultSellingPriceExcTax !== undefined) {
+      const calculatedPrice = parseFloat(this.product.defaultSellingPriceExcTax) * (1 + taxPercentage / 100);
+      this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(calculatedPrice);
+    }
   }
-}
 
-calculateTaxAmount(): number {
-  const taxPercentage = this.getTaxPercentage();
-  if (!taxPercentage || !this.product.defaultSellingPriceIncTax) return 0;
-  
-  const taxAmount = this.product.defaultSellingPriceIncTax - 
-                   (this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100));
-  
-  return this.roundToTwoDecimals(taxAmount);
-}
+  calculateTaxAmount(): number {
+    const taxPercentage = this.getTaxPercentage();
+    if (!taxPercentage || !this.product.defaultSellingPriceIncTax) return 0;
+
+    const taxAmount = this.product.defaultSellingPriceIncTax -
+      (this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100));
+
+    return this.roundToTwoDecimals(taxAmount);
+  }
+
+  private roundToTwoDecimals(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  private getTaxPercentage(): number {
+    return this.product.taxPercentage || 0;
+  }
+
   private loadCategories(): Promise<void> {
     return new Promise((resolve) => {
       const subscription = this.categoriesService.categories$.subscribe({
         next: (categories) => {
           this.categories = (categories || []).filter(cat => !cat.parentCategory);
-          this.allCategories = categories || []; // Store all categories including subcategories
+          this.allCategories = categories || [];
           console.log('Loaded categories:', this.categories.length);
           resolve();
         },
@@ -488,135 +528,102 @@ calculateTaxAmount(): number {
     });
   }
 
- getAvailableNotSellingProducts(): any[] {
+  getAvailableNotSellingProducts(): any[] {
     if (!this.availableProducts) return [];
-    
-    // Filter out products that are already selected
+
     const selectedProductIds = (this.product.notSellingProducts || []).map((item: any) => item.productId);
+
+    if (this.product.productType === 'Combination') {
+      return this.availableProducts.filter(product =>
+        !selectedProductIds.includes(product.id) &&
+        product.id !== this.product.id
+      );
+    }
     
-    return this.availableProducts.filter(product => 
-      !selectedProductIds.includes(product.id) && 
-      product.id !== this.product.id // Don't include the current product being edited
-      // Removed the stock check: && (product.currentStock || 0) > 0
+    return this.availableProducts.filter(product =>
+      !selectedProductIds.includes(product.id) &&
+      product.id !== this.product.id &&
+      product.notForSelling === true
     );
   }
 
-addNotSellingProduct(product: any) {
-  if (!product || !product.selectedQuantity || product.selectedQuantity <= 0) return;
+  addNotSellingProduct(product: any) {
+    if (!product || !product.selectedQuantity || product.selectedQuantity <= 0) return;
 
-  if (!this.selectedNotSellingProducts) {
-    this.selectedNotSellingProducts = [];
-  }
+    if (!this.selectedNotSellingProducts) {
+      this.selectedNotSellingProducts = [];
+    }
 
-  // Check if product is already added
-  const existingIndex = this.selectedNotSellingProducts.findIndex(
-    (item: any) => item.id === product.id
-  );
+    const existingIndex = this.selectedNotSellingProducts.findIndex(
+      (item: any) => item.id === product.id
+    );
 
-  if (existingIndex === -1) {
-    this.selectedNotSellingProducts.push({
-      ...product,
-      selectedQuantity: product.selectedQuantity
-    });
-  } else {
-    this.selectedNotSellingProducts[existingIndex].selectedQuantity = product.selectedQuantity;
-  }
-
-  // Update the main product's notSellingProducts array
-  if (!this.product.notSellingProducts) {
-    this.product.notSellingProducts = [];
-  }
-  this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
-    productId: p.id,
-    quantity: p.selectedQuantity
-  }));
-
-  // Reset the search
-  this.searchNotSellingProducts = '';
-  this.filterNotSellingProducts();
-}
-  
-
-updateNotSellingQuantity(product: any) {
-  if (product.selectedQuantity > product.currentStock) {
-    product.selectedQuantity = product.currentStock;
-    alert(`Quantity cannot exceed available stock (${product.currentStock})`);
-  }
-  
-  if (product.selectedQuantity < 1) {
-    product.selectedQuantity = 1;
-  }
-
-  // Update the main product's notSellingProducts array
-  this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
-    productId: p.id,
-    quantity: p.selectedQuantity
-  }));
-}
-
-removeNotSellingProduct(index: number) {
-  this.selectedNotSellingProducts.splice(index, 1);
-  
-  // Update the main product's notSellingProducts array
-  this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
-    productId: p.id,
-    quantity: p.selectedQuantity
-  }));
-}
-
-getTotalNotSellingQuantity(): number {
-  if (!this.selectedNotSellingProducts) return 0;
-  
-  return this.selectedNotSellingProducts.reduce((total: number, product: any) => {
-    return total + (product.selectedQuantity || 0);
-  }, 0);
-}
-
-getProductName(productId: string): string {
-  const product = this.availableProducts.find(p => p.id === productId);
-  return product ? product.productName : 'Unknown Product';
-}
-
-getProductSku(productId: string): string {
-  const product = this.availableProducts.find(p => p.id === productId);
-  return product ? product.sku : 'Unknown SKU';
-}
-
-getProductStock(productId: string): number {
-  const product = this.availableProducts.find(p => p.id === productId);
-  return product ? (product.currentStock || 0) : 0;
-}
-
-validateNotSellingQuantity(index: number): void {
-  const item = this.product.notSellingProducts[index];
-  const availableStock = this.getProductStock(item.productId);
-  
-  if (item.quantity > availableStock) {
-    item.quantity = availableStock;
-    alert(`Quantity cannot exceed available stock (${availableStock})`);
-  }
-  
-  if (item.quantity < 1) {
-    item.quantity = 1;
-  }
-}
-
-
-  private loadLocations(): Promise<void> {
-    return new Promise((resolve) => {
-      const subscription = this.locationService.getLocations().subscribe({
-        next: (locations) => {
-          this.locations = locations.filter((loc: any) => loc.active !== false);
-          console.log('Loaded locations:', this.locations.length);
-          resolve();
-        },
-        error: (error) => {
-          console.error('Error loading locations:', error);
-          resolve();
-        }
+    if (existingIndex === -1) {
+      this.selectedNotSellingProducts.push({
+        ...product,
+        selectedQuantity: product.selectedQuantity
       });
-      this.subscriptions.push(subscription);
-    });
+    } else {
+      this.selectedNotSellingProducts[existingIndex].selectedQuantity = product.selectedQuantity;
+    }
+
+    if (!this.product.notSellingProducts) {
+      this.product.notSellingProducts = [];
+    }
+    this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
+      productId: p.id,
+      quantity: p.selectedQuantity
+    }));
+
+    this.searchNotSellingProducts = '';
+    this.filterNotSellingProducts();
+  }
+
+  updateNotSellingQuantity(product: any) {
+    if (product.selectedQuantity < 1) {
+      product.selectedQuantity = 1;
+    }
+
+    this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
+      productId: p.id,
+      quantity: p.selectedQuantity
+    }));
+  }
+
+  removeNotSellingProduct(index: number) {
+    this.selectedNotSellingProducts.splice(index, 1);
+    this.product.notSellingProducts = this.selectedNotSellingProducts.map(p => ({
+      productId: p.id,
+      quantity: p.selectedQuantity
+    }));
+  }
+
+  getTotalNotSellingQuantity(): number {
+    if (!this.selectedNotSellingProducts) return 0;
+    return this.selectedNotSellingProducts.reduce((total: number, product: any) => {
+      return total + (product.selectedQuantity || 0);
+    }, 0);
+  }
+
+  getProductName(productId: string): string {
+    const product = this.availableProducts.find(p => p.id === productId);
+    return product ? product.productName : 'Unknown Product';
+  }
+
+  getProductSku(productId: string): string {
+    const product = this.availableProducts.find(p => p.id === productId);
+    return product ? product.sku : 'Unknown SKU';
+  }
+
+  getProductStock(productId: string): number {
+    return 0;
+  }
+
+  validateNotSellingQuantity(index: number): void {
+    const item = this.product.notSellingProducts[index];
+    if (item.quantity < 1) {
+      item.quantity = 1;
+    }
   }
 
   private loadUsers(): Promise<void> {
@@ -638,9 +645,8 @@ validateNotSellingQuantity(index: number): void {
 
   onUserSelect(user: any) {
     if (!user) return;
-    
     this.selectedUser = user;
-    this.product.addedBy = user.id;
+    this.product.addedByDocId = user.id;
     this.product.addedByName = user.name || user.email;
   }
 
@@ -694,29 +700,26 @@ validateNotSellingQuantity(index: number): void {
   private loadSubCategories(): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        this.subCategories = [
-
-        ];
+        this.subCategories = [];
         console.log('Loaded subcategories:', this.subCategories.length);
         resolve();
       }, 500);
     });
   }
 
- // Update the onCategoryChange method
-onCategoryChange() {
-  this.filterSubCategories();
+  onCategoryChange() {
+    this.filterSubCategories();
 
-  if (this.product.category) {
-    const category = this.allCategories.find(cat => cat.id === this.product.category);
-    if (category) {
-      const categoryName = category.name.toLowerCase();
-      if (this.categoryTaxMapping[categoryName]) {
-        this.setTaxBasedOnCategory(categoryName);
+    if (this.product.category) {
+      const category = this.allCategories.find(cat => cat.id === this.product.category);
+      if (category) {
+        const categoryName = category.name.toLowerCase();
+        if (this.categoryTaxMapping[categoryName]) {
+          this.setTaxBasedOnCategory(categoryName);
+        }
       }
     }
   }
-}
 
   private setTaxBasedOnCategory(categoryName: string) {
     const taxPercentage = this.categoryTaxMapping[categoryName];
@@ -757,82 +760,80 @@ onCategoryChange() {
     this.product.subCategory = '';
   }
 
-private async generateNumericSku(): Promise<string> {
-  try {
-    this.isGeneratingSku = true;
-    const lastSku = await this.productsService.getLastUsedSku();
-    let nextNumber = 100001;
-    
-    if (lastSku) {
-      const lastNumber = parseInt(lastSku, 10);
-      if (!isNaN(lastNumber)) {
-        nextNumber = lastNumber + 1;
-      }
-    }
-    
-    return nextNumber.toString();
-  } finally {
-    this.isGeneratingSku = false;
-  }
-}
-
-async onProductNameChange() {
-  if (this.product.productName && !this.product.sku) {
-    this.isGeneratingSku = true;
+  private async generateNumericSku(): Promise<string> {
     try {
-      this.product.sku = await this.skuGenerator.getNextSku();
-    } catch (error) {
-      console.error('Error generating SKU:', error);
-      this.product.sku = Date.now().toString().slice(-6);
+      this.isGeneratingSku = true;
+      const lastSku = await this.productsService.getLastUsedSku();
+      let nextNumber = 100001;
+
+      if (lastSku) {
+        const lastNumber = parseInt(lastSku, 10);
+        if (!isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
+
+      return nextNumber.toString();
     } finally {
       this.isGeneratingSku = false;
     }
   }
-}
 
-onProductTypeChange() {
-  if (this.product.productType === 'Combination') {
-    // Initialize with one empty component
-    if (!this.product.components || this.product.components.length === 0) {
-      this.product.components = [];
-      this.addComponent();
-    }
-    // For combination products, calculate price based on components
-    this.calculateCombinationPrices();
-  } else if (this.product.productType === 'Variant') {
-    // Initialize variant data if needed
-    if (!this.selectedVariations) {
-      this.selectedVariations = [];
-    }
-    this.generateVariantCombinations();
-  } else if (this.product.productType === 'Single') {
-    // Initialize not selling products array if not for selling is checked
-    if (this.product.notForSelling && !this.product.notSellingProducts) {
-      this.product.notSellingProducts = [];
+  async onProductNameChange() {
+    if (this.product.productName && !this.product.sku) {
+      this.isGeneratingSku = true;
+      try {
+        this.product.sku = await this.skuGenerator.getNextSku();
+      } catch (error) {
+        console.error('Error generating SKU:', error);
+        this.product.sku = Date.now().toString().slice(-6);
+      } finally {
+        this.isGeneratingSku = false;
+      }
     }
   }
-}
+
+  onProductTypeChange() {
+    if (this.product.productType === 'Combination') {
+      if (!this.product.components || this.product.components.length === 0) {
+        this.product.components = [];
+        this.addComponent();
+      }
+      this.calculateCombinationPrices();
+      
+      if (this.product.notForSelling && !this.product.notSellingProducts) {
+        this.product.notSellingProducts = [];
+      }
+    } else if (this.product.productType === 'Variant') {
+      if (!this.selectedVariations) {
+        this.selectedVariations = [];
+      }
+      this.generateVariantCombinations();
+    } else if (this.product.productType === 'Single') {
+      if (this.product.notForSelling && !this.product.notSellingProducts) {
+        this.product.notSellingProducts = [];
+      }
+    }
+  }
 
   removeComponent(index: number) {
     this.product.components.splice(index, 1);
     this.calculateCombinationPrices();
   }
 
-onComponentProductChange(index: number) {
-  const component = this.product.components[index];
-  if (component.productId) {
-    const product = this.getComponentProduct(index);
-    if (product) {
-      // Update the component with product details for display
-      component.productName = product.productName;
-      component.sku = product.sku;
-      component.currentStock = product.currentStock || 0;
-      component.price = product.defaultPurchasePriceExcTax || 0;
+  onComponentProductChange(index: number) {
+    const component = this.product.components[index];
+    if (component.productId) {
+      const product = this.getComponentProduct(index);
+      if (product) {
+        component.productName = product.productName;
+        component.sku = product.sku;
+        component.price = product.defaultPurchasePriceExcTax || 0;
+      }
     }
+    this.calculateCombinationPrices();
+    this.calculateAllPrices();
   }
-  this.calculateCombinationPrices();
-  this.calculateAllPrices(); // This will update the recommended price
-}
 
   getComponentProduct(index: number): any {
     const component = this.product.components[index];
@@ -840,45 +841,39 @@ onComponentProductChange(index: number) {
     return this.availableProducts.find(p => p.id === component.productId);
   }
 
-
- 
   calculateRecommendedPrice(): number {
     const cost = this.calculateCombinationPrices();
     const price = cost * (1 + (this.product.marginPercentage / 100));
-    return this.roundToWholeNumber(price);
+    return Math.round(price);
   }
 
-calculateCombinationPrices(): number {
-  if (!this.product.components || this.product.components.length === 0) {
-    this.product.defaultPurchasePriceExcTax = 0;
-    this.product.defaultPurchasePriceIncTax = 0;
-    return 0;
-  }
-  
-  let totalCost = 0;
-  
-  this.product.components.forEach((component: any) => {
-    const product = this.getComponentProduct(this.product.components.indexOf(component));
-    if (product && product.defaultPurchasePriceExcTax) {
-      const componentCost = product.defaultPurchasePriceExcTax * (component.quantity || 1);
-      totalCost += componentCost;
+  calculateCombinationPrices(): number {
+    if (!this.product.components || this.product.components.length === 0) {
+      this.product.defaultPurchasePriceExcTax = 0;
+      this.product.defaultPurchasePriceIncTax = 0;
+      return 0;
     }
-  });
-  
-  // Update the product's purchase prices
-  this.product.defaultPurchasePriceExcTax = this.roundToTwoDecimals(totalCost);
-  
-  // Calculate inclusive price based on tax
-  const taxPercentage = this.getTaxPercentage();
-  this.product.defaultPurchasePriceIncTax = this.roundToTwoDecimals(
-    totalCost * (1 + taxPercentage / 100)
-  );
-  
-  return this.roundToTwoDecimals(totalCost);
-}
 
+    let totalCost = 0;
 
-  // Variant Product Methods
+    this.product.components.forEach((component: any) => {
+      const product = this.getComponentProduct(this.product.components.indexOf(component));
+      if (product && product.defaultPurchasePriceExcTax) {
+        const componentCost = product.defaultPurchasePriceExcTax * (component.quantity || 1);
+        totalCost += componentCost;
+      }
+    });
+
+    this.product.defaultPurchasePriceExcTax = this.roundToTwoDecimals(totalCost);
+
+    const taxPercentage = this.getTaxPercentage();
+    this.product.defaultPurchasePriceIncTax = this.roundToTwoDecimals(
+      totalCost * (1 + taxPercentage / 100)
+    );
+
+    return this.roundToTwoDecimals(totalCost);
+  }
+
   isVariationSelected(variationId: string): boolean {
     return this.selectedVariations.some(v => v.id === variationId);
   }
@@ -900,7 +895,7 @@ calculateCombinationPrices(): number {
   isValueSelected(variationId: string, value: string): boolean {
     const variation = this.selectedVariations.find(v => v.id === variationId);
     return variation ? variation.values.includes(value) : false;
-  } 
+  }
 
   toggleValueSelection(variationId: string, value: string) {
     const variation = this.selectedVariations.find(v => v.id === variationId);
@@ -921,33 +916,31 @@ calculateCombinationPrices(): number {
       return;
     }
 
-    // Filter out variations with no selected values
     const activeVariations = this.selectedVariations.filter(v => v.values && v.values.length > 0);
-    
+
     if (activeVariations.length === 0) {
       this.variantCombinations = [];
       return;
     }
 
-    // Generate all possible combinations of selected values
     const combinations = this.getCombinations(activeVariations);
-    
-    // Update or create variant combinations
+
     const newCombinations = combinations.map(comb => {
-      const existing = this.variantCombinations.find(vc => 
+      const existing = this.variantCombinations.find(vc =>
         this.arraysEqual(vc.values, comb.values)
       );
-      
+
       return existing || {
         values: comb.values,
         sku: this.generateVariantSku(comb.values),
-        price: this.roundToWholeNumber(this.product.defaultSellingPriceExcTax || 0),
+        price: Math.round(this.product.defaultSellingPriceExcTax || 0),
         quantity: 0
       };
     });
-  
+
     this.variantCombinations = newCombinations;
   }
+
   getCombinations(variations: any[]): any[] {
     if (variations.length === 0) return [];
     if (variations.length === 1) {
@@ -955,10 +948,10 @@ calculateCombinationPrices(): number {
         values: [value]
       }));
     }
-    
+
     const first = variations[0];
     const rest = this.getCombinations(variations.slice(1));
-    
+
     const result: any[] = [];
     first.values.forEach((value: string) => {
       rest.forEach((r) => {
@@ -967,18 +960,17 @@ calculateCombinationPrices(): number {
         });
       });
     });
-    
+
     return result;
   }
 
-generateVariantSku(values: string[]): string {
-  const baseSku = this.product.sku || '100001'; // Default fallback
-  const variantCode = values.map(v => {
-    // Convert first 3 letters to numeric representation
-    return v.substring(0, 3).split('').map(c => c.charCodeAt(0)).join('');
-  }).join('-');
-  return `${baseSku}-${variantCode}`;
-}
+  generateVariantSku(values: string[]): string {
+    const baseSku = this.product.sku || '100001';
+    const variantCode = values.map(v => {
+      return v.substring(0, 3).split('').map(c => c.charCodeAt(0)).join('');
+    }).join('-');
+    return `${baseSku}-${variantCode}`;
+  }
 
   arraysEqual(a1: any[], a2: any[]): boolean {
     return a1.length === a2.length && a1.every((v, i) => v === a2[i]);
@@ -1001,36 +993,24 @@ generateVariantSku(values: string[]): string {
     this.calculateAllPrices();
   }
 
-  private getTaxPercentage(): number {
-    return this.product.taxPercentage || 0;
-  }
-
-
   calculateTax() {
     this.calculateAllPrices();
   }
 
-calculateSellingPrice() {
-  const { defaultPurchasePriceExcTax, marginPercentage } = this.product;
-  if (defaultPurchasePriceExcTax && marginPercentage !== null) {
-    // Calculate selling price before tax
-    const calculatedPrice = parseFloat(defaultPurchasePriceExcTax) * (1 + marginPercentage / 100);
-    this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(calculatedPrice);
-    
-    // Calculate MRP (including tax)
-    this.calculateSellingPriceIncTax();
+  calculateSellingPrice() {
+    const { defaultPurchasePriceExcTax, marginPercentage } = this.product;
+    if (defaultPurchasePriceExcTax && marginPercentage !== null) {
+      const calculatedPrice = parseFloat(defaultPurchasePriceExcTax) * (1 + marginPercentage / 100);
+      this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(calculatedPrice);
+      this.calculateSellingPriceIncTax();
+    }
   }
-}
-
-
-  
 
   calculatePurchasePriceExcTax() {
     const taxPercentage = this.getTaxPercentage();
     if (this.product.defaultPurchasePriceIncTax !== null) {
       this.product.defaultPurchasePriceExcTax =
         this.product.defaultPurchasePriceIncTax / (1 + taxPercentage / 100);
-
       this.calculateSellingPrice();
     }
   }
@@ -1043,310 +1023,228 @@ calculateSellingPrice() {
     }
   }
 
+  calculateAllPrices() {
+    const taxPercentage = this.getTaxPercentage();
 
-calculateAllPrices() {
-  const taxPercentage = this.getTaxPercentage();
-  
-  if (this.product.productType === 'Combination') {
-    // For combination products, always calculate from components
-    const cost = this.calculateCombinationPrices();
-    
-    // Calculate selling price based on margin if MRP isn't set
-    if (!this.product.defaultSellingPriceIncTax) {
-      const priceBeforeTax = cost * (1 + this.product.marginPercentage / 100);
-      this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(priceBeforeTax);
-      this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(
-        priceBeforeTax * (1 + taxPercentage / 100)
-      );
+    if (this.product.productType === 'Combination') {
+      const cost = this.calculateCombinationPrices();
+
+      if (!this.product.defaultSellingPriceIncTax) {
+        const priceBeforeTax = cost * (1 + this.product.marginPercentage / 100);
+        this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(priceBeforeTax);
+        this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(
+          priceBeforeTax * (1 + taxPercentage / 100)
+        );
+      } else {
+        this.calculateFromMRP();
+      }
     } else {
-      // If MRP is set, calculate the exc. tax price from it
-      this.calculateFromMRP();
-    }
-  } else {
-    // For regular products, calculate from MRP if set
-    if (this.product.defaultSellingPriceIncTax) {
-      this.calculateFromMRP();
+      if (this.product.defaultSellingPriceIncTax) {
+        this.calculateFromMRP();
+      }
     }
   }
-}
 
-async addProduct() {
-  this.productFormSubmitted = true;
-  
-  if (!this.validateForm()) {
-    this.isLoading = false;
-    return;
-  }
+  async addProduct() {
+    this.productFormSubmitted = true;
 
-  try {
-    this.isLoading = true;
-    
-    // Set currentStock equal to totalQuantity if manageStock is enabled
-    if (this.product.manageStock) {
-      this.product.currentStock = this.product.totalQuantity || 0;
-    } else {
-      this.product.currentStock = 0;
+    if (!this.validateForm()) {
+      this.isLoading = false;
+      return;
     }
 
-    // Add the product
-    const productId = await this.productsService.addProduct(this.product);
-    
-    // If manageStock is enabled, initialize the stock
-    if (this.product.manageStock && this.product.totalQuantity > 0) {
-      await this.stockService.initializeProductStock(
-        { id: productId, productName: this.product.productName },
-        this.product.totalQuantity
-      );
-    }
+    try {
+      this.isLoading = true;
+      
+      const productData = {
+        ...this.product,
+        productNameLower: this.product.productName.toLowerCase(),
+        manageStock: undefined,
+        totalQuantity: undefined,
+        currentStock: undefined,
+        alertQuantity: undefined,
+        locationDocId: undefined,
+        locationName: undefined,
+        locationsDocIds: undefined,
+        locationNames: undefined
+      };
 
-    this.showSuccess('Product added successfully!');
-    this.router.navigate(['/list-products']);
-    
-  } catch (error) {
-    this.handleError(error);
-  } finally {
-    this.isLoading = false;
+      if (productData.id) {
+        delete productData.id;
+      }
+
+      const productId = await this.newProductsService.addProduct(productData);
+
+      this.showSuccess('Product added successfully!');
+      this.router.navigate(['/list-products']);
+
+    } catch (error) {
+      this.handleError(error);
+    } finally {
+      this.isLoading = false;
+    }
   }
-}
-async saveAndNavigate(event?: Event) {
-  if (event) event.preventDefault(); // Prevent form submission
-  try {
-    await this.addProduct();
-    this.router.navigate(['/list-products']);
-  } catch (error) {
+
+  async saveAndNavigate(event?: Event) {
+    if (event) event.preventDefault();
+    try {
+      await this.addProduct();
+      this.router.navigate(['/list-products']);
+    } catch (error) {
+      console.error('Error saving product:', error);
+    }
+  }
+
+  private validateCombinationProduct() {
+    this.product.components = (this.product.components || []).filter((c: { productId: any; }) => c.productId);
+    if (this.product.components.length === 0) {
+      throw new Error('Please add at least one component for combination products');
+    }
+  }
+
+  private validateVariantProduct() {
+    this.product.variations = this.variantCombinations.map(vc => ({
+      values: vc.values,
+      sku: vc.sku,
+      price: vc.price,
+      quantity: vc.quantity
+    }));
+
+    if (this.product.variations.length === 0) {
+      throw new Error('Please select at least one variation for variant products');
+    }
+  }
+
+  private showSuccess(message: string) {
+    alert(message);
+  }
+
+  private handleError(error: unknown) {
     console.error('Error saving product:', error);
-  }
-}
 
-// Helper methods for better organization
-private validateCombinationProduct() {
-  this.product.components = (this.product.components || []).filter((c: { productId: any; }) => c.productId);
-  if (this.product.components.length === 0) {
-    throw new Error('Please add at least one component for combination products');
-  }
-}
+    let errorMessage = 'Failed to save product';
 
-private validateVariantProduct() {
-  this.product.variations = this.variantCombinations.map(vc => ({
-    values: vc.values,
-    sku: vc.sku,
-    price: vc.price,
-    quantity: vc.quantity
-  }));
-  
-  if (this.product.variations.length === 0) {
-    throw new Error('Please select at least one variation for variant products');
-  }
-}
+    if (error instanceof Error) {
+      errorMessage = error.message;
 
-private showSuccess(message: string) {
-  // You could replace this with a toast notification or other UI feedback
-  alert(message);
-}
-
-private handleError(error: unknown) {
-  console.error('Error saving product:', error);
-  
-  let errorMessage = 'Failed to save product';
-  
-  if (error instanceof Error) {
-    errorMessage = error.message;
-    
-    // Handle specific error cases
-    if (error.message.includes('Applicable Tax')) {
-      errorMessage = 'Please select a valid tax option or choose "None" if no tax applies';
-    } else if (error.message.includes('Firebase')) {
-      // Handle Firebase specific errors
-      if (error.message.includes('permission-denied')) {
-        errorMessage = 'You do not have permission to perform this action';
-      } else if (error.message.includes('network-request-failed')) {
-        errorMessage = 'Network error. Please check your internet connection';
+      if (error.message.includes('Applicable Tax')) {
+        errorMessage = 'Please select a valid tax option or choose "None" if no tax applies';
+      } else if (error.message.includes('Firebase')) {
+        if (error.message.includes('permission-denied')) {
+          errorMessage = 'You do not have permission to perform this action';
+        } else if (error.message.includes('network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection';
+        }
       }
-    }
-  } else if (typeof error === 'string') {
-    errorMessage = error;
-  }
-  
-  // Show user-friendly error message
-  alert(`Error: ${errorMessage}`);
-  
-  // Re-enable form after error
-  this.isLoading = false;
-}
-validateForm(): boolean {
-  let isValid = true;
-
-  // Basic required fields validation
-  const requiredFields = [
-    { field: 'productName', message: 'Product name is required' },
-    { field: 'unit', message: 'Unit is required' },
-    { field: 'barcodeType', message: 'Barcode type is required' },
-    { field: 'productType', message: 'Product type is required' }
-  ];
-
-  // Only require selling price tax type if product is for selling
-  if (!this.product.notForSelling) {
-    requiredFields.push(
-      { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' }
-    );
-  }
-
-  for (const { field, message } of requiredFields) {
-    if (!this.product[field]) {
-      alert(message);
-      isValid = false;
-    }
-  }
-
-  // Validate applicable tax
-  if (this.product.applicableTax === null || this.product.applicableTax === undefined) {
-    alert('Applicable Tax is required');
-    isValid = false;
-  }
-
-  // Skip price validation for not-for-selling products
-  if (!this.product.notForSelling) {
-    // Validate prices if product is for selling
-    if (!this.product.defaultSellingPriceExcTax && !this.product.defaultSellingPriceIncTax) {
-      alert('Either selling price (exc. tax) or MRP (inc. tax) is required');
-      isValid = false;
-    }
-  }
-
-  // Validate product type specific requirements
-  switch (this.product.productType) {
-    case 'Variant':
-      if (!this.variantCombinations || this.variantCombinations.length === 0) {
-        alert('Please select at least one variation');
-        isValid = false;
-      }
-      break;
-      
-    case 'Combination':
-      if (!this.product.components || this.product.components.length === 0) {
-        alert('Please add at least one component');
-        isValid = false;
-      }
-      break;
-      
-    case 'Single':
-      // No additional validation needed for single products
-      // Price validation is already handled above
-      break;
-  }
-
-  return isValid;
-}
-
-onNotForSellingChange() {
-  if (this.product.notForSelling) {
-    // Initialize not selling products array if not exists
-    if (!this.product.notSellingProducts) {
-      this.product.notSellingProducts = [];
-    }
-    
-    // Clear pricing fields for not-for-selling products
-    this.product.defaultSellingPriceExcTax = null;
-    this.product.defaultSellingPriceIncTax = null;
-    this.product.marginPercentage = 0;
-  } else {
-    // Clear not selling products if unchecked
-    this.product.notSellingProducts = [];
-    this.selectedNotSellingProducts = [];
-  }
-}
-
-async saveAndAddOpeningStock() {
-  if (!this.validateForm()) {
-    return;
-  }
-  
-  try {
-    this.isLoading = true;
-
-    // Set both location IDs and names
-    this.product.locations = this.selectedLocations.map(loc => loc.id);
-    this.product.locationNames = this.selectedLocations.map(loc => loc.name);
-
-    if (!this.product.sku && this.product.productName) {
-      this.product.sku = await this.generateNumericSku();
+    } else if (typeof error === 'string') {
+      errorMessage = error;
     }
 
-    this.calculateAllPrices();
-
-    let productId: string;
-
-    if (this.isEditing && this.product.id) {
-      await this.productsService.updateProduct(this.product.id, this.product);
-      productId = this.product.id;
-    } else {
-      productId = await this.productsService.addProduct(this.product);
-    }
-
-    const productData = {
-      id: productId,
-      productName: this.product.productName,
-      unit: this.product.unit,
-     locations: this.selectedLocations.map(loc => ({ id: loc.id, name: loc.name })),
-      totalQuantity: this.product.totalQuantity || 0,
-      currentStock: this.product.totalQuantity || 0, // Set currentStock same as totalQuantity
-      defaultPurchasePriceExcTax: this.product.defaultPurchasePriceExcTax,
-      sku: this.product.sku
-    };
-
-    this.router.navigate(['/opening-stock'], {
-      queryParams: {
-        productId: productId,
-        productData: JSON.stringify(productData)
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in saveAndAddOpeningStock:', error);
-    alert(`Error: ${error instanceof Error ? error.message : 'Failed to save product'}`);
-  } finally {
+    alert(`Error: ${errorMessage}`);
     this.isLoading = false;
   }
-}
 
+  validateForm(): boolean {
+    let isValid = true;
 
+    const requiredFields = [
+      { field: 'productName', message: 'Product name is required' },
+      { field: 'unit', message: 'Unit is required' },
+      { field: 'barcodeType', message: 'Barcode type is required' },
+      { field: 'productType', message: 'Product type is required' }
+    ];
 
-  // Format date for display in input (YYYY-MM-DD)
-formatDateForInput(dateString: string): string {
-  if (!dateString) return '';
-  
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
-  
-  const year = date.getFullYear();
-  const month = ('0' + (date.getMonth() + 1)).slice(-2);
-  const day = ('0' + date.getDate()).slice(-2);
-  
-  return `${year}-${month}-${day}`;
-}
+    if (!this.product.notForSelling) {
+      requiredFields.push(
+        { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' }
+      );
+    }
 
-// Handle date input changes
-onDateChange(event: any) {
-  const inputDate = event.target.value;
-  if (inputDate) {
-    // Convert from YYYY-MM-DD (input format) to Date object
-    this.product.addedDate = new Date(inputDate).toISOString();
+    for (const { field, message } of requiredFields) {
+      if (!this.product[field]) {
+        alert(message);
+        isValid = false;
+      }
+    }
+
+    if (this.product.applicableTax === null || this.product.applicableTax === undefined) {
+      alert('Applicable Tax is required');
+      isValid = false;
+    }
+
+    if (!this.product.notForSelling) {
+      if (!this.product.defaultSellingPriceExcTax && !this.product.defaultSellingPriceIncTax) {
+        alert('Either selling price (exc. tax) or MRP (inc. tax) is required');
+        isValid = false;
+      }
+    }
+
+    switch (this.product.productType) {
+      case 'Variant':
+        if (!this.variantCombinations || this.variantCombinations.length === 0) {
+          alert('Please select at least one variation');
+          isValid = false;
+        }
+        break;
+
+      case 'Combination':
+        if (!this.product.components || this.product.components.length === 0) {
+          alert('Please add at least one component');
+          isValid = false;
+        }
+        break;
+
+      case 'Single':
+        break;
+    }
+
+    return isValid;
   }
-}
 
- async saveAndAddAnother(event?: Event) {
-  if (event) event.preventDefault(); // Prevent form submission
-  try {
-    await this.addProduct();
-    this.resetForm();
-    setTimeout(() => {
-      const firstInput = document.querySelector('input');
-      (firstInput as HTMLInputElement)?.focus();
-    }, 100);
-  } catch (error) {
-    console.error('Error in saveAndAddAnother:', error);
+  onNotForSellingChange() {
+    if (this.product.notForSelling) {
+      if (!this.product.notSellingProducts) {
+        this.product.notSellingProducts = [];
+      }
+      this.product.defaultSellingPriceExcTax = null;
+      this.product.defaultSellingPriceIncTax = null;
+      this.product.marginPercentage = 0;
+    } else {
+      this.product.notSellingProducts = [];
+      this.selectedNotSellingProducts = [];
+    }
   }
-}
+
+  formatDateForInput(dateString: string): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = ('0' + (date.getMonth() + 1)).slice(-2);
+    const day = ('0' + date.getDate()).slice(-2);
+    return `${year}-${month}-${day}`;
+  }
+
+  onDateChange(event: any) {
+    const inputDate = event.target.value;
+    if (inputDate) {
+      this.product.addedDate = new Date(inputDate).toISOString();
+    }
+  }
+
+  async saveAndAddAnother(event?: Event) {
+    if (event) event.preventDefault();
+    try {
+      await this.addProduct();
+      this.resetForm();
+      setTimeout(() => {
+        const firstInput = document.querySelector('input');
+        (firstInput as HTMLInputElement)?.focus();
+      }, 100);
+    } catch (error) {
+      console.error('Error in saveAndAddAnother:', error);
+    }
+  }
 
   editProduct(product: any) {
     this.product = { ...product };
@@ -1364,7 +1262,6 @@ onDateChange(event: any) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-
   async deleteProduct(productId: string) {
     if (confirm('Are you sure you want to delete this product?')) {
       try {
@@ -1381,17 +1278,7 @@ onDateChange(event: any) {
     this.product = this.getInitialProduct();
     this.isEditing = false;
     this.filteredSubCategories = [];
-  }
-
-  onFileSelected(event: Event, type: 'image' | 'brochure') {
-    const input = event.target as HTMLInputElement;
-    if (input?.files && input.files.length > 0) {
-      const file = input.files[0];
-      if (type === 'image') {
-        this.product.productImage = file;
-      } else {
-        this.product.productBrochure = file;
-      }
-    }
+    this.removeImage();
+    this.removeBrochure();
   }
 }

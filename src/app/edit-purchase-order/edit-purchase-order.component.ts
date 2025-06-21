@@ -26,6 +26,8 @@ interface Product {
   defaultPurchasePrice?: number;
   currentStock?: number;
   taxPercentage?: number;
+    notForSelling?: boolean; // Add this line
+
   sku?: string;
   totalQuantity?: number;
   defaultSellingPriceExcTax?: number;
@@ -107,8 +109,8 @@ ngOnInit(): void {
     this.productsFormArray.push(
       this.fb.group({
         productId: ['', Validators.required],
-        quantity: [1, [Validators.required, Validators.min(1)]],
-        unitCost: [0, [Validators.required, Validators.min(0)]],
+        quantity: [1, [, Validators.min(1)]],
+        unitCost: [0, [, Validators.min(0)]],
         discountType: ['percent'],
         discountPercent: [0, [Validators.min(0), Validators.max(100)]],
         discountAmount: [0, [Validators.min(0)]],
@@ -149,30 +151,36 @@ ngOnInit(): void {
     }, 150);
   }
 
-  searchProducts(event: any) {
-    const searchTerm = event.target.value.toLowerCase().trim();
-    this.searchTerm = searchTerm;
-    
-    if (!searchTerm || searchTerm.length < 2) {
-      this.searchResults = [];
-      this.showSearchResults = false;
-      return;
+searchProducts(event: any) {
+  const searchTerm = event.target.value.toLowerCase().trim();
+  this.searchTerm = searchTerm;
+  
+  if (!searchTerm || searchTerm.length < 2) {
+    this.searchResults = [];
+    this.showSearchResults = false;
+    return;
+  }
+  
+  this.searchResults = this.productsList.filter(product => {
+    // Skip products marked as not for selling
+    if (product.notForSelling) {
+      return false;
     }
     
-    this.searchResults = this.productsList.filter(product => {
-      const searchString = [
-        product.productName,
-        product.sku || '',
-      ]
-      .filter(field => field)
-      .join(' ')
-      .toLowerCase();
-      
-      return searchString.includes(searchTerm);
-    });
+    const searchString = [
+      product.productName,
+      product.sku,
+      product.barcode
+    ]
+    .filter(field => field)
+    .join(' ')
+    .toLowerCase();
     
-    this.showSearchResults = this.searchResults.length > 0;
-  }
+    return searchString.includes(searchTerm);
+  });
+  
+  this.showSearchResults = this.searchResults.length > 0;
+}
 
   handleKeyDown(event: KeyboardEvent) {
     if (!this.showSearchResults) return;
@@ -216,57 +224,62 @@ loadTaxRates() {
   });
 }
 
-  addProductFromSearch(product: Product) {
-    const existingIndex = this.productsFormArray.controls.findIndex(
-      control => control.get('productId')?.value === product.id
-    );
-    
-    const unitCost = product.defaultPurchasePriceIncTax || 
-                   product.defaultPurchasePriceExcTax || 
-                   product.unitPurchasePrice || 
-                   product.purchasePrice ||
-                   0;
-
-    const sellingPrice = product.defaultSellingPriceIncTax || 
-                       product.unitSellingPrice || 
-                       product.sellingPrice ||
-                       0;
-
-    const currentStock = product.currentStock || product.totalQuantity || 0;
-
-    if (existingIndex >= 0) {
-      const currentQty = this.productsFormArray.at(existingIndex).get('quantity')?.value || 0;
-      this.productsFormArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
-      this.productsFormArray.at(existingIndex).get('currentStock')?.setValue(currentStock);
-      this.calculateLineTotal(existingIndex);
-    } else {
-      const productFormGroup = this.fb.group({
-        productId: [product.id, Validators.required],
-        productName: [product.productName],
-        quantity: [1, [Validators.required, Validators.min(1)]],
-        unitCost: [unitCost, [Validators.required, Validators.min(0)]],
-        sellingPrice: [sellingPrice],
-        currentStock: [currentStock],
-        discountType: ['percent'],
-        discountPercent: [0, [Validators.min(0), Validators.max(100)]],
-        discountAmount: [0, [Validators.min(0)]],
-        unitCostBeforeTax: [product.defaultPurchasePriceExcTax || unitCost],
-        subtotalBeforeTax: [unitCost],
-        taxPercent: [product.taxPercentage || 0, [Validators.min(0), Validators.max(100)]],
-        taxAmount: [0],
-        netCost: [unitCost],
-        lineTotal: [unitCost],
-        selected: [false]
-      });
-      
-      this.productsFormArray.push(productFormGroup);
-      this.calculateLineTotal(this.productsFormArray.length - 1);
-    }
-    
-    this.updateTotals();
-    this.clearSearch();
+addProductFromSearch(product: Product) {
+  // Double-check that the product is not marked as "not for selling"
+  if (product.notForSelling) {
+    alert('This product is marked as "Not for Selling" and cannot be added to purchase orders.');
+    return;
   }
 
+  const existingIndex = this.productsFormArray.controls.findIndex(
+    control => control.get('productId')?.value === product.id
+  );
+  
+  const unitCost = product.defaultPurchasePriceIncTax || 
+                 product.defaultPurchasePriceExcTax || 
+                 product.unitPurchasePrice || 
+                 product.purchasePrice ||
+                 0;
+
+  const sellingPrice = product.defaultSellingPriceIncTax || 
+                     product.unitSellingPrice || 
+                     product.sellingPrice ||
+                     0;
+
+  const currentStock = product.currentStock || product.totalQuantity || 0;
+
+  if (existingIndex >= 0) {
+    const currentQty = this.productsFormArray.at(existingIndex).get('quantity')?.value || 0;
+    this.productsFormArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
+    this.productsFormArray.at(existingIndex).get('currentStock')?.setValue(currentStock);
+    this.calculateLineTotal(existingIndex);
+  } else {
+    const productFormGroup = this.fb.group({
+      productId: [product.id, Validators.required],
+      productName: [product.productName],
+      quantity: [1, [, Validators.min(1)]],
+      unitCost: [unitCost, [Validators.required, Validators.min(0)]],
+      sellingPrice: [sellingPrice],
+      currentStock: [currentStock],
+      discountType: ['percent'],
+      discountPercent: [0, [Validators.min(0), Validators.max(100)]],
+      discountAmount: [0, [Validators.min(0)]],
+      unitCostBeforeTax: [product.defaultPurchasePriceExcTax || unitCost],
+      subtotalBeforeTax: [unitCost],
+      taxPercent: [product.taxPercentage || 0, [Validators.min(0), Validators.max(100)]],
+      taxAmount: [0],
+      netCost: [unitCost],
+      lineTotal: [unitCost],
+      selected: [false]
+    });
+    
+    this.productsFormArray.push(productFormGroup);
+    this.calculateLineTotal(this.productsFormArray.length - 1);
+  }
+  
+  this.updateTotals();
+  this.clearSearch();
+}
   clearSearch() {
     this.searchTerm = '';
     this.searchResults = [];
@@ -284,15 +297,16 @@ loadTaxRates() {
 
   initForm(): void {
     this.purchaseOrderForm = this.fb.group({
-      supplier: ['', Validators.required],
-      address: [''],
+      supplier: [''],
+      // address: [''],
       referenceNo: [{ value: '', disabled: true }, Validators.required],
       orderDate: ['', ],
       deliveryDate: [''],
       requiredDate: ['', ],
-      addedBy: ['', ],
       businessLocation: ['', ],
       status: ['Pending'],
+          addedBy: [''], // Add this line
+
       products: this.fb.array([]),
       shippingDetails: this.fb.group({
         shippingAddress: [''],
@@ -383,7 +397,7 @@ async loadOrderDetails(orderId: string): Promise<void> {
       // Populate the form with order data
       this.purchaseOrderForm.patchValue({
         supplier: orderData.supplier,
-        address: orderData.address,
+        // address: orderData.address,
         referenceNo: orderData.referenceNo,
         orderDate: this.formatDateForInput(orderData.date),
         deliveryDate: this.formatDateForInput(orderData.expectedDeliveryDate),
@@ -538,28 +552,35 @@ onProductSelect(index: number) {
   
   if (productId) {
     const selectedProduct = this.productsList.find(p => p.id === productId);
-    if (selectedProduct) {
-      // Get the appropriate price (prioritize purchase price, fall back to selling price)
-      const unitPrice = selectedProduct.defaultPurchasePriceIncTax || 
-                      selectedProduct.defaultPurchasePriceExcTax || 
-                      selectedProduct.unitPurchasePrice || 
-                      selectedProduct.purchasePrice ||
-                      selectedProduct.defaultSellingPriceIncTax ||
-                      selectedProduct.sellingPrice || 
-                      0;
-      
-      // Set the tax percentage from the product or default to 0
-      const taxPercent = selectedProduct.taxPercentage || 0;
-      
-      productFormGroup.patchValue({
-        unitCost: unitPrice,
-        currentStock: selectedProduct.currentStock || 0,
-        taxPercent: taxPercent
-      });
-      
-      // Force calculation after setting values
-      this.calculateLineTotal(index);
+    
+    if (!selectedProduct) {
+      return;
     }
+
+    // Check if product is marked as not for selling
+    if (selectedProduct.notForSelling) {
+      alert('This product is marked as "Not for Selling" and cannot be added to purchase orders.');
+      productFormGroup.get('productId')?.setValue('');
+      return;
+    }
+
+    const unitPrice = selectedProduct.defaultPurchasePriceIncTax || 
+                    selectedProduct.defaultPurchasePriceExcTax || 
+                    selectedProduct.unitPurchasePrice || 
+                    selectedProduct.purchasePrice ||
+                    selectedProduct.defaultSellingPriceIncTax ||
+                    selectedProduct.sellingPrice || 
+                    0;
+    
+    const taxPercent = selectedProduct.taxPercentage || 0;
+    
+    productFormGroup.patchValue({
+      unitCost: unitPrice,
+      currentStock: selectedProduct.currentStock || 0,
+      taxPercent: taxPercent
+    });
+    
+    this.calculateLineTotal(index);
   }
 }
 calculateLineTotal(index: number) {
@@ -666,7 +687,7 @@ private roundToTwo(num: number): number {
         const updatedOrder = {
           id: this.orderId,
           supplier: formData.supplier,
-          address: formData.address,
+          // address: formData.address,
           referenceNo: formData.referenceNo,
           date: formData.orderDate,
           // Fix: Map form field names to match PurchaseOrder interface
@@ -674,6 +695,7 @@ private roundToTwo(num: number): number {
           requiredByDate: formData.requiredDate,
           addedBy: formData.addedBy,
           businessLocation: formData.businessLocation,
+          
           status: formData.status,
           products: formData.products,
           shippingDetails: formData.shippingDetails,

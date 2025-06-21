@@ -9,9 +9,9 @@ export interface GinTransfer {
   referenceNo: string;
   locationFrom: string;
   locationTo: string;
-  locationTo2?: string | null; // Added secondary location field
+  locationTo2?: string | null;
   status: string;
-  items: GinTransferItem[];
+  items: GinTransferItem[];  // These items should contain the product details
   shippingCharges: number;
   additionalNotes: string;
   totalAmount: number;
@@ -22,10 +22,15 @@ export interface GinTransfer {
 export interface GinTransferItem {
   productId: string;
   productName: string;
+  sku: string;  // Moved to GinTransferItem
+  barcode?: string;  // Moved to GinTransferItem
   quantity: number;
-  secondaryQuantity?: number; // Added secondary quantity field
+  secondaryQuantity?: number;
   unitPrice: number;
   subtotal: number;
+  unit: string;  // Moved to GinTransferItem
+  locationFrom: string;
+  currentStock?: number;
 }
 
 @Injectable({

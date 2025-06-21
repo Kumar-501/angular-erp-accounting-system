@@ -32,7 +32,22 @@ interface DistrictMap {
   'Tamil Nadu': string[];
 }
 
-
+interface LeadFilters {
+  searchTerm: string;
+  source: string;
+  lifeStage: string;
+  leadStatus: string;
+  assignedTo: string;
+  dealStatus: string;
+  priority: string;
+  department: string;
+  addedBy: string;
+  fromDate: string;
+  toDate: string;
+  orderStatus: '' | 'Reordered' | 'No Reordered';
+  adCode: string;
+  dateOption: string; // Add this
+}
 
 
 @Component({
@@ -270,6 +285,77 @@ filterOptions = {
   toggleFilterSidebar() {
     this.showFilterSidebar = !this.showFilterSidebar;
   }
+  setQuickDate(option: string) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  let fromDate: Date;
+  let toDate: Date = today;
+
+  switch(option) {
+     case 'today':
+      fromDate = new Date(); // Create new instance to avoid reference issues
+      toDate = new Date();  // Create new instance to avoid reference issues
+      break;
+    case 'yesterday':
+      fromDate = yesterday;
+      toDate = yesterday;
+      break;
+    case 'last7':
+      fromDate = new Date(today);
+      fromDate.setDate(fromDate.getDate() - 6);
+      break;
+    case 'last30':
+      fromDate = new Date(today);
+      fromDate.setDate(fromDate.getDate() - 29);
+      break;
+    case 'lastMonth':
+      fromDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      toDate = new Date(today.getFullYear(), today.getMonth(), 0);
+      break;
+    case 'thisMonth':
+      fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    case 'thisFY':
+      // Adjust this based on your fiscal year start (April in this example)
+      const fyStartMonth = 3; // April (0-indexed)
+      fromDate = today.getMonth() >= fyStartMonth ? 
+        new Date(today.getFullYear(), fyStartMonth, 1) :
+        new Date(today.getFullYear() - 1, fyStartMonth, 1);
+      break;
+    case 'lastFY':
+      const lastFYStartMonth = 3; // April (0-indexed)
+      fromDate = new Date(today.getFullYear() - 1, lastFYStartMonth, 1);
+      toDate = new Date(today.getFullYear(), lastFYStartMonth, 0);
+      break;
+    default:
+      fromDate = new Date(0); // Default to beginning of time
+  }
+
+ this.filters.fromDate = this.formatDate(fromDate);
+  this.filters.toDate = this.formatDate(toDate);
+  this.filters.dateOption = option;
+  
+  this.applyFilters();
+}
+private formatDate(date: Date): string {
+  if (!date) return '';
+  
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
+isActiveDateOption(option: string): boolean {
+  // Implement logic to check if the current filter matches this option
+  // This is for highlighting the active option
+  // You'll need to compare your current date range with what the option would set
+  // This is a simplified version - you'll need to expand it
+  return this.filters.dateOption === option;
+}
+
   // Add this method to handle user selection
 onUserSelected(event: Event): void {
   const selectElement = event.target as HTMLSelectElement;
@@ -1192,7 +1278,9 @@ clearAllFilters(): void {
     fromDate: '',
     toDate: '',
     orderStatus: '',
-    adCode: ''
+    adCode: '',
+      dateOption: '' // Add this new property
+
   };
   this.applyFilters();
 }
@@ -1201,6 +1289,7 @@ showAdvancedFilters = false;
 // In your component class
 
 // Enhanced filters object
+// In your component.ts file, update your filters definition
 filters = {
   searchTerm: '',
   source: '',
@@ -1215,7 +1304,7 @@ filters = {
   toDate: '',
   orderStatus: '' as '' | 'Reordered' | 'No Reordered',
   adCode: '',
-  // Add any other filter criteria you need
+  dateOption: '' // Add this new property
 };
 get showBulkActions(): boolean {
   return this.currentUserRole !== 'Executive';
@@ -1600,9 +1689,10 @@ applyDateFilter() {
 }
 
 clearDateFilter() {
-  this.fromDate = '';
-  this.toDate = '';
-  this.applyFilters(); // Use the existing filter method without date filters
+  this.filters.fromDate = '';
+  this.filters.toDate = '';
+  this.filters.dateOption = '';
+  this.applyFilters();
 }
   viewCustomerDetails(customerId: string) {
     this.router.navigate(['/customers', customerId]);
@@ -2897,6 +2987,8 @@ removeSelectedProduct(product: any): void {
       department: '',
       addedBy: '',
       fromDate: '',
+          dateOption: '',
+
       toDate: '',
       adCode:'',
       orderStatus: '',

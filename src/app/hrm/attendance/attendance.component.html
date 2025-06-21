@@ -14,23 +14,91 @@
   <i class="bi bi-clock-history"></i>
   <div>Clock Out</div>
 </button>
-<div class="modal fade" [class.show]="showClockOutModal" [style.display]="showClockOutModal ? 'block' : 'none'">
+<!-- Updated Clock Out Modal with Location, IP Address, and Image Upload -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockOutModal">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5>Clock Out</h5>
-        <button (click)="closeClockOutModal()">×</button>
+        <h5 class="modal-title">Clock Out</h5>
+        <button type="button" class="btn-close" (click)="closeClockOutModal()"></button>
       </div>
       <div class="modal-body">
-        <p>Employee: {{ clockOutData.employee }}</p>
-        <textarea [(ngModel)]="clockOutData.clockOutNote" placeholder="Note"></textarea>
-      </div>
-      <div class="mb-3">
-        <label class="form-label">Clock Out Time</label>
-        <input type="text" class="form-control" [value]="currentTime | date:'medium'" readonly>
+        <form>
+          <div class="mb-3">
+            <label class="form-label">Employee</label>
+            <input type="text" class="form-control" [(ngModel)]="clockOutData.employee" name="employee" readonly>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Shift</label>
+            <input type="text" class="form-control" [(ngModel)]="clockOutData.shift" name="shift" readonly>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Clock Out Time</label>
+            <input type="text" class="form-control" [value]="currentTime | date:'medium'" readonly>
+          </div>
+
+          <!-- Location Section -->
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <div class="d-flex gap-2 mb-2">
+              <button type="button" class="btn btn-outline-primary" (click)="getCurrentLocationForClockOut()">
+                <i class="bi bi-geo-alt"></i> Detect Location
+              </button>
+              <button type="button" class="btn btn-outline-danger" (click)="clearClockOutLocation()" 
+                      *ngIf="clockOutData.latitude">
+                <i class="bi bi-trash"></i> Clear
+              </button>
+            </div>
+            <div class="row g-2" *ngIf="clockOutData.latitude">
+              <div class="col-md-6">
+                <label class="form-label">Latitude</label>
+                <input type="text" class="form-control" [(ngModel)]="clockOutData.latitude" 
+                       name="latitude" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Longitude</label>
+                <input type="text" class="form-control" [(ngModel)]="clockOutData.longitude" 
+                       name="longitude" readonly>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Address</label>
+                <input type="text" class="form-control" [(ngModel)]="clockOutData.locationAddress" 
+                       name="locationAddress" readonly>
+              </div>
+            </div>
+          </div>
+
+          <!-- IP Address Section -->
+          <div class="mb-3">
+            <label class="form-label">IP Address</label>
+            <input type="text" class="form-control" [(ngModel)]="clockOutData.ipAddress" name="ipAddress" readonly />
+          </div>
+          
+          <!-- Clock Out Note -->
+          <div class="mb-3">
+            <label class="form-label">Clock Out Note</label>
+            <textarea class="form-control" [(ngModel)]="clockOutData.clockOutNote" name="clockOutNote" placeholder="Optional note"></textarea>
+          </div>
+
+          <!-- Image Upload Section -->
+          <div class="mb-3">
+            <label class="form-label">Upload Image*</label>
+            <input type="file" class="form-control" (change)="onClockOutImageSelected($event)" accept="image/*" capture="environment" required>
+            <small class="text-muted">Please take a photo of your work environment</small>
+            <div class="mt-2" *ngIf="clockOutData.imagePreview">
+              <img [src]="clockOutData.imagePreview" alt="Preview" class="img-thumbnail" style="max-height: 150px;">
+            </div>
+          </div>
+        </form>
       </div>
       <div class="modal-footer">
-        <button (click)="submitClockOut()">Submit</button>
+        <button class="btn btn-secondary" (click)="closeClockOutModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="submitClockOut()" [disabled]="isClockingOut || !clockOutData.imageFile">
+          <span *ngIf="!isClockingOut">Clock Out</span>
+          <span *ngIf="isClockingOut" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </button>
       </div>
     </div>
   </div>
@@ -191,35 +259,174 @@
         </div>
       </div>
   
-      <!-- All Attendance Tab -->
-      <div *ngSwitchCase="'all'">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4>All Attendance</h4>
-          <button class="btn btn-primary" (click)="openAttendanceModal()">+ Add Attendance</button>
-        </div>
-        <table class="table table-bordered">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Clock In</th>
-              <th>Clock Out</th>
-              <th>Shift</th>
-              <th>IP Address</th>
-              <th>Clock In Note</th>
-              <th>Clock Out Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let a of attendances">
-              <td>{{ a.employee }}</td>
-              <td>{{ a.clockInTime | date:'medium' }}</td>
-              <td>{{ a.shift }}</td>
-              <td>{{ a.ipAddress }}</td>
-              <td>{{ a.clockInNote }}</td>
-            </tr>
-          </tbody>
-        </table>
+<div *ngSwitchCase="'all'">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>All Attendance</h4>
+    <div class="input-group" style="width: 200px;">
+      <input type="date" class="form-control" [(ngModel)]="attendanceFilterDate" (change)="filterAttendanceByDate()">
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover">
+      <thead class="table-light">
+        <tr>
+          <th>Employee</th>
+          <th>Clock In</th>
+          <th>Clock Out</th>
+          <th>Duration</th>
+          <th>Shift</th>
+          <th>Clock In Location</th>
+          <th>Clock Out Location</th>
+          <th>IP Address</th>
+          <th>Clock In Note</th>
+          <th>Clock Out Note</th>
+          <th>Clock In Image</th>
+          <th>Clock Out Image</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let a of filteredAttendances">
+          <td>{{ a.employee }}</td>
+          <td>{{ a.clockInTime | date:'medium' }}</td>
+          <td>{{ a.clockOutTime ? (a.clockOutTime | date:'medium') : '-' }}</td>
+          <td>{{ calculateWorkDuration(a.clockInTime, a.clockOutTime) }}</td>
+          <td>{{ a.shift }}</td>
+          <td>
+            <span *ngIf="a.location">
+              {{ a.location.address || 'Location recorded' }}
+              <small *ngIf="a.location.latitude && a.location.longitude" class="d-block text-muted">
+                ({{ a.location.latitude }}, {{ a.location.longitude }})
+              </small>
+            </span>
+            <span *ngIf="!a.location">-</span>
+          </td>
+          <td>
+            <span *ngIf="a.clockOutLocation">
+              {{ a.clockOutLocation.address || 'Location recorded' }}
+              <small *ngIf="a.clockOutLocation.latitude && a.clockOutLocation.longitude" class="d-block text-muted">
+                ({{ a.clockOutLocation.latitude }}, {{ a.clockOutLocation.longitude }})
+              </small>
+            </span>
+            <span *ngIf="!a.clockOutLocation">-</span>
+          </td>
+          <td>{{ a.ipAddress || '-' }}</td>
+          <td>{{ a.clockInNote || '-' }}</td>
+          <td>{{ a.clockOutNote || '-' }}</td>
+          <td>
+            <div *ngIf="a.imageUrl">
+              <img [src]="a.imageUrl" alt="Clock in image" style="max-height: 50px; cursor: pointer;" 
+                   (click)="openImageModal(a.imageUrl)">
+            </div>
+            <span *ngIf="!a.imageUrl">-</span>
+          </td>
+          <td>
+            <div *ngIf="a.clockOutImageUrl">
+              <img [src]="a.clockOutImageUrl" alt="Clock out image" style="max-height: 50px; cursor: pointer;" 
+                   (click)="openImageModal(a.clockOutImageUrl)">
+            </div>
+            <span *ngIf="!a.clockOutImageUrl">-</span>
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-primary" (click)="openEditAttendanceModal(a)" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-outline-danger" (click)="deleteAttendance(a)" title="Delete">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add this modal for editing attendance -->
+<div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showEditAttendanceModal">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Attendance Record</h5>
+        <button type="button" class="btn-close" (click)="closeEditAttendanceModal()"></button>
       </div>
+      <div class="modal-body">
+        <form>
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Employee</label>
+              <input type="text" class="form-control" [(ngModel)]="editAttendanceData.employee" name="employee" readonly>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Shift</label>
+              <select class="form-select" [(ngModel)]="editAttendanceData.shift" name="shift">
+                <option *ngFor="let shift of shifts" [value]="shift.shiftName">
+                  {{ shift.shiftName }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Clock In Time</label>
+              <input type="datetime-local" class="form-control" 
+                     [ngModel]="toDateTimeLocal(editAttendanceData.clockInTime)" 
+                     (ngModelChange)="editAttendanceData.clockInTime = $event"
+                     name="clockInTime">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Clock Out Time</label>
+              <input type="datetime-local" class="form-control" 
+                     [ngModel]="toDateTimeLocal(editAttendanceData.clockOutTime)" 
+                     (ngModelChange)="editAttendanceData.clockOutTime = $event"
+                     name="clockOutTime">
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Clock In Note</label>
+              <textarea class="form-control" [(ngModel)]="editAttendanceData.clockInNote" name="clockInNote"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Clock Out Note</label>
+              <textarea class="form-control" [(ngModel)]="editAttendanceData.clockOutNote" name="clockOutNote"></textarea>
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">IP Address</label>
+              <input type="text" class="form-control" [(ngModel)]="editAttendanceData.ipAddress" name="ipAddress">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Location</label>
+              <input type="text" class="form-control" 
+                     [value]="editAttendanceData.location?.address || 'No location data'" 
+                     readonly>
+            </div>
+          </div>
+
+          <div class="mb-3" *ngIf="editAttendanceData.imageUrl">
+            <label class="form-label">Clock-in Image</label>
+            <div>
+              <img [src]="editAttendanceData.imageUrl" alt="Clock-in image" class="img-thumbnail" style="max-height: 150px;">
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeEditAttendanceModal()">Cancel</button>
+        <button class="btn btn-primary" (click)="updateAttendance()" [disabled]="isUpdatingAttendance">
+          <span *ngIf="!isUpdatingAttendance">Save Changes</span>
+          <span *ngIf="isUpdatingAttendance" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
   
       <!-- Attendance by Shift Tab -->
       <div *ngSwitchCase="'byShift'">
@@ -342,75 +549,89 @@
         </div>
       </div>
   
-      <!-- Import Attendance Tab - Updated to match the UI in the screenshot -->
-      <div *ngSwitchCase="'import'">
-        <h2>Attendance</h2>
-        
-       
-       
-        
-        <!-- File Import Section -->
-        <div class="mt-4">
-          <div class="form-group mb-3">
-            <label for="fileImport">File To Import:</label>
-            <div class="d-flex">
-              <input type="file" id="fileImport" class="form-control form-control-sm" style="width: auto;" (change)="onFileSelect($event)">
-              <button class="btn btn-primary ms-2" (click)="uploadFile()">Submit</button>
-            </div>
-          </div>
-          
-          <div class="mt-4">
-            <button class="btn btn-success">
-              <i class="bi bi-download"></i> Download template file
-            </button>
-          </div>
-          
-          <!-- Template Instructions Table -->
-          <div class="mt-4">
-            <table class="table table-bordered">
-              <thead class="bg-light">
-                <tr>
-                  <th class="text-center align-middle" style="width: 15%">Column Number</th>
-                  <th class="text-center align-middle" style="width: 25%">Column Name</th>
-                  <th class="text-center align-middle" style="width: 60%">Instruction</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="text-center align-middle">1</td>
-                  <td class="align-middle">Email <span class="text-danger fw-bold">(Required)</span></td>
-                  <td class="align-middle">Email id of the user</td>
-                </tr>
-                <tr>
-                  <td class="text-center align-middle">2</td>
-                  <td class="align-middle">Clock in time <span class="text-danger fw-bold">(Required)</span></td>
-                  <td class="align-middle">Clock in time in "Y-m-d H:i:s" format (2025-04-15 04:45:14)</td>
-                </tr>
-                <tr>
-                  <td class="text-center align-middle">3</td>
-                  <td class="align-middle">Clock out time <span class="text-secondary">(Optional)</span></td>
-                  <td class="align-middle">Clock out time in "Y-m-d H:i:s" format (2025-04-15 04:45:14)</td>
-                </tr>
-                <tr>
-                  <td class="text-center align-middle">4</td>
-                  <td class="align-middle">Clock in note <span class="text-secondary">(Optional)</span></td>
-                  <td class="align-middle"></td>
-                </tr>
-                <tr>
-                  <td class="text-center align-middle">5</td>
-                  <td class="align-middle">Clock out note <span class="text-secondary">(Optional)</span></td>
-                  <td class="align-middle"></td>
-                </tr>
-                <tr>
-                  <td class="text-center align-middle">6</td>
-                  <td class="align-middle">IP Address <span class="text-secondary">(Optional)</span></td>
-                  <td class="align-middle"></td>
-                </tr>
-              </tbody>
-            </table>
+ <!-- Import Attendance Tab -->
+<div *ngSwitchCase="'import'">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Import Attendance</h4>
+  </div>
+
+  <!-- File Import Section -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <div class="mb-4">
+        <label class="form-label fw-bold">File To Import:</label>
+        <div class="d-flex align-items-center gap-2">
+          <input type="file" id="fileImport" class="form-control" 
+                 accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                 (change)="onFileSelect($event)">
+          <button class="btn btn-primary" (click)="uploadFile()" [disabled]="!selectedFile || isImporting">
+            <span *ngIf="!isImporting">Submit</span>
+            <span *ngIf="isImporting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          </button>
+        </div>
+        <small class="text-muted">Accepted formats: CSV, Excel (.xlsx, .xls)</small>
+      </div>
+
+      <div *ngIf="importError" class="alert alert-danger">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        {{ importError }}
+      </div>
+
+      <div *ngIf="importSuccess" class="alert alert-success">
+        <i class="bi bi-check-circle-fill me-2"></i>
+        {{ importSuccess }}
+        <div *ngIf="importResults">
+          <div>Total records: {{ importResults.total }}</div>
+          <div>Successfully imported: {{ importResults.success }}</div>
+          <div *ngIf="importResults.errors.length > 0">
+            Errors: {{ importResults.errors.length }}
+            <ul class="mt-2">
+              <li *ngFor="let error of importResults.errors">{{ error }}</li>
+            </ul>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Template Download Section -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Download Template</h5>
+      <p class="card-text">Download the template file and fill in the attendance data.</p>
+      <button class="btn btn-success" (click)="downloadTemplateFile()">
+        <i class="bi bi-download me-2"></i> Download Template
+      </button>
+
+      <!-- Template Instructions -->
+      <div class="mt-4">
+        <h5>Template Instructions</h5>
+        <table class="table table-bordered">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 15%">Column</th>
+              <th style="width: 25%">Name</th>
+              <th style="width: 60%">Instructions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let col of importColumns">
+              <td class="text-center">{{ col.number }}</td>
+              <td>
+                {{ col.name }}
+                <span *ngIf="col.required" class="badge bg-danger ms-2">Required</span>
+              </td>
+              <td>
+                {{ col.description }}
+                <span *ngIf="col.format" class="text-muted ms-2">{{ col.format }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
   
       <div *ngSwitchDefault>
         <div class="card border-0 shadow-sm">
@@ -492,7 +713,7 @@
       </div>
     </div>
   
-<!-- Add this modal for Clock In at the bottom of the file, before the closing </div> tag -->
+<!-- Update the clock-in modal -->
 <div class="modal fade show" tabindex="-1" style="display: block;" *ngIf="showClockInModal">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -502,15 +723,16 @@
       </div>
       <div class="modal-body">
         <form>
-          <div class="mb-3">
-            <label class="form-label">Employee Name*</label>
-            <select class="form-select" [(ngModel)]="clockInData.employee" name="employee" required>
-              <option value="">Select Employee</option>
-              <option *ngFor="let user of users" [value]="user.username || user.email">
-                {{ user.username || user.email }}
-              </option>
-            </select>
-          </div>
+<div class="mb-3">
+  <label class="form-label">Employee Name</label>
+  <input 
+    type="text" 
+    class="form-control" 
+    [value]="clockInData.employee" 
+    readonly
+  >
+</div>
+
           <div class="mb-3">
             <label class="form-label">Shift*</label>
             <select class="form-select" [(ngModel)]="clockInData.shift" name="shift" required>
@@ -520,19 +742,65 @@
               </option>
             </select>
           </div>
+
+    <!-- Location Section -->
+<div class="mb-3">
+  <label class="form-label">Location</label>
+  <div class="d-flex gap-2 mb-2">
+    <button type="button" class="btn btn-outline-primary" (click)="getCurrentLocation()">
+      <i class="bi bi-geo-alt"></i> Detect Location
+    </button>
+    <button type="button" class="btn btn-outline-danger" (click)="clearLocation()" 
+            *ngIf="clockInData.latitude">
+      <i class="bi bi-trash"></i> Clear
+    </button>
+  </div>
+  <div class="row g-2" *ngIf="clockInData.latitude">
+    <div class="col-md-6">
+      <label class="form-label">Latitude</label>
+      <input type="text" class="form-control" [(ngModel)]="clockInData.latitude" 
+             name="latitude" readonly>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Longitude</label>
+      <input type="text" class="form-control" [(ngModel)]="clockInData.longitude" 
+             name="longitude" readonly>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Address</label>
+      <input type="text" class="form-control" [(ngModel)]="clockInData.locationAddress" 
+             name="locationAddress" readonly>
+    </div>
+  </div>
+</div>
+
+
+
           <div class="mb-3">
             <label class="form-label">IP Address</label>
             <input type="text" class="form-control" [(ngModel)]="clockInData.ipAddress" name="ipAddress" readonly />
           </div>
+
           <div class="mb-3">
             <label class="form-label">Clock In Note</label>
             <textarea class="form-control" [(ngModel)]="clockInData.clockInNote" name="clockInNote" placeholder="Optional note"></textarea>
           </div>
+
+          <!-- Image Upload Field -->
+          <div class="mb-3">
+            <label class="form-label">Upload Image*</label>
+            <input type="file" class="form-control" (change)="onImageSelected($event)" accept="image/*" capture="environment" required>
+            <small class="text-muted">Please take a photo of your work environment</small>
+            <div class="mt-2" *ngIf="clockInData.imagePreview">
+              <img [src]="clockInData.imagePreview" alt="Preview" class="img-thumbnail" style="max-height: 150px;">
+            </div>
+          </div>
         </form>
       </div>
+
       <div class="modal-footer">
         <button class="btn btn-secondary" (click)="closeClockInModal()">Cancel</button>
-        <button class="btn btn-primary" (click)="submitClockIn()" [disabled]="isClockingIn">
+        <button class="btn btn-primary" (click)="submitClockIn()" [disabled]="isClockingIn || !clockInData.imageFile">
           <span *ngIf="!isClockingIn">Clock In</span>
           <span *ngIf="isClockingIn" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
         </button>
@@ -625,5 +893,22 @@
         <button class="btn btn-primary" (click)="closeClockOutSuccessModal()">OK</button>
       </div>
     </div>
-  </div>
+  </div>
+</div>
+<!-- Image Preview Modal -->
+<div class="modal fade" [class.show]="showImageModal" [style.display]="showImageModal ? 'block' : 'none'">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Attendance Image</h5>
+        <button type="button" class="btn-close" (click)="closeImageModal()"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img [src]="selectedImageUrl" alt="Full size attendance image" style="max-width: 100%; max-height: 70vh;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeImageModal()">Close</button>
+      </div>
+    </div>
+  </div>
 </div>

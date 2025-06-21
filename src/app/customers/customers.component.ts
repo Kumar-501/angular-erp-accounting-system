@@ -96,6 +96,8 @@ keralaDistricts = [
 lifeStages: any[] = [];
   customersList: Customer[] = [];
   filteredCustomers: Customer[] = [];
+  isSaving = false; // Add this line with other properties
+
   editingCustomerId: string | null = null;
   assignedUsers: {id: string, username: string}[] = [];
   showFilterSidebar = false;
@@ -618,50 +620,65 @@ applyFilters(): void {
     }
   }
 
-  saveCustomer(): void {
+async saveCustomer(): Promise<void> {
+  // Prevent multiple submissions
+  if (this.isSaving) return;
+  this.isSaving = true;
+
+  try {
     // First set the isIndividual property
     this.customerData.isIndividual = this.isIndividual;
     this.customerData.mobile = this.cleanPhoneNumber(this.customerData.mobile || '');
-  this.customerData.landline = this.cleanPhoneNumber(this.customerData.landline || '');
-  this.customerData.alternateContact = this.cleanPhoneNumber(this.customerData.alternateContact || '');
+    this.customerData.landline = this.cleanPhoneNumber(this.customerData.landline || '');
+    this.customerData.alternateContact = this.cleanPhoneNumber(this.customerData.alternateContact || '');
+
     // Validate based on whether it's an individual or business
     if (this.isIndividual && !this.customerData.firstName) {
       alert('First Name is required for individuals');
+      this.isSaving = false;
       return;
     }
-    // Add this to your validation checks
-if (this.customerData.age && (this.customerData.age < 0 || this.customerData.age > 120)) {
-  alert('Age must be between 0 and 120');
-  return;
-}
+
+    // Age validation
+    if (this.customerData.age && (this.customerData.age < 0 || this.customerData.age > 120)) {
+      alert('Age must be between 0 and 120');
+      this.isSaving = false;
+      return;
+    }
+
     if (!this.isIndividual && !this.customerData.businessName) {
       alert('Business Name is required for businesses');
+      this.isSaving = false;
       return;
     }
     
     // Validate mobile number
     if (!this.customerData.mobile || this.customerData.mobile.length !== 10) {
       alert('Mobile number must be exactly 10 digits');
+      this.isSaving = false;
       return;
     }
     
     // Validate landline if provided
     if (this.customerData.landline && this.customerData.landline.length !== 10) {
       alert('Landline number must be exactly 10 digits');
+      this.isSaving = false;
       return;
     }
     
     // Validate alternate contact if provided
     if (this.customerData.alternateContact && this.customerData.alternateContact.length !== 10) {
       alert('Alternate contact number must be exactly 10 digits');
+      this.isSaving = false;
       return;
     }
 
-    if (this.customerData.lifestage) {
-      this.customerData.lifestage = this.customerData.lifestage;
+    // Set default life stage if not selected
+    if (!this.customerData.lifestage && this.lifeStages.length > 0) {
+      this.customerData.lifestage = this.lifeStages[0].name;
     }
     
-    // Set the createdAt and updatedAt fields
+    // Set timestamps
     const now = new Date();
     if (!this.editingCustomerId) {
       this.customerData.createdAt = now;
@@ -675,13 +692,19 @@ if (this.customerData.age && (this.customerData.age < 0 || this.customerData.age
     
     // Process based on editing state
     if (this.editingCustomerId) {
-      this.updateExistingCustomer();
+      await this.updateExistingCustomer();
     } else {
-      this.addNewCustomer();
+      await this.addNewCustomer();
     }
+  } catch (error) {
+    console.error('Error saving customer:', error);
+    alert('Error saving customer. Please try again.');
+    this.isSaving = false;
   }
+}
 
-  addNewCustomer(): void {
+async addNewCustomer(): Promise<void> {
+  try {
     // Ensure contact ID is generated
     if (!this.customerData.contactId) {
       this.customerData.contactId = this.generateContactId();
@@ -692,68 +715,67 @@ if (this.customerData.age && (this.customerData.age < 0 || this.customerData.age
     
     // Save to appropriate collection based on contact type
     if (this.customerData.contactType === 'Customer' || this.customerData.contactType === 'Both') {
-      this.customerService.addCustomer(this.customerData as Customer)
-        .then(() => {
-          if (this.customerData.contactType !== 'Both') {
-            this.toggleForm();
-            this.loadCustomers();
-            alert('Customer added successfully!');
-          }
-        })
-        .catch((error) => {
-          console.error('Error adding customer: ', error);
-          alert('Error adding customer. Please try again.');
-        });
+      await this.customerService.addCustomer(this.customerData as Customer);
+      
+      if (this.customerData.contactType !== 'Both') {
+        this.toggleForm();
+        this.loadCustomers();
+        alert('Customer added successfully!');
+      }
     }
     
     if (this.customerData.contactType === 'Supplier' || this.customerData.contactType === 'Both') {
-      this.supplierService.addSupplier(this.customerData as any)
-        .then(() => {
-          this.toggleForm();
-          this.loadCustomers();
-          alert(`${this.customerData.contactType === 'Both' ? 'Contact' : 'Supplier'} added successfully!`);
-        })
-        .catch((error) => {
-          console.error('Error adding supplier: ', error);
-          alert('Error adding supplier. Please try again.');
-        });
+      await this.supplierService.addSupplier(this.customerData as any);
+      
+      this.toggleForm();
+      this.loadCustomers();
+      alert(`${this.customerData.contactType === 'Both' ? 'Contact' : 'Supplier'} added successfully!`);
     }
+  } catch (error) {
+    console.error('Error adding customer: ', error);
+    alert('Error adding customer. Please try again.');
+    throw error; // Re-throw to be caught in saveCustomer
+  } finally {
+    this.isSaving = false;
+  }
+}
+
+async updateExistingCustomer(): Promise<void> {
+  if (!this.editingCustomerId) {
+    this.isSaving = false;
+    return;
   }
 
-  updateExistingCustomer(): void {
-    if (this.editingCustomerId) {
-      // Ensure the isIndividual property is properly set
-      this.customerData.isIndividual = this.isIndividual;
+  try {
+    // Ensure the isIndividual property is properly set
+    this.customerData.isIndividual = this.isIndividual;
+    
+    if (this.customerData.contactType === 'Customer' || this.customerData.contactType === 'Both') {
+      await this.customerService.updateCustomer(this.editingCustomerId, this.customerData as Customer);
       
-      if (this.customerData.contactType === 'Customer' || this.customerData.contactType === 'Both') {
-        this.customerService.updateCustomer(this.editingCustomerId, this.customerData as Customer)
-          .then(() => {
-            if (this.customerData.contactType !== 'Both') {
-              this.toggleForm();
-              this.loadCustomers();
-              alert('Customer updated successfully!');
-            }
-          })
-          .catch((error) => {
-            console.error('Error updating customer: ', error);
-            alert('Error updating customer. Please try again.');
-          });
-      }
-      
-      if (this.customerData.contactType === 'Supplier' || this.customerData.contactType === 'Both') {
-        this.supplierService.updateSupplier(this.editingCustomerId, this.customerData as any)
-          .then(() => {
-            this.toggleForm();
-            this.loadCustomers();
-            alert(`${this.customerData.contactType === 'Both' ? 'Contact' : 'Supplier'} updated successfully!`);
-          })
-          .catch((error) => {
-            console.error('Error updating supplier: ', error);
-            alert('Error updating supplier. Please try again.');
-          });
+      if (this.customerData.contactType !== 'Both') {
+        this.toggleForm();
+        this.loadCustomers();
+        alert('Customer updated successfully!');
       }
     }
+    
+    if (this.customerData.contactType === 'Supplier' || this.customerData.contactType === 'Both') {
+      await this.supplierService.updateSupplier(this.editingCustomerId, this.customerData as any);
+      
+      this.toggleForm();
+      this.loadCustomers();
+      alert(`${this.customerData.contactType === 'Both' ? 'Contact' : 'Supplier'} updated successfully!`);
+    }
+  } catch (error) {
+    console.error('Error updating customer: ', error);
+    alert('Error updating customer. Please try again.');
+    throw error; // Re-throw to be caught in saveCustomer
+  } finally {
+    this.isSaving = false;
   }
+}
+
 
   editCustomer(customer: Customer): void {
     // Create a deep copy of customer data

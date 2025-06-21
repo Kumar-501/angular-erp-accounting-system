@@ -15,6 +15,22 @@
     color: #666;
   }
 }
+/* In your component's CSS file */
+td[data-column="Supplier Address"] {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+td[data-column="Supplier Address"]:hover {
+  white-space: normal;
+  overflow: visible;
+  position: relative;
+  z-index: 100;
+  background: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
 /* Filter sidebar container */
 .sidebar-body {
   padding: 15px;

@@ -20,6 +20,8 @@ export class SalesAgentsComponent implements OnInit, OnDestroy {
   agentForm!: FormGroup;
   isEditMode: boolean = false;
   currentAgentId: string | null = null;
+  // Add this to your component class
+isSaving: boolean = false;
 
   // Pagination
   currentPage: number = 1;
@@ -148,14 +150,14 @@ export class SalesAgentsComponent implements OnInit, OnDestroy {
   }
 
   async saveAgent() {
-    if (this.agentForm.valid) {
+  if (this.agentForm.valid && !this.isSaving) {
+    this.isSaving = true; // Disable the button
+    
+    try {
       const formData = this.agentForm.value;
       
-      // Find the selected user to get the name
       const selectedUser = this.users.find(u => u.id === formData.userId);
-      // Find the selected business to get the name
       const selectedBusiness = this.businesses.find(b => b.id === formData.businessId);
-      // Find the selected business type to get the name
       const selectedBusinessType = this.businessTypes.find(t => t.id === formData.businessTypeId);
       
       const agentData = {
@@ -173,9 +175,16 @@ export class SalesAgentsComponent implements OnInit, OnDestroy {
       } else {
         await this.commissionService.addSalesAgent(agentData);
       }
+      
       this.closeModal();
+    } catch (error) {
+      console.error('Error saving agent:', error);
+      // Handle error (maybe show a toast message)
+    } finally {
+      this.isSaving = false; // Re-enable the button
     }
   }
+}
 
   async deleteAgent(id: string) {
     if (confirm('Are you sure you want to delete this agent?')) {

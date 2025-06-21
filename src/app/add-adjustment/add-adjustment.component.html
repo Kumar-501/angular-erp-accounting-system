@@ -7,10 +7,9 @@
       <div class="form-header-grid">
         <div class="col-md-6">
           <div class="form-group">
-            <label>Business Location:</label>
-            <select formControlName="businessLocation" class="form-control" required>
+            <label>Business Location:</label>            <select formControlName="businessLocation" class="form-control" required>
               <option value="">Select Business Location</option>
-              <option *ngFor="let location of businessLocations" [value]="location.name">
+              <option *ngFor="let location of businessLocations" [value]="location.id">
                 {{ location.name }} ({{ location.locationId || 'BL000' + (businessLocations.indexOf(location) + 1) }})
               </option>
             </select>
@@ -80,15 +79,13 @@
                              placeholder="Select or search product" 
                              (click)="onInputClick($event)"
                              (input)="onProductSearch($event)"
-                             [attr.list]="'productList-' + i">
-                      <datalist [id]="'productList-' + i">
-                        <option *ngFor="let product of filteredProducts" [value]="product.name"></option>
+                             [attr.list]="'productList-' + i">                      <datalist [id]="'productList-' + i">
+                        <option *ngFor="let product of filteredProducts" [value]="product.productName"></option>
                       </datalist>
-                      <div class="dropdown-menu w-100" [class.show]="filteredProducts.length > 0">
-                        <button type="button" class="dropdown-item" 
+                      <div class="dropdown-menu w-100" [class.show]="filteredProducts.length > 0">                        <button type="button" class="dropdown-item" 
                                 *ngFor="let prod of filteredProducts" 
                                 (click)="selectProduct(prod, i)">
-                          {{ prod.name }} - ₹{{ prod.unitPrice }}
+                          {{ prod.productName }} ({{ prod.sku }}) - ₹{{ prod.defaultSellingPriceExcTax || 0 }}
                         </button>
                       </div>
                     </div>
@@ -146,8 +143,13 @@
       
       <!-- Form Actions -->
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Adjustment</button>
-        <button type="button" class="btn btn-secondary" (click)="router.navigate(['/list-adjustment'])">
+<!-- In your template, update the submit button -->
+<button type="submit" class="btn btn-primary" [disabled]="isSaving || adjustmentForm.invalid">
+  <span *ngIf="!isSaving">Save Adjustment</span>
+  <span *ngIf="isSaving">
+    <i class="fa fa-spinner fa-spin"></i> Saving...
+  </span>
+</button>        <button type="button" class="btn btn-secondary" (click)="router.navigate(['/list-adjustment'])">
           Go to List
         </button>
       </div>

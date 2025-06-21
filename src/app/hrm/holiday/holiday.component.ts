@@ -13,6 +13,8 @@ export class HolidayComponent implements OnInit {
   holidayForm!: FormGroup;
   holidays: any[] = [];
   locations: any[] = [];
+    isEditMode = false; // Add this flag
+  currentHolidayId: string | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -29,8 +31,8 @@ export class HolidayComponent implements OnInit {
   createForm() {
     this.holidayForm = this.fb.group({
       name: ['', Validators.required],
-      startDate: ['', Validators.required],
-      endDate: ['', Validators.required],
+      startDate: ['',],
+      endDate: ['',],
       businessLocation: ['', Validators.required],
       note: [''],
     });
@@ -56,28 +58,67 @@ export class HolidayComponent implements OnInit {
     });
   }
 
-  openPopup() {
+  openPopup(holiday?: any) {
     this.showPopup = true;
+    if (holiday) {
+      // Edit mode
+      this.isEditMode = true;
+      this.currentHolidayId = holiday.id;
+      this.holidayForm.patchValue({
+        name: holiday.name,
+        startDate: holiday.startDate,
+        endDate: holiday.endDate,
+        businessLocation: holiday.businessLocation,
+        note: holiday.note
+      });
+    } else {
+      // Add mode
+      this.isEditMode = false;
+      this.currentHolidayId = null;
+      this.holidayForm.reset();
+    }
   }
-
-  closePopup() {
+  
+ closePopup() {
     this.showPopup = false;
+    this.isEditMode = false;
+    this.currentHolidayId = null;
     this.holidayForm.reset();
   }
-
+  editHoliday(holiday: any) {
+    this.openPopup(holiday);
+  }
+  deleteHoliday(id: string) {
+    if (confirm('Are you sure you want to delete this holiday?')) {
+      this.holidayService.deleteHoliday(id)
+        .then(() => {
+          this.loadHolidays();
+        });
+    }
+  }
   saveHoliday() {
     if (this.holidayForm.valid) {
       const holidayData = this.holidayForm.value;
 
-      this.holidayService.addHoliday(holidayData).then(() => {
-        this.closePopup();
-        this.loadHolidays();
-      });
+      if (this.isEditMode && this.currentHolidayId) {
+        // Update existing holiday
+        this.holidayService.updateHoliday(this.currentHolidayId, holidayData)
+          .then(() => {
+            this.closePopup();
+            this.loadHolidays();
+          });
+      } else {
+        // Add new holiday
+        this.holidayService.addHoliday(holidayData)
+          .then(() => {
+            this.closePopup();
+            this.loadHolidays();
+          });
+      }
     } else {
       alert('Please fill out all required fields');
     }
   }
-
   // Helper function to get location name by ID
   getLocationName(locationId: string): string {
     const location = this.locations.find(loc => loc.id === locationId);

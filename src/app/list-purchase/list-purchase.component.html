@@ -46,7 +46,7 @@
         </div>
         
         <div class="form-group mb-0">
-          <input type="text" class="form-control form-control-sm" placeholder="Search by reference, supplier, product, invoice no..." [(ngModel)]="searchText" (input)="applyFilter()">
+          <input type="text" class="form-control form-control-sm" placeholder="Search ..." [(ngModel)]="searchText" (input)="applyFilter()">
         </div>
       </div>
       
@@ -59,17 +59,32 @@
   </div>
   
   <div class="filter-body">
-    <div class="mb-3">
-      <label class="form-label">Date Range</label>
-      <div class="input-group input-group-sm mb-2">
-        <span class="input-group-text">From</span>
-        <input type="date" class="form-control" [(ngModel)]="dateFilter.startDate">
+ <!-- Add this inside your filters section -->
+<div class="row mb-3">
+  <div class="col-12">
+    <div class="btn-group btn-group-sm" role="group">
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('today')">Today</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('yesterday')">Yesterday</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('last7days')">Last 7 Days</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('last30days')">Last 30 Days</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('lastMonth')">Last Month</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('thisMonth')">This Month</button>
+      <button type="button" class="btn btn-outline-secondary" (click)="setDateRange('custom')">Custom Range</button>
+    </div>
+    
+    <!-- Show custom date range picker only when custom is selected -->
+    <div class="row mt-2" *ngIf="selectedDateRange === 'custom'">
+      <div class="col-md-6">
+        <label>From Date</label>
+        <input type="date" class="form-control form-control-sm" [(ngModel)]="dateFilter.startDate">
       </div>
-      <div class="input-group input-group-sm">
-        <span class="input-group-text">To</span>
-        <input type="date" class="form-control" [(ngModel)]="dateFilter.endDate">
+      <div class="col-md-6">
+        <label>To Date</label>
+        <input type="date" class="form-control form-control-sm" [(ngModel)]="dateFilter.endDate">
       </div>
     </div>
+  </div>
+</div>
     
     <div class="mb-3">
       <label class="form-label">Purchase Status</label>
@@ -166,6 +181,8 @@
       Payment Status <i class="fas" [ngClass]="getSortIcon('paymentStatus')"></i>
     </th>
     <!-- In your table header section -->
+
+    <!-- In your table header section -->
 <!-- Add these columns to your table -->
 <th (click)="sortTable('totalTax')">Tax (₹)</th>
 <th (click)="sortTable('cgst')">CGST (₹)</th>
@@ -234,6 +251,7 @@
                 </span>
               </td>
               <td>{{ purchase.paymentStatus || 'Unknown' }}</td>
+              <!-- In your table body section -->
               <!-- In your table body section -->
 <td>₹ {{ purchase.totalTax?.toFixed(2) || '0.00' }}</td>
 <td>₹ {{ purchase.cgst?.toFixed(2) || '0.00' }}</td>
@@ -319,95 +337,115 @@
 </div>
 
 <!-- Return Modal -->
-<!-- Return Modal -->
 <div class="modal fade" id="returnModal" tabindex="-1" aria-labelledby="returnModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="returnModalLabel">Return Purchase</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-content return-modal-custom">
+      <!-- Screen overlay when disabled -->
+      <div class="screen-overlay" *ngIf="isDisabled">
+        <div class="spinner-border text-primary overlay-spinner" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="overlay-message" *ngIf="disabledMessage">{{disabledMessage}}</div>
       </div>
-      <div class="modal-body">
-        <div *ngIf="selectedPurchase">
-          <div class="mb-3 row">
+      
+      <div class="modal-header return-modal-header">
+        <h5 class="modal-title" id="returnModalLabel">
+          <i class="fas fa-undo-alt me-2"></i>Return Purchase
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" [disabled]="isDisabled"></button>
+      </div>
+      
+      <div class="modal-body return-modal-body" [class.disabled-content]="isDisabled">
+        <div *ngIf="selectedPurchase" class="return-form-container">
+          <!-- Header Section -->
+          <div class="row mb-4 header-section">
             <div class="col-md-6">
-              <label class="form-label">Purchase Reference:</label>
-              <input type="text" class="form-control" [value]="selectedPurchase.referenceNo" readonly>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Return Date:</label>
-              <input type="date" class="form-control" [(ngModel)]="returnData.returnDate">
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Products:</label>
-            <div class="table-responsive">
-              <table class="table table-bordered">
-                <thead>
-                  <tr>
-                    <th>Product</th>
-                    <th>Purchased Qty</th>
-                    <th>Return Qty</th>
-                    <th>Unit Price</th>
-                    <th>Subtotal</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let product of selectedPurchase.products; let i = index">
-                    <td>{{ product.name || product.productName }}</td>
-                    <td>{{ product.quantity }}</td>
-                    <td>
-                      <input type="number" class="form-control form-control-sm" 
-  [(ngModel)]="returnData.products[i].returnQuantity" 
-  (change)="calculateReturnSubtotal(i)"
-  min="0" [max]="product.quantity ?? null">
-                    </td>
-                    <td>₹ {{ product.price }}</td>
-                    <td>₹ {{ returnData.products[i].subtotal.toFixed(2) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Return Reason:</label>
-            <textarea class="form-control" rows="3" [(ngModel)]="returnData.reason"></textarea>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="mb-3">
-                <label class="form-label">Return Status:</label>
-                <select class="form-select" [(ngModel)]="returnData.returnStatus">
-                  <option value="pending">Pending</option>
-                  <option value="completed">Completed</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
+              <label class="form-label return-label">Purchase Reference:</label>
+              <div class="return-reference-value">{{selectedPurchase.referenceNo}}</div>
             </div>
             <div class="col-md-6">
-              <div class="mb-3">
-                <label class="form-label">Payment Status:</label>
-                <select class="form-select" [(ngModel)]="returnData.paymentStatus">
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="partial">Partial</option>
-                </select>
-              </div>
+              <label class="form-label return-label">Return Date:</label>
+              <input type="date" class="form-control return-date-input" 
+                     [(ngModel)]="returnData.returnDate" [disabled]="isDisabled">
             </div>
           </div>
-          <div class="row">
-            <div class="col-12 text-end">
-              <h5>Total Return Amount: ₹ {{ calculateTotalReturnAmount().toFixed(2) }}</h5>
+
+        <div class="table-responsive mb-4 return-products-table">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="product-col">Product</th>
+              <th class="qty-col">Purchased Qty</th>
+              <th class="return-col">Return Qty</th>
+              <th class="price-col">Unit Price (₹)</th>
+              <th class="subtotal-col">Subtotal (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of returnData.products; let i = index">
+              <td class="product-name">{{ product.name || product.productName }}</td>
+              <td class="purchased-qty">{{ product.quantity }}</td>
+              <td class="return-qty-input">
+                <input type="number" class="form-control" 
+                       [(ngModel)]="returnData.products[i].returnQuantity" 
+                       (change)="calculateReturnSubtotal(i)"
+                       min="0" [max]="product.quantity || 0" [disabled]="isDisabled">
+              </td>
+              <td class="unit-price">{{ product.price | number:'1.2-2' }}</td>
+              <td class="subtotal">{{ returnData.products[i].subtotal | number:'1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+
+          <!-- Return Reason -->
+          <div class="mb-4 return-reason-section">
+            <label class="form-label return-label">Return Reason:</label>
+            <textarea class="form-control return-reason-textarea" 
+                      rows="3" 
+                      placeholder="Please specify the reason for return..."
+                      [(ngModel)]="returnData.reason" [disabled]="isDisabled"></textarea>
+          </div>
+
+          <!-- Status Section -->
+          <div class="row mb-4 status-section">
+            <div class="col-md-6 status-select">
+              <label class="form-label return-label">Return Status:</label>
+              <select class="form-select" [(ngModel)]="returnData.returnStatus" [disabled]="isDisabled">
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
+            <div class="col-md-6 status-select">
+              <label class="form-label return-label">Payment Status:</label>
+              <select class="form-select" [(ngModel)]="returnData.paymentStatus" [disabled]="isDisabled">
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+                <option value="partial">Partial</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Total Amount -->
+          <div class="total-amount-section">
+            <div class="total-amount-label">Total Return Amount:</div>
+            <div class="total-amount-value">₹ {{ calculateTotalReturnAmount() | number:'1.2-2' }}</div>
           </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" (click)="submitReturn()">Submit Return</button>
+
+      <div class="modal-footer return-modal-footer">
+        <button type="button" class="btn btn-cancel" data-bs-dismiss="modal" [disabled]="isDisabled">
+          <i class="fas fa-times me-2"></i>Cancel
+        </button>
+        <button type="button" class="btn btn-submit" (click)="submitReturn()" [disabled]="isDisabled">
+          <i class="fas fa-check me-2"></i>Submit Return
+        </button>
       </div>
     </div>
-  </div>
+  </div>
 </div>
 
 <!-- Payment Modal -->

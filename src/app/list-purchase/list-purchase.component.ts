@@ -13,6 +13,12 @@ import { PaymentService } from '../services/payment.service';
 import { LocationService } from '../services/location.service';
 import { AccountService } from '../services/account.service';
 import { SupplierService } from '../services/supplier.service';
+import { GoodsService } from '../services/goods.service';
+
+interface Supplier {
+  id: number;
+  name: string;
+}
 
 interface ProductItem {
   id?: string;
@@ -25,7 +31,7 @@ interface ProductItem {
   price?: number;
   code?: string;
   batchNumber?: string;
-  expiryDate?: string;
+  expiryDate?: Date | string;
 }
 interface Payment {
   id?: string;
@@ -44,6 +50,13 @@ interface Payment {
 interface ReturnProductItem extends ProductItem {
   returnQuantity: number;
   subtotal: number;
+  productId?: string;
+  productName?: string;
+  sku?: string;
+  unitCost?: number;
+  totalCost?: number;
+  batchNumber?: string;
+  expiryDate?: Date;
 }
 
 // Define the user interface for addedBy field
@@ -55,6 +68,8 @@ interface User {
 interface Purchase {
   id: string;
   purchaseDate?: Date | string | { toDate: () => Date };
+    receivedDate?: Date | string | { toDate: () => Date }; // Add this line
+
   referenceNo?: string;
   businessLocation?: string;
   productsTotal?: number;
@@ -78,7 +93,6 @@ interface Purchase {
   purchaseOrder?: any; 
   invoiceNo?: string;
   invoicedDate?: string;
-  receivedDate?: string;
   shippingCharges?: number;
   payTerm?: string;
   paymentMethod?: string;
@@ -125,15 +139,20 @@ export class ListPurchaseComponent implements OnInit, AfterViewInit {
   filteredPurchases: Purchase[] = [];
   isLoading = true;
   paymentAccounts: any[] = [];
+    goodsReceivedNotes: any[] = [];
+
   paymentAccountsLoading = false;
   errorMessage = '';
   showFilterSidebar = false;
   statusFilter = '';
+  selectedDateRange: string = '';
+isDisabled: boolean = false;
+disabledMessage: string = "Processing your request...";
   selectedPurchaseForAction: Purchase | null = null;
   actionModal: Modal | null = null;
   paymentStatusFilter = '';
   supplierFilter = '';
-  locationFilter = '';
+  locationFilter = '';  
   uniqueSuppliers: string[] = [];
   uniqueLocations: string[] = [];
   dateFilter = {
@@ -141,6 +160,8 @@ export class ListPurchaseComponent implements OnInit, AfterViewInit {
     endDate: ''
   };
   searchText = '';
+  showFilterDrawer = false;
+
   showPaymentForm = false;
   sortColumn: string = '';
   sortDirection: 'asc' | 'desc' = 'asc';
@@ -148,6 +169,9 @@ export class ListPurchaseComponent implements OnInit, AfterViewInit {
   paymentForm: FormGroup;
   supplierSearchText: string = '';
   filteredSuppliers: string[] = [];
+   // Date range
+  showDateRangeDrawer = false;
+
   returnModal: Modal | null = null;
   private currentOpenModal: Modal | null = null;
   selectedPurchase: Purchase | null = null;
@@ -173,7 +197,10 @@ constructor(
     private fb: FormBuilder,
     private locationService: LocationService,
     private supplierService: SupplierService,
-    private accountService: AccountService,
+  private accountService: AccountService,
+  private goodsService: GoodsService,
+
+
   ) {
     this.paymentForm = this.fb.group({
       purchaseId: [''],
@@ -249,6 +276,88 @@ loadPaymentAccounts(): void {
   }
 }
 
+setDateRange(range: string): void {
+  this.selectedDateRange = range;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  switch(range) {
+    case 'today':
+      this.dateFilter.startDate = this.formatDate(today);
+      this.dateFilter.endDate = this.formatDate(today);
+      break;
+      
+    case 'yesterday':
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      this.dateFilter.startDate = this.formatDate(yesterday);
+      this.dateFilter.endDate = this.formatDate(yesterday);
+      break;
+      
+    case 'last7days':
+      const last7days = new Date(today);
+      last7days.setDate(last7days.getDate() - 6);
+      this.dateFilter.startDate = this.formatDate(last7days);
+      this.dateFilter.endDate = this.formatDate(today);
+      break;
+      
+    case 'last30days':
+      const last30days = new Date(today);
+      last30days.setDate(last30days.getDate() - 29);
+      this.dateFilter.startDate = this.formatDate(last30days);
+      this.dateFilter.endDate = this.formatDate(today);
+      break;
+      
+    case 'lastMonth':
+      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      this.dateFilter.startDate = this.formatDate(firstDayLastMonth);
+      this.dateFilter.endDate = this.formatDate(lastDayLastMonth);
+      break;
+      
+    case 'thisMonth':
+      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      this.dateFilter.startDate = this.formatDate(firstDayThisMonth);
+      this.dateFilter.endDate = this.formatDate(today);
+      break;
+      
+    case 'thisFinancialYear':
+      // Adjust based on your financial year start (April in this example)
+      const financialYearStartMonth = 3; // April (0-based)
+      let startYear = today.getFullYear();
+      if (today.getMonth() < financialYearStartMonth) {
+        startYear--;
+      }
+      const firstDayFinancialYear = new Date(startYear, financialYearStartMonth, 1);
+      this.dateFilter.startDate = this.formatDate(firstDayFinancialYear);
+      this.dateFilter.endDate = this.formatDate(today);
+      break;
+      
+    case 'lastFinancialYear':
+      const lastFYStartMonth = 3; // April (0-based)
+      let lastFYStartYear = today.getFullYear() - 1;
+      if (today.getMonth() < lastFYStartMonth) {
+        lastFYStartYear--;
+      }
+      const firstDayLastFY = new Date(lastFYStartYear, lastFYStartMonth, 1);
+      const lastDayLastFY = new Date(lastFYStartYear + 1, lastFYStartMonth, 0);
+      this.dateFilter.startDate = this.formatDate(firstDayLastFY);
+      this.dateFilter.endDate = this.formatDate(lastDayLastFY);
+      break;
+      
+    case 'custom':
+      // Reset dates - user will set them manually
+      this.dateFilter.startDate = '';
+      this.dateFilter.endDate = '';
+      return;
+  }
+  
+  this.applyAdvancedFilters();
+}
+
+private formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
   sortTable(column: string): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -369,6 +478,9 @@ filterSuppliers(): void {
   this.filteredSuppliers = this.uniqueSuppliers.filter(supplier => 
     supplier.toLowerCase().includes(searchText)
   );
+  }
+  toggleFilterDrawer() {
+  this.showFilterDrawer = !this.showFilterDrawer;
 }
  ngOnInit(): void {
     this.loadPurchases();
@@ -380,21 +492,26 @@ filterSuppliers(): void {
       if (this.router.url === '/list-purchase') {
         this.loadPurchases();
         this.loadPurchaseReturns();
+          this.loadGoodsReceivedNotes(); // Add this line
+
       }
     });
   }
 
  ngAfterViewInit(): void {
-    const modalElement = document.getElementById('returnModal');
-    if (modalElement) {
-      this.returnModal = new Modal(modalElement);
-    }
-
-    const statusModalElement = document.getElementById('statusModal');
-    if (statusModalElement) {
-      this.statusModal = new Modal(statusModalElement);
-    }
+  const modalElement = document.getElementById('returnModal');
+  if (modalElement && !this.returnModal) {
+    this.returnModal = new Modal(modalElement);
+    
+    // Add event listener to remove backdrop when modal is hidden
+    modalElement.addEventListener('hidden.bs.modal', () => {
+      const backdrops = document.getElementsByClassName('modal-backdrop');
+      if (backdrops.length > 0) {
+        document.body.removeChild(backdrops[0]);
+      }
+    });
   }
+}
   
 
 
@@ -492,14 +609,15 @@ closePaymentForm(): void {
   toggleFilterSidebar(): void {
     this.showFilterSidebar = !this.showFilterSidebar;
   }
-  resetFilters(): void {
-    this.dateFilter = { startDate: '', endDate: '' };
-    this.statusFilter = '';
-    this.paymentStatusFilter = '';
-    this.supplierFilter = '';
-    this.locationFilter = '';
-    this.applyAdvancedFilters();
-  }
+ resetFilters(): void {
+  this.selectedDateRange = '';
+  this.dateFilter = { startDate: '', endDate: '' };
+  this.statusFilter = '';
+  this.paymentStatusFilter = '';
+  this.supplierFilter = '';
+  this.locationFilter = '';
+  this.applyAdvancedFilters();
+}
   
 
 // In list-purchase.component.ts where you navigate to product details:
@@ -587,6 +705,8 @@ async updatePurchaseStatus(): Promise<void> {
 loadPurchases(): void {
   this.isLoading = true;
   this.errorMessage = '';
+        this.loadGoodsReceivedNotes();
+
   this.purchaseService.getPurchases().subscribe({
     next: (purchases: any[]) => {
       this.purchases = purchases.map(purchase => {
@@ -629,7 +749,8 @@ loadPurchases(): void {
 
           totalTax = taxCalculations.totalTax;
           productsTotal = taxCalculations.productsTotal;
-          taxRate = taxCalculations.taxRate;
+         taxRate = taxCalculations.taxRate;
+         
 
           // Split tax for CGST/SGST or IGST based on interstate status
           if (isInterState) {
@@ -726,6 +847,9 @@ loadPurchases(): void {
           supplier: supplierName,
           supplierName: supplierName,
           supplierId: purchase.supplierId,
+          
+                    receivedDate: this.getFormattedDate(purchase.receivedDate),
+
           supplierAddress: purchase.supplier?.addressLine1 ||
             purchase.address ||
             purchase.supplierAddress ||
@@ -746,7 +870,6 @@ loadPurchases(): void {
 
           invoiceNo: purchase.invoiceNo,
           invoicedDate: purchase.invoicedDate,
-          receivedDate: purchase.receivedDate,
           shippingCharges,
           payTerm: purchase.payTerm,
           paymentMethod: purchase.paymentMethod,
@@ -804,36 +927,73 @@ loadPurchases(): void {
     return products.map(p => p.name || p.productName || 'Unnamed').join(', ');
   }
 
-  private getFormattedDate(date: any): string {
-    if (!date) return '';
-    
-    try {
-      if (typeof date === 'object' && 'toDate' in date) {
-        return this.datePipe.transform(date.toDate(), 'mediumDate') || '';
-      } else if (date instanceof Date) {
-        return this.datePipe.transform(date, 'mediumDate') || '';
-      } else {
-        return this.datePipe.transform(new Date(date), 'mediumDate') || '';
-      }
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return '';
+private getFormattedDate(date: any): string {
+  if (!date) return '';
+  
+  try {
+    // Handle Firestore Timestamp
+    if (typeof date === 'object' && 'toDate' in date) {
+      return this.datePipe.transform(date.toDate(), 'mediumDate') || '';
+    } 
+    // Handle JavaScript Date
+    else if (date instanceof Date) {
+      return this.datePipe.transform(date, 'mediumDate') || '';
+    } 
+    // Handle string date
+    else {
+      return this.datePipe.transform(new Date(date), 'mediumDate') || '';
     }
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return '';
   }
+  }
+  private loadGoodsReceivedNotes(): void {
+  this.goodsService.getAllGoodsReceived().subscribe({
+    next: (goodsNotes: any[]) => {
+      // Create a map of invoice numbers to received dates
+      const invoiceDateMap = new Map<string, Date>();
+      
+      goodsNotes.forEach(goods => {
+        if (goods.invoiceNo && goods.receivedDate) {
+          const receivedDate = goods.receivedDate.toDate 
+            ? goods.receivedDate.toDate() 
+            : new Date(goods.receivedDate);
+          invoiceDateMap.set(goods.invoiceNo, receivedDate);
+        }
+      });
+
+      // Update purchases with received dates
+      this.purchases = this.purchases.map(purchase => {
+        if (purchase.invoiceNo && invoiceDateMap.has(purchase.invoiceNo)) {
+          return {
+            ...purchase,
+            receivedDate: invoiceDateMap.get(purchase.invoiceNo)
+          };
+        }
+        return purchase;
+      });
+
+      this.filteredPurchases = [...this.purchases];
+    },
+    error: (error) => {
+      console.error('Error loading goods received notes:', error);
+    }
+  });
+}
   applyAdvancedFilters(): void {
     let filtered = [...this.purchases];
     
     // Apply date filter
-    if (this.dateFilter.startDate || this.dateFilter.endDate) {
-      filtered = filtered.filter(purchase => {
-        const purchaseDate = this.getDateValue(purchase.purchaseDate);
-        const startDate = this.dateFilter.startDate ? new Date(this.dateFilter.startDate).getTime() : 0;
-        const endDate = this.dateFilter.endDate ? new Date(this.dateFilter.endDate).getTime() : Date.now();
-        
-        return purchaseDate >= startDate && purchaseDate <= endDate;
-      });
-    }
-    
+  if (this.dateFilter.startDate || this.dateFilter.endDate) {
+    filtered = filtered.filter(purchase => {
+      const purchaseDate = this.getDateValue(purchase.purchaseDate);
+      const startDate = this.dateFilter.startDate ? new Date(this.dateFilter.startDate).getTime() : 0;
+      const endDate = this.dateFilter.endDate ? new Date(this.dateFilter.endDate).getTime() + 86400000 : Date.now(); // Add 1 day to include end date
+      
+      return purchaseDate >= startDate && purchaseDate <= endDate;
+    });
+  }
     // Apply status filter
     if (this.statusFilter) {
       filtered = filtered.filter(purchase => 
@@ -907,7 +1067,8 @@ if (this.supplierFilter) {
     const headers = [
       'Date', 'Reference No', 'Invoice No', 'Products', 'Location', 'Supplier', 
       'Purchase Status', 'Payment Status', 'Grand Total', 'Payment Due', 'Added By',
-      'Shipping Charges', 'Pay Term', 'Payment Method', 'Total Tax', 'Balance', 'Tax',
+      'Shipping Charges', 'Pay Term', 'Payment Method', 'Total Tax', 'Balance', 'Tax',    'Date', 'Received Date', 'Reference No', // Add 'Received Date'
+
           'CGST', 'SGST', 'IGST', 
     ];
     
@@ -963,7 +1124,9 @@ if (this.supplierFilter) {
       'Products': purchase.products && purchase.products.length > 0 ? 
         purchase.products.map(p => p.name || p.productName || 'Unnamed').join(', ') : 'N/A',
       'Location': purchase.businessLocation || 'N/A',
-      'Supplier': purchase.supplier || 'N/A',
+      'Supplier': purchase.supplier || 'N/A', 
+          'Received Date': purchase.receivedDate || 'N/A', // Add this line
+
       'Purchase Status': purchase.purchaseStatus || 'Unknown',
       'Payment Status': purchase.paymentStatus || 'Unknown',
       'Grand Total': `₹ ${purchase.grandTotal || '0.00'}`,
@@ -1009,6 +1172,8 @@ if (this.supplierFilter) {
     const data = this.filteredPurchases.map(purchase => [
       purchase.purchaseDate || 'N/A',
       purchase.referenceNo || 'N/A',
+          purchase.receivedDate || 'N/A', // Add this line
+
       purchase.invoiceNo || 'N/A',
       purchase.products && purchase.products.length > 0 ? 
         purchase.products.map(p => p.name || p.productName || 'Unnamed').join(', ') : 'N/A',
@@ -1181,6 +1346,8 @@ printPurchase(purchase: Purchase): void {
               <td>${purchase.invoiceNo || 'N/A'}</td>
               <td class="label">Payment Method:</td>
               <td>${purchase.paymentMethod || 'N/A'}</td>
+                          <td>${purchase.receivedDate || 'N/A'}</td>
+
             </tr>
           </table>
         </div>
@@ -1327,24 +1494,42 @@ printPurchase(purchase: Purchase): void {
     }
     return 'status-unknown';
   }
-  openReturnModal(purchase: Purchase): void {
-    this.selectedPurchase = purchase;
-    this.returnData = this.initReturnData();
-    this.returnData.returnDate = new Date().toISOString().split('T')[0];
-    
+openReturnModal(purchase: Purchase): void {
+  this.selectedPurchase = purchase;
+  this.returnData = this.initReturnData();
+  this.returnData.returnDate = new Date().toISOString().split('T')[0];
     if (purchase.products && purchase.products.length) {
-      this.returnData.products = purchase.products.map(product => ({
-        ...product,
-        returnQuantity: 0,
-        subtotal: 0
-      }));
-    }
-    
-    if (this.returnModal) {
-      this.returnModal.show();
-    }
+    this.returnData.products = purchase.products.map(product => ({
+      ...product,
+      returnQuantity: 0,
+      subtotal: 0,
+      expiryDate: product.expiryDate ? 
+        (typeof product.expiryDate === 'string' ? new Date(product.expiryDate) : product.expiryDate) 
+        : undefined
+    }));
   }
   
+  // Close any existing modal first
+  if (this.currentOpenModal) {
+    this.currentOpenModal.hide();
+  }
+  
+  const modalElement = document.getElementById('returnModal');
+  if (modalElement) {
+    // Remove any existing backdrop
+    const existingBackdrops = document.getElementsByClassName('modal-backdrop');
+    while (existingBackdrops.length > 0) {
+      existingBackdrops[0].parentNode?.removeChild(existingBackdrops[0]);
+    }
+    
+    this.currentOpenModal = new Modal(modalElement);
+    this.currentOpenModal.show();
+  }
+}
+  applyFilters() {
+  // Your filter logic here
+  // This should match what you previously had in applyAdvancedFilters or applyFilter
+}
   calculateReturnSubtotal(index: number): void {
     if (!this.returnData.products[index]) return;
     const product = this.returnData.products[index];

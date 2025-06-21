@@ -351,7 +351,19 @@
   </div>
   
   <div class="sidebar-content">
-    <div class="date-range-picker">
+      <div class="date-range-picker">
+    <div class="quick-date-options">
+      <button class="date-option" [class.active]="isActiveDateOption('today')" (click)="setQuickDate('today')">Today</button>
+      <button class="date-option" [class.active]="isActiveDateOption('yesterday')" (click)="setQuickDate('yesterday')">Yesterday</button>
+      <button class="date-option" [class.active]="isActiveDateOption('last7')" (click)="setQuickDate('last7')">Last 7 Days</button>
+      <button class="date-option" [class.active]="isActiveDateOption('last30')" (click)="setQuickDate('last30')">Last 30 Days</button>
+      <button class="date-option" [class.active]="isActiveDateOption('lastMonth')" (click)="setQuickDate('lastMonth')">Last Month</button>
+      <button class="date-option" [class.active]="isActiveDateOption('thisMonth')" (click)="setQuickDate('thisMonth')">This Month</button>
+      <button class="date-option" [class.active]="isActiveDateOption('thisFY')" (click)="setQuickDate('thisFY')">This Financial Year</button>
+      <button class="date-option" [class.active]="isActiveDateOption('lastFY')" (click)="setQuickDate('lastFY')">Last Financial Year</button>
+    </div>
+    
+    <div class="custom-date-range">
       <div class="date-input">
         <label for="fromDate">From:</label>
         <input type="date" id="fromDate" #fromDateInput
@@ -370,7 +382,7 @@
         Clear Dates
       </button>
     </div>
-
+  </div>
     <!-- Source Filter -->
     <div class="filter-group">
       <h4>Source:</h4>

@@ -91,6 +91,7 @@
               </select>
             </div>
           </div>
+<!-- Add this in your form, preferably near the supplier dropdown -->
 
           <div class="col-md-4">
 <div class="form-group">
@@ -103,7 +104,12 @@
   </div>
 </div>
           </div>
-
+<div class="col-md-12 mt-3">
+  <div class="form-group">
+    <label>Supplier Address:</label>
+    <textarea formControlName="supplierAddress" class="form-control" rows="3" readonly></textarea>
+  </div>
+</div>
      <!-- In your form template -->
 <div class="form-group">
   <label for="addedBy">Added By</label>
@@ -118,7 +124,7 @@
     </option>
     
     <!-- Separator (optional) -->
-\    
+    
     <!-- Other users -->
     <option *ngFor="let user of users" 
             [value]="user.displayName || user.email"
@@ -187,7 +193,6 @@
               </div>
               <div class="text-end">
                 <span class="badge bg-primary me-1">Stock: {{ product.currentStock || 0 }}</span>
-                <span class="badge bg-success">₹{{ product.defaultPurchasePrice || 0 | number:'1.2-2'}}</span>
               </div>
             </div>
             <small *ngIf="product.barcode" class="text-muted d-block">
@@ -278,8 +283,9 @@
         <i class="fa fa-trash"></i> Delete Selected
       </button>
 <button type="submit" class="btn btn-primary" 
-        [disabled]="!purchaseForm.valid || products.length === 0">
-  Save
-</button>    </div>
+        [disabled]="isSaving || !purchaseForm.valid || products.length === 0">
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>   </div>
   </div>
 </div>

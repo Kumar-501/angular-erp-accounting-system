@@ -107,9 +107,9 @@
       <button class="btn btn-secondary ms-2" (click)="toggleFilterSidebar()">
         <i class="bi bi-funnel"></i> Filter
       </button>
-      <button class="btn btn-info ms-2" (click)="openImportModal()">
+      <!-- <button class="btn btn-info ms-2" (click)="openImportModal()">
         <i class="bi bi-upload"></i> Import
-      </button>
+      </button> -->
     </div>
     
     <!-- Export and Bulk Action Buttons -->
@@ -251,15 +251,17 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <form [formGroup]="leaveForm" (ngSubmit)="submitForm()">
-            <div class="mb-3">
-              <label for="employeeSelect" class="form-label">Select employee:</label>
-              <select id="employeeSelect" class="form-select" formControlName="employeeId">
-                <option value="">-- Select --</option>
-                <option *ngFor="let user of users" [value]="user.id">{{ user.username }}</option>
-              </select>
-            </div>
-            
+        <form [formGroup]="leaveForm" (ngSubmit)="submitForm()">
+          <!-- Employee Field (hidden but still in form) -->
+          <input type="hidden" formControlName="employeeId">
+          
+          <!-- Display current user's name -->
+          <div class="mb-3">
+            <label class="form-label">Employee:</label>
+            <p class="form-control-plaintext">{{ currentUserName }}</p>
+          </div>
+          
+           
             <div class="mb-3">
               <label for="leaveTypeSelect" class="form-label">Leave Type:*</label>
               <select id="leaveTypeSelect" class="form-select" formControlName="leaveTypeId">
@@ -267,7 +269,27 @@
                 <option *ngFor="let type of leaveTypes" [value]="type.id">{{ type.leaveType }}</option>
               </select>
             </div>
-            
+  <div class="mb-3">
+  <label for="maxLeaveCount" class="form-label">Maximum Leave Count:*</label>
+  <input 
+    id="maxLeaveCount" 
+    type="number" 
+    class="form-control" 
+    formControlName="maxLeaveCount"
+    min="1"
+    required
+    [readonly]="leaveForm.get('leaveTypeId')?.value"
+  >
+  <div *ngIf="leaveForm.get('maxLeaveCount')?.invalid && (leaveForm.get('maxLeaveCount')?.dirty || leaveForm.get('maxLeaveCount')?.touched)"
+       class="text-danger">
+    <div *ngIf="leaveForm.get('maxLeaveCount')?.errors?.['required']">
+      Maximum leave count is required
+    </div>
+    <div *ngIf="leaveForm.get('maxLeaveCount')?.errors?.['min']">
+      Minimum 1 day is required
+    </div>
+  </div>
+</div>
             <div class="mb-3">
               <label for="sessionSelect" class="form-label">Session:*</label>
               <select id="sessionSelect" class="form-select" formControlName="session">
@@ -282,6 +304,10 @@
               <label for="startDate" class="form-label">Start Date:*</label>
               <input id="startDate" type="date" class="form-control" formControlName="startDate">
             </div>
+  <div class="mb-3">
+      <label for="endDate" class="form-label">End Date:*</label>
+      <input id="endDate" type="date" class="form-control" formControlName="endDate">
+    </div>
 
             <div class="mb-3">
               <label for="reason" class="form-label">Reason:</label>
@@ -309,16 +335,20 @@
                 (change)="toggleSelectAll()" 
                 id="selectAllCheckbox"
               >
-              <label class="form-check-label" for="selectAllCheckbox">
-                All
-              </label>
+          
             </div>
           </th>
-          <th *ngIf="columns[1].visible">Reference No</th>
           <th *ngIf="columns[2].visible">Leave Type</th>
           <th *ngIf="columns[3].visible">Employee</th>
           <th *ngIf="columns[4].visible">Dates</th>
+              <th *ngIf="columns[5].visible">End Date</th>
+
           <th *ngIf="columns[5].visible">Session</th>
+              <th *ngIf="columns[3].visible">Max Days</th>
+                    <th *ngIf="columns[10].visible">Days Taken</th>
+
+      <th *ngIf="columns[11].visible">Remaining Leave</th>
+
           <th *ngIf="columns[6].visible">Reason</th>
           <th *ngIf="columns[7].visible">Status</th>
           <th *ngIf="columns[8].visible">Actions</th>
@@ -337,11 +367,19 @@
               >
             </div>
           </td>
-          <td *ngIf="columns[1].visible">{{ leave.referenceNo }}</td>
           <td *ngIf="columns[2].visible">{{ leave.leaveType }}</td>
           <td *ngIf="columns[3].visible">{{ leave.employeeName }}</td>
           <td *ngIf="columns[4].visible">{{ leave.startDate | date:'dd-MM-yyyy' }}</td>
+              <td *ngIf="columns[5].visible">{{ leave.endDate | date:'dd-MM-yyyy' }}</td>
+
           <td *ngIf="columns[5].visible">{{ leave.session }}</td>
+              <td *ngIf="columns[3].visible">{{ leave.maxLeaveCount }}</td>
+ <td *ngIf="columns[10].visible">{{ leave.daysTaken }}</td>
+      <td *ngIf="columns[11].visible">
+        <span [ngClass]="{'text-danger': leave.remainingLeave <= 0}">
+          {{ leave.remainingLeave }}
+        </span>
+      </td>
           <td *ngIf="columns[6].visible">{{ leave.reason }}</td>
           <td *ngIf="columns[7].visible">
             <span 
@@ -356,20 +394,89 @@
               {{ leave.status | titlecase }}
             </span>
           </td>
-          <td *ngIf="columns[8].visible">
-            <button class="btn btn-info btn-sm" (click)="viewActivity(leave)">
-              <i class="bi bi-activity"></i> Activity
-            </button>
-            <button class="btn btn-danger btn-sm ms-1" (click)="deleteLeave(leave.id)">
-              <i class="bi bi-trash"></i> Delete
-            </button>
-          </td>
+       <!-- In your table row (replace the current actions column) -->
+<td *ngIf="columns[8].visible">
+  <button class="btn btn-info btn-sm" (click)="viewActivity(leave)">
+    <i class="bi bi-activity"></i> Activity
+  </button>
+  <button class="btn btn-primary btn-sm ms-1" (click)="openEditModal(leave)">
+    <i class="bi bi-pencil"></i> Edit
+  </button>
+  <button class="btn btn-danger btn-sm ms-1" (click)="deleteLeave(leave.id)">
+    <i class="bi bi-trash"></i> Delete
+  </button>
+</td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
+<!-- Edit Leave Modal -->
+<div #editLeaveModal class="modal fade" id="editLeaveModal" tabindex="-1" aria-labelledby="editLeaveModalLabel" aria-hidden="true">  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editLeaveModalLabel">Edit Leave</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form [formGroup]="editLeaveForm" (ngSubmit)="updateLeave()">
+          <div class="mb-3">
+            <label class="form-label">Employee:</label>
+            <p class="form-control-plaintext">{{ currentUserName }}</p>
+          </div>
+          
+      <!-- In your edit modal template -->
+<select formControlName="leaveTypeId" class="form-control">
+  <option value="">Select Leave Type</option>
+  <option *ngFor="let type of leaveTypes" [value]="type.id">
+    {{ type.leaveType }}
+  </option>
+</select>
+          
+          <div class="mb-3">
+            <label for="editMaxLeaveCount" class="form-label">Maximum Leave Count:*</label>
+            <input 
+              id="editMaxLeaveCount" 
+              type="number" 
+              class="form-control" 
+              formControlName="maxLeaveCount"
+              min="1"
+              required
+            >
+          </div>
+          
+          <div class="mb-3">
+            <label for="editSessionSelect" class="form-label">Session:*</label>
+            <select id="editSessionSelect" class="form-select" formControlName="session">
+              <option value="Full Day">Full Day</option>
+              <option value="First Half">First Half</option>
+              <option value="Second Half">Second Half</option>
+            </select>
+          </div>
 
+          <div class="mb-3">
+            <label for="editStartDate" class="form-label">Start Date:*</label>
+            <input id="editStartDate" type="date" class="form-control" formControlName="startDate">
+          </div>
+          
+          <div class="mb-3">
+            <label for="editEndDate" class="form-label">End Date:*</label>
+            <input id="editEndDate" type="date" class="form-control" formControlName="endDate">
+          </div>
+
+          <div class="mb-3">
+            <label for="editReason" class="form-label">Reason:</label>
+            <textarea id="editReason" class="form-control" rows="3" formControlName="reason"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" (click)="updateLeave()">Update</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Leave Status Modal -->
 <div #statusModal class="modal fade" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">

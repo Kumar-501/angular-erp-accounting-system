@@ -19,8 +19,10 @@ export class AddUsersComponent implements OnInit {
   departments: any[] = [];
   designations: any[] = [];
   filteredDesignations: any[] = [];
-  businessLocations: any[] = [];
   selectedLocations: string[] = [];
+businessLocations: any[] = [];
+
+
   roles: any[] = [];
 
   constructor(
@@ -134,6 +136,7 @@ export class AddUsersComponent implements OnInit {
       department: ['', ],
       designation: ['', ],
       employeeId: [''], // No longer readonly, will be manually entered
+    allLocations: [true], // This should be true by default
 
       email: ['', [Validators.required, Validators.email]],
       isActive: [false],
@@ -142,7 +145,6 @@ export class AddUsersComponent implements OnInit {
       // Login
       allowLogin: [false],
       role: [''],
-      allLocations: [true],
       username: [''],
       password: [''],
       confirmPassword: [''],
@@ -188,6 +190,9 @@ export class AddUsersComponent implements OnInit {
     this.addUserForm.get('confirmPassword')?.valueChanges.subscribe(() => {
       this.addUserForm.updateValueAndValidity();
     });
+ this.addUserForm.get('allLocations')?.valueChanges.subscribe(value => {
+    console.log('All Locations value changed to:', value);
+  });
 
     // Removed the department valueChanges subscription that called generateEmployeeId
   
@@ -205,39 +210,60 @@ export class AddUsersComponent implements OnInit {
     });
   }
 
-  fetchBusinessLocations(): void {
-    this.locationService.getLocations().subscribe(
-      (locations) => {
-        this.businessLocations = locations;
-        console.log('Business Locations:', this.businessLocations);
-      },
-      (error) => {
-        console.error('Error fetching locations:', error);
-      }
-    );
-  }
+fetchBusinessLocations(): void {
+  this.locationService.getLocations().subscribe(
+    (locations) => {
+      this.businessLocations = locations;
+      console.log('Business Locations:', this.businessLocations);
+    },
+    (error) => {
+      console.error('Error fetching locations:', error);
+    }
+  );
+}
   
-  onAllLocationsChange(): void {
-    const allLocationsControl = this.addUserForm.get('allLocations');
-    if (allLocationsControl?.value) {
+onAllLocationsChange(): void {
+  const allLocationsControl = this.addUserForm.get('allLocations');
+  if (allLocationsControl) {
+    // No need to toggle here - Angular forms handle the checkbox value automatically
+    if (allLocationsControl.value) {
       this.selectedLocations = [];
     }
   }
+}
 
-  isLocationSelected(locationId: string): boolean {
-    return this.selectedLocations.includes(locationId);
+
+isLocationSelected(locationId: string): boolean {
+  return this.selectedLocations.includes(locationId);
+}
+
+onLocationSelect(locationId: string, event: Event): void {
+  const isChecked = (event.target as HTMLInputElement).checked;
+  
+  if (isChecked) {
+    if (!this.selectedLocations.includes(locationId)) {
+      this.selectedLocations.push(locationId);
+    }
+  } else {
+    this.selectedLocations = this.selectedLocations.filter(id => id !== locationId);
   }
+  
+  // If all locations are selected, you might want to check if we should auto-check "All Locations"
+  this.checkAllLocationsStatus();
+}
 
-  onLocationSelect(locationId: string, event: any): void {
-    if (event.target.checked) {
-      if (!this.selectedLocations.includes(locationId)) {
-        this.selectedLocations.push(locationId);
-      }
-    } else {
-      this.selectedLocations = this.selectedLocations.filter(id => id !== locationId);
+private checkAllLocationsStatus(): void {
+  if (this.businessLocations.length > 0) {
+    const allSelected = this.businessLocations.every(loc => 
+      this.selectedLocations.includes(loc.id)
+    );
+    
+    if (allSelected) {
+      this.addUserForm.get('allLocations')?.setValue(true, { emitEvent: false });
+      this.selectedLocations = [];
     }
   }
-
+}
   onSubmit(): void {
     // Mark all fields as touched to show validation errors
     if (this.addUserForm.invalid) {

@@ -19,7 +19,20 @@
       margin-bottom: 20px;
     }
   }
-  
+  .save-btn {
+  /* Your existing button styles */
+  transition: all 0.3s ease;
+}
+
+.save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #cccccc;
+}
+
+.fa-spinner {
+  margin-right: 5px;
+}
   .form-row {
     display: flex;
     flex-wrap: wrap;

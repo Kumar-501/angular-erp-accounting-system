@@ -57,6 +57,7 @@ interface InvoiceData {
 
 interface Shipment {
   prescription: any;
+  prescriptions?: PrescriptionData[]; // Add this line
   id: string;
   date: string | Date;  // Can be either string or Date object
   invoiceNo: string;
@@ -91,6 +92,29 @@ interface Shipment {
     note?: string;
   }[];
 }
+
+interface PrescriptionData {
+  patientName: string;
+  patientAge?: string;
+  date: string;
+  medicines: Medicine[];
+  additionalNotes?: string;
+  doctorName?: string;
+  createdAt?: Date;
+}
+
+interface Medicine {
+  name: string;
+  type: string;
+  dosage?: string;
+  instructions?: string;
+  quantity?: string;
+  powder?: string;
+  pills?: string;
+  time: string;
+  [key: string]: any;
+}
+
 interface PrescriptionForm {
   patientName: string;
   date: string;
@@ -130,11 +154,13 @@ export class ShipmentsComponent implements OnInit {
   serviceMap: Map<string, any> = new Map<string, any>();
 private unsubscribeShipments!: () => void;
 private invoiceModal: any; // Add this property
+private prescriptionModal: any; // Add this property
 shipments: Shipment[] = [];
   selectedShipments: string[] = []; // Array to store selected shipment IDs
 isUpdating = false;
 // Add these to your component class
 combinedAddress: string = '';
+currentPrescriptionData: PrescriptionData | null = null; // Add this property
 invoiceData: InvoiceData = {
   invoiceNo: '',
   date: '',
@@ -169,6 +195,361 @@ selectedIds: number[] = [];
 bulkStatusUpdate = {
   status: 'Pending' // Default status
 };
+
+// Add this method to get medicine type names (same as in add-sale component)
+getMedicineTypeName(type: string): string {
+  const typeNames: {[key: string]: string} = {
+    'kasayam': 'Kasayam (കഷായം)',
+    'buligha': 'Buligha (ഗുളിക)',
+    'bhasmam': 'Bhasmam (ഭസ്മം)',
+    'krudham': 'Krudham (ഘൃതം)',
+    'suranam': 'Suranam (ചൂർണ്ണം)',
+    'rasayanam': 'Rasayanam (രസായനം)',
+    'lagium': 'Lagium (ലേഹ്യം)'
+  };
+  return typeNames[type] || 'Medicine';
+}
+
+// Add method to view prescription
+viewPrescription(shipment: Shipment): void {
+  console.log('Viewing prescription for shipment:', shipment);
+  
+  // Check if shipment has prescriptions
+  if (!shipment.prescriptions || shipment.prescriptions.length === 0) {
+    alert('No prescription available for this shipment.');
+    return;
+  }
+  
+  // Get the first prescription (you can modify this to handle multiple prescriptions)
+  this.currentPrescriptionData = shipment.prescriptions[0];
+  
+  // Initialize prescription modal if not already done
+  if (!this.prescriptionModal) {
+    const modalElement = document.getElementById('prescriptionModal');
+    if (modalElement) {
+      this.prescriptionModal = new bootstrap.Modal(modalElement);
+    }
+  }
+  
+  // Show the modal
+  if (this.prescriptionModal) {
+    this.prescriptionModal.show();
+  }
+}
+
+// Add method to print prescription as PDF
+printPrescriptionPDF(): void {
+  if (!this.currentPrescriptionData) return;
+  
+  const printContent = this.generatePrescriptionPDFContent(this.currentPrescriptionData);
+  const printWindow = window.open('', '_blank');
+  
+  if (!printWindow) {
+    alert('Please allow popups for this website to print prescriptions.');
+    return;
+  }
+
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+}
+
+// Add method to download prescription as PDF
+downloadPrescriptionPDF(): void {
+  if (!this.currentPrescriptionData) return;
+  
+  // For now, we'll use the print method. For actual PDF download,
+  // you would need a PDF library like jsPDF or pdfmake
+  this.printPrescriptionPDF();
+}
+
+// Generate prescription PDF content
+private generatePrescriptionPDFContent(prescription: PrescriptionData): string {
+  const formattedDate = prescription.date ? 
+    new Date(prescription.date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) : 
+    new Date().toLocaleDateString();
+  
+  // Generate medicines HTML
+  let medicinesHtml = '';
+  if (prescription.medicines && prescription.medicines.length > 0) {
+    prescription.medicines.forEach((medicine, index) => {
+      medicinesHtml += `
+        <div class="medicine-item" style="margin-bottom: 20px; page-break-inside: avoid;">
+          <h4 style="font-size: 16px; margin-bottom: 8px; color: #0056b3;">
+            ${index + 1}. ${this.getMedicineTypeName(medicine.type)}
+          </h4>
+          ${this.generateMedicineDetailsHTML(medicine)}
+        </div>
+      `;
+    });
+  }
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Prescription - ${prescription.patientName}</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          line-height: 1.6; 
+          padding: 20px; 
+          max-width: 800px; 
+          margin: 0 auto;
+          position: relative;
+        }
+        .header { 
+          text-align: center; 
+          margin-bottom: 30px; 
+          border-bottom: 2px solid #0056b3;
+          padding-bottom: 20px;
+        }
+        .header h2 {
+          color: #0056b3;
+          margin-bottom: 5px;
+          font-size: 24px;
+        }
+        .header h3 {
+          color: #28a745;
+          margin-top: 15px;
+          font-size: 20px;
+        }
+        .patient-info { 
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 30px;
+          padding: 15px;
+          background: #f8f9fa;
+          border-radius: 8px;
+        }
+        .patient-info div {
+          text-align: center;
+        }
+        .patient-info strong {
+          display: block;
+          margin-bottom: 5px;
+          color: #0056b3;
+        }
+        .prescription-title {
+          text-align: center;
+          font-size: 20px;
+          font-weight: bold;
+          margin: 30px 0 20px 0;
+          color: #0056b3;
+          border-bottom: 1px solid #dee2e6;
+          padding-bottom: 10px;
+        }
+        .medicine-item { 
+          margin-bottom: 25px; 
+          padding: 15px;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+        .medicine-content {
+          margin-left: 20px;
+          font-size: 16px;
+          line-height: 1.8;
+        }
+        .malayalam-text {
+          font-family: "Noto Sans Malayalam", Arial, sans-serif;
+          font-size: 16px;
+          line-height: 1.8;
+        }
+        .additional-notes {
+          margin-top: 30px;
+          padding: 15px;
+          background: #e9ecef;
+          border-radius: 8px;
+          border-left: 4px solid #0056b3;
+        }
+        .footer {
+          margin-top: 50px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 30px;
+          padding-top: 30px;
+          border-top: 1px solid #dee2e6;
+        }
+        .signature-section {
+          text-align: center;
+        }
+        .signature-line {
+          border-top: 2px solid #000;
+          width: 200px;
+          margin: 60px auto 10px auto;
+        }
+        .clinic-info {
+          text-align: center;
+          font-size: 14px;
+          color: #6c757d;
+        }
+        
+        @media print {
+          body {
+            padding: 10px;
+            font-size: 14px;
+          }
+          .prescription-header {
+            margin-top: 0;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h2>ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h2>
+        <p><strong>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</strong></p>
+        <p><strong>E-mail: contact@herballytouch.com | Ph: 7034110999</strong></p>
+        <h3><strong>ഡോ. രാജന പി.ആർ., BAMS</strong></h3>
+      </div>
+      
+      <div class="patient-info">
+        <div>
+          <strong>പേര് (Name)</strong>
+          <span>${prescription.patientName || 'Not specified'}</span>
+        </div>
+        <div>
+          <strong>Age</strong>
+          <span>${prescription.patientAge || 'Not specified'}</span>
+        </div>
+        <div>
+          <strong>തീയതി (Date)</strong>
+          <span>${formattedDate}</span>
+        </div>
+      </div>
+      
+      <div class="prescription-title">PRESCRIPTION</div>
+      
+      <div class="prescription-medicines">
+        ${medicinesHtml}
+      </div>
+      
+      ${prescription.additionalNotes ? `
+        <div class="additional-notes">
+          <h4>Additional Notes:</h4>
+          <p>${prescription.additionalNotes}</p>
+        </div>
+      ` : ''}
+      
+      <div class="footer">
+        <div class="clinic-info">
+          <p><strong>Doctor:</strong> ${prescription.doctorName || 'Dr. Rajana P.R., BAMS'}</p>
+          <p><strong>Generated On:</strong> ${new Date().toLocaleDateString()}</p>
+          <p style="margin-top: 20px; font-style: italic;">
+            This prescription is valid for 30 days from the date of issue.
+          </p>
+        </div>
+        
+        <div class="signature-section">
+          <div class="signature-line"></div>
+          <p>Doctor's Signature</p>
+          <div style="margin-top: 30px; border: 2px dashed #6c757d; padding: 20px; text-align: center;">
+            <p style="color: #6c757d; margin: 0;">Clinic Stamp</p>
+          </div>
+        </div>
+      </div>
+      
+      <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #6c757d;">
+        <p><strong>Important:</strong> Please follow the dosage instructions carefully. Do not share your medicines with others.</p>
+        <p>For any queries, contact: 7034110999 (10AM - 6PM)</p>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// Generate medicine details HTML based on type
+private generateMedicineDetailsHTML(medicine: Medicine): string {
+  let details = '';
+  
+  switch(medicine.type) {
+    case 'kasayam':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> കഷായം ${medicine.instructions || ''}ml എടുത്ത് 
+          ${medicine.quantity || ''}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
+          ${medicine.powder || ''} ഗുളിക പൊടിച്ച്ചേർത്ത് 
+          ${medicine.pills || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'buligha':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> ഗുളിക ${medicine.instructions || ''} എണ്ണം എടുത്ത് 
+          ${medicine.powder || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'bhasmam':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> ഭസ്മം ${medicine.dosage || ''} എടുത്ത് ${medicine.quantity || ''}ml 
+          ${medicine.instructions || ''} ചേർത്ത് ${medicine.powder || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'krudham':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത് ${medicine.instructions || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'suranam':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> ചൂർണ്ണം ${medicine.instructions || ''} എടുത്ത് ${medicine.powder || ''} ചേർത്ത് തിളപ്പിച്ച് 
+          ${medicine.dosage || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'rasayanam':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് ${medicine.instructions || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    case 'lagium':
+      details = `
+        <div class="medicine-content malayalam-text">
+          <p><strong>${medicine.name}</strong> ലേഹ്യം ${medicine.instructions || ''} എടുത്ത് ${medicine.dosage || ''} നേരം ${medicine.time || ''} സേവിക്കുക.</p>
+        </div>
+      `;
+      break;
+      
+    default:
+      details = `
+        <div class="medicine-content">
+          <p><strong>Medicine:</strong> ${medicine.name || 'Not specified'}</p>
+          ${medicine.dosage ? `<p><strong>Dosage:</strong> ${medicine.dosage}</p>` : ''}
+          ${medicine.instructions ? `<p><strong>Instructions:</strong> ${medicine.instructions}</p>` : ''}
+          <p><strong>Time:</strong> ${medicine.time || 'Not specified'}</p>
+        </div>
+      `;
+  }
+  
+  return details;
+}
 
 // Helper method to convert Firebase Timestamp to Date
 private convertFirebaseDate(firebaseDate: any): Date {
@@ -1038,6 +1419,7 @@ loadShipments(): void {
         paymentAmount: order.paymentAmount || 0,
         products: order.products || [], // Ensure products are included
         prescription: order.prescription || null,
+        prescriptions: order.prescriptions || [], // Add this line to include prescriptions array
         typeOfService: order.typeOfService || 'Standard',
         typeOfServiceName: order.typeOfServiceName || order.typeOfService || 'Standard',
         addedBy: order.addedBy || 'System',

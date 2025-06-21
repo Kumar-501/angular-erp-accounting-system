@@ -251,7 +251,7 @@ private roundToWholeNumber(value: number): number {
       productType: 'Single',
       defaultPurchasePriceExcTax: null,
       defaultPurchasePriceIncTax: null,
-      marginPercentage: 25.0,
+      marginPercentage:0,
       defaultSellingPriceExcTax: null,
       defaultSellingPriceIncTax: null,
       components: [],

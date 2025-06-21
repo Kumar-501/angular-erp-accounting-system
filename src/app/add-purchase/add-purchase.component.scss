@@ -1,111 +1,414 @@
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-  }
-  h2{
-    margin-top: 5%;
-  }
-  .card {
-    background: #fff;
-    border-radius: 8px;
-    padding: 15px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
-  }
-  
-  input, select, textarea {
-    width: 100%;
-    padding: 8px;
-    margin-top: 5px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-  }
-  
-  button {
-    background: #6c63ff;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    cursor: pointer;
-    margin-top: 10px;
-    border-radius: 4px;
-  }
-  
-  button:hover {
-    background: #5548c2;
-  }
-  /* Add this to your component's CSS */
-input[type="checkbox"] {
-  cursor: pointer;
+.purchase-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.btn-sm {
+.page-title {
+    color: #2c3e50;
+    margin-bottom: 25px;
+    font-weight: 600;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 10px;
+}
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+/* Style for invalid form controls */
+.ng-invalid.ng-touched:not(form) {
+  border-color: #dc3545 !important; /* Bootstrap danger color */
+}
+
+/* Style for error messages */
+.invalid-feedback {
+  display: block;
+  color: #dc3545;
+  font-size: 0.875em;
+}
+
+/* Style for labels of required fields */
+.required-field::after {
+  content: " *";
+  color: #dc3545;
+}
+.spinner-border {
   margin-right: 5px;
-}.bg-light {
-  background-color: #f8f9fa !important;
+}
+.purchase-section {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    margin-bottom: 25px;
+    border: 1px solid #e0e0e0;
 }
 
-.input-group-text {
-  font-weight: bold;
-  background-color: #e9ecef;
-}.dropdown-menu {
-  width: 100%;
-  
-  .dropdown-item {
-    white-space: normal;
-    padding: 0.5rem 1rem;
-    
-    small {
-      font-size: 0.8rem;
-    }
-  }
+.section-title {
+    background-color: #f8f9fa;
+    padding: 12px 20px;
+    margin: 0;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #34495e;
 }
 
-// Make the dropdown match the input width
-.dropdown {
-  .dropdown-menu {
-    width: calc(100% - 2px); // Account for border
-  }
-}.dropdown-menu {
-  max-height: 300px;
-  overflow-y: auto;
+.section-content {
+    padding: 20px;
 }
 
-.dropdown-item {
-  cursor: pointer;
+.form-group {
+    margin-bottom: 15px;
 }
 
-.dropdown-item:hover {
-  background-color: #f8f9fa;
-}.dropdown-like-input {
-  /* Makes it look like a dropdown */
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  
-  /* Add a dropdown arrow */
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 1rem;
-  
-  /* Prevent text from going under the arrow */
-  padding-right: 2rem;
-  
-  /* Other styling to match dropdowns */
-  cursor: pointer;
-}/* Ensure table columns maintain their width even when empty */
+.form-label {
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 5px;
+    display: block;
+    font-size: 0.9rem;
+}
+
+.form-control {
+    border-radius: 4px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+
+.form-control:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+    padding: 10px 25px;
+    font-weight: 500;
+    min-width: 200px;
+    font-size: 1rem;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
 .table {
-  table-layout: fixed;
+    width: 100%;
+    margin-bottom: 1rem;
+    color: #212529;
+    font-size: 0.9rem;
 }
 
-.empty-row {
-  height: 150px; /* Give some height to the empty state */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
 }
 
-/* Make sure all columns have appropriate widths */
-th:nth-child(1), td:nth-child(1) { width: 50px; }  /* Checkbox */
-th:nth-child(2), td:nth-child(2) { width: 60px; }  /* S.No */
-th:nth-child(3), td:nth-child(3) { width: 200px; } /* Product Name */
-th:nth-child(4), td:nth-child(4) { width: 80px; }  /* Qty */
-/* Continue for all columns as needed */
+.alert-danger {
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.search-results-dropdown {
+    z-index: 1050;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+    .section-content {
+        padding: 15px;
+    }
+    
+    .form-group {
+        margin-bottom: 10px;
+    }
+    
+    .btn-primary {
+        width: 100%;
+    }
+}.table td, .table th {
+  white-space: nowrap;
+  padding: 8px 12px;
+}/* Clean Table Styling with Full Data Visibility */
+
+/* Table Container */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: #fff;
+}
+
+/* Main Table Styling */
+.table {
+  min-width: 1400px; /* Increased for better spacing */
+  margin-bottom: 0;
+  font-size: 14px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Table Header - Simple, Clean, No Effects */
+.table thead th {
+  background-color: #e9ecef;
+  color: #495057;
+  font-weight: 600;
+  padding: 12px 8px;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+/* Table Body */
+.table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+  background-color: #ffffff;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.table tbody td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  border: 1px solid #e9ecef;
+  white-space: nowrap;
+  color: #495057;
+}
+
+/* Form Controls - Ensuring Full Content Visibility */
+.form-control-sm {
+  min-width: 100px; /* Minimum width to prevent content hiding */
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background-color: #fff;
+}
+
+.form-control-sm:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Specific Column Widths for Data Visibility */
+.table th:nth-child(1), .table td:nth-child(1) { width: 40px; } /* Checkbox */
+.table th:nth-child(2), .table td:nth-child(2) { width: 60px; } /* S.NO */
+.table th:nth-child(3), .table td:nth-child(3) { min-width: 250px; } /* Product Name */
+.table th:nth-child(4), .table td:nth-child(4) { width: 80px; } /* Qty */
+.table th:nth-child(5), .table td:nth-child(5) { width: 100px; } /* Unit Price */
+.table th:nth-child(6), .table td:nth-child(6) { width: 90px; } /* Discount % */
+.table th:nth-child(7), .table td:nth-child(7) { width: 100px; } /* Unit Cost */
+.table th:nth-child(8), .table td:nth-child(8) { width: 120px; } /* Tax Rate */
+.table th:nth-child(9), .table td:nth-child(9) { width: 100px; } /* Tax Amt */
+.table th:nth-child(10), .table td:nth-child(10) { width: 120px; } /* Net Cost */
+.table th:nth-child(11), .table td:nth-child(11) { width: 100px; } /* Batch No */
+.table th:nth-child(12), .table td:nth-child(12) { width: 110px; } /* Expiry */
+.table th:nth-child(13), .table td:nth-child(13) { width: 100px; } /* Subtotal */
+.table th:nth-child(14), .table td:nth-child(14) { width: 120px; } /* Total */
+.table th:nth-child(15), .table td:nth-child(15) { width: 60px; } /* Actions */
+
+/* Product Select Dropdown */
+select.form-control-sm {
+  min-width: 180px;
+  max-width: 200px;
+}
+
+select.form-control-sm option {
+  padding: 4px;
+  font-size: 13px;
+}
+
+/* Number Inputs */
+input[type="number"].form-control-sm {
+  min-width: 80px;
+}
+
+/* Text Inputs */
+input[type="text"].form-control-sm {
+  min-width: 90px;
+}
+
+/* Date Inputs */
+input[type="date"].form-control-sm {
+  min-width: 120px;
+}
+
+/* Net Cost Display */
+.table td:nth-child(10) div {
+  font-weight: 600;
+  color: #495057;
+}
+
+.table td:nth-child(10) small {
+  font-size: 11px;
+  color: #6c757d;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Total Column */
+.table td:nth-child(14) div {
+  font-weight: 700;
+  color: #28a745;
+  font-size: 15px;
+}
+
+/* Buttons */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+/* Empty State */
+.empty-row td {
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+}
+
+.empty-row i {
+  color: #adb5bd;
+}
+
+.empty-row p {
+  color: #6c757d;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+/* Footer */
+.table tfoot td {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-top: 2px solid #495057;
+  font-weight: 600;
+  padding: 15px 8px;
+  color: #212529;
+}
+
+.table tfoot .fw-bold {
+  color: #28a745;
+  font-size: 16px;
+}
+
+/* Checkboxes */
+.form-check-input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+  
+  .form-control-sm {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  
+  .table th, .table td {
+    padding: 8px 6px;
+  }
+}
+
+/* Ensure no text overflow or hiding */
+.table td, .table th {
+  overflow: visible;
+  text-overflow: initial;
+  white-space: nowrap;
+}
+
+/* Select dropdown full width within cell */
+.table td select {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Input fields full width within cell */
+.table td input {
+  width: 100%;
+}
+
+/* Read-only fields styling */
+.form-control-sm[readonly] {
+  background-color: #f8f9fa;
+  color: #495057;
+  border-color: #e9ecef;
+}
+
+/* Currency display */
+.text-end {
+  text-align: right !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+/* Additional padding for better readability */
+.table-hover tbody tr:hover td {
+  background-color: #f8f9fa;
+}
+
+/* Scrollbar styling for webkit browsers */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

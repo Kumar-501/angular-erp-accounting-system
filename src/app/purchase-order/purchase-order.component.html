@@ -192,15 +192,19 @@
         <th *ngIf="columns[5].visible" (click)="sortTable('status')">
           Status <i class="fa" [ngClass]="getSortIcon('status')"></i>
         </th>
-        <th *ngIf="columns[6].visible" (click)="sortTable('shippingStatus')">
-          Shipping Status <i class="fa" [ngClass]="getSortIcon('shippingStatus')"></i>
-        </th>
+      
         <th *ngIf="columns[9].visible" (click)="sortTable('supplierName')">
           Supplier <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
         </th>
+        <!-- <th *ngIf="columns[2].visible" (click)="sortTable('supplierAddress')">
+  Supplier Address <i class="fa" [ngClass]="getSortIcon('supplierAddress')"></i>
+</th> -->
         <th *ngIf="columns[14].visible" (click)="sortTable('unitPurchasePrice')">
           Unit Purchase Price <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
         </th>
+        <th *ngIf="columns[15].visible" (click)="sortTable('purchasePrice')">
+  Purchase Price <i class="fa" [ngClass]="getSortIcon('purchasePrice')"></i>
+</th>
         <th *ngIf="columns[11].visible" (click)="sortTable('items')">
           Products <i class="fa" [ngClass]="getSortIcon('items')"></i>
         </th>
@@ -210,6 +214,7 @@
         <th *ngIf="columns[13].visible" (click)="sortTable('currentStock')">
           Quantity Remaining <i class="fa" [ngClass]="getSortIcon('currentStock')"></i>
         </th>
+ 
       </tr>
     </thead>
     <tbody>
@@ -247,10 +252,7 @@
         <span>Download PDF</span>
       </div>
       
-      <div class="action-item" (click)="addPurchaseForOrder(order, $event); closeActionPopup()">
-        <i class="fas fa-cart-plus text-success"></i>
-        <span>Add Purchase</span>
-      </div>
+
       
       <div class="divider"></div>
       
@@ -277,12 +279,9 @@
             {{ order.status }}
           </span>
         </td>
-        <td *ngIf="columns[6].visible">
-          <span class="status-badge" [ngClass]="order.shippingStatus | lowercase">
-            {{ order.shippingStatus }}
-          </span>
-        </td>
+     
         <td *ngIf="columns[9].visible">{{ order.supplierName || 'N/A' }}</td>
+        <!-- <td *ngIf="columns[2].visible">{{ order.supplierAddress || 'N/A' }}</td> -->
         
         <td *ngIf="columns[14].visible">
           <div *ngIf="order.items && order.items.length > 0">
@@ -294,6 +293,9 @@
             N/A
           </div>
         </td>  
+<td *ngIf="columns[15].visible">
+  {{ order.orderTotal | currency:'INR' }}
+</td>
 <td *ngIf="columns[11].visible">
   <div *ngIf="order.items && order.items.length > 0">
     <span *ngFor="let item of order.items; let last = last">

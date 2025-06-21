@@ -166,6 +166,7 @@ import { LeadsReportComponent } from './leads-report/leads-report.component';
 import { LeadsReportsComponent } from './leads-reports/leads-reports.component';
 import { CustomerReportComponent } from './customer-report/customer-report.component';
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
+import { NotSellingComponent } from './not-selling/not-selling.component';
 
 const routes: Routes = [
 
@@ -213,6 +214,8 @@ const routes: Routes = [
 {path:'customer-detail',component:CustomerDetailComponent},
 {path:'add-stock',component:AddStockComponent},
 {path:'list-expenses',component:ListExpensesComponent},
+{path:"not-for-selling-products",component:ListProductsComponent},
+{path:'not-selling',component:NotSellingComponent},
 {path:'add-expense',component:AddExpenseComponent},
 {path:'expense-categories',component:ExpenseCategoriesComponent},
 {path:'sales',component:SalesComponent},

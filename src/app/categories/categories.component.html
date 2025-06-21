@@ -56,9 +56,15 @@
             <button class="action-btn edit-btn" (click)="editCategory(item)">
               <i class="fa fa-edit"></i> Edit
             </button>
-            <button class="action-btn delete-btn" (click)="deleteCategory(item.id)">
-              <i class="fa fa-trash"></i> Delete
-            </button>
+         <button 
+  class="action-btn delete-btn" 
+  (click)="deleteCategory(item.id)"
+  [disabled]="isDeleting"
+>
+  <i class="fa fa-trash"></i> 
+  <span *ngIf="!isDeleting">Delete</span>
+  <span *ngIf="isDeleting">Deleting...</span>
+</button>
           </td>
         </tr>
         <tr *ngIf="filteredCategories.length === 0">
@@ -130,8 +136,13 @@
 </div>
         
         <div class="btn-group">
-          <button type="submit">{{ isEditing ? 'Update' : 'Save' }}</button>
-          <button type="button" (click)="resetForm()">Close</button>
+<button 
+  type="submit" 
+  [disabled]="isSaving || !category.name || !category.description || (category.isSubCategory && !category.parentCategory)"
+>
+  <span *ngIf="!isSaving">{{ isEditing ? 'Update' : 'Save' }}</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>          <button type="button" (click)="resetForm()">Close</button>
         </div>
       </form>
     </div>

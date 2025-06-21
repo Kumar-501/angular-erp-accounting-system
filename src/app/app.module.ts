@@ -223,6 +223,8 @@ import { LeadsReportComponent } from './leads-report/leads-report.component';
 import { LeadsReportsComponent } from './leads-reports/leads-reports.component';
 import { CustomerReportComponent } from './customer-report/customer-report.component';
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
+import { NotForSellingProductsComponent } from './not-for-selling-products/not-for-selling-products.component';
+import { NotSellingComponent } from './not-selling/not-selling.component';
 @NgModule({
   declarations: [
     AppComponent,
@@ -402,6 +404,8 @@ import { SellReturnReportComponent } from './sell-return-report/sell-return-repo
     LeadsReportsComponent,
     CustomerReportComponent,
     SellReturnReportComponent,
+    NotForSellingProductsComponent,
+    NotSellingComponent,
  
 
 

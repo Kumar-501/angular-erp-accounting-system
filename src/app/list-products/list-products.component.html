@@ -228,6 +228,7 @@
                   'fa-sort-down': currentSortColumn === 'productName' && !isAscending
                 }"></i>
               </th>
+              <th>Type & Components</th>
               <th>Locations</th>
               <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
                 Selling Price (Exc Tax)
@@ -269,22 +270,6 @@
                   'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
                 }"></i>
               </th>
-              <th class="text-end" (click)="sortBy('alertQuantity')">
-                Alert Qty
-                <i class="fas ms-1" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'alertQuantity',
-                  'fa-sort-up': currentSortColumn === 'alertQuantity' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'alertQuantity' && !isAscending
-                }"></i>
-              </th>
-              <th (click)="sortBy('productType')">
-                Product Type
-                <i class="fas ms-1" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'productType',
-                  'fa-sort-up': currentSortColumn === 'productType' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'productType' && !isAscending
-                }"></i>
-              </th>
               <th (click)="sortBy('category')">
                 Category
                 <i class="fas ms-1" [ngClass]="{
@@ -319,6 +304,10 @@
                 [class.table-secondary]="!product.isActive || product.notForSelling"
                 [class.text-muted]="!product.isActive">
               <td><input type="checkbox" [(ngModel)]="product.selected"></td>
+              
+              <!-- Product Image Column -->
+           
+              
               <td>
                 <!-- Action Button -->
                 <button class="btn btn-sm btn-outline-secondary" type="button" 
@@ -383,11 +372,9 @@
                   </div>
                 </div>
               </td>
+              
               <td>
                 <div class="d-flex align-items-center">
-                  <div class="me-2">
-                    <!-- Product image placeholder -->
-                  </div>
                   <div>
                     <div class="fw-medium d-flex align-items-center flex-wrap">
                       <span>{{ product.productName }}</span>
@@ -404,6 +391,41 @@
                   </div>
                 </div>
               </td>
+              
+              <!-- Product Type & Components Column -->
+              <td>
+                <div class="product-type-info">
+                  <span class="badge" [ngClass]="{
+                    'bg-primary': product.productType === 'Single',
+                    'bg-success': product.productType === 'Combination',
+                    'bg-info': product.productType === 'Variant'
+                  }">{{ product.productType }}</span>
+                  
+                  <!-- Show combination components -->
+                  <div *ngIf="product.productType === 'Combination' && product.components?.length > 0" class="mt-1">
+                    <small class="text-muted d-block">Components ({{ product.components.length }}):</small>
+                    <div class="component-list">
+                      <div *ngFor="let component of product.components.slice(0, 3)" class="component-item">
+                        <small class="text-secondary">
+                          • {{ getComponentProductName(component.productId) }} 
+                          <span class="text-muted">({{ component.quantity }})</span>
+                        </small>
+                      </div>
+                      <small *ngIf="product.components.length > 3" class="text-muted">
+                        +{{ product.components.length - 3 }} more...
+                      </small>
+                    </div>
+                  </div>
+
+                  <!-- Show variant information -->
+                  <div *ngIf="product.productType === 'Variant' && product.variations?.length > 0" class="mt-1">
+                    <small class="text-muted d-block">Variants: {{ product.variations.length }}</small>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Files Column -->
+         
               <td>
                 <div *ngIf="product.locationNames?.length > 0">
                   <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
@@ -427,18 +449,18 @@
                   {{ product.currentStock || '0.00' }}
                 </span>
               </td>
-              <td class="text-end">
-                <span [class.text-danger]="product.currentStock <= product.alertQuantity">
-                  {{ product.alertQuantity || '-' }}
-                </span>
-              </td>
-              <td>{{ product.productType }}</td>
               <td>{{ product.category || '-' }}</td>
               <td>{{ product.brand || '-' }}</td>
               <td>
                 <span [class.text-danger]="isExpired(product.expiryDate)" 
                       [class.text-warning]="isExpiringSoon(product.expiryDate)">
                   {{ product.formattedExpiryDate || 'No expiry' }}
+                </span>
+                <span *ngIf="isExpired(product.expiryDate)" class="badge bg-danger ms-1">
+                  Expired
+                </span>
+                <span *ngIf="isExpiringSoon(product.expiryDate)" class="badge bg-warning text-dark ms-1">
+                  Expiring Soon
                 </span>
               </td>
               <td>{{ product.sku || '-' }}</td>
@@ -486,21 +508,49 @@
   <!-- Bulk Actions Footer -->
   <div class="d-flex justify-content-between p-3 border-top">
     <div>
-      <button class="btn btn-outline-primary me-2" (click)="openAddToLocationModal()" [disabled]="!hasSelectedProducts()">
-        <i class="fas fa-map-marker-alt me-1"></i> Add to Location
-      </button>
       <button class="btn btn-outline-danger me-2" (click)="removeFromLocation()" [disabled]="!hasSelectedProducts()">
         <i class="fas fa-trash-alt me-1"></i> Remove from Location
       </button>
-<button class="btn btn-outline-warning me-2" 
-        (click)="toggleProductActivation()" 
-        [disabled]="!hasSelectedProducts()">
-  <i class="fas fa-power-off me-1"></i> 
-  {{ getActivationButtonText() }}
-</button>
+      <button class="btn btn-outline-warning me-2" 
+              (click)="toggleProductActivation()" 
+              [disabled]="!hasSelectedProducts()">
+        <i class="fas fa-power-off me-1"></i> 
+        {{ getActivationButtonText() }}
+      </button>
       <button class="btn btn-outline-secondary" (click)="toggleBulkSellingStatus()" [disabled]="!hasSelectedProducts()">
         <i class="fas fa-ban me-1"></i> Toggle Selling Status
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Image Modal -->
+<div class="modal fade" [class.show]="showImageModal" tabindex="-1" role="dialog" 
+     [style.display]="showImageModal ? 'block' : 'none'"
+     *ngIf="showImageModal">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-image me-2"></i>
+          {{ selectedProductForImage?.productName }} - Product Image
+        </h5>
+        <button type="button" class="btn-close" (click)="closeImageModal()"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img [src]="selectedProductImageUrl" 
+             [alt]="selectedProductForImage?.productName"
+             class="img-fluid rounded shadow"
+             style="max-height: 500px; max-width: 100%;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeImageModal()">
+          <i class="fas fa-times me-1"></i>Close
+        </button>
+        <button type="button" class="btn btn-primary" (click)="downloadProductImage()">
+          <i class="fas fa-download me-1"></i>Download
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -559,8 +609,29 @@
                 <div class="col-8">{{ selectedProduct?.brand || '-' }}</div>
               </div>
             </div>
+
+            <!-- Combination Components -->
+            <div *ngIf="selectedProduct?.productType === 'Combination' && selectedProduct?.components?.length > 0" class="mb-3">
+              <h6 class="text-muted">Product Components</h6>
+              <hr class="mt-1">
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Quantity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let component of selectedProduct.components">
+                      <td>{{ getComponentProductName(component.productId) }}</td>
+                      <td>{{ component.quantity }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-          
           
           <!-- Right Column -->
           <div class="col-md-6">
@@ -571,52 +642,50 @@
                 <div class="col-4 fw-medium">Purchase Price:</div>
                 <div class="col-8">₹{{ selectedProduct?.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</div>
               </div>
-            <!-- In the Product Details Modal -->
-<div class="row mb-2">
-  <div class="col-4 fw-medium">MRP (Inc. Tax):</div>
-  <div class="col-8">₹{{ selectedProduct?.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</div>
-</div>
-<!-- Remove the Purchase Price row -->
               <div class="row mb-2">
-                <div class="col-4 fw-medium">Current Stock:</div>
+                <div class="col-4 fw-medium">MRP (Inc. Tax):</div>
+                <div class="col-8">₹{{ selectedProduct?.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</div>
+              </div>
+              <div class="row mb-2">
+                
+             
+             
+            </div>
+
+            <!-- Files Section -->
+            <div class="mb-3" *ngIf="hasProductImage(selectedProduct) || hasProductBrochure(selectedProduct)">
+              <hr class="mt-1">
+              <div class="row mb-2" *ngIf="hasProductImage(selectedProduct)">
+                <div class="col-4 fw-medium">Product Image:</div>
                 <div class="col-8">
-                  <span class="badge" [ngClass]="{
-                    'bg-success': (selectedProduct?.currentStock || 0) > 10,
-                    'bg-warning': (selectedProduct?.currentStock || 0) <= 10 && (selectedProduct?.currentStock || 0) > 0,
-                    'bg-danger': (selectedProduct?.currentStock || 0) <= 0
-                  }">
-                    {{ selectedProduct?.displayStock || '0.00' }}
-                  </span>
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewProductImage(selectedProduct)">
+                    <i class="fas fa-image me-1"></i>View Image
+                  </button>
                 </div>
               </div>
-              <div class="row mb-2">
-                <div class="col-4 fw-medium">Location:</div>
-                <div class="col-8">{{ selectedProduct?.locationName || '-' }}</div>
-              </div>
-              <div class="row mb-2">
-                <div class="col-4 fw-medium">Tax:</div>
-                <div class="col-8">{{ selectedProduct?.tax || '-' }}</div>
+              <div class="row mb-2" *ngIf="hasProductBrochure(selectedProduct)">
+                <div class="col-4 fw-medium">Brochure:</div>
+                <div class="col-8">
+                  <button class="btn btn-sm btn-outline-info" (click)="viewProductBrochure(selectedProduct)">
+                    <i class="fas fa-file-pdf me-1"></i>Download Brochure
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
        
-<div class="row mb-4">
-  <div class="col-12 text-center">
-    <div class="product-image-container">
-      <img *ngIf="getProductImageUrl(selectedProduct)"
-           [src]="getProductImageUrl(selectedProduct)"
-           alt="{{ selectedProduct?.productName }}"
-           class="img-fluid rounded border"
-           style="max-height: 200px;">
-      <div *ngIf="!getProductImageUrl(selectedProduct)"
-           class="no-image-placeholder bg-light rounded border d-flex align-items-center justify-content-center"
-           style="height: 200px; width: 100%;">
-        <i class="fas fa-box-open fa-3x text-muted"></i>
-      </div>
-    </div>
-  </div>
-</div>
+        <div class="row mb-4" *ngIf="hasProductImage(selectedProduct)">
+          <div class="col-12 text-center">
+            <div class="product-image-container">
+              <img [src]="getProductImageUrl(selectedProduct)"
+                   [alt]="selectedProduct?.productName"
+                   class="img-fluid rounded border"
+                   style="max-height: 200px; cursor: pointer;"
+                   (click)="viewProductImage(selectedProduct)">
+            </div>
+          </div>
+        </div>
 
         <!-- Additional Details Section -->
         <div class="mt-3" *ngIf="selectedProduct?.description || selectedProduct?.barcode">
@@ -643,4 +712,3 @@
     </div>
   </div>
 </div>
-<!-- Add this near your other filter controls -->

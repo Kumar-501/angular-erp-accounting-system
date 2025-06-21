@@ -77,12 +77,12 @@
             </span>
           </th>
       
-          <th (click)="sortData('totalAmount')">
+          <!-- <th (click)="sortData('totalAmount')">
             Total Amount
             <span class="sort-icon" *ngIf="currentSortColumn === 'totalAmount'">
               <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
             </span>
-          </th>
+          </th> -->
           <th>Additional Notes</th>
           <th>Action</th>
         </tr>
@@ -98,7 +98,7 @@
               {{ transfer.status }}
             </span>
           </td>
-          <td>₹ {{ transfer.totalAmount.toFixed(2) }}</td>
+          <!-- <td>₹ {{ transfer.totalAmount.toFixed(2) }}</td> -->
           <td>{{ transfer.additionalNotes || '-' }}</td>
           <td>
             <div class="action-buttons">

@@ -188,6 +188,9 @@
       <li><a class="dropdown-item" (click)="exportCSV()"><i class="fa fa-file-csv"></i> CSV</a></li>
       <li><a class="dropdown-item" (click)="exportExcel()"><i class="fa fa-file-excel"></i> Excel</a></li>
       <li><a class="dropdown-item" (click)="printData()"><i class="fa fa-print"></i> Print</a></li>
+      <!-- Removed invalid reference to 'sale' outside of *ngFor context -->
+      <!-- If you want a View History link for a specific sale, move this inside the table row's dropdown menu where 'sale' is defined -->
+    
     </ul>
   </div>
 </div>

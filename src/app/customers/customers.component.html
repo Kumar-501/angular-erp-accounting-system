@@ -702,8 +702,9 @@
           <!-- Form Actions -->
           <div class="form-actions">
             <button type="button" class="btn-cancel" (click)="toggleForm()">Cancel</button>
-            <button type="submit" class="btn-save">Save</button>
-          </div>
+<button type="submit" class="btn-save" [disabled]="isSaving">
+  {{ isSaving ? 'Saving...' : 'Save' }}
+</button>          </div>
         </form>
       </div>
     </div>

@@ -16,16 +16,20 @@ export class CategoriesComponent implements OnInit {
   category = {
     name: '',
     code: '',
+    
     description: '',
     parentCategory: '',
     isSubCategory: false
   };
   showPopup = false;
   isEditing = false;
+  isDeleting: boolean = false;
+
   editId: string | null = null;
   
   math = Math;
-  
+  // In your component class
+isSaving: boolean = false;
   currentPage = 1;
   itemsPerPage = 3;
   totalPages = 1;
@@ -119,39 +123,47 @@ get availableParentCategories() {
     this.applyFilters();
   }
 
-  addCategory() {
-    if (!this.category.name || !this.category.description) {
-      alert('Please fill in all required fields');
-      return;
-    }
-
-    const categoryData: any = {
-      name: this.category.name,
-      code: this.category.code,
-      description: this.category.description
-    };
-
-    // Only add parentCategory if it's a subcategory
-    if (this.category.isSubCategory) {
-      if (!this.category.parentCategory) {
-        alert('Please select a parent category for subcategory');
-        return;
-      }
-      categoryData.parentCategory = this.category.parentCategory;
-    }
-
-    if (this.isEditing && this.editId) {
-      this.categoriesService.updateCategory(this.editId, categoryData).then(() => {
-        alert('Category updated successfully!');
-        this.resetForm();
-      });
-    } else {
-      this.categoriesService.addCategory(categoryData).then(() => {
-        alert('Category added successfully!');
-        this.resetForm();
-      });
-    }
+addCategory() {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
+  if (!this.category.name || !this.category.description) {
+    alert('Please fill in all required fields');
+    return;
   }
+
+  // Validate subcategory selection
+  if (this.category.isSubCategory && !this.category.parentCategory) {
+    alert('Please select a parent category for subcategory');
+    return;
+  }
+
+  this.isSaving = true;
+
+  const categoryData: any = {
+    name: this.category.name,
+    code: this.category.code,
+    description: this.category.description
+  };
+
+  // Only add parentCategory if it's a subcategory
+  if (this.category.isSubCategory) {
+    categoryData.parentCategory = this.category.parentCategory;
+  }
+
+  const saveOperation = this.isEditing && this.editId
+    ? this.categoriesService.updateCategory(this.editId, categoryData)
+    : this.categoriesService.addCategory(categoryData);
+
+  saveOperation.then(() => {
+    const message = this.isEditing ? 'Category updated successfully!' : 'Category added successfully!';
+    alert(message);
+    this.resetForm();
+  }).catch(error => {
+    alert(`Error saving category: ${error.message}`);
+  }).finally(() => {
+    this.isSaving = false;
+  });
+}
   editCategory(category: any) {
     this.category = { 
       name: category.name,
@@ -166,15 +178,20 @@ get availableParentCategories() {
   }
 
 
-  deleteCategory(id: string) {
-    if (confirm('Are you sure you want to delete this category?')) {
-      this.categoriesService.deleteCategory(id).then(() => {
-        alert('Category deleted successfully!');
-      }).catch(error => {
-        alert('Error deleting category: ' + error.message);
-      });
-    }
-  }
+deleteCategory(id: string) {
+  if (this.isDeleting) return;
+  
+  if (!confirm('Are you sure you want to delete this category?')) return;
+
+  this.isDeleting = true;
+  this.categoriesService.deleteCategory(id).then(() => {
+    alert('Category deleted successfully!');
+  }).catch(error => {
+    alert('Error deleting category: ' + error.message);
+  }).finally(() => {
+    this.isDeleting = false;
+  });
+}
 
   resetForm() {
     this.category = {

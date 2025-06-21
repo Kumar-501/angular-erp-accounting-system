@@ -1,18 +1,9 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { AttendanceService, Attendance } from '../../services/attendance.service';
-import { UserService } from '../../services/user.service';
+import { UserService, User } from '../../services/user.service';
 import { Subscription, Observable } from 'rxjs';
-
-// Define User interface locally since it's not exported from user.service
-export interface User {
-  id?: string;
-  username: string;
-  email: string;
-  displayName?: string;
-  firstName?: string;
-  lastName?: string;
-  shift?: string;
-}
+import { Papa } from 'ngx-papaparse';
+import { AuthService } from '../../auth.service';
 
 export interface Shift {
   shiftName: string;
@@ -21,8 +12,13 @@ export interface Shift {
   description: string;
   shiftType: string;
   holiday: string;
-
   id?: string;
+}
+
+interface ImportResults {
+  total: number;
+  success: number;
+  errors: string[];
 }
 
 export interface ImportColumn {
@@ -42,20 +38,44 @@ export class AttendanceComponent implements OnInit, OnDestroy {
   activeTab = 'shifts';
   showModal = false;
   showAttendanceModal = false;
+  showEditAttendanceModal = false;
+  isUpdatingAttendance = false;
+  currentAttendanceId = '';
+
+  editAttendanceData: any = {
+    employee: '',
+    clockInTime: '',
+    clockOutTime: '',
+    shift: '',
+    ipAddress: '',
+    clockInNote: '',
+    clockOutNote: '',
+    location: null,
+    imageUrl: ''
+  };
+  
   showClockInModal = false;
   showClockOutSuccessModal = false;
   showClockOutModal = false;
-workDuration: string = '';
-isClockingOut = false;
-currentTime: Date = new Date(); // Initialize current time
+  showImageModal = false;
+  selectedImageUrl = '';
+  workDuration: string = '';
+  isClockingOut = false;
+  currentTime: Date = new Date();
 
   attendanceFilterDate: string = '';
-filteredAttendances: Attendance[] = [];
-clockOutData = {
-  employee: '',
-  shift: '',
-  clockOutNote: ''
-};
+  filteredAttendances: Attendance[] = [];
+  clockOutData = {
+    employee: '',
+    shift: '',
+    clockOutNote: '',
+    latitude: '',
+    longitude: '',
+    locationAddress: '',
+    ipAddress: '',
+    imageFile: null as File | null,
+    imagePreview: ''
+  };
 
   showClockInSuccessModal = false;
   isEditMode = false;
@@ -93,9 +113,11 @@ clockOutData = {
     { number: 5, name: 'Clock out note', required: false, description: 'Clock out note' },
     { number: 6, name: 'IP Address', required: false, description: 'IP Address' }
   ];
+  
   importError: string = '';
   importSuccess: string = '';
   isImporting: boolean = false;
+  importResults: ImportResults | null = null;
 
   shiftSub!: Subscription;
   attendanceSub!: Subscription;
@@ -109,7 +131,6 @@ clockOutData = {
     description: '',
     shiftType: 'Fixed shift',
     holiday: '',
- 
   };
 
   newAttendance: Attendance = {
@@ -122,18 +143,24 @@ clockOutData = {
     clockOutNote: '',
   };
 
+  // Update the clockInData interface
   clockInData = {
     employee: '',
     shift: '',
     ipAddress: '',
-    clockInNote: ''
+    clockInNote: '',
+    latitude: '',
+    longitude: '',
+    locationAddress: '',
+    imageFile: null as File | null,
+    imagePreview: ''
   };
-
-
 
   constructor(
     private attendanceService: AttendanceService,
-    private userService: UserService
+    private userService: UserService,
+    private authService: AuthService,
+    private papa: Papa
   ) {}
 
   ngOnInit(): void {
@@ -147,7 +174,7 @@ clockOutData = {
         localStorage.removeItem('currentAttendance');
       }
     }
-  
+
     this.loadShifts();
     this.loadAttendance();
     this.loadUsers();
@@ -157,7 +184,7 @@ clockOutData = {
     setInterval(() => {
       this.currentTime = new Date();
     }, 1000);
-  
+
     // Initialize date range with current week
     const currentDate = new Date();
     const startOfWeek = new Date(currentDate);
@@ -171,6 +198,16 @@ clockOutData = {
     this.loadAttendanceByDate();
   }
 
+  openImageModal(imageUrl: string) {
+    this.selectedImageUrl = imageUrl;
+    this.showImageModal = true;
+  }
+
+  closeImageModal() {
+    this.showImageModal = false;
+    this.selectedImageUrl = '';
+  }
+
   ngOnDestroy(): void {
     if (this.shiftSub) this.shiftSub.unsubscribe();
     if (this.attendanceSub) this.attendanceSub.unsubscribe();
@@ -178,31 +215,254 @@ clockOutData = {
     if (this.currentUserSub) this.currentUserSub.unsubscribe();
   }
 
+  getCurrentLocationForClockOut() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.clockOutData.latitude = position.coords.latitude.toString();
+          this.clockOutData.longitude = position.coords.longitude.toString();
+          this.getAddressFromCoordinatesForClockOut(
+            position.coords.latitude, 
+            position.coords.longitude
+          );
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Unable to get your location. Please ensure location services are enabled.');
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+  }
+
+  async getAddressFromCoordinatesForClockOut(lat: number, lng: number) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      const data = await response.json();
+      
+      if (data.display_name) {
+        this.clockOutData.locationAddress = data.display_name;
+      } else {
+        this.clockOutData.locationAddress = 'Address not available';
+      }
+    } catch (error) {
+      console.error('Error getting address:', error);
+      this.clockOutData.locationAddress = 'Could not retrieve address';
+    }
+  }
+
+  clearClockOutLocation() {
+    this.clockOutData.latitude = '';
+    this.clockOutData.longitude = '';
+    this.clockOutData.locationAddress = '';
+  }
+
+  onClockOutImageSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.clockOutData.imageFile = file;
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.clockOutData.imagePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   getCurrentUser() {
-    // Fix: Ensure getCurrentUser returns an Observable<User>
-    const userObservable: Observable<User> = this.userService.getCurrentUser() as unknown as Observable<User>;
-    this.currentUserSub = userObservable.subscribe((user: User) => {
+    // Subscribe to current user from UserService
+    this.currentUserSub = this.userService.getCurrentUser().subscribe((user: User | null) => {
       if (user) {
         this.currentUser = user;
+        console.log('Current user loaded:', this.currentUser); // Debug log
         this.checkUserClockStatus();
+      } else {
+        console.log('No current user found'); // Debug log
+        this.currentUser = null;
       }
     });
   }
+
+  getCurrentLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          this.clockInData.latitude = position.coords.latitude.toString();
+          this.clockInData.longitude = position.coords.longitude.toString();
+          
+          // Reverse geocode to get address (using Nominatim as example)
+          this.getAddressFromCoordinates(
+            position.coords.latitude, 
+            position.coords.longitude
+          );
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Unable to get your location. Please ensure location services are enabled.');
+        },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      alert('Geolocation is not supported by this browser.');
+    }
+  }
+
+  async getAddressFromCoordinates(lat: number, lng: number) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+      );
+      const data = await response.json();
+      
+      if (data.display_name) {
+        this.clockInData.locationAddress = data.display_name;
+      } else {
+        this.clockInData.locationAddress = 'Address not available';
+      }
+    } catch (error) {
+      console.error('Error getting address:', error);
+      this.clockInData.locationAddress = 'Could not retrieve address';
+    }
+  }
+
+  clearLocation() {
+    this.clockInData.latitude = '';
+    this.clockInData.longitude = '';
+    this.clockInData.locationAddress = '';
+  }
+
+  // Convert ISO date to datetime-local format
+  toDateTimeLocal(isoDate: string | undefined): string {
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  openEditAttendanceModal(attendance: any) {
+    this.currentAttendanceId = attendance.id || '';
+    this.editAttendanceData = {
+      employee: attendance.employee,
+      clockInTime: attendance.clockInTime,
+      clockOutTime: attendance.clockOutTime || '',
+      shift: attendance.shift,
+      ipAddress: attendance.ipAddress || '',
+      clockInNote: attendance.clockInNote || '',
+      clockOutNote: attendance.clockOutNote || '',
+      location: attendance.location || null,
+      imageUrl: attendance.imageUrl || ''
+    };
+    this.showEditAttendanceModal = true;
+  }
+
+  closeEditAttendanceModal() {
+    this.showEditAttendanceModal = false;
+    this.currentAttendanceId = '';
+    this.isUpdatingAttendance = false;
+    this.editAttendanceData = {
+      employee: '',
+      clockInTime: '',
+      clockOutTime: '',
+      shift: '',
+      ipAddress: '',
+      clockInNote: '',
+      clockOutNote: '',
+      location: null,
+      imageUrl: ''
+    };
+  }
+
+  updateAttendance() {
+    if (!this.currentAttendanceId) return;
+    
+    this.isUpdatingAttendance = true;
+    
+    // Prepare the data to update
+    const updatedData = {
+      employee: this.editAttendanceData.employee,
+      clockInTime: this.editAttendanceData.clockInTime,
+      clockOutTime: this.editAttendanceData.clockOutTime || '',
+      shift: this.editAttendanceData.shift,
+      ipAddress: this.editAttendanceData.ipAddress,
+      clockInNote: this.editAttendanceData.clockInNote,
+      clockOutNote: this.editAttendanceData.clockOutNote,
+      location: this.editAttendanceData.location,
+      imageUrl: this.editAttendanceData.imageUrl
+    };
+    
+    this.attendanceService.updateAttendance(this.currentAttendanceId, updatedData)
+      .then(() => {
+        this.closeEditAttendanceModal();
+        this.loadAttendance(); // Refresh the data
+      })
+      .catch(error => {
+        console.error('Error updating attendance:', error);
+        alert('Error updating attendance. Please try again.');
+        this.isUpdatingAttendance = false;
+      });
+  }
+
+  deleteAttendance(attendance: any) {
+    if (!attendance.id) return;
+    
+    if (confirm(`Are you sure you want to delete this attendance record for ${attendance.employee}?`)) {
+      this.attendanceService.deleteAttendance(attendance.id)
+        .then(() => {
+          this.loadAttendance(); // Refresh the data
+        })
+        .catch((error: any) => {
+          console.error('Error deleting attendance:', error);
+          alert('Error deleting attendance. Please try again.');
+        });
+    }
+  }
+
+  onImageSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      this.clockInData.imageFile = file;
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.clockInData.imagePreview = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   openClockOutModal(attendance: Attendance) {
     console.log('Opening modal...');
     this.currentAttendance = attendance;
     this.clockOutData = {
       employee: attendance.employee,
       shift: attendance.shift,
-      clockOutNote: ''
+      clockOutNote: '',
+      latitude: '',
+      longitude: '',
+      locationAddress: '',
+      ipAddress: this.clockInData.ipAddress || '',
+      imageFile: null,
+      imagePreview: ''
     };
     this.showClockOutModal = true;
     console.log('Modal should be visible now');
   }
-  
+
   closeClockOutModal() {
     this.showClockOutModal = false;
   }
+
   checkUserClockStatus() {
     // First check local storage for active attendance
     const storedAttendance = localStorage.getItem('currentAttendance');
@@ -216,13 +476,13 @@ clockOutData = {
         localStorage.removeItem('currentAttendance');
       }
     }
-  
+
     // Fall back to checking database if nothing in local storage
     if (!this.currentUser) return;
-  
+
     const userIdentifier = this.currentUser.username || this.currentUser.email;
     const today = new Date().toISOString().split('T')[0];
-  
+
     // Find today's attendance records for this user
     this.userAttendances = this.attendances.filter(a => {
       if (!a.clockInTime) return false;
@@ -230,10 +490,10 @@ clockOutData = {
       const clockInDate = new Date(a.clockInTime).toISOString().split('T')[0];
       return a.employee === userIdentifier && clockInDate === today;
     });
-  
+
     // Check for active attendance (clocked in but not clocked out)
     const activeAttendance = this.userAttendances.find(a => !a.clockOutTime);
-  
+
     if (activeAttendance) {
       this.currentAttendance = activeAttendance;
       this.clockedInShift = this.shifts.find(s => s.shiftName === activeAttendance.shift);
@@ -403,19 +663,21 @@ clockOutData = {
   closeAttendanceModal() {
     this.showAttendanceModal = false;
   }
-// Add these new methods for filtering
-filterAttendanceByDate() {
-  if (!this.attendanceFilterDate) {
-    this.filteredAttendances = [...this.attendances];
-    return;
+
+  // Add these new methods for filtering
+  filterAttendanceByDate() {
+    if (!this.attendanceFilterDate) {
+      this.filteredAttendances = [...this.attendances];
+      return;
+    }
+
+    this.filteredAttendances = this.attendances.filter(a => {
+      if (!a.clockInTime) return false;
+      const clockInDate = new Date(a.clockInTime).toISOString().split('T')[0];
+      return clockInDate === this.attendanceFilterDate;
+    });
   }
 
-  this.filteredAttendances = this.attendances.filter(a => {
-    if (!a.clockInTime) return false;
-    const clockInDate = new Date(a.clockInTime).toISOString().split('T')[0];
-    return clockInDate === this.attendanceFilterDate;
-  });
-}
   resetForm() {
     this.newShift = {
       shiftName: '',
@@ -424,7 +686,6 @@ filterAttendanceByDate() {
       description: '',
       shiftType: 'Fixed shift',
       holiday: '',
-   
     };
   }
 
@@ -461,8 +722,6 @@ filterAttendanceByDate() {
     }
   }
 
-
-
   addAttendance() {
     if (
       this.newAttendance.employee &&
@@ -488,155 +747,218 @@ filterAttendanceByDate() {
 
   openClockInModal() {
     this.getIPAddress();
-    this.clockInData = {
-      employee: this.currentUser?.username || this.currentUser?.email || '',
-      shift: this.currentUser?.shift || '',
-      ipAddress: '',
-      clockInNote: ''
-    };
-    this.showClockInModal = true;
     
-    // Update current time every second
-  setInterval(() => {
-      this.currentTime = new Date();
-    }, 1000);
+    // Auto-fill employee name with current user's details
+    const userDisplayName = this.currentUser?.displayName || 
+                           this.currentUser?.username || 
+                           this.currentUser?.email ||
+                           '';
+    
+    console.log('Auto-filling employee name:', userDisplayName); // Debug log
+    
+    // Set up clockInData with current user's information
+    this.clockInData = {
+      employee: userDisplayName,
+      shift: this.currentUser?.shift || '', // Auto-fill shift if available in user data
+      ipAddress: '',
+      clockInNote: '',
+      latitude: '',
+      longitude: '',
+      locationAddress: '',
+      imageFile: null,
+      imagePreview: ''
+    };
+    
+    this.showClockInModal = true;
   }
 
   closeClockInModal() {
     this.showClockInModal = false;
   }
 
-
-// In your attendance.component.ts
-// Update the submitClockIn method to set currentAttendance after successful clock-in
-
-submitClockIn() {
-  if (this.isClockingIn) return;
-  
-  if (!this.clockInData.employee) {
-    alert('Please select an employee');
-    return;
-  }
-  
-  if (!this.clockInData.shift) {
-    alert('Please select a shift');
-    return;
-  }
-  
-  this.isClockingIn = true;
-
-  const selectedShift = this.shifts.find(s => s.shiftName === this.clockInData.shift);
-  if (!selectedShift) {
-    alert('Selected shift not found');
-    this.isClockingIn = false;
-    return;
-  }
-
-  const newClockIn: Attendance = {
-    employee: this.clockInData.employee,
-    clockInTime: new Date().toISOString(),
-    clockOutTime: '',
-    shift: this.clockInData.shift,
-    ipAddress: this.clockInData.ipAddress || '',
-    clockInNote: this.clockInData.clockInNote || '',
-    clockOutNote: ''
-  };
-
-  this.attendanceService.addAttendance(newClockIn).then((response) => {
-    // Update local state immediately
-    this.currentAttendance = {
-      ...newClockIn,
-      id: response.id
-    };
-    this.clockedInShift = selectedShift;
+  async submitClockIn() {
+    if (this.isClockingIn) return;
     
-    // Store in local storage
-    localStorage.setItem('currentAttendance', JSON.stringify(this.currentAttendance));
+    if (!this.clockInData.employee) {
+      alert('Please select an employee');
+      return;
+    }
     
-    this.closeClockInModal();
-    this.showClockInSuccessModal = true;
-    this.isClockingIn = false;
-  }).catch(error => {
-    console.error('Error clocking in:', error);
-    alert('Error clocking in. Please try again.');
-    this.isClockingIn = false;
-  });
-}
+    if (!this.clockInData.shift) {
+      alert('Please select a shift');
+      return;
+    }
+    
+    if (!this.clockInData.imageFile) {
+      alert('Please upload an image');
+      return;
+    }
+    
+    this.isClockingIn = true;
 
-// Also make sure the closeClockInSuccessModal method updates the state properly
-closeClockInSuccessModal() {
-  this.showClockInSuccessModal = false;
-  // Force check user clock status again to refresh UI
-  this.checkUserClockStatus();
-}
+    const selectedShift = this.shifts.find(s => s.shiftName === this.clockInData.shift);
+    if (!selectedShift) {
+      alert('Selected shift not found');
+      this.isClockingIn = false;
+      return;
+    }
 
-
-submitClockOut() {
-  if (this.isClockingOut || !this.currentAttendance || !this.currentAttendance.id) {
-    return;
-  }
-  
-  this.isClockingOut = true;
-  const clockOutTime = new Date().toISOString();
-  
-  // Calculate work duration
-  if (this.currentAttendance.clockInTime) {
-    const start = new Date(this.currentAttendance.clockInTime);
-    const end = new Date(clockOutTime);
-    const diffMs = end.getTime() - start.getTime();
-    const diffSec = Math.floor(diffMs / 1000);
-    const hours = Math.floor(diffSec / 3600);
-    const minutes = Math.floor((diffSec % 3600) / 60);
-    const seconds = diffSec % 60;
-    this.workDuration = [
-      hours.toString().padStart(2, '0'),
-      minutes.toString().padStart(2, '0'),
-      seconds.toString().padStart(2, '0')
-    ].join(':');
-  }
-  
-  const updatedAttendance = {
-    ...this.currentAttendance,
-    clockOutTime: clockOutTime,
-    clockOutNote: this.clockOutData.clockOutNote || '',
-    ipAddress: this.currentAttendance.ipAddress || this.clockInData.ipAddress || ''
-  };
-
-  this.attendanceService.updateAttendance(this.currentAttendance.id, updatedAttendance)
-    .then(() => {
-      // Clear current attendance and update UI
-      this.currentAttendance = null;
-      this.clockOutData = {
-        employee: '',
-        shift: '',
-        clockOutNote: ''
+    // Upload image first
+    let imageUrl = '';
+    try {
+      // Call your image upload service
+      imageUrl = await this.attendanceService.uploadImage(this.clockInData.imageFile);
+      
+      // Create the attendance record
+      const newClockIn: any = {
+        employee: this.clockInData.employee,
+        clockInTime: new Date().toISOString(),
+        clockOutTime: '',
+        shift: this.clockInData.shift,
+        ipAddress: this.clockInData.ipAddress || '',
+        clockInNote: this.clockInData.clockInNote || '',
+        clockOutNote: '',
+        imageUrl: imageUrl // Make sure this is stored
       };
-      
-      // Remove from local storage
-      localStorage.removeItem('currentAttendance');
-      
-      // Close modals and show success
-      this.closeClockOutModal();
-      this.showClockOutSuccessModal = true;
-      this.isClockingOut = false;
-      
-      // Refresh attendance data
-      this.loadAttendance();
-    })
-    .catch(error => {
-      console.error('Error clocking out:', error);
-      alert('Error clocking out. Please try again.');
-      this.isClockingOut = false;
-    });
-}
 
-closeClockOutSuccessModal() {
-  this.showClockOutSuccessModal = false;
-  // Reset current attendance
-  this.currentAttendance = null;
-  // Force check user clock status again to refresh UI
-  this.checkUserClockStatus();
-}
+      // Add location data if available
+      if (this.clockInData.latitude) {
+        newClockIn.location = {
+          latitude: this.clockInData.latitude,
+          longitude: this.clockInData.longitude,
+          address: this.clockInData.locationAddress || ''
+        };
+      }
+
+      // Save to database
+      const response = await this.attendanceService.addAttendance(newClockIn);
+      
+      this.currentAttendance = {
+        ...newClockIn,
+        id: response.id
+      };
+      this.clockedInShift = selectedShift;
+      
+      localStorage.setItem('currentAttendance', JSON.stringify(this.currentAttendance));
+      
+      this.closeClockInModal();
+      this.showClockInSuccessModal = true;
+    } catch (error) {
+      console.error('Error during clock in:', error);
+      alert('Error during clock in. Please try again.');
+    } finally {
+      this.isClockingIn = false;
+    }
+  }
+
+  // Also make sure the closeClockInSuccessModal method updates the state properly
+  closeClockInSuccessModal() {
+    this.showClockInSuccessModal = false;
+    // Force check user clock status again to refresh UI
+    this.checkUserClockStatus();
+  }
+
+  async submitClockOut() {
+    if (this.isClockingOut || !this.currentAttendance || !this.currentAttendance.id) {
+      return;
+    }
+    
+    this.isClockingOut = true;
+    const clockOutTime = new Date().toISOString();
+    
+    // Calculate work duration
+    if (this.currentAttendance.clockInTime) {
+      const start = new Date(this.currentAttendance.clockInTime);
+      const end = new Date(clockOutTime);
+      const diffMs = end.getTime() - start.getTime();
+      const diffSec = Math.floor(diffMs / 1000);
+      const hours = Math.floor(diffSec / 3600);
+      const minutes = Math.floor((diffSec % 3600) / 60);
+      const seconds = diffSec % 60;
+      this.workDuration = [
+        hours.toString().padStart(2, '0'),
+        minutes.toString().padStart(2, '0'),
+        seconds.toString().padStart(2, '0')
+      ].join(':');
+    }
+
+    // Upload image first if exists
+    let imageUrl = this.currentAttendance.imageUrl || '';
+    if (this.clockOutData.imageFile) {
+      try {
+        imageUrl = await this.attendanceService.uploadImage(this.clockOutData.imageFile);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        this.isClockingOut = false;
+        alert('Error uploading image. Please try again.');
+        return;
+      }
+    }
+    
+    const updatedAttendance: any = {
+      ...this.currentAttendance,
+      clockOutTime: clockOutTime,
+      clockOutNote: this.clockOutData.clockOutNote || '',
+      ipAddress: this.currentAttendance.ipAddress || this.clockOutData.ipAddress || '',
+      imageUrl: imageUrl,
+      clockOutLocation: this.clockOutData.latitude ? {
+        latitude: this.clockOutData.latitude,
+        longitude: this.clockOutData.longitude,
+        address: this.clockOutData.locationAddress || ''
+      } : null,
+      clockOutImageUrl: imageUrl
+    };
+
+    // Add location data if available
+    if (this.clockOutData.latitude) {
+      updatedAttendance.location = {
+        latitude: this.clockOutData.latitude,
+        longitude: this.clockOutData.longitude,
+        address: this.clockOutData.locationAddress || ''
+      };
+    }
+
+    this.attendanceService.updateAttendance(this.currentAttendance.id, updatedAttendance)
+      .then(() => {
+        // Clear current attendance and update UI
+        this.currentAttendance = null;
+        this.clockOutData = {
+          employee: '',
+          shift: '',
+          clockOutNote: '',
+          latitude: '',
+          longitude: '',
+          locationAddress: '',
+          ipAddress: '',
+          imageFile: null,
+          imagePreview: ''
+        };
+        
+        // Remove from local storage
+        localStorage.removeItem('currentAttendance');
+        
+        // Close modals and show success
+        this.closeClockOutModal();
+        this.showClockOutSuccessModal = true;
+        this.isClockingOut = false;
+        
+        // Refresh attendance data
+        this.loadAttendance();
+      })
+      .catch(error => {
+        console.error('Error clocking out:', error);
+        alert('Error clocking out. Please try again.');
+        this.isClockingOut = false;
+      });
+  }
+
+  closeClockOutSuccessModal() {
+    this.showClockOutSuccessModal = false;
+    // Reset current attendance
+    this.currentAttendance = null;
+    // Force check user clock status again to refresh UI
+    this.checkUserClockStatus();
+  }
 
   // Import functionality
   onFileSelected(event: any) {
@@ -648,23 +970,6 @@ closeClockOutSuccessModal() {
   // Alias for onFileSelected to match the method name in the template
   onFileSelect(event: any) {
     this.onFileSelected(event);
-  }
-
-  downloadTemplateFile() {
-    // Create CSV content
-    let csvContent = "Email,Clock in time,Clock out time,Clock in note,Clock out note,IP Address\n";
-    csvContent += "user@example.com,2025-04-15 09:00:00,2025-04-15 17:00:00,Morning check-in,Left office,192.168.1.1\n";
-    
-    // Create a blob and download it
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.setAttribute('hidden', '');
-    a.setAttribute('href', url);
-    a.setAttribute('download', 'attendance_import_template.csv');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   }
 
   submitImport() {
@@ -700,9 +1005,150 @@ closeClockOutSuccessModal() {
     }, 1500);
   }
 
-  // Alias for submitImport to match the method name in the template
-  uploadFile() {
-    this.submitImport();
+  async uploadFile() {
+    if (!this.selectedFile) {
+      this.importError = 'Please select a file to import';
+      return;
+    }
+
+    this.isImporting = true;
+    this.importError = '';
+    this.importSuccess = '';
+    this.importResults = null;
+
+    try {
+      if (this.selectedFile.name.endsWith('.csv')) {
+        await this.parseCSVFile(this.selectedFile);
+      } else if (this.selectedFile.name.endsWith('.xlsx') || this.selectedFile.name.endsWith('.xls')) {
+        await this.parseExcelFile(this.selectedFile);
+      } else {
+        this.importError = 'Unsupported file format. Please upload a CSV or Excel file.';
+      }
+    } catch (error) {
+      console.error('Error importing file:', error);
+      this.importError = 'Error processing file. Please check the format and try again.';
+    } finally {
+      this.isImporting = false;
+    }
+  }
+
+  private parseCSVFile(file: File): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          this.processImportData(results.data);
+          resolve();
+        },
+        error: (error) => {
+          reject(error);
+        }
+      });
+    });
+  }
+
+  private async parseExcelFile(file: File): Promise<void> {
+    // In a real app, you would use a library like xlsx to parse Excel files
+    // This is a simplified version for demonstration
+    this.importError = 'Excel file parsing not implemented in this demo. Please use CSV.';
+    throw new Error('Excel parsing not implemented');
+  }
+
+  private async processImportData(data: any[]) {
+    const results = {
+      total: data.length,
+      success: 0,
+      errors: [] as string[]
+    };
+
+    for (const [index, row] of data.entries()) {
+      try {
+        // Validate required fields
+        if (!row['Email']) {
+          throw new Error('Missing email');
+        }
+
+        if (!row['Clock in time']) {
+          throw new Error('Missing clock in time');
+        }
+
+        // Find user by email
+        const user = this.users.find(u => u.email === row['Email']);
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        // Parse dates
+        const clockInTime = new Date(row['Clock in time']);
+        if (isNaN(clockInTime.getTime())) {
+          throw new Error('Invalid clock in time format');
+        }
+
+        let clockOutTime = null;
+        if (row['Clock out time']) {
+          clockOutTime = new Date(row['Clock out time']);
+          if (isNaN(clockOutTime.getTime())) {
+            throw new Error('Invalid clock out time format');
+          }
+        }
+
+        // Prepare attendance record
+        const attendance: any = {
+          employee: user.username || user.email,
+          clockInTime: clockInTime.toISOString(),
+          clockOutTime: clockOutTime ? clockOutTime.toISOString() : '',
+          shift: user.shift || '',
+          ipAddress: row['IP Address'] || '',
+          clockInNote: row['Clock in note'] || '',
+          clockOutNote: row['Clock out note'] || ''
+        };
+
+        // Save to database
+        await this.attendanceService.addAttendance(attendance);
+        results.success++;
+      } catch (error) {
+        const errorMsg = `Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        results.errors.push(errorMsg);
+        console.error(`Error processing row ${index + 1}:`, error);
+      }
+    }
+
+    this.importResults = results;
+    if (results.success > 0) {
+      this.importSuccess = `Successfully imported ${results.success} of ${results.total} records`;
+      // Refresh attendance data
+      this.loadAttendance();
+    } else {
+      this.importError = `Failed to import any records. ${results.errors[0] || 'Unknown error'}`;
+    }
+  }
+
+  downloadTemplateFile() {
+    // CSV header row
+    let csvContent = "Email,Clock in time,Clock out time,Clock in note,Clock out note,IP Address\n";
+    
+    // Example data row
+    const exampleDate = new Date();
+    const clockInTime = exampleDate.toISOString().replace('T', ' ').replace(/\..+/, '');
+    
+    exampleDate.setHours(exampleDate.getHours() + 8);
+    const clockOutTime = exampleDate.toISOString().replace('T', ' ').replace(/\..+/, '');
+    
+    csvContent += `user@example.com,${clockInTime},${clockOutTime},Morning check-in,Left office,192.168.1.1\n`;
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'attendance_template.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   calculateWorkDuration(clockIn: string | undefined, clockOut: string | undefined): string {
@@ -730,6 +1176,7 @@ closeClockOutSuccessModal() {
       return '-';
     }
   }
+
   deleteShift(shift: Shift) {
     if (!shift.id) return;
     
@@ -744,6 +1191,7 @@ closeClockOutSuccessModal() {
         });
     }
   }
+
   formatDateTime(dateTimeStr: string | undefined): string {
     if (!dateTimeStr) return '';
     
@@ -754,4 +1202,5 @@ closeClockOutSuccessModal() {
       console.error('Error formatting date:', e);
       return '';
     }
-  }}
+  }
+}

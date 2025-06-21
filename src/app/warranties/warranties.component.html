@@ -122,8 +122,10 @@
         </div>
         
         <div class="form-actions">
-          <button type="submit" class="btn btn-save">Save</button>
-          <button type="button" class="btn btn-close" (click)="closeModal()">Close</button>
+<button type="submit" class="btn btn-save" [disabled]="isSaving || !warranty.productName || !warranty.durationValue || !warranty.durationUnit">
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>          <button type="button" class="btn btn-close" (click)="closeModal()">Close</button>
         </div>
       </form>
       

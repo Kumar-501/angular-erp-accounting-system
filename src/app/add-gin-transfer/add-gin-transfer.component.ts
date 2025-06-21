@@ -1,20 +1,30 @@
-// add-gin-transfer.component.ts
 import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ProductsService } from '../services/products.service';
 import { LocationService } from '../services/location.service';
 import { formatDate } from '@angular/common';
 import { GinTransferService, GinTransfer, GinTransferItem } from '../services/gin-transfer.service';
+import { Firestore, collection, doc, setDoc, getDoc, getDocs, increment, QueryDocumentSnapshot, DocumentData } from '@angular/fire/firestore';
+
+// Constants for Firestore collections
+const COLLECTIONS = {
+  PRODUCT_STOCK: 'product-stock',
+  PRODUCTS: 'products',
+  LOCATIONS: 'locations'
+};
 
 interface Product {
-  id?: string;
+  id: string;  // This is crucial for unique identification
   productName: string;
-  sku: string;
+  sku: string;  // Stock Keeping Unit - should be unique
   unit: string;
+  barcode?: string;
   defaultSellingPriceExcTax: number | null;
-  currentStock: number;
+  location?: string; // Single location ID (legacy)
+  locationName?: string; // Single location name (legacy)
+  locations?: string[]; // Array of location IDs
+  locationNames?: string[]; // Array of location names
 }
-
 @Component({
   selector: 'app-add-gin-transfer',
   templateUrl: './add-gin-transfer.component.html',
@@ -29,12 +39,12 @@ export class AddGinTransferComponent implements OnInit {
   searchTerm: string = '';
   currentDate: string;
   showSearchResults: boolean = false;
-  
-  constructor(
+    constructor(
     private fb: FormBuilder,
     private productsService: ProductsService,
     private locationService: LocationService,
-    private ginTransferService: GinTransferService
+    private ginTransferService: GinTransferService,
+    private firestore: Firestore
   ) {
     // Initialize current date
     this.currentDate = formatDate(new Date(), 'dd-MM-yyyy HH:mm', 'en');
@@ -71,50 +81,74 @@ export class AddGinTransferComponent implements OnInit {
       this.locations = locations;
     });
   }
-
   loadProducts() {
     this.productsService.getProductsRealTime().subscribe(products => {
+      // Store all products for location-based filtering
       this.products = products;
+      console.log('Loaded products:', products.length);
     });
   }
 
-  searchProducts() {
-    this.showSearchResults = true;
-    
-    if (this.searchTerm.trim() === '') {
-      // Show first 10 products if search is empty
-      this.filteredProducts = this.products.slice(0, 10);
-    } else {
-      const searchTermLower = this.searchTerm.toLowerCase();
-      this.filteredProducts = this.products.filter(product => 
-        product.productName.toLowerCase().includes(searchTermLower) ||
-        product.sku.toLowerCase().includes(searchTermLower)
-      );
-    }
+async searchProducts() {
+  this.showSearchResults = true;
+  
+  const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+  if (!locationFrom) {
+    this.filteredProducts = [];
+    return;
   }
 
-  addProduct(product: Product) {
-    const existingProduct = this.selectedProducts.find(p => p.productId === product.id);
-    
-    if (existingProduct) {
-      existingProduct.quantity += 1;
-      existingProduct.subtotal = existingProduct.quantity * existingProduct.unitPrice;
-    } else {
-      const unitPrice = product.defaultSellingPriceExcTax || 0;
-      this.selectedProducts.push({
-        productId: product.id!,
-        productName: product.productName,
-        quantity: 1,
-        secondaryQuantity: 0, // Initialize secondary quantity
-        unitPrice: unitPrice,
-        subtotal: unitPrice
-      });
-    }
-    
-    this.searchTerm = '';
-    this.showSearchResults = false;
-    this.calculateTotal();
+  console.log(`Searching for products at location: ${this.getLocationName(locationFrom)} (${locationFrom})`);
+
+  // Get all products that have stock at this location by checking product-stock collection
+  const availableProducts = await this.getProductsWithStockAtLocation(locationFrom);
+
+  // Apply search filter
+  if (this.searchTerm.trim() === '') {
+    this.filteredProducts = availableProducts.slice(0, 10);
+  } else {
+    const searchTermLower = this.searchTerm.toLowerCase();
+    this.filteredProducts = availableProducts.filter(product => 
+      product.productName.toLowerCase().includes(searchTermLower) ||
+      (product.sku && product.sku.toLowerCase().includes(searchTermLower)) ||
+      (product.barcode && product.barcode.toLowerCase().includes(searchTermLower))
+    ).slice(0, 10);
   }
+
+  console.log(`Found ${this.filteredProducts.length} products with stock at location ${this.getLocationName(locationFrom)}`);
+    // Pre-load stock for better UX
+  this.preloadStockForProducts();
+}
+
+addProduct(product: Product) {
+  // Check if product already exists in transfer by ID
+  const existingIndex = this.selectedProducts.findIndex(p => p.productId === product.id);
+  
+  if (existingIndex >= 0) {
+    // Product exists - increment quantity
+    this.selectedProducts[existingIndex].quantity += 1;
+    this.selectedProducts[existingIndex].subtotal = 
+      this.selectedProducts[existingIndex].quantity * this.selectedProducts[existingIndex].unitPrice;
+  } else {
+    // Add new product with all identifying information
+    this.selectedProducts.push({
+      productId: product.id,
+      productName: product.productName,
+      sku: product.sku,  // Include SKU in transfer items
+      barcode: product.barcode,  // Include barcode if available
+      quantity: 1,
+      secondaryQuantity: 0,
+      unitPrice: product.defaultSellingPriceExcTax || 0,
+      subtotal: product.defaultSellingPriceExcTax || 0,
+      unit: product.unit,
+      locationFrom: '' // Will be set from the form's locationFrom field
+    });
+  }
+  
+  this.searchTerm = '';
+  this.showSearchResults = false;
+  this.calculateTotal();
+}
   
   updateQuantity(index: number, value: any) {
     const quantity = parseInt(value);
@@ -161,71 +195,473 @@ export class AddGinTransferComponent implements OnInit {
     this.showSearchResults = false;
   }
 
-  async saveGinTransfer() {
-    if (this.ginTransferForm.valid && this.selectedProducts.length > 0) {
-      const formData = this.ginTransferForm.value;
-      const hasSecondaryLocation = !!formData.locationTo2;
-      
-      const ginTransfer: GinTransfer = {
-        date: formData.date,
-        referenceNo: formData.referenceNo,
-        locationFrom: formData.locationFrom,
-        locationTo: formData.locationTo,
-        locationTo2: formData.locationTo2 || null,
-        status: formData.status,
-        items: this.selectedProducts,
-        shippingCharges: formData.shippingCharges || 0,
-        additionalNotes: formData.additionalNotes || '',
-        totalAmount: this.calculateTotal(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      try {
-        const docId = await this.ginTransferService.addGinTransfer(ginTransfer);
-        console.log('GIN Transfer saved with ID:', docId);
-        
-        // Process primary location transfer
-        for (const item of this.selectedProducts) {
-          // Deduct from source location
-          await this.productsService.adjustProductStock(
-            item.productId, 
-            formData.locationFrom, 
-            -(item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0))
-          );
-          
-          // Add to primary destination
-          await this.productsService.adjustProductStock(
-            item.productId, 
-            formData.locationTo, 
-            item.quantity
-          );
-          
-          // Add to secondary destination if specified
-          if (hasSecondaryLocation && item.secondaryQuantity && item.secondaryQuantity > 0) {
-            await this.productsService.adjustProductStock(
-              item.productId, 
-              formData.locationTo2, 
-              item.secondaryQuantity
-            );
-          }
-        }
-        
-        this.resetForm();
-        alert('GIN Transfer saved successfully!');
-        
-      } catch (error) {
-        console.error('Error saving GIN transfer:', error);
-        alert('Error saving GIN transfer. Please try again.');
-      }
-    } else {
-      Object.keys(this.ginTransferForm.controls).forEach(key => {
-        this.ginTransferForm.get(key)?.markAsTouched();
-      });
-      
-      if (this.selectedProducts.length === 0) {
-        alert('Please add at least one product to the transfer.');
+async saveGinTransfer() {
+  if (this.ginTransferForm.valid && this.ginTransferForm.value.locationFrom && this.selectedProducts.length > 0) {
+    // First check for duplicate products in the transfer
+    const productIds = this.selectedProducts.map(p => p.productId);
+    const hasDuplicates = new Set(productIds).size !== productIds.length;
+    
+    if (hasDuplicates) {
+      alert('Error: The same product appears multiple times in this transfer. Please combine quantities for each product.');
+      return;
+    }
+
+    const formData = this.ginTransferForm.value;
+    const hasSecondaryLocation = !!formData.locationTo2;
+
+    // Only validate stock availability if status is "Completed"
+    if (formData.status === 'Completed') {
+      const stockValid = await this.validateStockAvailability();
+      if (!stockValid) {
+        return;
       }
     }
+
+    // Validate all items have required fields
+    const invalidItems = this.selectedProducts.filter(item => 
+      !item.productId || !item.productName || !item.sku || !item.unit
+    );
+
+    if (invalidItems.length > 0) {
+      alert('Error: Some products are missing required information. Please check all products have SKU and unit.');
+      return;
+    }
+
+    // Prepare transfer items with all required fields
+    const transferItems = this.selectedProducts.map(item => ({
+      productId: item.productId,
+      productName: item.productName,
+      sku: item.sku,
+      unit: item.unit,
+      locationFrom: formData.locationFrom, // Use the form's locationFrom instead of item.locationFrom
+      quantity: item.quantity,
+      secondaryQuantity: item.secondaryQuantity || 0,
+      unitPrice: item.unitPrice || 0,
+      subtotal: item.subtotal || 0,
+      barcode: item.barcode || '',
+      currentStock: item.currentStock || 0
+    }));
+    
+    const ginTransfer: GinTransfer = {
+      date: formData.date,
+      referenceNo: formData.referenceNo,
+      locationFrom: formData.locationFrom,
+      locationTo: formData.locationTo,
+      locationTo2: formData.locationTo2 || null,
+      status: formData.status,
+      items: transferItems,
+      shippingCharges: formData.shippingCharges || 0,
+      additionalNotes: formData.additionalNotes || '',
+      totalAmount: this.calculateTotal(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+      try {
+      const docId = await this.ginTransferService.addGinTransfer(ginTransfer);
+      console.log('GIN Transfer saved with ID:', docId);
+      
+      // Only process stock movements if status is "Completed"
+      if (formData.status === 'Completed') {
+        await this.processStockMovements(ginTransfer, hasSecondaryLocation);
+      } else {
+        console.log(`GIN Transfer saved with status: ${formData.status}. Stock movements will be processed when status is set to "Completed".`);
+      }
+      
+      this.resetForm();
+      alert('GIN Transfer saved successfully!');
+      
+    } catch (error) {
+      console.error('Error saving GIN transfer:', error);
+      alert('Error saving GIN transfer. Please try again.');
+    }
+  } else {
+    Object.keys(this.ginTransferForm.controls).forEach(key => {
+      this.ginTransferForm.get(key)?.markAsTouched();
+    });
+    
+    if (this.selectedProducts.length === 0) {
+      alert('Please add at least one product to the transfer.');
+    }
+    
+    if (!this.ginTransferForm.value.locationFrom) {
+      alert('Please select a source location (Location From).');
+    }
   }
+}
+
+async validateStockAvailability(): Promise<boolean> {
+    const formData = this.ginTransferForm.value;
+    const hasSecondaryLocation = !!formData.locationTo2;
+    
+    for (const item of this.selectedProducts) {
+      const requiredQuantity = item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0);
+      
+      try {
+        // Get current stock from PRODUCT_STOCK collection
+        const availableStock = await this.getCurrentStockAtLocation(item.productId, formData.locationFrom);
+        
+        if (availableStock < requiredQuantity) {
+          alert(`Insufficient stock for product "${item.productName}". Available: ${availableStock}, Required: ${requiredQuantity}`);
+          return false;
+        }
+        
+        console.log(`Stock check passed for ${item.productName}: Available=${availableStock}, Required=${requiredQuantity}`);
+      } catch (error) {
+        console.error(`Error checking stock for product ${item.productName}:`, error);
+        alert(`Error checking stock availability for product "${item.productName}"`);
+        return false;
+      }    }
+    
+    return true;
+  }
+
+  /**
+   * Get current stock for a product at a specific location from PRODUCT_STOCK collection
+   */
+  private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        const data = stockDoc.data();
+        return data?.['quantity'] || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting stock at location:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Update stock for a product at a specific location in PRODUCT_STOCK collection
+   */
+  private async updateProductStockAtLocation(
+    productId: string,
+    productName: string,
+    sku: string,
+    locationId: string,
+    locationName: string,
+    quantityChange: number, // Positive to increase, negative to decrease
+    operation: 'increase' | 'decrease'
+  ): Promise<void> {
+    try {
+      if (!productId || !locationId || quantityChange === 0) {
+        throw new Error(`Invalid parameters for stock update`);
+      }
+
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      
+      console.log(`${operation === 'increase' ? 'Adding' : 'Removing'} ${Math.abs(quantityChange)} units of ${sku} ${operation === 'increase' ? 'to' : 'from'} ${locationName}`);
+      
+      // Get current stock document
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        // Update existing stock
+        const currentData = stockDoc.data();
+        const currentQuantity = currentData?.['quantity'] || 0;
+        
+        // For decrease operations, check if we have enough stock
+        if (operation === 'decrease' && currentQuantity < Math.abs(quantityChange)) {
+          throw new Error(`Insufficient stock for ${productName}. Available: ${currentQuantity}, Required: ${Math.abs(quantityChange)}`);
+        }
+        
+        const newQuantity = operation === 'increase' 
+          ? currentQuantity + quantityChange 
+          : currentQuantity - Math.abs(quantityChange);
+        
+        await setDoc(stockDocRef, {
+          quantity: newQuantity,
+          updatedAt: new Date()
+        }, { merge: true });
+        
+        console.log(`✓ Updated stock for ${sku} at ${locationName}: ${currentQuantity} → ${newQuantity}`);
+      } else {
+        // Handle case where stock document doesn't exist
+        if (operation === 'decrease') {
+          throw new Error(`No stock found for ${productName} at ${locationName}`);
+        }
+        
+        // Create new stock entry for increase operations
+        await setDoc(stockDocRef, {
+          productId: productId,
+          productName: productName,
+          sku: sku,
+          locationId: locationId,
+          locationName: locationName,
+          quantity: quantityChange,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        console.log(`✓ Created new stock entry for ${sku} at ${locationName}: 0 → ${quantityChange}`);
+      }
+    } catch (error) {
+      console.error(`✗ Error updating stock for ${productName} at location ${locationId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get current stock display for a product at the selected source location
+   * This method can be called from the template to show current stock
+   */
+  async getCurrentStockDisplay(productId: string): Promise<string> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !productId) return '0';
+    
+    try {
+      const stock = await this.getCurrentStockAtLocation(productId, locationFrom);
+      return stock.toString();
+    } catch (error) {
+      console.error('Error getting stock display:', error);
+      return 'Error';
+    }
+  }
+
+  /**
+   * Check if sufficient stock is available for a specific quantity
+   */
+  async checkStockAvailability(productId: string, requiredQuantity: number): Promise<boolean> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !productId) return false;
+    
+    try {
+      const currentStock = await this.getCurrentStockAtLocation(productId, locationFrom);
+      return currentStock >= requiredQuantity;
+    } catch (error) {
+      console.error('Error checking stock availability:', error);
+      return false;
+    }
+  }  /**
+   * Get current stock for display in template (no cache version)
+   * Returns a promise that resolves to stock quantity
+   */
+  async getStockForDisplayAsync(productId: string): Promise<number> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !productId) return 0;
+
+    try {
+      return await this.getCurrentStockAtLocation(productId, locationFrom);
+    } catch (error) {
+      console.error('Error fetching stock:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Stock display method that fetches real stock from PRODUCT_STOCK collection
+   * This will be used in the template with async pipe or manual calls
+   */
+  stockDisplayMap = new Map<string, number>();
+
+  async getAndCacheStock(productId: string): Promise<number> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !productId) return 0;
+
+    const cacheKey = `${productId}_${locationFrom}`;
+    
+    if (this.stockDisplayMap.has(cacheKey)) {
+      return this.stockDisplayMap.get(cacheKey) || 0;
+    }
+
+    try {
+      const stock = await this.getCurrentStockAtLocation(productId, locationFrom);
+      this.stockDisplayMap.set(cacheKey, stock);
+      return stock;
+    } catch (error) {
+      console.error('Error fetching stock:', error);
+      this.stockDisplayMap.set(cacheKey, 0);
+      return 0;
+    }
+  }
+
+  /**
+   * Get stock display text - checks cache first, then fetches if needed
+   */
+  getStockDisplayText(productId: string): string {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom) return 'Select location first';
+    if (!productId) return '0';
+
+    const cacheKey = `${productId}_${locationFrom}`;
+    
+    // Check if we have cached stock
+    if (this.stockDisplayMap.has(cacheKey)) {
+      return this.stockDisplayMap.get(cacheKey)?.toString() || '0';
+    }
+
+    // Fetch stock asynchronously and return "Loading..." for now
+    this.getAndCacheStock(productId);
+    return 'Loading...';
+  }
+
+  /**
+   * Clear stock cache when location changes
+   */
+  onLocationFromChange(): void {
+    this.stockDisplayMap.clear();
+    // Also trigger a new search to filter products by new location
+    if (this.searchTerm || this.showSearchResults) {
+      this.searchProducts();
+    }
+  }
+
+  /**
+   * Get location name from location ID
+   */
+  getLocationName(locationId: string): string {
+    if (!locationId) return 'N/A';
+    const location = this.locations.find(l => l.id === locationId);
+    return location ? location.name : 'Unknown Location';
+  }
+
+  /**
+   * Pre-load stock for all filtered products to improve UX
+   */
+  async preloadStockForProducts(): Promise<void> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !this.filteredProducts.length) return;
+
+    console.log(`Pre-loading stock for ${this.filteredProducts.length} products at location ${this.getLocationName(locationFrom)}`);
+    
+    // Use Promise.all to load stock for all products simultaneously
+    const stockPromises = this.filteredProducts.map(product => 
+      this.getAndCacheStock(product.id)
+    );
+    
+    await Promise.all(stockPromises);
+    console.log('Stock pre-loading completed');
+  }
+
+  /**
+   * Force refresh stock display (useful for manual refresh)
+   */
+  refreshStockDisplay(): void {
+    this.stockDisplayMap.clear();
+    if (this.filteredProducts.length > 0) {
+      this.preloadStockForProducts();
+    }
+  }
+
+  /**
+   * Get products with stock at a specific location from product-stock collection
+   * This queries the product-stock collection to find which products are actually available
+   */
+  private async getProductsWithStockAtLocation(locationId: string): Promise<Product[]> {
+    try {
+      console.log(`Checking product-stock collection for location: ${locationId}`);
+      
+      // Query the product-stock collection for documents that end with the locationId
+      const stockQuery = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK);
+      const stockSnapshot = await getDocs(stockQuery);
+      
+      // Get all product IDs that have stock at this location
+      const productIdsWithStock = new Set<string>();
+      stockSnapshot.forEach((doc: any) => {
+        const docId = doc.id;
+        // Check if document ID ends with the locationId (format: productId_locationId)
+        if (docId.endsWith(`_${locationId}`)) {
+          const stockData = doc.data();
+          // Only include if quantity > 0
+          if (stockData['quantity'] && stockData['quantity'] > 0) {
+            const productId = docId.replace(`_${locationId}`, '');
+            productIdsWithStock.add(productId);
+            console.log(`Found stock for product ${productId}: ${stockData['quantity']} units`);
+          }
+        }
+      });
+      
+      console.log(`Found ${productIdsWithStock.size} products with stock at this location`);
+      
+      // Filter the products array to only include products that have stock at this location
+      const availableProducts = this.products.filter(product => 
+        productIdsWithStock.has(product.id)
+      );
+      
+      console.log(`Filtered to ${availableProducts.length} products that exist in products collection`);
+      return availableProducts;
+      
+    } catch (error) {
+      console.error('Error getting products with stock at location:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Process stock movements for a GIN transfer
+   * This method should only be called when the transfer status is "Completed"
+   */
+  private async processStockMovements(ginTransfer: GinTransfer, hasSecondaryLocation: boolean): Promise<void> {
+    console.log('=== STARTING STOCK MOVEMENTS ===');
+    
+    // Get location names for logging
+    const sourceLocation = this.locations.find(l => l.id === ginTransfer.locationFrom);
+    const destinationLocation = this.locations.find(l => l.id === ginTransfer.locationTo);
+    const secondaryLocation = ginTransfer.locationTo2 ? this.locations.find(l => l.id === ginTransfer.locationTo2) : null;
+    
+    for (const item of ginTransfer.items) {
+      const totalQuantityFromSource = item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0);
+      
+      console.log(`Processing transfer for ${item.productName} (${item.sku})`);
+      console.log(`  From: ${sourceLocation?.name || ginTransfer.locationFrom} - Quantity: ${totalQuantityFromSource}`);
+      console.log(`  To: ${destinationLocation?.name || ginTransfer.locationTo} - Quantity: ${item.quantity}`);      if (hasSecondaryLocation && item.secondaryQuantity && item.secondaryQuantity > 0) {
+        console.log(`  To Secondary: ${secondaryLocation?.name || ginTransfer.locationTo2} - Quantity: ${item.secondaryQuantity}`);
+      }
+      
+      try {
+        // Step 1: Deduct from source location
+        await this.updateProductStockAtLocation(
+          item.productId, 
+          item.productName,
+          item.sku,
+          ginTransfer.locationFrom, 
+          sourceLocation?.name || 'Unknown Location',
+          totalQuantityFromSource,
+          'decrease'
+        );
+        
+        // Step 2: Add to primary destination
+        await this.updateProductStockAtLocation(
+          item.productId, 
+          item.productName,
+          item.sku,
+          ginTransfer.locationTo, 
+          destinationLocation?.name || 'Unknown Location',
+          item.quantity,
+          'increase'
+        );
+          // Step 3: Add to secondary destination if specified
+        if (hasSecondaryLocation && item.secondaryQuantity && item.secondaryQuantity > 0 && ginTransfer.locationTo2) {
+          await this.updateProductStockAtLocation(
+            item.productId, 
+            item.productName,
+            item.sku,
+            ginTransfer.locationTo2, 
+            secondaryLocation?.name || 'Unknown Location',
+            item.secondaryQuantity,
+            'increase'
+          );
+        }
+        
+        console.log(`✓ Stock transfer completed for ${item.productName}`);
+        
+      } catch (error) {
+        console.error(`✗ Error in stock movement for product ${item.productName}:`, error);
+        alert(`Error: ${error instanceof Error ? error.message : 'Failed to transfer stock'} for product ${item.productName}`);
+        
+        // TODO: Implement rollback logic here if needed
+        throw error;
+      }
+    }
+    
+    console.log('=== STOCK MOVEMENTS COMPLETED ===');
+  }
+
+  // ...existing code...
 }

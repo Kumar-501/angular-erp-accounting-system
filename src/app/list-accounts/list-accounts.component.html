@@ -105,16 +105,24 @@
     </td>
     <td>{{ acc.accountNumber }}</td>
     <td class="debit-amount">{{ getAccountDebitTotal(acc.id) | number:'1.2-2' }}</td>
-    <td class="credit-amount">{{ getAccountCreditTotal(acc.id) | number:'1.2-2' }}</td>
-    <td [class.negative-balance]="(acc.openingBalance || 0) < 0">
-      {{ (acc.openingBalance || 0) | number:'1.2-2' }}
-    </td>
-    <td class="recent-transactions">
+    <td class="credit-amount">{{ getAccountCreditTotal(acc.id) | number:'1.2-2' }}</td>    <td [class.negative-balance]="(acc.calculatedBalance || acc.openingBalance || 0) < 0">
+      {{ (acc.calculatedBalance || acc.openingBalance || 0) | number:'1.2-2' }}
+    </td><td class="recent-transactions">
       <div *ngFor="let tx of getAccountTransactions(acc.id) | slice:0:3" class="transaction-item">
-        <span class="tx-date">{{ tx.date | date:'shortDate' }}</span>
-        <span class="tx-desc">{{ tx.description }}</span>
+        <span class="tx-date">{{ tx.date | date:'M/d/yy' }}</span>
+        <span class="tx-desc">{{ tx.description || 'Transaction' }}</span>
         <span class="tx-amount" [class.debit]="tx.debit > 0" [class.credit]="tx.credit > 0">
-          {{ tx.debit > 0 ? ('-' + (tx.debit | number:'1.2-2')) : ('+' + (tx.credit | number:'1.2-2')) }}
+          <ng-container *ngIf="tx.debit > 0; else creditAmount">
+            -{{ tx.debit | number:'1.2-2' }}
+          </ng-container>
+          <ng-template #creditAmount>
+            <ng-container *ngIf="tx.credit > 0">
+              +{{ tx.credit | number:'1.2-2' }}
+            </ng-container>
+            <ng-container *ngIf="tx.credit <= 0">
+              0.00
+            </ng-container>
+          </ng-template>
         </span>
       </div>
       <div *ngIf="getAccountTransactions(acc.id).length === 0" class="no-transactions">

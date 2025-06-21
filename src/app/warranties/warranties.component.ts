@@ -19,6 +19,8 @@ export class WarrantiesComponent implements OnInit {
   };
   
   warranties: any[] = [];
+  // In your component class
+isSaving: boolean = false;
   filteredWarranties: any[] = [];
   displayedWarranties: any[] = [];
   isModalOpen: boolean = false;
@@ -133,21 +135,25 @@ export class WarrantiesComponent implements OnInit {
     this.isModalOpen = false;
   }
 
-  async saveWarranty() {
-    try {
-      if (this.selectedWarrantyId) {
-        await this.warrantyService.updateWarranty(this.selectedWarrantyId, this.warranty);
-      } else {
-        await this.warrantyService.addWarranty(this.warranty);
-      }
-      this.closeModal();
-      this.loadWarranties(); // Refresh data
-    } catch (error) {
-      console.error('Error saving warranty:', error);
-      alert('Error saving warranty. Please try again.');
+async saveWarranty() {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
+  this.isSaving = true;
+  try {
+    if (this.selectedWarrantyId) {
+      await this.warrantyService.updateWarranty(this.selectedWarrantyId, this.warranty);
+    } else {
+      await this.warrantyService.addWarranty(this.warranty);
     }
+    this.closeModal();
+    this.loadWarranties(); // Refresh data
+  } catch (error) {
+    console.error('Error saving warranty:', error);
+    alert('Error saving warranty. Please try again.');
+  } finally {
+    this.isSaving = false;
   }
-
+}
   async deleteWarranty(id: string) {
     if (confirm('Are you sure you want to delete this warranty?')) {
       try {

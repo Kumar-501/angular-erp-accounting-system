@@ -73,6 +73,15 @@
               <i *ngIf="sortColumn === 'status'" 
                  [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
             </th>
+            
+ <th (click)="sortBy('purchaseDate')">Purchase Date 
+      <i *ngIf="sortColumn === 'purchaseDate'" 
+         [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+    </th>
+<th (click)="sortBy('receivedDate')">Received Date
+  <i *ngIf="sortColumn === 'receivedDate'" 
+     [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+</th>
             <th (click)="sortBy('addedBy')">Added By
               <i *ngIf="sortColumn === 'addedBy'" 
                  [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
@@ -100,7 +109,8 @@
                 {{ formatStatus(grn.status) }}
               </span>
             </td>
-            <td>{{ grn.addedBy || 'N/A' }}</td>
+  <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
+<td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>            <td>{{ grn.addedBy || 'N/A' }}</td>
           </tr>
           <tr *ngIf="paginatedGoodsReceived.length === 0">
             <td colspan="8" class="no-data">No data available</td>

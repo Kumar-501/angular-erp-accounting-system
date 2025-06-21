@@ -108,7 +108,8 @@ export class AddSaleComponent implements OnInit {
   showProductsInterestedDropdown = false;
   productInterestedSearch = '';
   allProductsSelected: boolean = false;
-
+// Add this at the top of your component class
+isSubmitting = false;
   filteredProductsForInterested: any[] = [];
   prescriptions: PrescriptionData[] = [];
 editingPrescriptionIndex: number | null = null;
@@ -584,19 +585,18 @@ private formatDateForInput(dateString: string): string {
   }
 }
 openPrescriptionModal(): void {
-  // Reset if not editing
+  // Reset only if not editing
   if (this.editingPrescriptionIndex === null) {
     this.resetPrescriptionData();
-    
-    // Set patient name from form if not set
-    if (!this.prescriptionData.patientName) {
-      this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || '';
-    }
-    
-    // Set date to today if not set
-    if (!this.prescriptionData.date) {
-      this.prescriptionData.date = this.todayDate;
-    }
+  } else {
+    // When editing, ensure patient name is preserved
+    this.prescriptionData.patientName = this.prescriptionData.patientName || 
+                                      this.saleForm.get('customerName')?.value || '';
+  }
+  
+  // Set date to today if not set
+  if (!this.prescriptionData.date) {
+    this.prescriptionData.date = this.todayDate;
   }
 
   const modalElement = document.getElementById('prescriptionModal');
@@ -655,13 +655,17 @@ onContentEditableChange(event: any, field: string, index: number): void {
 editPrescription(index: number): void {
   this.editingPrescriptionIndex = index;
   
-  // Deep copy the prescription data
-  this.prescriptionData = JSON.parse(JSON.stringify(this.prescriptions[index]));
+  // Deep copy the prescription data while preserving patient name
+  this.prescriptionData = {
+    ...JSON.parse(JSON.stringify(this.prescriptions[index])),
+    patientName: this.prescriptions[index].patientName || 
+                this.saleForm.get('customerName')?.value || ''
+  };
   
-  // Ensure patient name and date are set
-  this.prescriptionData.patientName = this.prescriptionData.patientName || 
-                                     this.saleForm.get('customerName')?.value || '';
-  this.prescriptionData.date = this.prescriptionData.date || this.todayDate;
+  // Ensure date is set
+  if (!this.prescriptionData.date) {
+    this.prescriptionData.date = this.todayDate;
+  }
   
   // Open the modal
   this.openPrescriptionModal();
@@ -762,6 +766,9 @@ private updateFormFieldsFromPrescription(): void {
 }
 
 
+
+
+
 printPrescription(): void {
   // First save any unsaved changes from editable fields
   this.savePrescriptionData();
@@ -787,13 +794,11 @@ printPrescription(): void {
   }
 }
 
-
-p: any
 private generatePrintContent(prescription: PrescriptionData): string {
   // Format the date nicely
   const formattedDate = this.datePipe.transform(prescription.date || this.todayDate, 'MMMM d, yyyy') || this.todayDate;
   
-  // Generate medicines HTML
+  // Generate medicines HTML with all details
   let medicinesHtml = '';
   prescription.medicines.forEach((medicine, index) => {
     medicinesHtml += `
@@ -804,7 +809,7 @@ private generatePrintContent(prescription: PrescriptionData): string {
     `;
   });
 
-  // Return the full HTML template with logo in left corner
+  // Return the full HTML template with all details
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -870,7 +875,7 @@ private generatePrintContent(prescription: PrescriptionData): string {
         .prescription-header {
           text-align: center;
           margin-bottom: 20px;
-          margin-left: 140px; /* Add margin to account for logo space */
+          margin-left: 140px;
         }
         .doctor-title {
           font-weight: bold;
@@ -888,13 +893,34 @@ private generatePrintContent(prescription: PrescriptionData): string {
         .medicine-content {
           margin-left: 20px;
         }
+        .prescription-footer {
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #ddd;
+        }
+        .signature-line {
+          border-top: 1px solid #000;
+          width: 200px;
+          margin-top: 50px;
+        }
+        .clinic-stamp {
+          float: right;
+          text-align: center;
+          margin-top: 20px;
+        }
         
-        /* Responsive adjustments */
         @media print {
           .logo-container {
             position: absolute;
             top: 10px;
             left: 10px;
+          }
+          body {
+            padding: 10px;
+            font-size: 14px;
+          }
+          .prescription-header {
+            margin-top: 0;
           }
         }
         
@@ -918,26 +944,42 @@ private generatePrintContent(prescription: PrescriptionData): string {
       </div>
       
       <div class="prescription-header">
-        <h2>DR.RAJANA P.R.,BAMS</h2>
-        <h3>HERBALLY TOUCH AYURVEDA PRODUCTS PVT.LTD.</h3>
-        <p>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt.,Kerala - 683 579</p>
-        <p>E–mail: contact@herbalytouch.com | Ph: 7034110999</p>
+        <h2 style="margin-bottom: 5px;">DR. RAJANA P.R., BAMS</h2>
+        <h3 style="margin-bottom: 5px;">HERBALLY TOUCH AYURVEDA PRODUCTS PVT. LTD.</h3>
+        <p style="margin: 5px 0;">First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
+        <p style="margin: 5px 0;">E-mail: contact@herballytouch.com | Ph: 7034110999</p>
+        <p style="margin: 5px 0;">Reg. No: XXXXXXX | GSTIN: XXXXXXXXXXXXX</p>
       </div>
-      
       
       <table class="prescription-table">
         <tr>
-          <td><strong>Name</strong></td>
-          <td>${prescription.patientName || '______'}</td>
-          <td><strong>Age</strong></td>
-          <td>${prescription.patientAge || '______'}</td>
-          <td><strong>Date</strong></td>
+          <td width="15%"><strong>Name:</strong></td>
+          <td width="35%">${prescription.patientName || '_________________________'}</td>
+          <td width="15%"><strong>Age:</strong></td>
+          <td width="35%">${prescription.patientAge || '____'}</td>
+        </tr>
+        <tr>
+          <td><strong>Date:</strong></td>
           <td>${formattedDate}</td>
+          <td><strong>Gender:</strong></td>
+          <td>${this.saleForm.get('customerGender')?.value || '____'}</td>
+        </tr>
+        <tr>
+          <td><strong>Address:</strong></td>
+          <td colspan="3">${this.saleForm.get('billingAddress')?.value || '_________________________'}</td>
+        </tr>
+        <tr>
+          <td><strong>Contact:</strong></td>
+          <td>${this.saleForm.get('customerPhone')?.value || '____________'}</td>
+          <td><strong>Alt. Contact:</strong></td>
+          <td>${this.saleForm.get('alternateContact')?.value || '____________'}</td>
         </tr>
       </table>
       
-      
       <div class="medicine-content">
+        <h4 style="margin: 20px 0 10px 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">
+          PRESCRIPTION
+        </h4>
         ${medicinesHtml}
       </div>
       
@@ -948,18 +990,34 @@ private generatePrintContent(prescription: PrescriptionData): string {
         </div>
       ` : ''}
       
-      <div class="footer">
-        <p>Doctor's Signature: _________________</p>
-        <p class="doctor-title">${this.currentUser}</p>
+      <div class="prescription-footer">
+        <div style="margin-top: 40px;">
+          <div class="signature-line"></div>
+          <p style="margin-top: 5px;">Doctor's Signature</p>
+        </div>
+        
+        <div class="clinic-stamp">
+          <p>For HERBALLY TOUCH</p>
+          <p>Ayurveda Products Pvt. Ltd.</p>
+          <div style="height: 50px; border: 1px dashed #999; margin: 10px 0; display: flex; align-items: center; justify-content: center;">
+            <p style="color: #666;">Clinic Stamp</p>
+          </div>
+        </div>
+        
+        <div style="clear: both;"></div>
+        
+        <div style="margin-top: 30px; font-size: 12px; color: #666;">
+          <p><strong>Note:</strong> This prescription is valid for 30 days from the date of issue.</p>
+          <p>Please follow the dosage instructions carefully. Do not share your medicines with others.</p>
+          <p>For any queries, contact: 7034110999 (10AM - 6PM)</p>
+        </div>
       </div>
     </body>
     </html>
   `;
 }
-private getEditableFieldContent(id: string): string {
-  const element = document.getElementById(id);
-  return element?.textContent?.trim() || element?.innerText?.trim() || '';
-}
+
+
 private generateMedicineDetails(medicine: Medicine, index: number): string {
   let details = '';
   
@@ -977,11 +1035,17 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       const kasayamQuantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
       const kasayamPowder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
       const kasayamPills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
-      
+      const kasayamTime = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || '';
       
       details += `
-        <p>${kasayamName}കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. 
-        ഗുളിക . പൊടിച്ച്ചേർത്ത് ${kasayamPills} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>കഷായം:</strong> ${kasayamName} ${kasayamInstructions}ml<br>
+          <strong>വെള്ളം:</strong> ${kasayamQuantity}ml<br>
+          <strong>ചേർക്കേണ്ട മരുന്ന്:</strong> ${kasayamPowder}<br>
+          <strong>ഗുളിക:</strong> ${kasayamPills}<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${kasayamTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder} ഗുളിക പൊടിച്ച്ചേർത്ത് ${kasayamPills} നേരം ${kasayamTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
@@ -989,9 +1053,16 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       const bulighaName = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
       const bulighaInstructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
       const bulighaPowder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
+      const bulighaTime = this.getEditableFieldContent(`bulighaTime_${index}`) || medicine.time || '';
+      
       details += `
-        <p>${bulighaName}ഗുളിക ${bulighaInstructions} ml. എണ്ണംഎടുത്ത്
-         ${bulighaPowder} നേരംഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>ഗുളിക:</strong> ${bulighaName}<br>
+          <strong>എണ്ണം:</strong> ${bulighaInstructions}<br>
+          <strong>ചേർക്കേണ്ട മരുന്ന്:</strong> ${bulighaPowder}<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${bulighaTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${bulighaName} ഗുളിക ${bulighaInstructions} എണ്ണം എടുത്ത് ${bulighaPowder} ${bulighaTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
@@ -1001,17 +1072,33 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       const bhasmamQuantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
       const bhasmamInstructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
       const bhasmamPowder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
+      const bhasmamTime = this.getEditableFieldContent(`bhasmamTime_${index}`) || medicine.time || '';
       
       details += `
-        <p>${bhasmamName} ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. ${bhasmamInstructions} ചേർത്ത് ${bhasmamPowder} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>ഭസ്മം:</strong> ${bhasmamName}<br>
+          <strong>ഡോസേജ്:</strong> ${bhasmamDosage}<br>
+          <strong>വെള്ളം:</strong> ${bhasmamQuantity}ml<br>
+          <strong>ചേർക്കേണ്ട മരുന്ന്:</strong> ${bhasmamInstructions}<br>
+          <strong>ചേർക്കേണ്ട പൊടി:</strong> ${bhasmamPowder}<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${bhasmamTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${bhasmamName} ഭസ്മം ${bhasmamDosage} എടുത്ത് ${bhasmamQuantity}ml ${bhasmamInstructions} ചേർത്ത് ${bhasmamPowder} ${bhasmamTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
     case 'krudham':
       const krudhamName = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
       const krudhamInstructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
+      const krudhamTime = this.getEditableFieldContent(`krudhamTime_${index}`) || medicine.time || '';
+      
       details += `
-        <p>${krudhamName} ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത ${krudhamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>ഘൃതം:</strong> ${krudhamName}<br>
+          <strong>ഡോസേജ്:</strong> 1 ടീസ്പൂൺ<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${krudhamTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${krudhamName} ഘൃതം 1 ടീസ്പൂൺ എടുത്ത് ${krudhamInstructions} ${krudhamTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
@@ -1020,43 +1107,78 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       const suranamInstructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
       const suranamPowder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
       const suranamDosage = this.getEditableFieldContent(`suranamDosage_${index}`) || medicine.dosage || '';
+      const suranamTime = this.getEditableFieldContent(`suranamTime_${index}`) || medicine.time || '';
       
       details += `
-        <p>${suranamName}ചൂർണ്ണം ${suranamInstructions}ml. ടീ - സ്പൂൺ എടുത്ത്  ${suranamPowder} വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് ${suranamDosage} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>ചൂർണ്ണം:</strong> ${suranamName}<br>
+          <strong>ഡോസേജ്:</strong> ${suranamInstructions}<br>
+          <strong>ചേർക്കേണ്ട മരുന്ന്:</strong> ${suranamPowder}<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${suranamTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${suranamName} ചൂർണ്ണം ${suranamInstructions} എടുത്ത് ${suranamPowder} ചേർത്ത് തിളപ്പിച്ച് ${suranamDosage} നേരം ${suranamTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
     case 'rasayanam':
       const rasayanamName = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
       const rasayanamInstructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
+      const rasayanamTime = this.getEditableFieldContent(`rasayanamTime_${index}`) || medicine.time || '';
       
       details += `
-        <p>${rasayanamName} രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് ${rasayanamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>രസായനം:</strong> ${rasayanamName}<br>
+          <strong>ഡോസേജ്:</strong> 1 ടീസ്പൂൺ<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${rasayanamTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${rasayanamName} രസായനം 1 ടീസ്പൂൺ എടുത്ത് ${rasayanamInstructions} ${rasayanamTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
     case 'lagium':
-      const lagiumName = this.getEditableFieldContent(`lagiumName${index}`) || medicine.name || '';
-    
+      const lagiumName = this.getEditableFieldContent(`lagiumName_${index}`) || medicine.name || '';
       const lagiumInstructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
       const lagiumDosage = this.getEditableFieldContent(`lagiumDosage_${index}`) || medicine.dosage || '';
-
+      const lagiumTime = this.getEditableFieldContent(`lagiumTime_${index}`) || medicine.time || '';
+      
       details += `
-        <p>${lagiumName}ലേഹ്യം ${lagiumInstructions} ടീ - സ്പൂൺ എടുത്ത് നേരം ${lagiumDosage} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>ലേഹ്യം:</strong> ${lagiumName}<br>
+          <strong>ഡോസേജ്:</strong> ${lagiumInstructions}<br>
+          <strong>സേവിക്കേണ്ട സമയം:</strong> ${lagiumTime}<br>
+          <strong>ഉപയോഗ രീതി:</strong> ${lagiumName} ലേഹ്യം ${lagiumInstructions} എടുത്ത് ${lagiumDosage} നേരം ${lagiumTime} സേവിക്കുക.
+        </p>
       `;
       break;
       
     default:
       const defaultTime = medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
       details += `
-        <p>Type: ${medicine.type || '______'}</p>
-        ${medicine.dosage ? `<p>Dosage: ${medicine.dosage}</p>` : ''}
-        ${medicine.instructions ? `<p>Instructions: ${medicine.instructions}</p>` : ''}
-        <p>നേരം: ${defaultTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
+        <p style="margin-left: 20px;">
+          <strong>Type:</strong> ${medicine.type || '______'}<br>
+          ${medicine.dosage ? `<strong>Dosage:</strong> ${medicine.dosage}<br>` : ''}
+          ${medicine.instructions ? `<strong>Instructions:</strong> ${medicine.instructions}<br>` : ''}
+          <strong>Time:</strong> ${defaultTime}<br>
+          <strong>Direction:</strong> നേരം: ${defaultTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.
+        </p>
       `;
   }
   
+  // Add duration if available
+  if (medicine['duration']) {
+    details += `<p style="margin-left: 20px;"><strong>Duration:</strong> ${medicine['duration']}</p>`;
+  }
+  
+  // Add any additional notes for this medicine
+  if (medicine['notes']) {
+    details += `<p style="margin-left: 20px; color: #666; font-style: italic;">Note: ${medicine['notes']}</p>`;
+  }
+  
   return details;
+}
+private getEditableFieldContent(id: string): string {
+  const element = document.getElementById(id);
+  return element?.textContent?.trim() || element?.innerText?.trim() || '';
 }
 
 viewPrescription(prescription: PrescriptionData): void {
@@ -3123,9 +3245,18 @@ savePrescription(): void {
   this.showToast('Prescription saved successfully!', 'success');
 }
 
-resetPrescriptionData(): void {
+private resetPrescriptionData(): void {
   this.prescriptionData = {
-    medicines: [],
+    medicines: [{
+      name: '',
+      type: '',
+      dosage: '',
+      instructions: '',
+      ingredients: '',
+      pills: '',
+      powder: '',
+      time: 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'
+    }],
     patientName: this.saleForm.get('customerName')?.value || '',
     patientAge: this.saleForm.get('customerAge')?.value?.toString() || '',
     date: this.todayDate,
@@ -3156,7 +3287,9 @@ calculateRoundOff(): void {
 
   
 
-async saveSale(): Promise<void> {
+  async saveSale(): Promise<void> {
+    this.isSubmitting = true; // Disable the button
+
   try {
     // Form validation
     if (!this.saleForm.valid) {
@@ -3337,6 +3470,8 @@ async saveSale(): Promise<void> {
           leadId = parsedData.leadId;
           localStorage.removeItem('leadForSalesOrder');
         } catch (error) {
+              this.isSubmitting = false; // Re-enable on error
+
           console.error('Error parsing lead data:', error);
         }
       }
@@ -3433,7 +3568,6 @@ async saveSale(): Promise<void> {
         await this.leadService.updateLead(leadId, {
           status: 'Converted to Sales Order',
           convertedAt: new Date(),
-          convertedTo: 'sales-order/' + saleId,
           lifeStage: 'Customer',
           dealStatus: 'Won'
         });

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { increment } from '@angular/fire/firestore';
+import { COLLECTIONS } from '../../utils/constants';
 
 import {
   Firestore,
@@ -22,6 +23,33 @@ import {
 import { Observable, from, map, Subject } from 'rxjs';
 import { ProductsService } from '../services/products.service';
 import { Product } from '../models/product.model';
+
+// Standardized interface for stock history entries
+interface StockHistoryEntry {
+  id?: string;
+  productId: string;
+  locationId: string;
+  action: 'goods_received' | 'transfer' | 'adjustment' | 'sale' | 'initial_stock' | 'return' | 'add' | 'subtract';
+  quantity: number;
+  oldStock: number;
+  newStock: number;
+  timestamp: Date | any; // Allow both Date and Firestore serverTimestamp
+  userId: string;
+  referenceNo?: string;
+  invoiceNo?: string;
+  notes?: string;
+  // Transfer specific fields
+  locationFrom?: string;
+  locationTo?: string;
+  transferId?: string;
+  // Purchase specific fields
+  purchaseOrderId?: string;
+  supplierName?: string;
+  // Other reference fields
+  adjustmentId?: string;
+  saleId?: string;
+  returnId?: string;
+}
 
 // Interfaces
 export interface Stock {
@@ -95,14 +123,13 @@ export class StockService {
 
   private stockUpdatedSource = new Subject<void>();
   public stockUpdated$ = this.stockUpdatedSource.asObservable();
-
   constructor(
     private firestore: Firestore,
     private productService: ProductsService
   ) {
     this.stockCollection = collection(this.firestore, 'stockTransfers');
     this.usersCollection = collection(this.firestore, 'users');
-    this.stockHistoryCollection = collection(this.firestore, 'product_stock_history');
+    this.stockHistoryCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
   }
 
   public notifyStockUpdate(): void {
@@ -136,10 +163,10 @@ export class StockService {
             
               // Update product stock
               await this.productService.updateProductStock(product.product, newStock);
-            
-              // Add stock history entry
+              // Add stock history entry for source location
               await this.addStockHistoryEntry({
                 productId: product.product,
+                locationId: transfer.locationFrom,
                 transferId: docRef.id,
                 action: 'transfer',
                 quantity: product.quantity,
@@ -164,12 +191,58 @@ export class StockService {
       console.error('Error adding stock transfer:', error);
       throw error;
     }
-  }
-
-  private async addStockHistoryEntry(historyData: any): Promise<void> {
+  }  private async addStockHistoryEntry(historyData: StockHistoryEntry): Promise<void> {
     try {
-      const stockHistoryCollection = collection(this.firestore, 'product_stock_history');
-      await addDoc(stockHistoryCollection, historyData);
+      const stockHistoryCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
+      
+      // Ensure consistent data structure and filter out undefined values
+      const standardizedEntry: any = {
+        productId: historyData.productId,
+        locationId: historyData.locationId,
+        action: historyData.action,
+        quantity: historyData.quantity,
+        oldStock: historyData.oldStock,
+        newStock: historyData.newStock,
+        timestamp: historyData.timestamp || new Date(),
+        userId: historyData.userId
+      };
+
+      // Only add optional fields if they have values
+      if (historyData.referenceNo !== undefined && historyData.referenceNo !== null) {
+        standardizedEntry.referenceNo = historyData.referenceNo;
+      }
+      if (historyData.invoiceNo !== undefined && historyData.invoiceNo !== null) {
+        standardizedEntry.invoiceNo = historyData.invoiceNo;
+      }
+      if (historyData.notes !== undefined && historyData.notes !== null) {
+        standardizedEntry.notes = historyData.notes;
+      }
+      if (historyData.locationFrom !== undefined && historyData.locationFrom !== null) {
+        standardizedEntry.locationFrom = historyData.locationFrom;
+      }
+      if (historyData.locationTo !== undefined && historyData.locationTo !== null) {
+        standardizedEntry.locationTo = historyData.locationTo;
+      }
+      if (historyData.transferId !== undefined && historyData.transferId !== null) {
+        standardizedEntry.transferId = historyData.transferId;
+      }
+      if (historyData.purchaseOrderId !== undefined && historyData.purchaseOrderId !== null) {
+        standardizedEntry.purchaseOrderId = historyData.purchaseOrderId;
+      }
+      if (historyData.supplierName !== undefined && historyData.supplierName !== null) {
+        standardizedEntry.supplierName = historyData.supplierName;
+      }
+      if (historyData.adjustmentId !== undefined && historyData.adjustmentId !== null) {
+        standardizedEntry.adjustmentId = historyData.adjustmentId;
+      }
+      if (historyData.saleId !== undefined && historyData.saleId !== null) {
+        standardizedEntry.saleId = historyData.saleId;
+      }
+      if (historyData.returnId !== undefined && historyData.returnId !== null) {
+        standardizedEntry.returnId = historyData.returnId;
+      }
+      
+      await addDoc(stockHistoryCollection, standardizedEntry);
     } catch (error) {
       console.error('Error adding stock history entry:', error);
       throw error;
@@ -320,29 +393,79 @@ async getOpeningStockValue(date: Date): Promise<number> {
       return unsubscribe;
     });
   }
-
   async adjustProductStockWithParams(params: StockAdjustmentParams): Promise<void> {
-    const productRef = doc(this.firestore, `products/${params.productId}`);
+    // Get current stock from product-stock collection
+    const stockDocId = `${params.productId}_${params.locationId}`;
+    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+    const stockDoc = await getDoc(stockDocRef);
+    
+    let currentStock = 0;
+    if (stockDoc.exists()) {
+      currentStock = stockDoc.data()['quantity'] || 0;
+    }
     
     const stockChange = params.action === 'add' ? params.quantity : -params.quantity;
+    const newStock = Math.max(0, currentStock + stockChange);
 
-    await updateDoc(productRef, {
-      currentStock: increment(stockChange),
-      totalQuantity: increment(stockChange),
-      updatedAt: serverTimestamp()
-    });
+    // Update product-stock document
+    await setDoc(stockDocRef, {
+      productId: params.productId,
+      locationId: params.locationId,
+      quantity: newStock,
+      lastUpdated: new Date(),
+      updatedBy: params.userId
+    }, { merge: true });
 
     await this.addStockHistoryEntry({
       productId: params.productId,
-      action: params.action,
-      quantity: params.quantity,
       locationId: params.locationId,
+      action: params.action === 'add' ? 'adjustment' : 'adjustment',
+      quantity: params.quantity,
+      oldStock: currentStock,
+      newStock: newStock,
       notes: params.notes,
       userId: params.userId,
-      timestamp: serverTimestamp()
+      timestamp: new Date()
     });
 
     this.notifyStockUpdate();
+  }
+
+  /**
+   * Get consolidated stock history for a product across all locations
+   */
+  getProductStockHistoryAllLocations(productId: string): Observable<StockHistoryEntry[]> {
+    return this.getStockHistory(productId);
+  }
+
+  /**
+   * Get stock history for a specific product at a specific location
+   */
+  getProductStockHistoryByLocation(productId: string, locationId: string): Observable<StockHistoryEntry[]> {
+    return this.getStockHistory(productId, locationId);
+  }
+
+  /**
+   * Get stock movement history between locations for a product
+   */
+  getStockTransferHistory(productId: string): Observable<StockHistoryEntry[]> {
+    return new Observable(observer => {
+      const q = query(
+        collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
+        where('productId', '==', productId),
+        where('action', '==', 'transfer'),
+        orderBy('timestamp', 'desc')
+      );
+      
+      const unsubscribe = onSnapshot(q, snapshot => {
+        const history = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        } as StockHistoryEntry));
+        observer.next(history);
+      }, error => observer.error(error));
+      return unsubscribe;
+    });
   }
 
   getStockTransfersByLocation(locationId: string, isSource: boolean = true): Observable<Stock[]> {
@@ -420,16 +543,32 @@ async getOpeningStockValue(date: Date): Promise<number> {
 
     this.notifyStockUpdate();
   }
-
-  getStockHistory(productId: string): Observable<any[]> {
+  getStockHistory(productId: string, locationId?: string): Observable<StockHistoryEntry[]> {
     return new Observable(observer => {
-      const q = query(
-        collection(this.firestore, 'product_stock_history'),
-        where('productId', '==', productId),
-        orderBy('timestamp', 'desc')
-      );
+      let q;
+      if (locationId) {
+        // Get history for specific product at specific location
+        q = query(
+          collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
+          where('productId', '==', productId),
+          where('locationId', '==', locationId),
+          orderBy('timestamp', 'desc')
+        );
+      } else {
+        // Get history for product across all locations
+        q = query(
+          collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
+          where('productId', '==', productId),
+          orderBy('timestamp', 'desc')
+        );
+      }
+      
       const unsubscribe = onSnapshot(q, snapshot => {
-        observer.next(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const history = snapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        } as StockHistoryEntry));
+        observer.next(history);
       }, error => observer.error(error));
       return unsubscribe;
     });
@@ -610,8 +749,7 @@ async getOpeningStockValue(date: Date): Promise<number> {
         openingStock: currentProduct?.currentStock || 0,
         closingStock: currentProduct?.currentStock || 0,
         createdAt: new Date(),
-        updatedAt: new Date()
-      });
+        updatedAt: new Date()      });
     }
   }
 
@@ -625,16 +763,45 @@ async getOpeningStockValue(date: Date): Promise<number> {
     userId: string,
     context?: any
   ): Promise<void> {
-    const productRef = doc(this.firestore, `products/${productId}`);
+    // Get current stock from product-stock collection
+    const stockDocId = `${productId}_${locationId}`;
+    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+    const stockDoc = await getDoc(stockDocRef);
+    const currentStock = stockDoc.exists() ? (stockDoc.data()?.['quantity'] || 0) : 0;
     
+    let newStock = currentStock;
+    
+    // Calculate new stock based on action
+    switch (action) {
+      case 'add':
+        newStock = currentStock + quantity;
+        break;
+      case 'subtract':
+        newStock = Math.max(0, currentStock - quantity);
+        break;
+      case 'set':
+        newStock = quantity;
+        break;
+    }
+    
+    // Update product-stock collection
+    await setDoc(stockDocRef, {
+      productId,
+      locationId,
+      quantity: newStock,
+      lastUpdated: new Date(),
+      updatedBy: userId
+    }, { merge: true });
+    
+    // Update legacy product record (for backward compatibility)
+    const productRef = doc(this.firestore, `products/${productId}`);
     const updateData: any = {
       updatedAt: serverTimestamp()
     };
     
-    // Handle different stock adjustment types
+    // Handle different stock adjustment types for legacy field
     switch (action) {
       case 'add':
-        // updateData.currentStock = increment(quantity);
         updateData.totalQuantity = increment(quantity);
         break;
       case 'subtract':
@@ -647,14 +814,16 @@ async getOpeningStockValue(date: Date): Promise<number> {
     
     await updateDoc(productRef, updateData);
     
-    // Add stock history record
-    const historyEntry = {
+    // Add stock history record with proper oldStock and newStock
+    const historyEntry: StockHistoryEntry = {
       productId,
-      quantity,
+      quantity: Math.abs(newStock - currentStock),
+      oldStock: currentStock,
+      newStock: newStock,
       locationId,
       referenceNo: reference,
       userId,
-      timestamp: serverTimestamp(),
+      timestamp: new Date(),
       action: 'goods_received',
       notes: `Added ${quantity} units (Ref: ${reference})`,
       ...(context || {})
@@ -663,29 +832,35 @@ async getOpeningStockValue(date: Date): Promise<number> {
     await this.addStockHistoryEntry(historyEntry);
     this.notifyStockUpdate(); // This will refresh components listening to stock updates
   }
-
-  async initializeProductStock(product: any, initialQuantity: number): Promise<void> {
-    if (!product.id || initialQuantity < 0) {
-      throw new Error('Invalid product or quantity');
+  async initializeProductStock(product: any, initialQuantity: number, locationId: string): Promise<void> {
+    if (!product.id || initialQuantity < 0 || !locationId) {
+      throw new Error('Invalid product, quantity, or location');
     }
 
-    const productRef = doc(this.firestore, `products/${product.id}`);
+    // Update product-stock collection instead of product
+    const stockDocId = `${product.id}_${locationId}`;
+    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
     
     try {
-      await updateDoc(productRef, {
-        currentStock: initialQuantity,
-        totalQuantity: initialQuantity,
-        updatedAt: serverTimestamp()
-      });
+      await setDoc(stockDocRef, {
+        productId: product.id,
+        locationId: locationId,
+        quantity: initialQuantity,
+        lastUpdated: new Date(),
+        updatedBy: 'system'
+      }, { merge: true });
 
       await this.addStockHistoryEntry({
         productId: product.id,
+        locationId: locationId,
         action: 'initial_stock',
         quantity: initialQuantity,
+        oldStock: 0,
+        newStock: initialQuantity,
         referenceNo: 'initial_setup',
         userId: 'system',
         notes: `Initial stock setup with ${initialQuantity} units`,
-        timestamp: serverTimestamp()
+        timestamp: new Date()
       });
 
       this.notifyStockUpdate();

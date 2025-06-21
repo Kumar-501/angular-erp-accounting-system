@@ -6,6 +6,14 @@ import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { MatDialog } from '@angular/material/dialog';
 import { GinTransferViewComponent } from '../gin-transfer-view/gin-transfer-view.component';
+import { Firestore, doc, getDoc } from '@angular/fire/firestore';
+
+// Constants for Firestore collections
+const COLLECTIONS = {
+  PRODUCT_STOCK: 'product-stock',
+  PRODUCTS: 'products',
+  LOCATIONS: 'locations'
+};
 
 @Component({
   selector: 'app-list-gin-transfers',
@@ -38,12 +46,12 @@ selectedStatus: string = '';
   private locationsSub: Subscription | null = null;
   private routerSub: Subscription | null = null;
   Math = Math;
-
   constructor(
     private ginTransferService: GinTransferService,
     private locationService: LocationService,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private firestore: Firestore
   ) { }
 
   ngOnInit(): void {
@@ -355,6 +363,66 @@ printGinTransfers() {
     alert('Popup blocker might be preventing the print window from opening. Please allow popups for this site.');
   }
 }
+
+/**
+   * Get current stock for a product at a specific location from PRODUCT_STOCK collection
+   * This method can be used in templates or for displaying current stock information
+   */
+  async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        const data = stockDoc.data();
+        return data?.['quantity'] || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting stock at location:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get stock information for all items in a GIN transfer
+   * Useful for displaying current stock levels in transfer details
+   */
+  async getTransferStockInfo(transfer: GinTransfer): Promise<any[]> {
+    if (!transfer.items) return [];
+    
+    const stockInfo = [];
+    for (const item of transfer.items) {
+      try {
+        const fromStock = await this.getCurrentStockAtLocation(item.productId, transfer.locationFrom);
+        const toStock = await this.getCurrentStockAtLocation(item.productId, transfer.locationTo);
+        
+        stockInfo.push({
+          productId: item.productId,
+          productName: item.productName,
+          sku: item.sku,
+          transferredQuantity: item.quantity,
+          currentStockAtSource: fromStock,
+          currentStockAtDestination: toStock
+        });
+      } catch (error) {
+        console.error(`Error getting stock info for ${item.productName}:`, error);
+        stockInfo.push({
+          productId: item.productId,
+          productName: item.productName,
+          sku: item.sku,
+          transferredQuantity: item.quantity,
+          currentStockAtSource: 'Error',
+          currentStockAtDestination: 'Error'
+        });
+      }
+    }
+    
+    return stockInfo;
+  }
+
   ngOnDestroy() {
     if (this.ginTransfersSub) {
       this.ginTransfersSub.unsubscribe();

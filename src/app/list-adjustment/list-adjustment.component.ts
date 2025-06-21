@@ -6,6 +6,9 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { FormControl } from '@angular/forms';
+import { Firestore, collection, doc, getDoc } from '@angular/fire/firestore';
+import { COLLECTIONS } from '../../utils/constants';
+import { LocationService } from '../services/location.service';
 
 @Component({
   selector: 'app-list-adjustment',
@@ -17,10 +20,10 @@ export class ListAdjustmentComponent implements OnInit {
   filteredAdjustments$!: Observable<any>;
   adjustmentsList: any[] = [];
   adjustmentToDelete: any = null;
-  showDeleteModal = false;
-  isDeleting = false;
+  showDeleteModal = false;  isDeleting = false;
   sortField: string = 'date';
-sortDirection: 'asc' | 'desc' = 'desc';
+  sortDirection: 'asc' | 'desc' = 'desc';
+  locations: any[] = [];
 
   showColumnVisibility = false;
   searchControl = new FormControl('');
@@ -37,16 +40,56 @@ sortDirection: 'asc' | 'desc' = 'desc';
     { key: 'reason', label: 'Reason', visible: true },
     { key: 'addedBy', label: 'Added By', visible: true }
   ];
-
   constructor(
     private adjustmentService: AdjustmentService,
-    private router: Router
+    private router: Router,
+    private firestore: Firestore,
+    private locationService: LocationService
   ) {}
-
   ngOnInit(): void {
     this.loadAdjustments();
+    this.loadLocations();
     this.setupSearchFilter();
   }
+
+  loadLocations(): void {
+    this.locationService.getLocations().subscribe(
+      (locations) => {
+        this.locations = locations;
+      },
+      (error) => {
+        console.error('Error loading locations:', error);
+      }
+    );
+  }
+
+  /**
+   * Get location name by ID
+   */
+  getLocationName(locationId: string): string {
+    const location = this.locations.find(loc => loc.id === locationId);
+    return location?.name || locationId;
+  }
+
+  /**
+   * Get current stock for a product at a specific location from product-stock collection
+   */
+  async getProductStock(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        return stockDoc.data()['quantity'] || 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error getting product stock:', error);
+      return 0;
+    }
+  }
+
   sortData(field: string): void {
     if (this.sortField === field) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';

@@ -9,12 +9,16 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { AuthService } from '../auth.service';
+
 
 interface RequisitionItem {
   productId: string;
   productName: string;
   requiredQuantity: number;
-  
+    subtotal?: number; // Add this line
+  supplierAddress?: string; // Ensure this exists
+
   alertQuantity: number;
   currentStock?: number;
   unitPurchasePrice: number;       // Add this
@@ -36,6 +40,8 @@ interface Requisition {
   updatedAt?: Date;
   brand?: string;
   category?: string;
+    supplierAddress?: string; // Add this line
+
   shippingStatus?: string;
   supplier?: string;
   supplierName?: string;
@@ -67,9 +73,12 @@ export class PurchaseRequisitionComponent implements OnInit {
   selectedRequisitions: string[] = [];
 allSelected: boolean = false;
 // Add these properties to your component class
-isDateDrawerOpen: boolean = false;
+  isDateDrawerOpen: boolean = false;
+  
 selectedRange: string = '';
-isCustomDate: boolean = false;
+  isCustomDate: boolean = false;
+  // In your component class
+isSaving: boolean = false;
 fromDate: string = '';
 toDate: string = '';
   showFilters: boolean = false;
@@ -102,7 +111,10 @@ selectedSupplier: string = 'All';
     { name: 'Total Required Qty', field: 'totalQuantity', visible: true },
     { name: 'Current Stock', field: 'currentStock', visible: true }, // Add this new column
     { name: 'Unit Purchase Price', field: 'unitPurchasePrice', visible: true },
-  { name: 'Purchase Price (Inc Tax)', field: 'purchasePriceIncTax', visible: true },
+    { name: 'Purchase Price (Inc Tax)', field: 'purchasePriceIncTax', visible: true },
+    { name: 'Purchase Price', field: 'subtotal', visible: true },
+     { name: 'Supplier Address', field: 'supplierAddress', visible: true }, // Add this line
+
   ];
   
   businessLocations: any[] = [];
@@ -114,6 +126,7 @@ selectedSupplier: string = 'All';
   requiredByDate: string = '';
   sortColumn: string = '';
   sortDirection: 'asc' | 'desc' = 'asc';
+  afs: any;
 
   constructor(
     private requisitionService: PurchaseRequisitionService,
@@ -121,7 +134,9 @@ selectedSupplier: string = 'All';
     private locationService: LocationService,
     private supplierService: SupplierService,
     private router: Router,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+      private authService: AuthService,
+
   ) {}
 
   ngOnInit(): void {
@@ -356,72 +371,86 @@ deleteSelectedRequisitions(): void {
     }
     return this.sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
   }
-
-  loadRequisitions() {
-    this.isLoading = true;
-    this.requisitionService.getRequisitions().subscribe({
-      next: (data) => {
-        this.rows = data.map(req => {
-          const locationObj = this.businessLocations.find(loc => loc.id === req.location);
-          const locationName = locationObj ? locationObj.name : req.location;
-            const itemsWithPrices = req.items ? req.items.map(item => ({
+loadRequisitions() {
+  this.isLoading = true;
+  this.requisitionService.getRequisitions().subscribe({
+    next: (data) => {
+      this.rows = data.map(req => {
+        const locationObj = this.businessLocations.find(loc => loc.id === req.location);
+        const locationName = locationObj ? locationObj.name : req.location;
+        const itemsWithPrices = req.items ? req.items.map(item => ({
           ...item,
           currentStock: item.currentStock || 0,
           unitPurchasePrice: item.unitPurchasePrice || 0,
           purchasePriceIncTax: item.purchasePriceIncTax || 0
         })) : [];
-          let supplierName = 'N/A';
-          let supplierValue: string | undefined = undefined;
-          
-          if ('supplier' in req) {
-            if (typeof req.supplier === 'string') {
-              const supplierStr = req.supplier as string;
-              if (supplierStr && supplierStr !== '') {
-                supplierValue = supplierStr;
-                const supplierObj = this.suppliers.find(s => s.id === supplierStr);
-                if (supplierObj) {
-                  supplierName = supplierObj.businessName || 
-                                `${supplierObj.firstName} ${supplierObj.lastName}`.trim();
-                }
+        
+        let supplierName = 'N/A';
+        let supplierValue: string | undefined = undefined;
+        let supplierAddress = 'N/A'; // Add this line
+        
+        if ('supplier' in req) {
+          if (typeof req.supplier === 'string') {
+            const supplierStr = req.supplier as string;
+            if (supplierStr && supplierStr !== '') {
+              supplierValue = supplierStr;
+              const supplierObj = this.suppliers.find(s => s.id === supplierStr);
+              if (supplierObj) {
+                supplierName = supplierObj.businessName || 
+                              `${supplierObj.firstName} ${supplierObj.lastName}`.trim();
+                
+                // Build the address string
+                const addressParts = [
+                  supplierObj.address,
+                  supplierObj.addressLine1,
+                  supplierObj.addressLine2,
+                  supplierObj.city,
+                  supplierObj.state,
+                  supplierObj.postalCode || supplierObj.zipCode,
+                  supplierObj.country
+                ].filter(part => !!part); // Remove empty parts
+                
+                supplierAddress = addressParts.join(', '); // Set the address
               }
             }
           }
-          
-          return {
-            id: req.id,
-            date: req.date,
-            referenceNo: req.referenceNo,
-            location: req.location,
-            locationName: locationName,
-                      itemsWithPrices,
-
-            status: req.status,
-            requiredByDate: req.requiredByDate,
-            addedBy: req.addedBy,
-            items: req.items ? req.items.map(item => ({
-              ...item,
-              currentStock: item.currentStock || 0 // Ensure currentStock is included
-            })) : [],
-            brand: ('brand' in req) ? req.brand || 'N/A' : 'N/A',
-            category: ('category' in req) ? req.category || 'N/A' : 'N/A',
-            shippingStatus: ('shippingStatus' in req) ? req.shippingStatus || 'Not Shipped' : 'Not Shipped',
-            supplier: supplierValue,
-            supplierName: supplierName,
-            shippingDate: ('shippingDate' in req) ? req.shippingDate || 'N/A' : 'N/A',
-            totalQuantity: this.calculateTotalRequiredQuantity(req.items || [])
-          };
-        });
+        }
         
-        this.applyFilters();
-        this.isLoading = false;
-        this.cdr.detectChanges();
-      },
-      error: (error) => {
-        console.error('Error loading requisitions:', error);
-        this.isLoading = false;
-      }
-    });
-  }
+        return {
+          id: req.id,
+          date: req.date,
+          referenceNo: req.referenceNo,
+          location: req.location,
+          locationName: locationName,
+          itemsWithPrices,
+          status: req.status,
+          requiredByDate: req.requiredByDate,
+          addedBy: req.addedBy,
+          items: req.items ? req.items.map(item => ({
+            ...item,
+            currentStock: item.currentStock || 0
+          })) : [],
+          brand: ('brand' in req) ? req.brand || 'N/A' : 'N/A',
+          category: ('category' in req) ? req.category || 'N/A' : 'N/A',
+          shippingStatus: ('shippingStatus' in req) ? req.shippingStatus || 'Not Shipped' : 'Not Shipped',
+          supplier: supplierValue,
+          supplierName: supplierName,
+          supplierAddress: supplierAddress, // Add this line
+          shippingDate: ('shippingDate' in req) ? req.shippingDate || 'N/A' : 'N/A',
+          totalQuantity: this.calculateTotalRequiredQuantity(req.items || [])
+        };
+      });
+      
+      this.applyFilters();
+      this.isLoading = false;
+      this.cdr.detectChanges();
+    },
+    error: (error) => {
+      console.error('Error loading requisitions:', error);
+      this.isLoading = false;
+    }
+  });
+}
 
 applyCustomRange(): void {
   if (this.fromDate && this.toDate) {
@@ -481,6 +510,25 @@ approveRequisition(requisition: Requisition, event?: Event) {
   if (event) event.stopPropagation();
   
   if (confirm('Are you sure you want to approve this requisition?')) {
+    // Get the supplier details including address
+    const supplier = this.suppliers.find(s => s.id === requisition.supplier);
+    let supplierAddress = '';
+    
+    if (supplier) {
+      // Build the address string from supplier details
+      const addressParts = [
+        supplier.address,
+        supplier.addressLine1,
+        supplier.addressLine2,
+        supplier.city,
+        supplier.state,
+        supplier.postalCode || supplier.zipCode,
+        supplier.country
+      ].filter(part => !!part); // Remove empty parts
+      
+      supplierAddress = addressParts.join(', ');
+    }
+
     // Create a complete purchase order object from the requisition
     const purchaseOrder = {
       date: new Date().toLocaleDateString(),
@@ -489,6 +537,7 @@ approveRequisition(requisition: Requisition, event?: Event) {
       businessLocationId: requisition.location,
       supplier: requisition.supplier || 'To be assigned',
       supplierName: requisition.supplierName || 'To be assigned',
+      supplierAddress: supplierAddress || requisition.supplierAddress || 'N/A', // Add supplier address
       status: 'Pending',
       quantityRemaining: 0,
       shippingStatus: requisition.shippingStatus || 'Not Shipped',
@@ -502,40 +551,63 @@ approveRequisition(requisition: Requisition, event?: Event) {
         productId: item.productId,
         productName: item.productName,
         quantity: item.requiredQuantity,
-        unitCost: item.unitPurchasePrice || 0, // Use unitPurchasePrice from requisition
-        unitPurchasePrice: item.unitPurchasePrice || 0, // Explicitly include unitPurchasePrice
+        unitCost: item.unitPurchasePrice || 0,
+        unitPurchasePrice: item.unitPurchasePrice || 0,
         alertQuantity: item.alertQuantity,
         currentStock: item.currentStock,
-        requiredQuantity: item.requiredQuantity
+        requiredQuantity: item.requiredQuantity,
+        subtotal: item.subtotal // Include subtotal from requisition
       })),
       // Keep original items for reference
       items: requisition.items.map(item => ({
         ...item,
-        unitCost: item.unitPurchasePrice || 0 // Ensure unitCost is set from unitPurchasePrice
+        unitCost: item.unitPurchasePrice || 0,
+        subtotal: item.subtotal // Include subtotal from requisition
       })),
       brand: requisition.brand,
       category: requisition.category,
-      shippingDate: requisition.shippingDate
+      shippingDate: requisition.shippingDate,
+      orderTotal: this.calculateRequisitionTotal(requisition.items) // Calculate total
     };
 
+    this.isLoading = true;
+    
+    // First update the requisition status
     this.requisitionService.updateRequisitionStatus(requisition.id, 'Approved')
       .then(() => {
-        this.purchaseOrderService.createPurchaseOrderFromRequisition(purchaseOrder)
-          .then(() => {
-            alert('Requisition approved and purchase order created successfully!');
-            this.loadRequisitions();
-            this.openActionDropdownId = null;
-          })
-          .catch(error => {
-            console.error('Error creating purchase order:', error);
-            alert('Error creating purchase order. Please try again.');
-          });
+        // Then create the purchase order
+        return this.purchaseOrderService.createPurchaseOrderFromRequisition(purchaseOrder);
+      })
+      .then((createdOrder) => {
+        this.router.navigate(['/purchase-order'], {
+          queryParams: { 
+            newlyApproved: requisition.id 
+          }
+        });
       })
       .catch(error => {
-        console.error('Error updating requisition status:', error);
-        alert('Error approving requisition. Please try again.');
+        console.error('Error in approval process:', error);
+        alert('Error during approval process. Please try again.');
+      })
+      .finally(() => {
+        this.isLoading = false;
       });
   }
+  }
+ createPurchaseOrderFromRequisition(order: any): Promise<any> {
+  // Include supplierAddress in the data being saved
+  const orderData = {
+    ...order,
+    supplierAddress: order.supplierAddress || 'N/A'
+  };
+  
+  return this.afs.collection('purchaseOrders').add(orderData);
+}
+calculateRequisitionTotal(items: RequisitionItem[]): number {
+  if (!items || items.length === 0) return 0;
+  return items.reduce((total, item) => {
+    return total + (item.subtotal || (item.requiredQuantity * (item.unitPurchasePrice || 0)));
+  }, 0);
 }
 
 previousPage(): void {

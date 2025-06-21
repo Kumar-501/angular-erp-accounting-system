@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { collection, addDoc, Firestore, writeBatch, doc } from '@angular/fire/firestore';
 import { UserService } from '../services/user.service';
 import { Component, ElementRef, ViewChild } from '@angular/core';
+import { SaleService } from '../services/sale.service';
 
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -38,12 +39,12 @@ filteredAccounts: any[] = [];
   showDepositModal = false;
 transactions: any[] = [];
 accountTransactions: { [key: string]: any[] } = {};
-debitCreditTotals: { [key: string]: { debit: number, credit: number } } = {};
-  showCloseConfirmModal = false;
+debitCreditTotals: { [key: string]: { debit: number, credit: number } } = {};  showCloseConfirmModal = false;
   accounts: any[] = [];
   isEdit = false;
   currentUser: any;
   users: any[] = [];
+  sales: any[] = [];
   currentAccountId: string | null = null;
   selectedFromAccount: any = null;
   selectedAccount: any = null;
@@ -57,13 +58,13 @@ debitCreditTotals: { [key: string]: { debit: number, credit: number } } = {};
   currentPage = 1;
   unlinkedPayments = 3;
 acc: any;
-
   constructor(
     private fb: FormBuilder,
     private accountService: AccountService,
     private router: Router,
     private firestore: Firestore,
     private userService: UserService,
+    private saleService: SaleService
   ) {}
 
 // 2. Replace the existing ngOnInit method (around line 60) with:
@@ -71,17 +72,11 @@ ngOnInit(): void {
   this.initForm();
   this.initFundTransferForm();
   this.initDepositForm();
-  this.loadAccountsRealtime();
-    this.loadTransactionsRealtime(); // Add this line
-
   this.loadUsers();
   
-  // Listen for new transactions that might affect account balances
-  this.accountService.getAccounts((accounts) => {
-    this.accounts = accounts;
-    this.totalEntries = accounts.length;
-    this.calculateTotalBalance();
-  });
+  // Load sales first, then accounts to ensure sales data is available
+  this.loadSalesRealtime();
+  this.loadAccountsRealtime();
 }
 
  getAccountHeadOptions(): any[] {
@@ -184,40 +179,96 @@ sortData(column: string): void {
   });
 }
 loadTransactionsRealtime(): void {
-  this.accountService.getAllAccountBookTransactions((transactions) => {
+  this.accountService.getAllTransactions((transactions) => {
     this.transactions = transactions;
     this.processAccountTransactions();
   });
+}
+  
+processAccountTransactions(): void {
+    this.accountTransactions = {};
+    this.debitCreditTotals = {};
+    
+    // Group account service transactions by account
+    this.transactions.forEach(transaction => {
+      const accountId = transaction.accountId;
+      if (!this.accountTransactions[accountId]) {
+        this.accountTransactions[accountId] = [];
+      }
+      
+      // Calculate debit/credit based on transaction type and amount
+      let debit = 0;
+      let credit = 0;
+      const amount = Number(transaction.amount || 0);
+      
+      // If transaction already has debit/credit fields, use them
+      if (transaction.debit !== undefined && transaction.credit !== undefined) {
+        debit = Number(transaction.debit || 0);
+        credit = Number(transaction.credit || 0);
+      } else {
+        // Calculate debit/credit from amount and type
+        switch (transaction.type) {
+          case 'expense':
+          case 'transfer_out':
+          case 'purchase_payment':
+            debit = amount;
+            break;
+          case 'income':
+          case 'transfer_in':
+          case 'sale':
+          case 'purchase_return':
+          case 'deposit':
+            credit = amount;
+            break;
+          default:
+            // For unknown types, assume expense types are debits, others are credits
+            if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
+              debit = amount;
+            } else {
+              credit = amount;
+            }
+        }
+      }
+      
+      this.accountTransactions[accountId].push({
+        ...transaction,
+        debit: debit,
+        credit: credit
+      });
+    });
+    
+    // Include sales payments as credit transactions
+    this.sales.forEach(sale => {
+      const accountId = sale.paymentAccountId || sale.paymentAccount;
+      if (accountId) {
+        if (!this.accountTransactions[accountId]) {
+          this.accountTransactions[accountId] = [];
+        }
+        // Push a sale transaction with credit amount
+        const paymentAmount = Number(sale.paymentAmount) || 0;
+        this.accountTransactions[accountId].push({ 
+          debit: 0, 
+          credit: paymentAmount,
+          type: 'sale',
+          description: `Sale: ${sale.invoiceNo || 'No invoice'}`,
+          date: sale.saleDate || sale.createdAt,
+          amount: paymentAmount
+        });
+      }
+    });
+    
+    // Calculate debit and credit totals per account
+    Object.keys(this.accountTransactions).forEach(accountId => {
+      const txns = this.accountTransactions[accountId];
+      const totalDebit = txns.reduce((sum, t) => sum + (Number(t.debit) || 0), 0);
+      const totalCredit = txns.reduce((sum, t) => sum + (Number(t.credit) || 0), 0);
+      this.debitCreditTotals[accountId] = { debit: totalDebit, credit: totalCredit };
+    });
+    
+    // Update overall balance display
+    this.calculateTotalBalance();
   }
   
-  processAccountTransactions(): void {
-  this.accountTransactions = {};
-  this.debitCreditTotals = {};
-  
-  // Group transactions by account
-  this.transactions.forEach(transaction => {
-    const accountId = transaction.accountId;
-    
-    if (!this.accountTransactions[accountId]) {
-      this.accountTransactions[accountId] = [];
-      this.debitCreditTotals[accountId] = { debit: 0, credit: 0 };
-    }
-    
-    this.accountTransactions[accountId].push(transaction);
-    
-    // Calculate totals
-    if (transaction.debit) {
-      this.debitCreditTotals[accountId].debit += Number(transaction.debit);
-    }
-    if (transaction.credit) {
-      this.debitCreditTotals[accountId].credit += Number(transaction.credit);
-    }
-  });
-  
-  // Update the view
-  this.calculateTotalBalance();
-}
-
   
   
   
@@ -260,43 +311,125 @@ loadAccountsRealtime(): void {
     // First get all accounts
     this.accounts = accounts;
     
-    // Then get all transactions to calculate final balances
+    // Then get all transactions to calculate final balances and debit/credit totals
     this.accountService.getAllTransactions((transactions: any[]) => {
+      this.transactions = transactions;
+      
       // Create a map to store calculated balances
       const accountBalances = new Map<string, number>();
+      
+      // Initialize account transactions and debit/credit totals
+      this.accountTransactions = {};
+      this.debitCreditTotals = {};
       
       // Initialize with opening balances
       accounts.forEach(account => {
         accountBalances.set(account.id, account.openingBalance || 0);
+        this.accountTransactions[account.id] = [];
+        this.debitCreditTotals[account.id] = { debit: 0, credit: 0 };
       });
 
       // Process all transactions chronologically
       transactions.sort((a, b) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       ).forEach(transaction => {
-        if (accountBalances.has(transaction.accountId)) {
-          const currentBalance = accountBalances.get(transaction.accountId) || 0;
+        const accountId = transaction.accountId;
+        
+        if (accountBalances.has(accountId)) {
+          const currentBalance = accountBalances.get(accountId) || 0;
+          const amount = Number(transaction.amount || 0);
           
-          if (transaction.type === 'income' || transaction.type === 'transfer_in' || transaction.type === 'deposit') {
-            accountBalances.set(
-              transaction.accountId, 
-              currentBalance + (transaction.amount || transaction.credit || 0)
-            );
-          } else if (transaction.type === 'expense' || transaction.type === 'transfer_out') {
-            accountBalances.set(
-              transaction.accountId, 
-              currentBalance - (transaction.amount || transaction.debit || 0)
-            );
+          // Calculate debit/credit based on transaction type and amount
+          let debit = 0;
+          let credit = 0;
+          let balanceChange = 0;
+          
+          // If transaction already has debit/credit fields, use them
+          if (transaction.debit !== undefined && transaction.credit !== undefined) {
+            debit = Number(transaction.debit || 0);
+            credit = Number(transaction.credit || 0);
+            balanceChange = credit - debit;
+          } else {
+            // Calculate debit/credit from amount and type
+            switch (transaction.type) {
+              case 'expense':
+              case 'transfer_out':
+              case 'purchase_payment':
+                debit = amount;
+                balanceChange = -amount; // Debit decreases balance
+                break;
+              case 'income':
+              case 'transfer_in':
+              case 'deposit':
+              case 'sale':
+              case 'purchase_return':
+                credit = amount;
+                balanceChange = amount; // Credit increases balance
+                break;
+              default:
+                // For unknown types, assume expense types decrease balance
+                if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
+                  debit = amount;
+                  balanceChange = -amount;
+                } else {
+                  credit = amount;
+                  balanceChange = amount;
+                }
+            }
           }
+          
+          // Update balance
+          accountBalances.set(accountId, currentBalance + balanceChange);
+          
+          // Store transaction with calculated debit/credit for display
+          this.accountTransactions[accountId].push({
+            ...transaction,
+            debit: debit,
+            credit: credit
+          });
+          
+          // Update debit/credit totals
+          this.debitCreditTotals[accountId].debit += debit;
+          this.debitCreditTotals[accountId].credit += credit;
         }
       });
 
-      // Update accounts with calculated balances
-      this.accounts = accounts.map(account => ({
-        ...account,
-        openingBalance: accountBalances.get(account.id) || 0,
-        calculatedBalance: accountBalances.get(account.id) || 0
-      }));
+      // Also process sales data for balance calculation
+      this.sales.forEach(sale => {
+        const accountId = sale.paymentAccountId || sale.paymentAccount;
+        const paymentAmount = Number(sale.paymentAmount) || 0;
+        
+        if (accountId && paymentAmount > 0 && accountBalances.has(accountId)) {
+          const currentBalance = accountBalances.get(accountId) || 0;
+          accountBalances.set(accountId, currentBalance + paymentAmount);
+          
+          // Add sale as a credit transaction
+          if (!this.accountTransactions[accountId]) {
+            this.accountTransactions[accountId] = [];
+          }
+          this.accountTransactions[accountId].push({ 
+            debit: 0, 
+            credit: paymentAmount,
+            type: 'sale',
+            description: `Sale: ${sale.invoiceNo || 'No invoice'}`,
+            date: sale.saleDate || sale.createdAt,
+            amount: paymentAmount
+          });
+          
+          // Update credit total
+          if (!this.debitCreditTotals[accountId]) {
+            this.debitCreditTotals[accountId] = { debit: 0, credit: 0 };
+          }
+          this.debitCreditTotals[accountId].credit += paymentAmount;
+        }
+      });      // Update accounts with calculated balances
+      this.accounts = accounts.map(account => {
+        const calculatedBalance = accountBalances.get(account.id) || account.openingBalance || 0;
+        return {
+          ...account,
+          calculatedBalance: calculatedBalance
+        };
+      });
 
       this.filteredAccounts = [...this.accounts];
       this.totalEntries = this.accounts.length;
@@ -548,29 +681,38 @@ get accountHeadGroups(): any[] {
   }));
 }
 getAccountTransactions(accountId: string): any[] {
-  return this.accountService.getAccountTransactions(accountId);
+  const transactions = this.accountTransactions[accountId] || [];
+  
+  // Ensure all transactions have proper debit/credit values
+  return transactions.map(tx => ({
+    ...tx,
+    debit: Number(tx.debit || 0),
+    credit: Number(tx.credit || 0),
+    description: tx.description || 'No description',
+    date: tx.date || new Date()
+  })).sort((a, b) => 
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 }
 
 getAccountDebitTotal(accountId: string): number {
-  const totals = this.accountService.getAccountDebitCreditTotals(accountId);
-  return totals.debit;
+  return this.debitCreditTotals[accountId]?.debit || 0;
 }
 
 getAccountCreditTotal(accountId: string): number {
-  const totals = this.accountService.getAccountDebitCreditTotals(accountId);
-  return totals.credit;
+  return this.debitCreditTotals[accountId]?.credit || 0;
 }
 
 getTotalDebit(): number {
   return this.filteredAccounts.reduce((sum, acc) => {
-    const totals = this.accountService.getAccountDebitCreditTotals(acc.id);
+    const totals = this.debitCreditTotals[acc.id];
     return sum + (totals?.debit || 0);
   }, 0);
 }
 
 getTotalCredit(): number {
   return this.filteredAccounts.reduce((sum, acc) => {
-    const totals = this.accountService.getAccountDebitCreditTotals(acc.id);
+    const totals = this.debitCreditTotals[acc.id];
     return sum + (totals?.credit || 0);
   }, 0);
 }
@@ -1216,5 +1358,17 @@ deposit(account: any): void {
     if (this.currentPage * this.entriesPerPage < this.totalEntries) {
       this.currentPage++;
     }
+  }
+  loadSalesRealtime(): void {
+    this.saleService.getSalesWithAccountInfo().subscribe(
+      (sales: any[]) => {
+        this.sales = sales;
+        // No need to reprocess here since loadAccountsRealtime handles sales integration
+      },
+      (error: any) => {
+        console.error('Error loading sales:', error);
+        this.sales = []; // Initialize empty array on error
+      }
+    );
   }
 }

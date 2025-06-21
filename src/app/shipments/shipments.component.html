@@ -278,7 +278,8 @@
                   <button class="btn  dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     Actions
                   </button>
-                <ul class="dropdown-menu">
+<!-- Update the dropdown actions to include View Prescription -->
+<ul class="dropdown-menu">
   <li>
     <a class="dropdown-item" [routerLink]="['/shipments/view', shipment.id]">View</a>
   </li>
@@ -296,11 +297,16 @@
       <i class="fas fa-file-invoice"></i> Generate Invoice
     </a>
   </li>
-  <!-- Add these new options -->
-<!-- In your table row actions -->
-<li>
-  <a class="dropdown-item" href="javascript:void(0)" (click)="printShipment(shipment)">Print</a>
-</li>
+  <!-- Add View Prescription option -->
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="viewPrescription(shipment)" 
+       [class.disabled]="!shipment.prescriptions || shipment.prescriptions.length === 0">
+      <i class="fas fa-file-prescription"></i> View Prescription
+    </a>
+  </li>
+  <li>
+    <a class="dropdown-item" href="javascript:void(0)" (click)="printShipment(shipment)">Print</a>
+  </li>
   <li>
     <a class="dropdown-item text-danger" href="javascript:void(0)" (click)="confirmDelete(shipment)">Delete</a>
   </li>
@@ -388,6 +394,175 @@
 
 </div>
 
+<!-- Add the prescription modal at the end of the file -->
+<div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="prescriptionModalLabel">Prescription Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="prescriptionPrintContent">
+        <!-- Prescription content will be dynamically generated -->
+        <div *ngIf="currentPrescriptionData">
+          <!-- Header Section -->
+          <div class="text-center mb-4 prescription-header border-bottom pb-3">
+            <h3 class="text-primary fw-bold">ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h3>
+            <p class="mb-1"><strong>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</strong></p>
+            <p class="mb-1"><strong>E-mail: contact&#64;herballytouch.com | Ph: 7034110999</strong></p>
+            <h4 class="text-success mt-2"><strong>ഡോ. രാജന പി.ആർ., BAMS</strong></h4>
+          </div>
+          
+          <!-- Patient Information -->
+          <div class="row mb-4 patient-info bg-light p-3 rounded">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label class="form-label fw-bold">പേര് (Name):</label>
+                <p class="fw-bold">{{ currentPrescriptionData.patientName || 'Not specified' }}</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label class="form-label fw-bold">Age:</label>
+                <p class="fw-bold">{{ currentPrescriptionData.patientAge || 'Not specified' }}</p>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="form-group">
+                <label class="form-label fw-bold">തീയതി (Date):</label>
+                <p class="fw-bold">{{ currentPrescriptionData.date | date:'mediumDate' }}</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Medicines Section -->
+          <div class="prescription-medicines" *ngIf="currentPrescriptionData.medicines && currentPrescriptionData.medicines.length > 0">
+            <h4 class="mb-3 border-bottom pb-2">PRESCRIPTION</h4>
+            <div *ngFor="let medicine of currentPrescriptionData.medicines; let i = index" 
+                 class="medicine-item mb-4 p-3 border rounded shadow-sm bg-white">
+              
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary mb-0">
+                  <span class="badge bg-primary me-2">{{i + 1}}</span>
+                  {{getMedicineTypeName(medicine.type)}}
+                </h5>
+              </div>
+              
+              <!-- Medicine Details based on type -->
+              <div [ngSwitch]="medicine.type">
+                <!-- Kasayam Display -->
+                <div *ngSwitchCase="'kasayam'" class="kasayam-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> കഷായം {{medicine.instructions}}ml എടുത്ത് 
+                    {{medicine.quantity}}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
+                    {{medicine.powder}} ഗുളിക പൊടിച്ച്ചേർത്ത് 
+                    {{medicine.pills}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Buligha Display -->
+                <div *ngSwitchCase="'buligha'" class="buligha-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> ഗുളിക {{medicine.instructions}} എണ്ണം എടുത്ത് 
+                    {{medicine.powder}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Bhasmam Display -->
+                <div *ngSwitchCase="'bhasmam'" class="bhasmam-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> ഭസ്മം {{medicine.dosage}} എടുത്ത് {{medicine.quantity}}ml 
+                    {{medicine.instructions}} ചേർത്ത് {{medicine.powder}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Krudham Display -->
+                <div *ngSwitchCase="'krudham'" class="krudham-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Suranam Display -->
+                <div *ngSwitchCase="'suranam'" class="suranam-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> ചൂർണ്ണം {{medicine.instructions}} എടുത്ത് {{medicine.powder}} ചേർത്ത് തിളപ്പിച്ച് 
+                    {{medicine.dosage}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Rasayanam Display -->
+                <div *ngSwitchCase="'rasayanam'" class="rasayanam-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Lagium Display -->
+                <div *ngSwitchCase="'lagium'" class="lagium-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong> ലേഹ്യം {{medicine.instructions}} എടുത്ത് {{medicine.dosage}} നേരം {{medicine.time}} സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Default Display for other types -->
+                <div *ngSwitchDefault>
+                  <p class="mb-2">
+                    <strong>Medicine:</strong> {{medicine.name}}<br>
+                    <strong>Dosage:</strong> {{medicine.dosage}}<br>
+                    <strong>Instructions:</strong> {{medicine.instructions}}<br>
+                    <strong>Time:</strong> {{medicine.time}}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Additional Notes -->
+          <div *ngIf="currentPrescriptionData.additionalNotes" class="additional-notes mt-4 p-3 bg-light rounded">
+            <h5>Additional Notes:</h5>
+            <p>{{currentPrescriptionData.additionalNotes}}</p>
+          </div>
+          
+          <!-- Footer -->
+          <div class="prescription-footer mt-4 pt-3 border-top">
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>Doctor:</strong> Dr. Rajana P.R., BAMS</p>
+                <p><strong>Generated On:</strong> {{ this['today'] | date:'medium' }}</p>
+              </div>
+              <div class="col-md-6 text-end">
+                <div class="signature-line mt-4">
+                  <p class="border-top d-inline-block pt-2" style="width: 200px; text-align: center;">
+                    Doctor's Signature
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- No Prescription Message -->
+        <div *ngIf="!currentPrescriptionData" class="text-center py-5">
+          <i class="fas fa-file-prescription fa-5x text-muted mb-3"></i>
+          <h5 class="text-muted">No Prescription Available</h5>
+          <p class="text-muted">This shipment does not have any prescription attached.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-info" (click)="printPrescriptionPDF()" 
+                *ngIf="currentPrescriptionData">
+          <i class="fas fa-print"></i> Print Prescription
+        </button>
+        <button type="button" class="btn btn-primary" (click)="downloadPrescriptionPDF()" 
+                *ngIf="currentPrescriptionData">
+          <i class="fas fa-download"></i> Download PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- Add this modal near the bottom of your shipments.component.html -->
 <div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">

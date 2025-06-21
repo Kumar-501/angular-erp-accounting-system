@@ -75,7 +75,6 @@ viewProducts(grn: any): void {
   ngOnDestroy(): void {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
-
 loadGoodsReceived(): void {
   // Load suppliers first
   const supplierSub = this.supplierService.getSuppliers().subscribe(suppliers => {
@@ -88,6 +87,9 @@ loadGoodsReceived(): void {
         referenceNo: grn['referenceNo'] || this.generateReferenceNo(grn),
         invoiceNo: grn['invoiceNo'] || grn['invoiceRef'] || 'N/A',
         addedBy: grn['addedBy'] || grn['createdBy'] || 'N/A',
+        // Ensure dates are properly formatted
+        purchaseDate: this.parseDate(grn['purchaseDate']),
+        receivedDate: this.parseDate(grn['receivedDate']),
         // Ensure products array exists
         products: grn['products'] || []
       }));
@@ -98,7 +100,22 @@ loadGoodsReceived(): void {
   this.subscriptions.push(supplierSub);
 }
 
-
+private parseDate(dateValue: any): Date {
+  if (!dateValue) return new Date(); // Fallback to current date if not available
+  
+  // If it's already a Date object
+  if (dateValue instanceof Date) {
+    return dateValue;
+  }
+  
+  // If it's a Firestore Timestamp
+  if (dateValue.toDate) {
+    return dateValue.toDate();
+  }
+  
+  // If it's a string or number
+  return new Date(dateValue);
+}
   // Generate a reference number if none exists
   private generateReferenceNo(grn: any): string {
     if (grn.purchaseOrderDetails?.referenceNo) {
@@ -106,17 +123,28 @@ loadGoodsReceived(): void {
     }
     return `GRN-${grn.id.substring(0, 8).toUpperCase()}`;
   }
-
-  sortBy(column: string): void {
-    if (this.sortColumn === column) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortColumn = column;
-      this.sortDirection = 'asc';
-    }
+sortBy(column: string): void {
+  if (this.sortColumn === column) {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    this.sortColumn = column;
+    this.sortDirection = 'asc';
+  }
+  
+  // Special handling for date columns
+  if (column === 'purchaseDate' || column === 'receivedDate') {
+    this.filteredGoodsReceived.sort((a, b) => {
+      const dateA = this.parseDate(a[column]).getTime();
+      const dateB = this.parseDate(b[column]).getTime();
+      return this.sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+    });
+  } else {
+    // Existing sorting logic for other columns
     this.applyFilters();
   }
-
+  
+  this.updatePagination();
+}
   applyFilters(): void {
     // Filter by date range
     this.filteredGoodsReceived = this.goodsReceived.filter(grn => {
@@ -199,6 +227,7 @@ openActionModal(grn: any, index: number): void {
     bootstrapModal.show();
   }
 }
+// In your list-goods.component.ts
 
 closeActionModal(): void {
   this.selectedGrnForAction = null;

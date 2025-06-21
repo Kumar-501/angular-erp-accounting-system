@@ -18,6 +18,8 @@ export class VariationsComponent implements OnInit {
   errorMessage: string | null = null;
   successMessage: string | null = null;
   showAddForm = false;
+  isSaving: boolean = false;
+
   isEditing = false;
   math = Math;
   searchQuery = '';
@@ -183,65 +185,71 @@ export class VariationsComponent implements OnInit {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  saveVariation(): Promise<void> {
+ async saveVariation(): Promise<void> {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
+  this.isSaving = true;
+  try {
     if (this.isEditing) {
-      return this.updateVariation();
+      await this.updateVariation();
     } else {
-      return this.addVariation();
+      await this.addVariation();
     }
+  } catch (error) {
+    console.error('Error saving variation:', error);
+    this.errorMessage = 'Error saving variation. Please try again.';
+  } finally {
+    this.isSaving = false;
+    this.cdr.detectChanges();
+  }
+}
+async addVariation(): Promise<void> {
+  if (!this.newVariation.name.trim() || !this.newVariation.values.trim()) {
+    this.errorMessage = 'Please enter both name and values';
+    return;
   }
 
-  async addVariation(): Promise<void> {
-    if (!this.newVariation.name.trim() || !this.newVariation.values.trim()) {
-      this.errorMessage = 'Please enter both name and values';
-      return;
-    }
+  this.errorMessage = null;
+  
+  try {
+    await this.variationsService.addVariation({
+      name: this.newVariation.name.trim(),
+      values: this.newVariation.values.split(',').map(v => v.trim())
+    });
+    this.successMessage = 'Variation added successfully!';
+    this.resetForm();
+    this.showAddForm = false;
+    setTimeout(() => this.loadVariations(), 500);
+  } catch (error) {
+    console.error('Error:', error);
+    this.errorMessage = 'Failed to add variation';
+    throw error; // Re-throw to be caught in saveVariation
+  }
+}
 
-    this.isLoading = true;
-    this.errorMessage = null;
-    
-    try {
-      await this.variationsService.addVariation({
-        name: this.newVariation.name.trim(),
-        values: this.newVariation.values.split(',').map(v => v.trim())
-      });
-      this.successMessage = 'Variation added successfully!';
-      this.resetForm();
-      this.showAddForm = false;
-      setTimeout(() => this.loadVariations(), 500);
-    } catch (error) {
-      console.error('Error:', error);
-      this.errorMessage = 'Failed to add variation';
-      this.isLoading = false;
-      this.cdr.detectChanges();
-    }
+async updateVariation(): Promise<void> {
+  if (!this.newVariation.name.trim() || !this.newVariation.values.trim()) {
+    this.errorMessage = 'Please enter both name and values';
+    return;
   }
 
-  async updateVariation(): Promise<void> {
-    if (!this.newVariation.name.trim() || !this.newVariation.values.trim()) {
-      this.errorMessage = 'Please enter both name and values';
-      return;
-    }
-
-    this.isLoading = true;
-    this.errorMessage = null;
-    
-    try {
-      await this.variationsService.updateVariation(this.newVariation.id, {
-        name: this.newVariation.name.trim(),
-        values: this.newVariation.values.split(',').map(v => v.trim())
-      });
-      this.successMessage = 'Variation updated successfully!';
-      this.resetForm();
-      this.showAddForm = false;
-      setTimeout(() => this.loadVariations(), 500);
-    } catch (error) {
-      console.error('Error:', error);
-      this.errorMessage = 'Failed to update variation';
-      this.isLoading = false;
-      this.cdr.detectChanges();
-    }
+  this.errorMessage = null;
+  
+  try {
+    await this.variationsService.updateVariation(this.newVariation.id, {
+      name: this.newVariation.name.trim(),
+      values: this.newVariation.values.split(',').map(v => v.trim())
+    });
+    this.successMessage = 'Variation updated successfully!';
+    this.resetForm();
+    this.showAddForm = false;
+    setTimeout(() => this.loadVariations(), 500);
+  } catch (error) {
+    console.error('Error:', error);
+    this.errorMessage = 'Failed to update variation';
+    throw error; // Re-throw to be caught in saveVariation
   }
+}
   exportCSV(): void {
     const data = this.filteredVariations.map(v => ({
       Name: v.name,

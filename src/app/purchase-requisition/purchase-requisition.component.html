@@ -187,159 +187,296 @@
         </div>
       </div>
     </div>
-    <div class="table-responsive">
-      <table class="requisition-table">
-   <!-- Update the table header section to include click events for sorting -->
-<thead>
-  <tr>
-    <th>
-      <input type="checkbox" 
-             [checked]="allSelected" 
-             (change)="toggleSelectAll($event)">
-    </th>
-    <th *ngIf="columns[0].visible" (click)="sortTable('date')">
-      Date <i class="fa" [ngClass]="getSortIcon('date')"></i>
-    </th>
-    <th *ngIf="columns[1].visible" (click)="sortTable('referenceNo')">
-      Reference No <i class="fa" [ngClass]="getSortIcon('referenceNo')"></i>
-    </th>
-    <th *ngIf="columns[2].visible" (click)="sortTable('brand')">
-      Brand <i class="fa" [ngClass]="getSortIcon('brand')"></i>
-    </th>
-    <th *ngIf="columns[3].visible" (click)="sortTable('category')">
-      Category <i class="fa" [ngClass]="getSortIcon('category')"></i>
-    </th>
-    <th *ngIf="columns[4].visible" (click)="sortTable('locationName')">
-      Location <i class="fa" [ngClass]="getSortIcon('locationName')"></i>
-    </th>
-    <th *ngIf="columns[5].visible" (click)="sortTable('status')">
-      Status <i class="fa" [ngClass]="getSortIcon('status')"></i>
-    </th>
-    <th *ngIf="columns[6].visible" (click)="sortTable('shippingStatus')">
-      Shipping Status <i class="fa" [ngClass]="getSortIcon('shippingStatus')"></i>
-    </th>
-    <th *ngIf="columns[14].visible" (click)="sortTable('unitPurchasePrice')">
-  Unit Purchase Price <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
+<div class="table-responsive">
+  <table class="requisition-table">
+    <!-- Table Header -->
+    <thead>
+      <tr>
+        <!-- Checkbox Column -->
+        <th class="checkbox-col">
+          <input type="checkbox" 
+                 [checked]="allSelected" 
+                 (change)="toggleSelectAll($event)">
+        </th>
+        
+        <!-- Basic Info Columns -->
+        <th *ngIf="columns[0].visible" 
+            class="sortable-col" 
+            (click)="sortTable('date')">
+          Date 
+          <i class="fa" [ngClass]="getSortIcon('date')"></i>
+        </th>
+        
+        <th *ngIf="columns[1].visible" 
+            class="sortable-col" 
+            (click)="sortTable('referenceNo')">
+          Reference No 
+          <i class="fa" [ngClass]="getSortIcon('referenceNo')"></i>
+        </th>
+        
+        <th *ngIf="columns[2].visible" 
+            class="sortable-col" 
+            (click)="sortTable('brand')">
+          Brand 
+          <i class="fa" [ngClass]="getSortIcon('brand')"></i>
+        </th>
+        
+        <th *ngIf="columns[3].visible" 
+            class="sortable-col" 
+            (click)="sortTable('category')">
+          Category 
+          <i class="fa" [ngClass]="getSortIcon('category')"></i>
+        </th>
+        
+        <th *ngIf="columns[4].visible" 
+            class="sortable-col" 
+            (click)="sortTable('locationName')">
+          Location 
+          <i class="fa" [ngClass]="getSortIcon('locationName')"></i>
+        </th>
+        
+        <!-- Status Columns -->
+        <th *ngIf="columns[5].visible" 
+            class="sortable-col" 
+            (click)="sortTable('status')">
+          Status 
+          <i class="fa" [ngClass]="getSortIcon('status')"></i>
+        </th>
+        
+        <!-- <th *ngIf="columns[6].visible" 
+            class="sortable-col" 
+            (click)="sortTable('shippingStatus')">
+          Shipping Status 
+          <i class="fa" [ngClass]="getSortIcon('shippingStatus')"></i>
+        </th>
+         -->
+        <!-- Date Columns -->
+        <th *ngIf="columns[7].visible" 
+            class="sortable-col" 
+            (click)="sortTable('requiredByDate')">
+          Required By Date 
+          <i class="fa" [ngClass]="getSortIcon('requiredByDate')"></i>
+        </th>
+        
+        <!-- <th *ngIf="columns[10].visible" 
+            class="sortable-col" 
+            (click)="sortTable('shippingDate')">
+          Shipping Date 
+          <i class="fa" [ngClass]="getSortIcon('shippingDate')"></i>
+        </th> -->
+        
+        <!-- User Info Columns -->
+        <th *ngIf="columns[8].visible" 
+            class="sortable-col" 
+            (click)="sortTable('addedBy')">
+          Added By 
+          <i class="fa" [ngClass]="getSortIcon('addedBy')"></i>
+        </th>
+        
+        <!-- Supplier Columns -->
+        <th *ngIf="columns[9].visible" 
+            class="sortable-col" 
+            (click)="sortTable('supplierName')">
+          Supplier 
+          <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
+        </th>
+        
+   <th *ngIf="columns[2].visible" (click)="sortTable('supplierAddress')">
+  Supplier Address <i class="fa" [ngClass]="getSortIcon('supplierAddress')"></i>
 </th>
-<th *ngIf="columns[15].visible" (click)="sortTable('purchasePriceIncTax')">
-  Purchase Price (Inc Tax) <i class="fa" [ngClass]="getSortIcon('purchasePriceIncTax')"></i>
-</th>
+        
+        <!-- Product Columns -->
+        <th *ngIf="columns[11].visible" 
+            class="sortable-col" 
+            (click)="sortTable('items')">
+          Products 
+          <i class="fa" [ngClass]="getSortIcon('items')"></i>
+        </th>
+        
+        <!-- Quantity Columns -->
+        <th *ngIf="columns[12].visible" 
+            class="sortable-col text-right" 
+            (click)="sortTable('totalQuantity')">
+          Total Required Qty 
+          <i class="fa" [ngClass]="getSortIcon('totalQuantity')"></i>
+        </th>
+        
+        <th *ngIf="columns[13].visible" 
+            class="sortable-col text-right" 
+            (click)="sortTable('currentStock')">
+          Quantity Remaining 
+          <i class="fa" [ngClass]="getSortIcon('currentStock')"></i>
+        </th>
+        
+        <!-- Price Columns -->
+        <th *ngIf="columns[14].visible" 
+            class="sortable-col text-right" 
+            (click)="sortTable('unitPurchasePrice')">
+          Unit Purchase Price 
+          <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
+        </th>
+        
+        <th *ngIf="columns[15].visible" 
+            class="sortable-col text-right" 
+            (click)="sortTable('purchasePriceIncTax')">
+          Purchase Price (Inc Tax) 
+          <i class="fa" [ngClass]="getSortIcon('purchasePriceIncTax')"></i>
+        </th>
+        
+        <!-- Action Column -->
+        <th class="action-col">Actions</th>
+      </tr>
+    </thead>
+    
+    <!-- Table Body -->
+    <tbody>
+      <tr *ngFor="let row of getPaginatedRows(); trackBy: trackByFn">
+        <!-- Checkbox Column -->
+        <td class="checkbox-col">
+          <input type="checkbox" 
+                 [checked]="isSelected(row.id)" 
+                 (change)="toggleSelection(row.id)">
+        </td>
+        
+        <!-- Basic Info Columns -->
+        <td *ngIf="columns[0].visible">
+          {{ row.date | date }}
+        </td>
+        
+        <td *ngIf="columns[1].visible">
+          {{ row.referenceNo }}
+        </td>
+        
+        <td *ngIf="columns[2].visible">
+          {{ row.brand }}
+        </td>
+        
+        <td *ngIf="columns[3].visible">
+          {{ row.category }}
+        </td>
+        
+        <td *ngIf="columns[4].visible">
+          {{ row.locationName }}
+        </td>
+        
+        <!-- Status Columns -->
+        <td *ngIf="columns[5].visible">
+          <span class="status-badge" [ngClass]="row.status | lowercase">
+            {{ row.status }}
+          </span>
+        </td>
+<!--         
+        <td *ngIf="columns[6].visible">
+          <span class="status-badge" [ngClass]="row.shippingStatus | lowercase">
+            {{ row.shippingStatus || 'Not Shipped' }}
+          </span>
+        </td> -->
+        
+        <!-- Date Columns -->
+        <td *ngIf="columns[7].visible">
+          {{ row.requiredByDate | date }}
+        </td>
+        
+        <!-- <td *ngIf="columns[10].visible">
+          {{ row.shippingDate | date }}
+        </td> -->
+        
+        <!-- User Info Columns -->
+        <td *ngIf="columns[8].visible">
+          {{ row.addedBy }}
+        </td>
+        
+        <!-- Supplier Columns -->
+        <td *ngIf="columns[9].visible">
+          {{ row.supplierName || 'N/A' }}
+        </td>
+        
+    <td *ngIf="columns[2].visible">{{ row.supplierAddress || 'N/A' }}</td>
 
-    <th *ngIf="columns[7].visible" (click)="sortTable('requiredByDate')">
-      Required by date <i class="fa" [ngClass]="getSortIcon('requiredByDate')"></i>
-    </th>
-    <th *ngIf="columns[8].visible" (click)="sortTable('addedBy')">
-      Added By <i class="fa" [ngClass]="getSortIcon('addedBy')"></i>
-    </th>
-    <th *ngIf="columns[9].visible" (click)="sortTable('supplierName')">
-      Supplier <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
-    </th>
-    <th *ngIf="columns[10].visible" (click)="sortTable('shippingDate')">
-      Shipping Date <i class="fa" [ngClass]="getSortIcon('shippingDate')"></i>
-    </th>
-    <th *ngIf="columns[11].visible" (click)="sortTable('items')">
-      Products <i class="fa" [ngClass]="getSortIcon('items')"></i>
-    </th>
-    <th *ngIf="columns[12].visible" (click)="sortTable('totalQuantity')">
-      Total Required Qty <i class="fa" [ngClass]="getSortIcon('totalQuantity')"></i>
-    </th>
-    <th *ngIf="columns[13].visible" (click)="sortTable('currentStock')">
-      Quantity Remaining <i class="fa" [ngClass]="getSortIcon('currentStock')"></i>
-    </th>
-    <th>Action</th>
-  </tr>
-</thead>
-        <tbody>
-          <tr *ngFor="let row of getPaginatedRows(); trackBy: trackByFn">
-            <td>
-      <input type="checkbox" 
-             [checked]="isSelected(row.id)" 
-             (change)="toggleSelection(row.id)">
-    </td>
-            <td *ngIf="columns[0].visible">{{ row.date | date }}</td>
-            <td *ngIf="columns[1].visible">{{ row.referenceNo }}</td>
-            <td *ngIf="columns[2].visible">{{ row.brand }}</td>
-            <td *ngIf="columns[3].visible">{{ row.category }}</td>
-            <td *ngIf="columns[4].visible">{{ row.locationName }}</td>
-            <td *ngIf="columns[5].visible">
-              <span class="status-badge" [ngClass]="row.status | lowercase">
-                {{ row.status }}
-              </span>
-            </td>
-            <td *ngIf="columns[6].visible">
-              <span class="status-badge" [ngClass]="row.shippingStatus | lowercase">
-                {{ row.shippingStatus || 'Not Shipped' }}
-              </span>
-            </td>
-            <td *ngIf="columns[14].visible">
-  <div *ngIf="row.items && row.items.length > 0">
-    <span *ngFor="let item of row.items; let last = last">
-      {{ item.unitPurchasePrice | currency:'INR' }}{{ !last ? ', ' : '' }}
-    </span>
-  </div>
-  <div *ngIf="!row.items || row.items.length === 0">
-    N/A
-  </div>
-</td>
-<td *ngIf="columns[15].visible">
-  <div *ngIf="row.items && row.items.length > 0">
-    <span *ngFor="let item of row.items; let last = last">
-      {{ item.purchasePriceIncTax |currency:'INR'  }}{{ !last ? ', ' : '' }}
-    </span>
-  </div>
-  <div *ngIf="!row.items || row.items.length === 0">
-    N/A
-  </div>
-</td>
-
-            <td *ngIf="columns[7].visible">{{ row.requiredByDate | date }}</td>
-            <td *ngIf="columns[8].visible">{{ row.addedBy }}</td>
-            <td *ngIf="columns[9].visible">{{ row.supplierName || 'N/A' }}</td>
-            <td *ngIf="columns[10].visible">{{ row.shippingDate | date }}</td>
-            <td *ngIf="columns[11].visible">
-              <div *ngIf="row.items && row.items.length > 0">
-                <span *ngFor="let item of row.items; let last = last">
-                  {{ item.productName }} ({{ item.requiredQuantity }}){{ !last ? ', ' : '' }}
-                </span>
-              </div>
-              <div *ngIf="!row.items || row.items.length === 0">
-                No products
-              </div>
-            </td>
-            <td *ngIf="columns[12].visible">
-              {{ calculateTotalRequiredQuantity(row.items) }}
-            </td>
-            <td *ngIf="columns[13].visible">
-              <div *ngIf="row.items && row.items.length > 0">
-                <span *ngFor="let item of row.items; let last = last">
-                  {{ item.currentStock || 0 }}{{ !last ? ', ' : '' }}
-                </span>
-              </div>
-              <div *ngIf="!row.items || row.items.length === 0">
-                N/A
-              </div>
-            </td>
-            <td>
-              <div class="action-buttons">
-                <button class="btn-view" title="View" (click)="viewRequisition(row.id, $event)">
-                  <i class="fa fa-eye"></i>
-                </button>
-                <button class="btn-approve" title="Approve" *ngIf="row.status !== 'Approved'" (click)="approveRequisition(row, $event)">
-                  <i class="fa fa-check"></i>
-                </button>
-                <button class="btn-delete" title="Delete" (click)="deleteRequisition(row.id, $event)">
-                  <i class="fa fa-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-          <tr *ngIf="filteredRows.length === 0">
-            <td [attr.colspan]="columns.length + 1" class="text-center">No records found</td>
-          </tr>
-          
-        </tbody>
-      </table>
-    </div>
+        
+        <!-- Product Columns -->
+        <td *ngIf="columns[11].visible">
+          <div *ngIf="row.items && row.items.length > 0">
+            <span *ngFor="let item of row.items; let last = last">
+              {{ item.productName }} ({{ item.requiredQuantity }}){{ !last ? ', ' : '' }}
+            </span>
+          </div>
+          <div *ngIf="!row.items || row.items.length === 0">
+            No products
+          </div>
+        </td>
+        
+        <!-- Quantity Columns -->
+        <td *ngIf="columns[12].visible" class="text-right">
+          {{ calculateTotalRequiredQuantity(row.items) }}
+        </td>
+        
+        <td *ngIf="columns[13].visible" class="text-right">
+          <div *ngIf="row.items && row.items.length > 0">
+            <span *ngFor="let item of row.items; let last = last">
+              {{ item.currentStock || 0 }}{{ !last ? ', ' : '' }}
+            </span>
+          </div>
+          <div *ngIf="!row.items || row.items.length === 0">
+            N/A
+          </div>
+        </td>
+        
+        <!-- Price Columns -->
+        <td *ngIf="columns[14].visible" class="text-right">
+          <div *ngIf="row.items && row.items.length > 0">
+            <span *ngFor="let item of row.items; let last = last">
+              {{ item.unitPurchasePrice | currency:'INR' }}{{ !last ? ', ' : '' }}
+            </span>
+          </div>
+          <div *ngIf="!row.items || row.items.length === 0">
+            N/A
+          </div>
+        </td>
+        
+        <td *ngIf="columns[15].visible" class="text-right">
+          <div *ngIf="row.items && row.items.length > 0">
+            <span *ngFor="let item of row.items; let last = last">
+              {{ item.purchasePriceIncTax | currency:'INR' }}{{ !last ? ', ' : '' }}
+            </span>
+          </div>
+          <div *ngIf="!row.items || row.items.length === 0">
+            N/A
+          </div>
+        </td>
+        
+        <!-- Action Column -->
+        <td class="action-col">
+          <div class="action-buttons">
+            <button class="btn-view" 
+                    title="View" 
+                    (click)="viewRequisition(row.id, $event)">
+              <i class="fa fa-eye"></i>
+            </button>
+            <button class="btn-approve" 
+                    title="Approve" 
+                    *ngIf="row.status !== 'Approved'" 
+                    (click)="approveRequisition(row, $event)">
+              <i class="fa fa-check"></i>
+            </button>
+            <button class="btn-delete" 
+                    title="Delete" 
+                    (click)="deleteRequisition(row.id, $event)">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+      
+      <!-- No Records Row -->
+      <tr *ngIf="filteredRows.length === 0">
+        <td [attr.colspan]="getVisibleColumns().length + 2" class="text-center no-records">
+          No records found
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
 
 <div class="table-footer">
   <div class="showing-entries">

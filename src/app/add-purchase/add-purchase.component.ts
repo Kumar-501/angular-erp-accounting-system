@@ -79,6 +79,9 @@ interface PaymentAccount {
   accountType?: string;
 }
 
+
+
+
 @Component({
   selector: 'app-add-purchase',
   templateUrl: './add-purchase.component.html',
@@ -370,6 +373,7 @@ addProductToTable(product: Product): void {
       this.isLoadingFromPurchaseOrder = false;
       this.generateReferenceNumber();
       this.generateInvoiceNumber();
+
     }
   }
 
@@ -610,27 +614,28 @@ filterPurchaseOrders(supplierIdentifier: string): void {
       }
     });
   }
-// In your purchase order component
-loadPurchaseOrderData(orderId: string): void {
-  this.purchaseOrderService.getOrderById(orderId)
-    .then((orderData) => {
-      if (orderData) {
-        this.purchaseOrderData = orderData;
-        this.prefillFormFromPurchaseOrder(orderData);
-        
-        // Set the purchase order ID in the form
-        this.purchaseForm.patchValue({
-          purchaseOrderId: orderId,
-          purchaseOrder: orderData.referenceNo,
-          supplierName: orderData.supplier // Changed from supplierName to supplier
-        });
-      }
-    })
-    .catch((err: any) => {
-      console.error('Error loading purchase order:', err);
-      this.generateReferenceNumber();
-      this.generateInvoiceNumber();
-    });
+async loadPurchaseOrderData(orderId: string): Promise<void> {
+  try {
+    const orderData = await this.purchaseOrderService.getOrderById(orderId);
+    if (orderData) {
+      this.purchaseOrderData = orderData;
+      this.prefillFormFromPurchaseOrder(orderData);
+      
+      // Set the purchase order ID in the form
+      this.purchaseForm.patchValue({
+        purchaseOrderId: orderId,
+        purchaseOrder: orderData.referenceNo,
+        shippingCharges: orderData.shippingCharges || 0,
+        supplierName: orderData.supplier,
+        // Add the required by date from the purchase order
+        receivedDate: orderData.requiredByDate || ''
+      });
+    }
+  } catch (error) {
+    console.error('Error loading purchase order:', error);
+    this.generateReferenceNumber();
+    this.generateInvoiceNumber();
+  }
 }
 
 // Updated method to fetch complete product details and tax rates
@@ -710,13 +715,16 @@ async prefillFormFromPurchaseOrder(orderData: any): Promise<void> {
     additionalNotes: orderData.notes || '',
     shippingCharges: orderData.shippingCharges || 0,
     invoicedDate: orderData.invoicedDate || '',
-    receivedDate: orderData.receivedDate || '',
+    receivedDate: orderData.requiredByDate || '',
     invoiceNo: orderData.invoiceNo || '',
     purchaseTaxId: orderData.purchaseTaxId || ''
   });
-
+  this.purchaseForm.patchValue({
+    shippingCharges: orderData.shippingCharges || 0
+  });
   this.purchaseForm.get('referenceNo')?.enable();
   
+  // Clear existing products
   while (this.productsFormArray.length !== 0) {
     this.productsFormArray.removeAt(0);
   }
@@ -734,7 +742,10 @@ async prefillFormFromPurchaseOrder(orderData: any): Promise<void> {
     this.onSupplierChange(supplierId);
   }
   
-  this.calculateTotals();
+  // Force recalculation of totals after loading all products
+  setTimeout(() => {
+    this.calculateTotals();
+  }, 100);
 }
 
   navigateToAddSupplier(): void {
@@ -993,32 +1004,59 @@ calculateLineTotal(index: number): void {
     });
   }
 
- calculateTotals(): void {
+calculateTotals(): void {
   this.totalItems = this.productsFormArray.length;
   
-  let productsTotal = 0;
+  let productsSubtotal = 0;
   let totalTax = 0;
 
+  // Calculate product subtotals and taxes
   this.productsFormArray.controls.forEach(productGroup => {
-    productsTotal += (parseFloat(productGroup.get('lineTotal')?.value) || 0);
-    totalTax += (parseFloat(productGroup.get('taxAmount')?.value) || 0);
+    const quantity = parseFloat(productGroup.get('quantity')?.value) || 0;
+    const unitCost = parseFloat(productGroup.get('unitCost')?.value) || 0;
+    const discountPercent = parseFloat(productGroup.get('discountPercent')?.value) || 0;
+    const taxRate = parseFloat(productGroup.get('taxRate')?.value) || 0;
+    
+    // Calculate line total before tax
+    const lineTotalBeforeTax = quantity * unitCost * (1 - (discountPercent / 100));
+    
+    // Calculate tax amount
+    const taxAmount = lineTotalBeforeTax * (taxRate / 100);
+    
+    // Calculate line total (including tax)
+    const lineTotal = lineTotalBeforeTax + taxAmount;
+    
+    // Update form values
+    productGroup.patchValue({
+      subtotal: parseFloat(lineTotalBeforeTax.toFixed(2)),
+      taxAmount: parseFloat(taxAmount.toFixed(2)),
+      lineTotal: parseFloat(lineTotal.toFixed(2)),
+      netCost: parseFloat((unitCost * (1 - (discountPercent / 100))).toFixed(2))
+    }, {emitEvent: false});
+    
+    productsSubtotal += lineTotalBeforeTax;
+    totalTax += taxAmount;
   });
 
+  // Get shipping charges
   const shippingCharges = parseFloat(this.purchaseForm.get('shippingCharges')?.value) || 0;
-  this.netTotalAmount = parseFloat((productsTotal + shippingCharges).toFixed(2));
+  
+  // Calculate grand total (products + tax + shipping)
+  this.netTotalAmount = parseFloat((productsSubtotal + totalTax + shippingCharges).toFixed(2));
   this.totalTax = parseFloat(totalTax.toFixed(2));
 
   // Calculate rounded total and round off amount
   const roundedTotal = Math.round(this.netTotalAmount);
   const roundOffAmount = parseFloat((roundedTotal - this.netTotalAmount).toFixed(2));
 
+  // Update form values
   this.purchaseForm.patchValue({
     purchaseTotal: this.netTotalAmount,
     totalPayable: roundedTotal,
     paymentAmount: roundedTotal,
     roundOffAmount: roundOffAmount,
     roundedTotal: roundedTotal,
-    totalTax: this.totalTax  // Make sure to update the total tax in the form
+    totalTax: this.totalTax
   });
 
   this.calculatePaymentBalance();
@@ -1101,7 +1139,6 @@ calculateLineTotal(index: number): void {
       this.purchaseForm.patchValue({ document: file.name });
     }
   }
-
 async savePurchase() {
   // Mark all form controls as touched to show validation errors
   this.markFormGroupTouched(this.purchaseForm);
@@ -1141,38 +1178,59 @@ async savePurchase() {
       accountType: selectedAccount.accountType || ''
     } : null;
     
-    // Prepare products data
-    const products = this.productsFormArray.value.map((product: any) => ({
-      productId: product.productId,
-      productName: product.productName || '',
-      quantity: Number(product.quantity) || 1,
-      unitCost: Number(product.unitCost) || 0,
-      discountPercent: Number(product.discountPercent) || 0,
-      unitCostBeforeTax: Number(product.unitCostBeforeTax) || 0,
-      subtotal: Number(product.subtotal) || 0,
-      taxAmount: Number(product.taxAmount) || 0,
-      supplierId: formValue.supplierId, // Use the form control value
-      lineTotal: Number(product.lineTotal) || 0,
-      taxRate: Number(product.taxRate) || 0,
-      batchNumber: product.batchNumber || '',
-      expiryDate: product.expiryDate || '',
-      netCost: Number(product.netCost) || 0
-    }));
+    // Calculate totals correctly
+    let productsSubtotal = 0;
+    let totalTax = 0;
     
-    // Calculate totals
-    const subtotal = this.productsFormArray.value.reduce(
-      (sum: number, p: any) => sum + (parseFloat(p.subtotal) || 0), 0);
-    const totalTax = this.productsFormArray.value.reduce(
-      (sum: number, p: any) => sum + (parseFloat(p.taxAmount) || 0), 0);
+    // Prepare products data with proper calculations
+    const products = this.productsFormArray.value.map((product: any) => {
+      const productId = product.productId;
+      const productName = product.productName || '';
+      const quantity = Number(product.quantity) || 0;
+      const unitCost = Number(product.unitCost) || 0;
+      const discountPercent = Number(product.discountPercent) || 0;
+      const taxRate = Number(product.taxRate) || 0;
+      const batchNumber = product.batchNumber || '';
+      const expiryDate = product.expiryDate || '';
+      
+      // Calculate line values step by step
+      const unitCostBeforeTax = unitCost;
+      const netCost = unitCost * (1 - (discountPercent / 100));
+      const subtotal = quantity * netCost; // This is the line total before tax
+      const taxAmount = subtotal * (taxRate / 100);
+      const lineTotal = subtotal + taxAmount; // Final line total including tax
+      
+      // Accumulate totals
+      productsSubtotal += subtotal;
+      totalTax += taxAmount;
+      
+      return {
+        productId: productId,
+        productName: productName,
+        quantity: quantity,
+        unitCost: unitCost,
+        discountPercent: discountPercent,
+        unitCostBeforeTax: parseFloat(unitCostBeforeTax.toFixed(2)),
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        taxAmount: parseFloat(taxAmount.toFixed(2)),
+        supplierId: formValue.supplierId,
+        lineTotal: parseFloat(lineTotal.toFixed(2)),
+        taxRate: taxRate,
+        batchNumber: batchNumber,
+        expiryDate: expiryDate,
+        netCost: parseFloat(netCost.toFixed(2))
+      };
+    });
+    
+    // Calculate final totals
     const shippingCharges = Number(formValue.shippingCharges) || 0;
-    const totalAmount = subtotal + totalTax + shippingCharges;
-    const roundedTotal = Math.round(totalAmount);
-    const roundOffAmount = roundedTotal - totalAmount;
-    const grandTotal = subtotal + totalTax + shippingCharges;
+    const grandTotal = productsSubtotal + totalTax + shippingCharges;
+    const roundedTotal = Math.round(grandTotal);
+    const roundOffAmount = parseFloat((roundedTotal - grandTotal).toFixed(2));
     
     // Calculate payment status based on amounts
-    let calculatedPaymentStatus = 'due';
     const paymentAmount = Number(formValue.paymentAmount) || 0;
+    let calculatedPaymentStatus = 'due';
     
     if (paymentAmount >= grandTotal) {
       calculatedPaymentStatus = 'paid';
@@ -1182,30 +1240,33 @@ async savePurchase() {
     
     // Use the selected payment status or calculated one
     const paymentStatus = formValue.paymentStatus || calculatedPaymentStatus;
+    const paymentDue = Math.max(0, grandTotal - paymentAmount);
     
-    // Prepare purchase data with payment account details and payment status
+    // Prepare purchase data with all required fields
     const purchaseData = {
       supplierId: this.selectedSupplier?.id || '',
       supplierName: supplierName,
       referenceNo: formValue.referenceNo,
       purchaseDate: new Date(formValue.purchaseDate),
-      totalTax: totalTax, // Add this line to store the total tax
-      grandTotal: grandTotal,
+      productsSubtotal: parseFloat(productsSubtotal.toFixed(2)),
+      totalTax: parseFloat(totalTax.toFixed(2)),
+      grandTotal: parseFloat(grandTotal.toFixed(2)),
       cgst: this.calculateCGST(totalTax, formValue.isInterState),
       sgst: this.calculateSGST(totalTax, formValue.isInterState),
       igst: this.calculateIGST(totalTax, formValue.isInterState),
       taxRate: this.getHighestTaxRate(),
       purchaseStatus: formValue.purchaseStatus,
-      paymentStatus: paymentStatus, // Added payment status
+      paymentStatus: paymentStatus,
       businessLocation: formValue.businessLocation,
       address: formValue.address || '',
       products: products,
       shippingCharges: shippingCharges,
-      purchaseTotal: totalAmount,
+      purchaseTotal: parseFloat(grandTotal.toFixed(2)), // Keep both for compatibility
       paymentAmount: paymentAmount,
-      paidOn: new Date(formValue.paidOn),
+      paymentDue: parseFloat(paymentDue.toFixed(2)),
+      paidOn: formValue.paidOn ? new Date(formValue.paidOn) : null,
       paymentMethod: formValue.paymentMethod,
-      paymentAccount: paymentAccount, // Enhanced with full account details
+      paymentAccount: paymentAccount,
       paymentNote: formValue.paymentNote || '',
       additionalNotes: formValue.additionalNotes || '',
       invoiceNo: formValue.invoiceNo || '',

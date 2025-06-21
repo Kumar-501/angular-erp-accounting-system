@@ -173,8 +173,8 @@
         <th>Reference No</th>
         <th>Supplier</th>
         <th>Description</th>
-        <th>Debit (₹)</th>
         <th>Credit (₹)</th>
+        <th>Debit</th>
         <th>Balance (₹)</th>
         <th>Status</th>
       </tr>
@@ -187,8 +187,8 @@
         <td>{{ entry.referenceNo }}</td>
         <td>{{ entry.supplier }}</td>
         <td>{{ entry.description }}</td>
-        <td class="text-danger">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
-        <td class="text-success">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+        <td class="text-success">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+        <td class="text-danger">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
         <td [ngClass]="{'text-danger': entry.balance < 0, 'text-success': entry.balance >= 0}">
           {{ entry.balance | currency:'INR':'symbol':'1.2-2' }}
         </td>

@@ -74,9 +74,15 @@
                 <button class="btn-edit" (click)="openPopup(unit)">
                   <i class="fas fa-edit"></i> Edit
                 </button>
-                <button class="btn-delete" (click)="deleteUnit(unit.id!)">
-                  <i class="fas fa-trash"></i> Delete
-                </button>
+            <button 
+  class="btn-delete" 
+  (click)="deleteUnit(unit.id!)"
+  [disabled]="isDeleting"
+>
+  <i class="fas fa-trash"></i> 
+  <span *ngIf="!isDeleting">Delete</span>
+  <span *ngIf="isDeleting">Deleting...</span>
+</button>
               </td>
             </tr>
             <tr *ngIf="filteredUnits.length === 0">
@@ -156,8 +162,14 @@
         </div>
         
         <div class="form-actions">
-          <button type="submit" class="btn-save">Save</button>
-          <button type="button" class="btn-cancel" (click)="closePopup()">Close</button>
+<button 
+  type="submit" 
+  class="btn-save" 
+  [disabled]="isSaving || unitForm.invalid"
+>
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>          <button type="button" class="btn-cancel" (click)="closePopup()">Close</button>
         </div>
       </form>
     </div>

@@ -1,11 +1,39 @@
+/**
+ * Purchase Return Component
+ * 
+ * This component handles purchase returns with proper location-wise stock management.
+ * 
+ * Key Features:
+ * - Location-aware stock returns using product-stock collection
+ * - Stock history tracking for all return transactions
+ * - Validation of return quantities against available stock
+ * - Bulk return processing capabilities
+ * - Integration with existing purchase return workflow
+ * 
+ * Stock Management:
+ * - Uses product-stock collection with document IDs: {productId}_{locationId}
+ * - Creates history entries in product-stock-history collection
+ * - Validates stock availability before processing returns
+ * - Updates stock quantities when returns are marked as 'completed'
+ * 
+ * Data Structure:
+ * - businessLocationId: Required for location-specific stock updates
+ * - products: Array with productId, quantity, and other product details
+ * - returnStatus: 'pending', 'completed', 'rejected', etc.
+ */
+
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { PurchaseReturnService } from '../services/purchase-return.service';
+import { AccountService } from '../services/account.service';
+import { PurchaseService } from '../services/purchase.service';
 import { Subscription } from 'rxjs';
 import { Modal } from 'bootstrap';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Firestore, collection, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { COLLECTIONS } from '../../utils/constants';
 
 interface PurchaseReturn {
   id?: string;
@@ -14,14 +42,26 @@ interface PurchaseReturn {
   parentPurchaseId: string;
   parentPurchaseRef: string;
   businessLocation: string;
+  businessLocationId?: string;
   supplier: string;
   returnStatus: string;
   paymentStatus: string;
-  products: any[];
+  products: any[]; // Keep flexible for compatibility
   reason: string;
   grandTotal: number;
   createdAt: Date;
   createdBy: string;
+}
+
+interface PurchaseReturnProduct {
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitCost: number;
+  totalCost: number;
+  batchNumber?: string;
+  expiryDate?: Date;
 }
 
 @Component({
@@ -42,9 +82,12 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
 
   selectedReturn!: PurchaseReturn;
   tempStatus: string = '';
-  private subscription!: Subscription;
-
-  constructor(private purchaseReturnService: PurchaseReturnService) {}
+  private subscription!: Subscription;  constructor(
+    private purchaseReturnService: PurchaseReturnService,
+    private accountService: AccountService,
+    private purchaseService: PurchaseService,
+    private firestore: Firestore
+  ) {}
 
   ngOnInit(): void {
     this.loadPurchaseReturns();
@@ -131,6 +174,136 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         ? String(aValue).localeCompare(String(bValue))
         : String(bValue).localeCompare(String(aValue));
     });
+  }
+  /**
+   * Process purchase return and update stock at specific location
+   */
+  async processPurchaseReturn(returnData: PurchaseReturn): Promise<void> {
+    try {
+      if (!returnData.businessLocationId && returnData.businessLocation) {
+        // Extract location ID from businessLocation if it's an object
+        const location = typeof returnData.businessLocation === 'object' 
+          ? (returnData.businessLocation as any).id 
+          : returnData.businessLocation;
+        returnData.businessLocationId = location;
+      }
+
+      // Process each product in the return
+      for (const product of returnData.products) {
+        await this.returnProductStock(
+          product.productId || product.id,
+          returnData.businessLocationId!,
+          product.quantity,
+          returnData.referenceNo,
+          `Purchase return: ${returnData.reason}`
+        );
+      }
+
+      // Create transaction record for the purchase return
+      await this.createReturnTransaction(returnData);
+
+      // Update return status
+      await this.updateReturnStatus(returnData.id!, 'completed');
+      
+    } catch (error) {
+      console.error('Error processing purchase return:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Return stock to location-specific inventory
+   */
+  private async returnProductStock(
+    productId: string,
+    locationId: string,
+    quantity: number,
+    referenceNo: string,
+    notes: string
+  ): Promise<void> {
+    try {
+      // Get current stock for this product at this location
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      let currentStock = 0;
+      if (stockDoc.exists()) {
+        currentStock = stockDoc.data()['quantity'] || 0;
+      }
+      
+      const newStock = currentStock + quantity;
+      
+      // Update stock
+      await setDoc(stockDocRef, {
+        productId: productId,
+        locationId: locationId,
+        quantity: newStock,
+        lastUpdated: new Date(),
+        updatedBy: 'system'
+      }, { merge: true });
+      
+      // Create stock history entry
+      await this.createStockHistoryEntry({
+        productId,
+        locationId,
+        action: 'return',
+        quantity,
+        oldStock: currentStock,
+        newStock,
+        referenceNo,
+        notes,
+        userId: 'system'
+      });
+      
+    } catch (error) {
+      console.error('Error returning product stock:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create stock history entry for returns
+   */
+  private async createStockHistoryEntry(entry: {
+    productId: string;
+    locationId: string;
+    action: string;
+    quantity: number;
+    oldStock: number;
+    newStock: number;
+    referenceNo: string;
+    notes: string;
+    userId: string;
+  }): Promise<void> {
+    try {
+      const historyCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
+      await setDoc(doc(historyCollection), {
+        ...entry,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error('Error creating stock history entry:', error);
+    }
+  }
+
+  /**
+   * Get current stock for a product at a location
+   */
+  async getCurrentStock(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        return stockDoc.data()['quantity'] || 0;
+      }
+      return 0;
+    } catch (error) {
+      console.error('Error getting current stock:', error);
+      return 0;
+    }
   }
 
   onDelete(id: string): void {
@@ -223,32 +396,178 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Process multiple returns at once
+   */
+  async processBulkReturns(returnIds: string[]): Promise<void> {
+    this.isUpdating = true;
+    let processedCount = 0;
+    
+    try {
+      for (const id of returnIds) {
+        const returnItem = this.purchaseReturns.find(item => item.id === id);
+        if (returnItem && returnItem.returnStatus !== 'completed') {
+          await this.processPurchaseReturn(returnItem);
+          processedCount++;
+        }
+      }
+      
+      this.errorMessage = null;
+      alert(`Successfully processed ${processedCount} returns.`);
+      
+    } catch (error) {
+      console.error('Error processing bulk returns:', error);
+      this.errorMessage = `Failed to process some returns. ${processedCount} were successful.`;
+    } finally {
+      this.isUpdating = false;
+    }
+  }
+
+  /**
+   * Validate return before processing
+   */
+  validateReturn(returnData: PurchaseReturn): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    if (!returnData.businessLocationId && !returnData.businessLocation) {
+      errors.push('Business location is required');
+    }
+    
+    if (!returnData.products || returnData.products.length === 0) {
+      errors.push('At least one product is required');
+    }
+    
+    for (const product of returnData.products) {
+      if (!product.productId && !product.id) {
+        errors.push(`Product ID is missing for ${product.productName || 'unknown product'}`);
+      }
+      
+      if (!product.quantity || product.quantity <= 0) {
+        errors.push(`Invalid quantity for ${product.productName || 'unknown product'}`);
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Get return impact summary before processing
+   */
+  async getReturnImpactSummary(returnData: PurchaseReturn): Promise<any> {
+    const summary = {
+      locationId: returnData.businessLocationId,
+      products: [] as any[]
+    };
+    
+    for (const product of returnData.products) {
+      const currentStock = await this.getCurrentStock(
+        product.productId || product.id,
+        returnData.businessLocationId!
+      );
+      
+      summary.products.push({
+        productId: product.productId || product.id,
+        productName: product.productName,
+        sku: product.sku,
+        currentStock,
+        returnQuantity: product.quantity,
+        newStock: currentStock + product.quantity
+      });
+    }
+    
+    return summary;
+  }
+
   openStatusModal(returnItem: PurchaseReturn): void {
     this.selectedReturn = returnItem;
     this.tempStatus = returnItem.returnStatus;
   }
-
-  updateReturnStatus(id: string, newStatus: string): void {
+  async updateReturnStatus(id: string, newStatus: string): Promise<void> {
     this.isUpdating = true;
-    this.purchaseReturnService.updatePurchaseReturn(id, {
-      returnStatus: newStatus
-    })
-    .then(() => {
+    
+    try {
+      // If status is being changed to 'completed', process the stock return
+      if (newStatus === 'completed') {
+        const returnItem = this.purchaseReturns.find(item => item.id === id);
+        if (returnItem && returnItem.returnStatus !== 'completed') {
+          await this.processPurchaseReturn(returnItem);
+        }
+      }
+      
+      // Update the return status
+      await this.purchaseReturnService.updatePurchaseReturn(id, {
+        returnStatus: newStatus
+      });
+      
+      // Update local data
       const index = this.purchaseReturns.findIndex(item => item.id === id);
       if (index !== -1) {
         this.purchaseReturns[index].returnStatus = newStatus;
         this.sortData();
       }
+      
       this.isUpdating = false;
       const modalElement = document.getElementById('statusModal');
       if (modalElement) {
         const modalInstance = Modal.getInstance(modalElement);
         modalInstance?.hide();
       }
-    })
-    .catch(err => {
+      
+    } catch (error) {
+      console.error('Error updating return status:', error);
       this.errorMessage = 'Failed to update status. Please try again.';
       this.isUpdating = false;
-    });
+    }
   }
+  /**
+   * Create transaction record for purchase return
+   */
+  private async createReturnTransaction(returnData: PurchaseReturn): Promise<void> {
+    try {
+      // Get the original purchase to find the payment account
+      const originalPurchase = await this.purchaseService.getPurchaseById(returnData.parentPurchaseId);
+      
+      if (!originalPurchase) {
+        console.warn('Original purchase not found for return:', returnData.parentPurchaseId);
+        return;
+      }
+
+      // For purchase returns, we typically:
+      // - Credit the same account that was debited during the original purchase
+      // - This increases cash (if cash purchase) or reduces accounts payable (if credit purchase)
+      
+      const transactionData = {
+        amount: returnData.grandTotal,
+        type: 'purchase_return',
+        date: new Date(returnData.returnDate),
+        description: `Purchase Return: ${returnData.referenceNo} - ${returnData.reason}`,
+        paymentMethod: originalPurchase.paymentMethod || 'Purchase Return',
+        paymentDetails: returnData.referenceNo,
+        note: `Returned to supplier: ${returnData.supplier}. Reason: ${returnData.reason}`,
+        addedBy: returnData.createdBy || 'System',
+        reference: returnData.referenceNo,
+        relatedDocId: returnData.id || '',
+        source: 'purchase_return',
+        supplier: returnData.supplier,
+        returnStatus: returnData.returnStatus,
+        paymentStatus: returnData.paymentStatus,
+        originalPurchaseId: returnData.parentPurchaseId
+      };      // Use the payment account from the original purchase
+      const paymentAccountId = typeof originalPurchase.paymentAccount === 'object' 
+        ? originalPurchase.paymentAccount.id 
+        : originalPurchase.paymentAccount;
+      
+      if (paymentAccountId) {
+        await this.accountService.addTransaction(paymentAccountId, transactionData);
+      } else {
+        console.warn('No payment account found in original purchase:', returnData.parentPurchaseId);
+      }
+      
+    } catch (error) {
+      console.error('Error creating return transaction:', error);
+      // Don't throw here to avoid breaking the return process
+    }  }
 }

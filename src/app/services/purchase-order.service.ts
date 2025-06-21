@@ -6,6 +6,7 @@ interface PurchaseOrderReference {
   referenceNo: string;
   date?: string;
   status?: string;
+  
 }
 
 export interface PurchaseOrder {
@@ -47,30 +48,52 @@ export interface PurchaseOrder {
 })
 export class PurchaseOrderService {
   private ordersCollection;
-
+private calculatePaymentStatus(paymentAmount: number, orderTotal: number): string {
+  if (!paymentAmount) return 'unpaid';
+  if (paymentAmount >= orderTotal) return 'paid';
+  if (paymentAmount > 0) return 'partial';
+  return 'unpaid';
+}
   constructor(private firestore: Firestore) {
     this.ordersCollection = collection(this.firestore, 'purchase-orders');
   }
   
 
   // Add a new purchase order
-  async addOrder(orderData: PurchaseOrder): Promise<any> {
-    // Add timestamps
-    orderData.createdAt = new Date();
-    
-    // Ensure products array exists
-    if (!orderData.products && orderData.items) {
-      orderData.products = this.mapItemsToProducts(orderData.items);
+async addOrder(purchaseData: any): Promise<any> {
+  try {
+    // Calculate totals if not provided
+    if (!purchaseData.orderTotal) {
+      purchaseData.orderTotal = purchaseData.items.reduce((total: number, item: any) => {
+        return total + (item.quantity * item.unitCost);
+      }, 0);
     }
 
-    try {
-      const docRef = await addDoc(this.ordersCollection, orderData);
-      return { id: docRef.id, ...orderData };
-    } catch (error) {
-      console.error('Error adding order:', error);
-      throw error;
+    // Add shipping charges if they exist
+    if (purchaseData.shippingCharges) {
+      purchaseData.orderTotal += purchaseData.shippingCharges;
     }
+
+    // Set default values
+    const purchaseToAdd = {
+      ...purchaseData,
+      orderTotal: purchaseData.orderTotal,
+      paymentDue: purchaseData.orderTotal - (purchaseData.paymentAmount || 0),
+      paymentStatus: this.calculatePaymentStatus(purchaseData.paymentAmount, purchaseData.orderTotal),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: purchaseData.status || 'pending'
+    };
+
+    // Add to Firestore
+    const docRef = await addDoc(this.ordersCollection, purchaseToAdd);
+    
+    return { id: docRef.id, ...purchaseToAdd };
+  } catch (error) {
+    console.error('Error creating purchase:', error);
+    throw error;
   }
+}
 
   async updateOrderShippingDetails(id: string, shippingDetails: any): Promise<void> {
     try {

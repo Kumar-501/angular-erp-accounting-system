@@ -8,10 +8,16 @@ import { LocationService } from '../services/location.service';
 import { ProductsService } from '../services/products.service';
 import { UserService } from '../services/user.service';
 import { SupplierService } from '../services/supplier.service';
-// Add this import
 import { AuthService } from '../auth.service';
+import { Firestore, collection, doc, getDoc } from '@angular/fire/firestore';
 
 import { Subscription } from 'rxjs';
+
+// Constants for Firestore collections
+const COLLECTIONS = {
+  PRODUCT_STOCK: 'product-stock'
+};
+
 interface RequisitionItem {
   productId: string;
   productName: string;
@@ -20,6 +26,18 @@ interface RequisitionItem {
   currentStock?: number;
   unitPurchasePrice: number;       
   purchasePriceIncTax: number;    
+}
+interface Supplier {
+  // ... other fields ...
+  address: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  zipCode?: string;
+  // ... other fields ...
 }
 @Component({
   selector: 'app-add-purchase-requisition',
@@ -37,7 +55,9 @@ export class AddPurchaseRequisitionComponent implements OnInit, OnDestroy {
   users: any[] = [];
   searchTerm: string = '';
 searchResults: any[] = [];
-showSearchResults: boolean = false;
+  showSearchResults: boolean = false;
+  // In your component class
+isSaving: boolean = false;
   suppliers: any[] = [];
   filteredProducts: any[] = [];
   private locationsSubscription: Subscription | undefined;
@@ -46,8 +66,7 @@ showSearchResults: boolean = false;
   private searchTimeout: any;
 
 selectedItems = new Set<number>();
-allSelected = false;
-  constructor(
+allSelected = false;  constructor(
     private fb: FormBuilder,
     private requisitionService: PurchaseRequisitionService,
     private brandsService: BrandsService,
@@ -57,8 +76,8 @@ allSelected = false;
     private userService: UserService,
     private supplierService: SupplierService,
     public router: Router,
-        private authService: AuthService
-
+    private authService: AuthService,
+    private firestore: Firestore
   ) {}
 
   ngOnInit(): void {
@@ -88,6 +107,11 @@ searchProducts(event: any) {
   }
   
   this.searchResults = this.productsList.filter(product => {
+    // Skip products marked as not for selling
+    if (product.notForSelling) {
+      return false;
+    }
+    
     const searchString = [
       product.productName,
       product.sku,
@@ -201,7 +225,31 @@ handleKeyDown(event: KeyboardEvent) {
     this.purchaseForm.get('addedBy')?.setValue(userName);
   }
 }
-addProductFromSearch(product: any) {
+  private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        const data = stockDoc.data();
+        return data?.['quantity'] || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting stock at location:', error);
+      return 0;
+    }
+  }
+
+async addProductFromSearch(product: any) {
+  // Double-check that the product is not marked as "not for selling"
+  if (product.notForSelling) {
+    alert('This product is marked as "Not for Selling" and cannot be added to purchase requisitions.');
+    return;
+  }
+
   const existingIndex = this.products.controls.findIndex(
     control => control.get('productId')?.value === product.id
   );
@@ -212,6 +260,11 @@ addProductFromSearch(product: any) {
     this.products.at(existingIndex).get('requiredQuantity')?.setValue(currentQty + 1);
     this.calculateSubtotal(existingIndex);
   } else {
+    // Get current stock at the selected location
+    const selectedLocationId = this.purchaseForm.get('location')?.value;
+    const currentStock = selectedLocationId ? 
+      await this.getCurrentStockAtLocation(product.id, selectedLocationId) : 0;
+
     // Calculate purchase price including tax
     const unitPurchasePrice = product.unitPurchasePrice || 
                             product.defaultPurchasePrice || 
@@ -225,7 +278,7 @@ addProductFromSearch(product: any) {
       productId: [product.id, Validators.required],
       productName: [product.productName, Validators.required],
       alertQuantity: [product.alertQuantity || 0, [Validators.required, Validators.min(0)]],
-      currentStock: [product.currentStock || 0, [Validators.required, Validators.min(0)]],
+      currentStock: [currentStock, [Validators.required, Validators.min(0)]],
       unitPurchasePrice: [unitPurchasePrice, [Validators.required, Validators.min(0)]],
       purchasePriceIncTax: [purchasePriceIncTax, [Validators.required, Validators.min(0)]],
       requiredQuantity: [1, [Validators.required, Validators.min(1)]],
@@ -266,6 +319,8 @@ initializeForm(): void {
     brand: ['', Validators.required],
     category: ['', Validators.required],
     location: ['', Validators.required],
+        supplierAddress: [''], // Add this line
+
     locationName: [''],
     referenceNo: ['', Validators.required],
     requiredByDate: [''], // Removed Validators.required
@@ -332,8 +387,35 @@ initializeForm(): void {
     } catch (error) {
       console.error('Error loading data:', error);
     }
+     this.purchaseForm.get('supplier')?.valueChanges.subscribe(supplierId => {
+    this.onSupplierChange(supplierId);
+  });
+
+  }
+// Add this method to handle supplier changes
+onSupplierChange(supplierId: string): void {
+  if (!supplierId) {
+    this.purchaseForm.get('supplierAddress')?.setValue('');
+    return;
   }
 
+  this.supplierService.getSupplierById(supplierId).subscribe(supplier => {
+    if (supplier) {
+      const addressParts = [
+        supplier.address,
+        supplier.addressLine1,
+        supplier.addressLine2,
+        supplier.city,
+        supplier.state,
+        supplier.postalCode || supplier.zipCode,
+        supplier.country
+      ].filter(part => !!part); // Remove empty parts
+
+      const fullAddress = addressParts.join(', ');
+      this.purchaseForm.get('supplierAddress')?.setValue(fullAddress);
+    }
+  });
+}
 async generateReferenceNumber(): Promise<void> {
   // Only generate if we haven't already
   if (this.referenceNumberGenerated) return;
@@ -420,45 +502,68 @@ calculateTotal(): number {
   removeProduct(index: number): void {
     this.products.removeAt(index);
   }
-onProductSelect(index: number): void {
+async onProductSelect(index: number): Promise<void> {
   const selectedProductId = this.products.at(index).get('productId')?.value;
-  const selectedProduct = this.productsList.find(p => p.id === selectedProductId);
+  const selectedProduct = this.productsList.find(p => p.id === selectedProductId && !p.notForSelling);
   
-  if (selectedProduct) {
-    // Get unit purchase price - prioritize unitPurchasePrice, then defaultPurchasePrice
-    const unitPurchasePrice = selectedProduct.unitPurchasePrice || 
-                            selectedProduct.defaultPurchasePrice || 
-                            0;
-    
-    // Calculate purchase price including tax
-    const taxPercentage = selectedProduct.taxPercentage || 0;
-    const purchasePriceIncTax = selectedProduct.defaultPurchasePriceIncTax || 
-                              (unitPurchasePrice * (1 + (taxPercentage / 100)));
-    
-    this.products.at(index).patchValue({
-      productName: selectedProduct.productName,
-      alertQuantity: selectedProduct.alertQuantity || 0,
-      currentStock: selectedProduct.currentStock || 0,
-      unitPurchasePrice: unitPurchasePrice,
-      purchasePriceIncTax: purchasePriceIncTax,
-      requiredQuantity: 1 // Default to 1 when selecting a product
-    });
-    
-    // Calculate initial subtotal
-    this.calculateSubtotal(index);
+  if (!selectedProduct) {
+    if (this.productsList.find(p => p.id === selectedProductId)?.notForSelling) {
+      alert('This product is marked as "Not for Selling" and cannot be added to purchase requisitions.');
+      this.products.at(index).get('productId')?.setValue('');
+      return;
+    }
+    return;
   }
+  
+  // Get current stock at the selected location
+  const selectedLocationId = this.purchaseForm.get('location')?.value;
+  const currentStock = selectedLocationId ? 
+    await this.getCurrentStockAtLocation(selectedProduct.id, selectedLocationId) : 0;
+  
+  // Rest of your existing code...
+  const unitPurchasePrice = selectedProduct.unitPurchasePrice || 
+                          selectedProduct.defaultPurchasePrice || 
+                          0;
+  
+  // Calculate purchase price including tax
+  const taxPercentage = selectedProduct.taxPercentage || 0;
+  const purchasePriceIncTax = selectedProduct.defaultPurchasePriceIncTax || 
+                            (unitPurchasePrice * (1 + (taxPercentage / 100)));
+  
+  this.products.at(index).patchValue({
+    productName: selectedProduct.productName,
+    alertQuantity: selectedProduct.alertQuantity || 0,
+    currentStock: currentStock,
+    unitPurchasePrice: unitPurchasePrice,
+    purchasePriceIncTax: purchasePriceIncTax,
+    requiredQuantity: 1 // Default to 1 when selecting a product
+  });
+  
+  // Calculate initial subtotal
+  this.calculateSubtotal(index);
 }
 
   
 
 async savePurchase(): Promise<void> {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
   if (this.purchaseForm.invalid) {
     alert('Please fill all required fields!');
     return;
   }
 
+  if (this.products.length === 0) {
+    alert('Please add at least one product!');
+    return;
+  }
+
+  this.isSaving = true;
+
   try {
     const formData = this.purchaseForm.getRawValue();
+        formData.supplierAddress = this.purchaseForm.get('supplierAddress')?.value; // Add this line
+
     
     formData.items = formData.products.map((product: any, index: number) => {
       const refParts = formData.referenceNo.split(' ');
@@ -473,12 +578,12 @@ async savePurchase(): Promise<void> {
         currentStock: product.currentStock,
         unitPurchasePrice: product.unitPurchasePrice,
         purchasePriceIncTax: product.purchasePriceIncTax,
-        subtotal: product.subtotal, // Add this line
+        subtotal: product.subtotal,
         itemReference: `${prNumber} ${itemNumber}`
       };
     });
     
-    formData.total = this.calculateTotal(); // Add total to the form data
+    formData.total = this.calculateTotal();
     delete formData.products;
 
     await this.requisitionService.addRequisition(formData);
@@ -487,6 +592,8 @@ async savePurchase(): Promise<void> {
   } catch (error) {
     console.error('Error adding requisition:', error);
     alert('Failed to add purchase requisition. Please try again.');
+  } finally {
+    this.isSaving = false;
   }
 }
 }

@@ -163,12 +163,13 @@
                           <input type="date" formControlName="invoicedDate" class="form-control" />
                       </div>
                     </div>
-                    <div class="col-md-6">
-                      <div class="form-group">
-                          <label>Received Date:</label>
-                          <input type="date" formControlName="receivedDate" class="form-control" />
-                      </div>
-                    </div>
+        <div class="col-md-6">
+    <div class="form-group">
+        <label>Received Date:</label>
+        <input type="date" formControlName="receivedDate" class="form-control" 
+               [value]="purchaseOrderData?.requiredByDate || requisitionData?.requiredDate || ''" />
+    </div>
+</div>
                     <!-- End new fields -->
                     <div class="col-md-6" formGroupName="addedBy">
                         <!-- <div class="form-group">
@@ -190,201 +191,195 @@
                 </div>
             </div>
         </div>
-  
-    <!-- Card 2: Product Table -->
-<!-- Card 2: Product Table -->
-<!-- Card 2: Product Table -->
-<div class="card mb-3">
-<div class="row mb-3">
-  <div class="col-md-12">
-    <div class="position-relative">
-      <input type="text" 
-             class="form-control form-control-lg" 
-             placeholder="Enter Product name / SKU / Scan bar code"
-             (keyup)="onSearchInput($event)"
-             (keydown)="handleKeyDown($event)"
-             (focus)="onSearchFocus()"
-             (blur)="onSearchBlur()"
-             [(ngModel)]="searchTerm"
-             [ngModelOptions]="{standalone: true}"
-      />
-    <div *ngIf="showSearchResults" 
-     class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm mt-1" 
-     style="z-index: 1050; max-height: 300px; overflow-y: auto;">
-  <div class="list-group">
-    <button type="button" 
-            class="list-group-item list-group-item-action text-start py-2"
-            *ngFor="let product of searchResults"
-            (mousedown)="addProductFromSearch(product); $event.preventDefault()"
-            (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
-            tabindex="0">
-      <div class="d-flex justify-content-between align-items-center">
-        <div class="text-truncate pe-2">
-          <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
-          <small *ngIf="product.sku" class="text-muted ms-2">
-            SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
-          </small>
-        </div>
-        <div class="text-nowrap">
-          <!-- Show currentStock or totalQuantity if available -->
-          <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
-          <span class="badge bg-success">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2'}}</span>
-        </div>
-      </div>
-      <small *ngIf="product.barcode" class="text-muted d-block text-truncate">
-        Barcode: {{ product.barcode }}
-      </small>
-    </button>
-    <div *ngIf="searchResults.length === 0" class="list-group-item text-muted py-2">
-      No products found matching "{{ searchTerm }}"
-    </div>
-  </div>
-</div>
-    </div>
-  </div>
+
+
+<div class="purchase-section">
+            <h3 class="section-title">Product Information</h3>
+            <div class="section-content">
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="position-relative">
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   placeholder="Enter Product name / SKU / Scan bar code"
+                                   (keyup)="onSearchInput($event)"
+                                   (keydown)="handleKeyDown($event)"
+                                   (focus)="onSearchFocus()"
+                                   (blur)="onSearchBlur()"
+                                   [(ngModel)]="searchTerm"
+                                   [ngModelOptions]="{standalone: true}"/>
+                            
+                            <div *ngIf="showSearchResults" 
+                                 class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm mt-1" 
+                                 style="z-index: 1050; max-height: 300px; overflow-y: auto;">
+                                <div class="list-group">
+                                    <button type="button" 
+                                            class="list-group-item list-group-item-action text-start py-2"
+                                            *ngFor="let product of searchResults"
+                                            (mousedown)="addProductFromSearch(product); $event.preventDefault()"
+                                            (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
+                                            tabindex="0">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="text-truncate pe-2">
+                                                <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
+                                                <small *ngIf="product.sku" class="text-muted ms-2">
+                                                    SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
+                                                </small>
+                                            </div>
+                                            <div class="text-nowrap">
+                                                <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
+                                            </div>
+                                        </div>
+                                        <small *ngIf="product.barcode" class="text-muted d-block text-truncate">
+                                            Barcode: {{ product.barcode }}
+                                        </small>
+                                    </button>
+                                    <div *ngIf="searchResults.length === 0" class="list-group-item text-muted py-2">
+                                        No products found matching "{{ searchTerm }}"
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+           <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+    <table class="table table-hover mb-0" style="min-width: 1200px;">
+        <thead class="table-success">
+            <tr>
+                <th class="align-middle">
+                    <input type="checkbox" class="form-check-input" (change)="toggleSelectAll($event)" />
+                </th>
+                <th class="text-center">S.NO</th>
+                <th>Product Name</th>
+                <th class="text-center">Qty</th>
+                <th class="text-end">Unit Price</th>
+                <th class="text-center">Discount %</th>
+                <th class="text-end">Unit Cost</th>
+                <th class="text-center">Tax Rate</th>
+                <th class="text-end">Tax Amt</th>
+                <th class="text-end">Net Cost</th>
+                <th>Batch No</th>
+                <th>Expiry</th>
+                <th class="text-end">Subtotal</th>
+                <th class="text-end">Total</th>
+                <th class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteSelectedProducts()" title="Delete Selected">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </th>
+            </tr>
+        </thead>
+        <tbody formArrayName="products">
+            <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i" class="align-middle">
+                <td>
+                    <input type="checkbox" class="form-check-input" [checked]="isProductSelected(i)" (change)="toggleProductSelection(i)" />
+                </td>
+                <td class="text-center">{{ i + 1 }}</td>
+                <td>
+                    <select formControlName="productId" class="form-control form-control-sm" (change)="onProductSelect(i)" required>
+                        <option value="">Select Product</option>
+                        <option *ngFor="let product of productsList" [value]="product.id">
+                            {{ product.productName }} 
+                            <span *ngIf="product.currentStock !== undefined">
+                                (Stock: {{ product.currentStock }})
+                            </span>
+                        </option>
+                    </select>
+                </td>
+                <td>
+                    <input type="number" formControlName="quantity" class="form-control form-control-sm text-center" 
+                           min="1" step="1" (input)="calculateLineTotal(i)" required>
+                </td>
+                <td>
+                    <input type="number" formControlName="unitCost" class="form-control form-control-sm text-end" 
+                           min="0" step="0.01" (input)="calculateLineTotal(i)" required>
+                </td>
+                <td>
+                    <input type="number" formControlName="discountPercent" class="form-control form-control-sm text-center" 
+                           min="0" max="100" step="1" (input)="calculateLineTotal(i)">
+                </td>
+                <td>
+                    <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" readonly>
+                </td>
+                <td>
+                    <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
+                        <option value="0">No Tax</option>
+                        <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === item.get('taxRate')?.value">
+                            {{ tax.name }} ({{ tax.rate }}%)
+                        </option>
+                    </select>
+                </td>
+                <td>
+                    <input type="number" formControlName="taxAmount" class="form-control form-control-sm text-end" readonly>
+                </td>
+                <td class="text-end">
+                    <div>₹{{ productsFormArray.at(i).get('netCost')?.value | number:'1.2-2' }}</div>
+                    <small class="text-muted">
+                        ({{ productsFormArray.at(i).get('quantity')?.value }} × 
+                        {{ productsFormArray.at(i).get('unitCost')?.value | number:'1.2-2' }})
+                    </small>
+                </td>
+                <td>
+                    <input type="text" formControlName="batchNumber" class="form-control form-control-sm" 
+                           placeholder="Batch no">
+                </td>
+                <td>
+                    <input type="date" formControlName="expiryDate" class="form-control form-control-sm">
+                </td>
+                <td>
+                    <input type="number" formControlName="subtotal" class="form-control form-control-sm text-end" readonly>
+                </td>
+                <td class="text-end">
+                    <div class="fw-bold">₹{{ productsFormArray.at(i).get('lineTotal')?.value | number:'1.2-2' }}</div>
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeProduct(i)" title="Remove">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            <tr *ngIf="productsFormArray.length === 0" class="empty-row">
+                <td colspan="15" class="text-center py-4">
+                    <div class="d-flex flex-column align-items-center">
+                        <i class="fas fa-box-open fa-3x text-muted mb-2"></i>
+                        <p class="mb-0">No products added yet</p>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" (click)="addProduct()">
+                            <i class="fas fa-plus me-1"></i> Add Product
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+        <tfoot class="table-light">
+            <tr>
+                <td colspan="12" class="text-end fw-semibold">Grand Total:</td>
+                <td class="text-end fw-bold">₹{{ netTotalAmount | number:'1.2-2' }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
 </div>
 
-<div class="card mb-4">
-  <div class="card-header bg-light">
-    <h5 class="mb-0">Product Details</h5>
-  </div>
-  <div class="card-body p-0">
-<div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-  <table class="table table-hover mb-0" style="min-width: 1200px;">
-    <thead class="table-success">
-
-      <tr>
-        <th class="align-middle">
-          <input type="checkbox" class="form-check-input" (change)="toggleSelectAll($event)" />
-        </th>
-        <th class="text-center">S.NO</th>
-        <th>Product Name</th>
-        <th class="text-center">Qty</th>
-        <th class="text-end">Unit Price</th>
-        <th class="text-center d-none d-md-table-cell">Discount %</th>
-        <th class="text-end d-none d-lg-table-cell">Unit Cost</th>
-        <th class="text-center d-none d-md-table-cell">Tax Rate</th>
-        <th class="text-end d-none d-lg-table-cell">Tax Amt</th>
-        <th class="text-end">Net Cost</th>
-        <th class="d-none d-sm-table-cell">Batch No</th>
-        <th class="d-none d-sm-table-cell">Expiry</th>
-        <th class="text-end d-none d-md-table-cell">Subtotal</th>
-        <th class="text-end">Total</th>
-        <th class="text-center">
-          <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteSelectedProducts()" title="Delete Selected">
-            <i class="fas fa-trash"></i>
-          </button>
-        </th>
-      </tr>
-    </thead>
-    <tbody formArrayName="products">
-      <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i" class="align-middle">
-        <td>
-          <input type="checkbox" class="form-check-input" [checked]="isProductSelected(i)" (change)="toggleProductSelection(i)" />
-        </td>
-        <td class="text-center">{{ i + 1 }}</td>
-        <td>
-    
-           <select formControlName="productId" class="form-control form-control-sm" (change)="onProductSelect(i)" required>
-    <option value="">Select Product</option>
-    <option *ngFor="let product of productsList" [value]="product.id">
-      {{ product.productName }} 
-      <span *ngIf="product.currentStock !== undefined">
-        (Stock: {{ product.currentStock }})
-      </span>
-    </option>
-  </select>
-        </td>
-        <td>
-          <input type="number" formControlName="quantity" class="form-control form-control-sm text-center" 
-                 min="1" step="1" (input)="calculateLineTotal(i)" required>
-        </td>
-        <td>
-          <input type="number" formControlName="unitCost" class="form-control form-control-sm text-end" 
-                 min="0" step="0.01" (input)="calculateLineTotal(i)" required>
-        </td>
-        <td class="d-none d-md-table-cell">
-          <input type="number" formControlName="discountPercent" class="form-control form-control-sm text-center" 
-                 min="0" max="100" step="1" (input)="calculateLineTotal(i)">
-        </td>
-        <td class="d-none d-lg-table-cell">
-          <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" readonly>
-        </td>
-     <td class="d-none d-md-table-cell">
-  <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
-    <option value="0">No Tax</option>
-    <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === item.get('taxRate')?.value">
-      {{ tax.name }} ({{ tax.rate }}%)
-    </option>
-  </select>
-</td>
-        <td class="d-none d-lg-table-cell">
-          <input type="number" formControlName="taxAmount" class="form-control form-control-sm text-end" readonly>
-        </td>
-        <td class="text-end">
-          <div>₹{{ productsFormArray.at(i).get('netCost')?.value | number:'1.2-2' }}</div>
-          <small class="text-muted d-none d-sm-inline">
-            ({{ productsFormArray.at(i).get('quantity')?.value }} × 
-            {{ productsFormArray.at(i).get('unitCost')?.value | number:'1.2-2' }})
-          </small>
-        </td>
-        <td class="d-none d-sm-table-cell">
-          <input type="text" formControlName="batchNumber" class="form-control form-control-sm" 
-                 placeholder="Batch no">
-        </td>
-        <td class="d-none d-sm-table-cell">
-          <input type="date" formControlName="expiryDate" class="form-control form-control-sm">
-        </td>
-        <td class="d-none d-md-table-cell">
-          <input type="number" formControlName="subtotal" class="form-control form-control-sm text-end" readonly>
-        </td>
-        <td class="text-end">
-          <div class="fw-bold">₹{{ productsFormArray.at(i).get('lineTotal')?.value | number:'1.2-2' }}</div>
-        </td>
-        <td class="text-center">
-          <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeProduct(i)" title="Remove">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-    </tbody>
-    <tfoot class="table-light">
-      <tr>
-        <td colspan="12" class="text-end fw-semibold">Grand Total:</td>
-        <td class="text-end fw-bold">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-    <div class="d-flex justify-content-between align-items-center p-3 border-top">
-    <tr *ngIf="productsFormArray.length === 0" class="empty-row">
-        <td colspan="15" class="text-center py-4">
-          <div class="d-flex flex-column align-items-center">
-            <i class="fas fa-box-open fa-3x text-muted mb-2"></i>
-            <p class="mb-0">No products added yet</p>
-            <button type="button" class="btn btn-sm btn-primary mt-2" (click)="addProduct()">
-              <i class="fas fa-plus me-1"></i> Add Product
-            </button>
-          </div>
-        </td>
-      </tr>
-
-      
-      <div class="d-flex flex-column text-end">
-        <div class="mb-1">
-          <span class="fw-semibold me-2">Total Items:</span>
-          <span class="fw-bold">{{ totalItems }}</span>
+                <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                    <div class="d-flex flex-column text-end">
+                        <div class="mb-1">
+                            <span class="fw-semibold me-2">Total Items:</span>
+                            <span class="fw-bold">{{ totalItems }}</span>
+                        </div>
+                        <div>
+                            <span class="fw-semibold me-2">Net Total Amount:</span>
+                            <span class="fw-bold fs-5">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div>
-          <span class="fw-semibold me-2">Net Total Amount:</span>
-          <span class="fw-bold fs-5">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
+
+
+
+
+
         
         <!-- Card 3: Additional Notes -->
         <div class="card mb-3">

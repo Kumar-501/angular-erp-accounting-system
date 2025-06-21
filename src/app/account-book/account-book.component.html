@@ -17,24 +17,26 @@
     </div>
   </div>
   
-  <div class="filters-section">
-    <div class="date-filter">
+  <div class="filters-section">    <div class="date-filter">
       <label>From:</label>
       <input type="date" [ngModel]="dateRange.from | date:'yyyy-MM-dd'" 
-             (ngModelChange)="dateRange.from = $event; onDateRangeChange()">
+             (ngModelChange)="onDateFromChange($event)">
       
       <label>To:</label>
       <input type="date" [ngModel]="dateRange.to | date:'yyyy-MM-dd'" 
-             (ngModelChange)="dateRange.to = $event; onDateRangeChange()">
+             (ngModelChange)="onDateToChange($event)">
     </div>
-    
-    <div class="transaction-type-filter">
+      <div class="transaction-type-filter">
       <label>Type:</label>
       <select [(ngModel)]="transactionType" (change)="onTransactionTypeChange()">
         <option value="All">All</option>
         <option value="Debit">Debit</option>
         <option value="Credit">Credit</option>
         <option value="Transfer">Transfer</option>
+        <option value="Expense">Expense</option>
+        <option value="Income">Income</option>
+        <option value="Sale">Sale</option>
+        <option value="Purchase Return">Purchase Return</option>
       </select>
     </div>
     
@@ -93,11 +95,10 @@
     <tbody>         
       <tr *ngFor="let transaction of pagedTransactions">           
         <!-- Consistent date formatting with MM/dd/yyyy HH:mm format --> 
-        <td>{{(transaction.date | date:'MM/dd/yyyy') || 'N/A'}}</td>           
-        <td>             
+        <td>{{(transaction.date | date:'MM/dd/yyyy') || 'N/A'}}</td>             <td>             
           <span class="badge" [ngClass]="{               
             'badge-success': transaction.type === 'income' || transaction.type === 'sale',               
-            'badge-danger': transaction.type === 'expense' || transaction.type === 'purchase',               
+            'badge-danger': transaction.type === 'expense',               
             'badge-info': transaction.type === 'transfer' || transaction.type === 'transfer_in' || transaction.type === 'transfer_out',               
             'badge-warning': transaction.type === 'deposit'             
           }">               
@@ -112,17 +113,10 @@
               {{transaction.invoiceNo}}               
             </a>             
           </span>             
-          <span *ngIf="transaction.source === 'purchase'">               
-            <a [routerLink]="['/purchases', transaction.purchaseId]"                   
-               class="purchase-link"                   
-               title="View Purchase Details">                 
-              {{transaction.referenceNo}}               
-            </a>             
-          </span>             
-          <span *ngIf="transaction.source !== 'sale' && transaction.source !== 'purchase'">               
+          <span *ngIf="transaction.source !== 'sale'">               
             {{transaction.description}}             
           </span>           
-        </td>                 
+        </td>
         <td>{{transaction.paymentMethod}}</td>           
         <td>{{transaction.paymentDetails}}</td>           
         <td>{{transaction.note}}</td>           
@@ -176,28 +170,19 @@
         </div>
       </div>
       <div class="card-body">
-        <h4 class="card-title">
-          <span *ngIf="transaction.source === 'sale'">
+        <h4 class="card-title">          <span *ngIf="transaction.source === 'sale'">
             <a [routerLink]="['/sales', transaction.saleId]" 
                class="sale-link" 
                title="View Sale Details">
               {{transaction.invoiceNo}}
             </a>
           </span>
-          <span *ngIf="transaction.source === 'purchase'">
-            <a [routerLink]="['/purchases', transaction.purchaseId]" 
-               class="purchase-link" 
-               title="View Purchase Details">
-              {{transaction.referenceNo}}
-            </a>
-          </span>
-          <span *ngIf="transaction.source !== 'sale' && transaction.source !== 'purchase'">
+          <span *ngIf="transaction.source !== 'sale'">
             {{transaction.description}}
           </span>
         </h4>
         <div class="card-details">
           <p *ngIf="transaction.source === 'sale'"><strong>Customer:</strong> {{transaction.customerName || 'N/A'}}</p>
-          <p *ngIf="transaction.source === 'purchase'"><strong>Supplier:</strong> {{transaction.supplier || 'N/A'}}</p>
           <p><strong>Payment Method:</strong> {{transaction.paymentMethod}}</p>
           <p *ngIf="transaction.paymentDetails"><strong>Payment Details:</strong> {{transaction.paymentDetails}}</p>
           <p *ngIf="transaction.note"><strong>Note:</strong> {{transaction.note}}</p>

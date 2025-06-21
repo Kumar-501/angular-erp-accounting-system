@@ -140,9 +140,10 @@
           
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
-            <button type="submit" class="btn btn-primary" [disabled]="agentForm.invalid">
-              {{ isEditMode ? 'Update' : 'Save' }}
-            </button>
+        <button type="submit" class="btn btn-primary" [disabled]="agentForm.invalid || isSaving">
+  <span *ngIf="!isSaving">{{ isEditMode ? 'Update' : 'Save' }}</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>
           </div>
         </form>
       </div>

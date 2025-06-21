@@ -26,11 +26,15 @@ export class UnitsComponent implements OnInit {
   units: Unit[] = [];
   filteredUnits: Unit[] = [];
   unitForm!: FormGroup;
+  isDeleting: boolean = false;
+
   showPopup = false;
   isEditing = false;
   editId: string | null = null;
   searchTerm = '';
   currentPage = 1;
+  // In your component class
+isSaving: boolean = false;
   pageSize = 3; // Changed to show 3 items per page
   totalPages = 1;
   sortField = 'name';
@@ -173,67 +177,72 @@ export class UnitsComponent implements OnInit {
     });
   }
 
-  saveUnit() {
-    // First, check if required fields are valid
-    const nameControl = this.unitForm.get('name');
-    const shortNameControl = this.unitForm.get('shortName');
-    const allowDecimalControl = this.unitForm.get('allowDecimal');
-    
-    // Mark these controls as touched to show validation errors
-    nameControl?.markAsTouched();
-    shortNameControl?.markAsTouched();
-    allowDecimalControl?.markAsTouched();
-    
-    // Check if basic required fields are valid
-    if (!nameControl?.valid || !shortNameControl?.valid || !allowDecimalControl?.valid) {
-      return; // Don't proceed if required fields are invalid
+saveUnit() {
+  if (this.isSaving) return; // Prevent multiple clicks
+  
+  // First, check if required fields are valid
+  const nameControl = this.unitForm.get('name');
+  const shortNameControl = this.unitForm.get('shortName');
+  const allowDecimalControl = this.unitForm.get('allowDecimal');
+  
+  // Mark these controls as touched to show validation errors
+  nameControl?.markAsTouched();
+  shortNameControl?.markAsTouched();
+  allowDecimalControl?.markAsTouched();
+  
+  // Check if basic required fields are valid
+  if (!nameControl?.valid || !shortNameControl?.valid || !allowDecimalControl?.valid) {
+    return; // Don't proceed if required fields are invalid
+  }
+  
+  this.isSaving = true;
+  
+  // Create unit data from valid fields
+  const unitData: Unit = {
+    name: this.unitForm.value.name,
+    shortName: this.unitForm.value.shortName,
+    allowDecimal: !!this.unitForm.value.allowDecimal,
+    isMultiple: !!this.unitForm.value.isMultiple
+  };
+  
+  // Only add baseUnit and multiplier if isMultiple is true and they are provided
+  if (unitData.isMultiple) {
+    if (this.unitForm.value.baseUnit) {
+      unitData.baseUnit = this.unitForm.value.baseUnit;
     }
     
-    // Create unit data from valid fields
-    const unitData: Unit = {
-      name: this.unitForm.value.name,
-      shortName: this.unitForm.value.shortName,
-      allowDecimal: !!this.unitForm.value.allowDecimal,
-      isMultiple: !!this.unitForm.value.isMultiple
-    };
-    
-    // Only add baseUnit and multiplier if isMultiple is true and they are provided
-    if (unitData.isMultiple) {
-      if (this.unitForm.value.baseUnit) {
-        unitData.baseUnit = this.unitForm.value.baseUnit;
-      }
-      
-      if (this.unitForm.value.multiplier !== undefined && this.unitForm.value.multiplier !== null) {
-        unitData.multiplier = this.unitForm.value.multiplier;
-      }
-    }
-    
-    if (this.isEditing && this.editId) {
-      this.unitsService.updateUnit(this.editId, unitData).then(() => {
-        this.loadUnits();
-        this.closePopup();
-      }).catch(err => {
-        console.error('Error updating unit:', err);
-      });
-    } else {
-      this.unitsService.addUnit(unitData).then(() => {
-        this.loadUnits();
-        this.closePopup();
-      }).catch(err => {
-        console.error('Error adding unit:', err);
-      });
+    if (this.unitForm.value.multiplier !== undefined && this.unitForm.value.multiplier !== null) {
+      unitData.multiplier = this.unitForm.value.multiplier;
     }
   }
+  
+  const saveOperation = this.isEditing && this.editId 
+    ? this.unitsService.updateUnit(this.editId, unitData)
+    : this.unitsService.addUnit(unitData);
+  
+  saveOperation.then(() => {
+    this.loadUnits();
+    this.closePopup();
+  }).catch(err => {
+    console.error('Error saving unit:', err);
+  }).finally(() => {
+    this.isSaving = false;
+  });
+}
+deleteUnit(id: string) {
+  if (this.isDeleting) return;
+  
+  if (!confirm('Are you sure you want to delete this unit?')) return;
 
-  deleteUnit(id: string) {
-    if (confirm('Are you sure you want to delete this unit?')) {
-      this.unitsService.deleteUnit(id).then(() => {
-        this.loadUnits();
-      }).catch(err => {
-        console.error('Error deleting unit:', err);
-      });
-    }
-  }
+  this.isDeleting = true;
+  this.unitsService.deleteUnit(id).then(() => {
+    this.loadUnits();
+  }).catch(err => {
+    console.error('Error deleting unit:', err);
+  }).finally(() => {
+    this.isDeleting = false;
+  });
+}
 
   markFormGroupTouched(formGroup: FormGroup) {
     Object.values(formGroup.controls).forEach(control => {

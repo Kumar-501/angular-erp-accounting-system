@@ -145,10 +145,10 @@ export class StockDetailsComponent implements OnInit {
       this.isLoading = true;
       
       // Load all sales for this product
-      const sales = await this.saleService.getSalesByProductId(this.productId).toPromise();
+      const sales = await this.saleService.getSalesByProductId(this.productId);
       
       // Format the sales data
-      this.allSales = (sales || []).map(sale => ({
+      this.allSales = sales.map(sale => ({
         ...sale,
         saleDate: sale.saleDate instanceof Date ? sale.saleDate : new Date(sale.saleDate),
         customer: sale.customer || 'Walk-in Customer',

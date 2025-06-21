@@ -52,15 +52,14 @@
             >
               Close
             </button>
-            <button
-              class="btn btn-save"
-              (click)="saveVariation()"
-              [disabled]="!newVariation.name || !newVariation.values || isLoading"
-            >
-              <span *ngIf="!isLoading">Save</span>
-              <span *ngIf="isLoading">Saving...</span>
-            </button>
-          </div>
+    <button
+  class="btn btn-save"
+  (click)="saveVariation()"
+  [disabled]="isSaving || !newVariation.name || !newVariation.values"
+>
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">Saving...</span>
+</button>
         </div>
       </div>
     </div>

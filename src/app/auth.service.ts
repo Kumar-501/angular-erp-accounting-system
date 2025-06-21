@@ -95,6 +95,7 @@ export class AuthService {
           role: userData['role'] || 'user',
           department: userData['department'] || '',
           permissions: permissions,
+
           businessId: userData['businessId'] || null,
           locations: userLocations, // Make sure this is set
           allLocations: allLocations // And this

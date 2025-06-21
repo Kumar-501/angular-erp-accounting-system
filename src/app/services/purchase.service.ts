@@ -14,6 +14,7 @@ export interface Purchase {
     name: string;
     accountNumber?: string;
   };
+  
   cgst?: number;
   sgst?: number;
   igst?: number;
@@ -244,12 +245,15 @@ async getPurchasesByDateRange(startDate: Date, endDate: Date): Promise<Purchase[
       return () => unsubscribe();
     });
   }
-
 getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
   return new Observable<Purchase[]>(observer => {
+    // Remove any additional range conditions if not absolutely necessary
     const q = query(
       collection(this.firestore, 'purchases'),
       where('supplierId', '==', supplierId)
+      // Remove other range conditions if they're not essential
+      // where('paymentDue', '>', 0),
+      // orderBy('purchaseDate', 'asc')
     );
 
     const unsubscribe = onSnapshot(q, 
@@ -276,7 +280,9 @@ getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
           };
           purchases.push(purchase);
         });
-        observer.next(purchases);
+        // Filter in memory if needed
+        const filteredPurchases = purchases.filter(p => (p.paymentDue ?? 0) > 0);
+        observer.next(filteredPurchases);
       },
       (error) => {
         console.error('Error fetching supplier purchases:', error);
@@ -286,7 +292,7 @@ getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
 
     return () => unsubscribe();
   });
-  }
+}
   async getPurchaseById(id: string): Promise<Purchase> {
     try {
       const purchaseRef = doc(this.firestore, 'purchases', id);
@@ -368,26 +374,26 @@ getPurchasesBySupplier(supplierId: string): Observable<Purchase[]> {
     throw error;
   }
 }
-async updatePurchasePayment(purchaseId: string, paymentAmount: number): Promise<void> {
-  if (!purchaseId || paymentAmount === undefined || paymentAmount === null) {
-    throw new Error('Purchase ID and payment amount are required');
+async updatePurchasePayment(purchaseId: string, amount: number): Promise<void> {
+  if (!purchaseId || amount === undefined || amount === null) {
+    throw new Error('Purchase ID and amount are required');
   }
 
   try {
     const purchaseRef = doc(this.firestore, 'purchases', purchaseId);
     
-    return runTransaction(this.firestore, async (transaction) => {
+    await runTransaction(this.firestore, async (transaction) => {
       const purchaseDoc = await transaction.get(purchaseRef);
       
       if (!purchaseDoc.exists()) {
         throw new Error('Purchase not found');
       }
 
-      const purchaseData = purchaseDoc.data() as Purchase;
-      const currentPayment = purchaseData.paymentAmount || 0;
-      const grandTotal = purchaseData.grandTotal || purchaseData.purchaseTotal || 0;
+      const purchase = purchaseDoc.data() as Purchase;
+      const currentPayment = purchase.paymentAmount || 0;
+      const grandTotal = purchase.grandTotal || purchase.purchaseTotal || 0;
       
-      const newPaymentAmount = currentPayment + paymentAmount;
+      const newPaymentAmount = currentPayment + amount;
       const newPaymentDue = Math.max(grandTotal - newPaymentAmount, 0);
       
       let paymentStatus = 'Due';

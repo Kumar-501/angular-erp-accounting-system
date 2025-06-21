@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+
 import { 
   Firestore, 
   collection, 
@@ -693,19 +694,44 @@ export class AccountService {
       });
     });
   }
-
   // Enhanced addTransaction with proper timestamp handling
   async addTransaction(accountId: string, transactionData: any): Promise<void> {
     try {
       const transactionsRef = collection(this.firestore, 'transactions');
+      
+      // Determine debit/credit based on transaction type
+      let debit = 0;
+      let credit = 0;
+      const amount = transactionData.amount;
+      
+      switch (transactionData.type) {
+        case 'expense':
+        case 'transfer_out':
+          debit = amount;
+          break;
+        case 'income':
+        case 'transfer_in':
+        case 'sale':
+        case 'purchase_return':
+          credit = amount;
+          break;
+        default:
+          // For unknown types, assume expense if no specific rule
+          if (transactionData.type?.includes('expense') || transactionData.type?.includes('payment')) {
+            debit = amount;
+          } else {
+            credit = amount;
+          }
+      }
+      
       const transaction = {
         accountId,
-        amount: transactionData.amount,
+        amount: amount,
         type: transactionData.type,
         date: Timestamp.fromDate(new Date(transactionData.date)),
         description: transactionData.description,
-        debit: transactionData.type === 'expense' || transactionData.type === 'transfer_out' ? transactionData.amount : 0,
-        credit: transactionData.type === 'income' || transactionData.type === 'transfer_in' || transactionData.type === 'sale' ? transactionData.amount : 0,
+        debit: debit,
+        credit: credit,
         paymentMethod: transactionData.paymentMethod || '',
         note: transactionData.note || '',
         reference: transactionData.reference || '',
@@ -714,18 +740,17 @@ export class AccountService {
         saleId: transactionData.saleId || '',
         invoiceNo: transactionData.invoiceNo || '',
         customer: transactionData.customer || '',
+        supplier: transactionData.supplier || '',
         paymentStatus: transactionData.paymentStatus || '',
+        originalPurchaseId: transactionData.originalPurchaseId || '',
         createdAt: Timestamp.now()
       };
 
       await addDoc(transactionsRef, transaction);
       
-      // Update account balance
-      const amount = transactionData.type === 'income' || transactionData.type === 'transfer_in' || transactionData.type === 'sale' 
-        ? transactionData.amount 
-        : -transactionData.amount;
-        
-      await this.updateAccountBalance(accountId, amount);
+      // Update account balance (credits increase balance, debits decrease it)
+      const balanceChange = credit - debit;
+      await this.updateAccountBalance(accountId, balanceChange);
     } catch (error) {
       console.error('Error adding transaction:', error);
       throw error;
@@ -1242,6 +1267,65 @@ export class AccountService {
     });
     
     await batch.commit();
+  }
+
+
+  async decreaseAccountBalance(accountId: string, amount: number, description: string): Promise<void> {
+  try {
+    const accountRef = doc(this.firestore, 'paymentAccounts', accountId);
+    
+    await runTransaction(this.firestore, async (transaction) => {
+      const accountDoc = await transaction.get(accountRef);
+      if (!accountDoc.exists()) {
+        throw new Error('Account not found');
+      }
+      
+      const currentBalance = accountDoc.data()['balance'] || 0;
+      const newBalance = currentBalance - amount;
+      
+      if (newBalance < 0) {
+        throw new Error('Insufficient funds in account');
+      }
+      
+      transaction.update(accountRef, {
+        balance: newBalance,
+        updatedAt: new Date()
+      });
+      
+      // Record the transaction
+      const transactionRef = doc(collection(this.firestore, 'accountTransactions'));
+      transaction.set(transactionRef, {
+        accountId,
+        amount,
+        type: 'debit',
+        description,
+        date: new Date(),
+        previousBalance: currentBalance,
+        newBalance,
+        reference: `PAY-${new Date().getTime()}`
+      });
+    });
+  } catch (error) {
+    console.error('Error decreasing account balance:', error);
+    throw error;
+  }
+}
+getPaymentAccounts(): Observable<any[]> {
+    const paymentAccountsRef = collection(this.firestore, 'accounts');
+    return new Observable<any[]>(observer => {
+      const unsubscribe = onSnapshot(paymentAccountsRef, (snapshot) => {
+        const accounts = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data() as any
+        })).filter(account => 
+          // Filter for bank accounts or other payment accounts
+          account.accountHead?.group === 'Asset' && 
+          account.accountHead?.value === 'bank_accounts'
+        );
+        observer.next(accounts);
+      });
+      return () => unsubscribe();
+    });
   }
 
   getIncomeSummary(callback: (summary: any) => void): void {

@@ -47,20 +47,19 @@ export class GoodsService {
 
   // Add new goods received note with stock update
 // Add new goods received note with stock update
+// goods.service.ts
 async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
   const goodsCollection = collection(this.firestore, 'goodsReceived');
-  
   
   // Add timestamps
   const completeData = {
     ...goodsData,
-    receivedDate: serverTimestamp(),
     createdAt: serverTimestamp(),
+        receivedDate: serverTimestamp(), // This ensures the server timestamp is used
+
     status: 'received',
-        linkedPurchaseId: goodsData.purchaseId || null // Add this field to link to purchase
-
+    linkedPurchaseId: goodsData.purchaseOrder || null // Add this field to link to purchase
   };
-
 
   // Save the goods received note first
   const docRef = await addDoc(goodsCollection, completeData);
@@ -86,36 +85,19 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
           `Goods received (Ref: ${docRef.id})`,
           completeData.addedBy || 'system'
         );
-
-        // If this goods receipt is linked to a purchase, update the purchase
-        if (completeData.linkedPurchaseId) {
-          const purchaseRef = doc(this.firestore, `purchases/${completeData.linkedPurchaseId}`);
-          
-          // Find the product in the purchase to update received quantity
-          const purchaseSnap = await getDoc(purchaseRef);
-          if (purchaseSnap.exists()) {
-            const purchaseData = purchaseSnap.data() as any;
-            const updatedProducts = purchaseData.products.map((p: any) => {
-              if (p.productId === product.id) {
-                return {
-                  ...p,
-                  receivedQuantity: (p.receivedQuantity || 0) + product.receivedQuantity
-                };
-              }
-              return p;
-            });
-
-            // Update the purchase with new received quantities
-            await updateDoc(purchaseRef, {
-              products: updatedProducts,
-              updatedAt: serverTimestamp()
-            });
-          }
-        }
       }
     });
     
     await Promise.all(updatePromises);
+  }
+  
+  // If this goods receipt is linked to a purchase, update the purchase status
+  if (completeData.linkedPurchaseId) {
+    const purchaseRef = doc(this.firestore, `purchases/${completeData.linkedPurchaseId}`);
+    await updateDoc(purchaseRef, {
+      status: 'completed',
+      updatedAt: serverTimestamp()
+    });
   }
   
   return docRef;

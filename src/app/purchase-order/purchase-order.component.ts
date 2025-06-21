@@ -18,10 +18,12 @@ interface PurchaseOrder {
   date: string;
   referenceNo: string;
   requiredByDate: string;
+supplierAddress?: string; // Add this line
+
   businessLocation: string;
   businessLocationId: string;
   supplier: string;
-  
+    orderTotal?: number;
   supplierName: string;
    batchNumber?: string;  // Add this
     expiryDate?: string | Date;
@@ -34,6 +36,8 @@ interface PurchaseOrder {
   brand?: string;
   category?: string;
   shippingDate?: string;
+      unitPurchasePrice?: number; // Ensure this exists
+ purchaseTotal?: number;
   requisitionId?: string;
   products: {
     productId: string;
@@ -101,19 +105,22 @@ interface Product {
 })
 export class PurchaseOrderComponent implements OnInit, OnDestroy {
   exportToExcel() {
-    throw new Error('Method not implemented.');
+    this.exportExcel();
   }
   exportToPDF() {
-    throw new Error('Method not implemented.');
+    this.exportPDF();
   }
   clearSearch() {
-    throw new Error('Method not implemented.');
+    this.searchTerm = '';
+    this.applyFilters();
   }
   toggleFilters() {
-    throw new Error('Method not implemented.');
+    this.toggleFilterSidebar();
   }
-  goToPage(arg0: number) {
-    throw new Error('Method not implemented.');
+  goToPage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+    }
   }
   
   purchaseOrders: PurchaseOrder[] = [];
@@ -274,6 +281,10 @@ selectSupplier(supplier: string): void {
         { name: 'Batch No', visible: true },
     { name: 'Expiry Date', visible: true },
     { name: 'Shipping Status', visible: true }, // Make sure this is included
+    { name: 'Purchase Price', visible: true },
+    { name: 'Supplier Address', visible: true }, // Add this new column
+
+
 
 
   ];
@@ -492,8 +503,12 @@ loadPurchaseOrders(): void {
         businessLocation: order.businessLocation || 'N/A',
         businessLocationId: order.businessLocationId || order.location || 'N/A',
         supplier: order.supplier || 'N/A',
+                supplierAddress: order.supplierAddress || order.supplier?.address || 'N/A', // Add this line
+
         supplierName: order.supplierName || order.supplier || 'Unknown Supplier',
         status: order.status || 'Pending',
+        orderTotal: order.orderTotal || this.calculatePurchaseTotal(order),
+
         quantityRemaining: order.quantityRemaining || 0,
         shippingStatus: order.shippingStatus || 'Not Shipped',
         shippingCharges: order.shippingCharges || 0,
@@ -502,8 +517,8 @@ loadPurchaseOrders(): void {
         brand: order.brand || 'N/A',
         category: order.category || 'N/A',
         shippingDate: order.shippingDate || 'N/A',
+        purchaseTotal: this.calculatePurchaseTotal(order), // Add this line
         requisitionId: order.requisitionId || null,
-        // Include both items and products for compatibility
         items: order.items ? order.items.map((item: any) => ({
           productId: item.productId,
           productName: item.productName,
@@ -931,8 +946,22 @@ private calculateNetTotal(order: PurchaseOrder): number {
 }
 
 private calculatePurchaseTotal(order: PurchaseOrder): number {
-  // In a real implementation, you might want to include taxes here
-  return this.calculateNetTotal(order);
+  // If orderTotal exists, use that (it should already include shipping)
+  if (order.orderTotal) return order.orderTotal;
+  
+  // Otherwise calculate it from items
+  if (!order.items && !order.products) return 0;
+  
+  const items = order.items || order.products || [];
+  const subtotal = items.reduce((total, item) => {
+    const quantity = item.quantity || item.requiredQuantity || 0;
+    const unitCost = item.unitCost || 0;
+    return total + (quantity * unitCost);
+  }, 0);
+  
+  const shippingCharges = order.shippingCharges || 0;
+  
+  return subtotal + shippingCharges;
 }
 
 private renderTaxBreakdown(order: PurchaseOrder): string {
@@ -965,7 +994,7 @@ private renderTaxBreakdown(order: PurchaseOrder): string {
   openStatusModal(order: PurchaseOrder, modalId: string): void {
     this.selectedOrderForEdit = order;
     this.selectedShippingStatusForEdit = order.shippingStatus || 'Pending';
-    this.selectedDeliveredTo = order.shippingDetails?.deliveredTo || '';
+this.selectedDeliveredTo = order.shippingDetails?.deliveredTo || order.businessLocation || '';
     this.selectedDeliveryPerson = order.shippingDetails?.deliveryPerson || '';
     this.shippingNote = order.shippingDetails?.note || '';
     this.uploadedFiles = [];

@@ -182,30 +182,16 @@ private async processIncomeData(incomeData: any): Promise<any> {
       addedBy: incomeData.addedBy || 'System',
       addedByDisplayName: incomeData.addedByDisplayName || incomeData.addedBy || 'System'
     };
-  }
-  private async recordIncomeTransaction(incomeData: any, docId: string): Promise<void> {
+  }  private async recordIncomeTransaction(incomeData: any, docId: string): Promise<void> {
     try {
-      await this.accountService.recordTransaction(
-        incomeData.paymentAccount,
-        {
-          amount: incomeData.paymentAmount,
-          type: 'income',
-          date: new Date(incomeData.paidOn || incomeData.date),
-          reference: incomeData.referenceNo || docId,
-          relatedDocId: docId,
-          description: `Income: ${incomeData.incomeCategoryName || incomeData.incomeCategory} - ${incomeData.incomeNote || ''}`,
-          category: incomeData.incomeCategoryName || incomeData.incomeCategory,
-          paymentMethod: incomeData.paymentMethod
-        }
-      );
-      
-      // Update account balance
+      // Only update account balance - this will create the transaction
       await this.updateAccountBalance(
         incomeData.paymentAccount, 
         incomeData.paymentAmount,
         docId,
         'income',
         incomeData
+        // Don't pass isUpdateOperation parameter, defaults to false which creates the transaction
       );
     } catch (error) {
       console.error('Error recording income transaction:', error);
@@ -356,6 +342,7 @@ const expense: Expense = {
   type: 'expense',
   businessLocation: storageData.businessLocation,
   expenseCategory: storageData.expenseCategory,
+  expenseCategoryName: storageData.expenseCategoryName || '', // Add category name
   subCategory: storageData.subCategory,
   expenseType: storageData.expenseType || '', // Get from resolved data
   accountHead: storageData.accountHead,
@@ -387,31 +374,16 @@ const expense: Expense = {
 console.log('Adding expense to Firestore:', expense);
     const docRef = await addDoc(this.expensesCollection, expense);
       console.log('Adding expense to Firestore:', expense);
-      console.log('Expense added successfully with ID:', docRef.id);
-      
-      // Record transaction in account book if payment account exists
+      console.log('Expense added successfully with ID:', docRef.id);      // Record transaction in account book if payment account exists
       if (expense.paymentAccount && expense.paymentAmount) {
-        await this.accountService.recordTransaction(
-          expense.paymentAccount,
-          {
-            amount: expense.paymentAmount,
-            type: 'expense',
-            date: new Date(expense.paidOn || expense.date),
-            reference: expense.referenceNo || docRef.id,
-            relatedDocId: docRef.id,
-            description: `Expense: ${expenseData.expenseCategoryName || expense.expenseCategory} - ${expense.expenseNote || ''}`,
-            category: expenseData.expenseCategoryName || expense.expenseCategory,
-            paymentMethod: expense.paymentMethod
-          }
-        );
-        
-        // Also update account balance (keeping existing functionality)
+        // Only update account balance - this will create the transaction
         await this.updateAccountBalance(
           expense.paymentAccount, 
           -expense.paymentAmount,
           docRef.id,
           'expense',
           expense
+          // Don't pass isUpdateOperation parameter, defaults to false which creates the transaction
         );
       }
       
@@ -508,21 +480,35 @@ console.log('Adding expense to Firestore:', expense);
       // Only record a new transaction if this isn't part of an update operation
       if (!isUpdateOperation) {
         const transactionsRef = collection(this.firestore, 'transactions');
-        
+          // Get category name for better description and category field
+        let categoryName = '';
+        if (type === 'expense' && transactionData.expenseCategory) {
+          // Try to get category name from the expense categories
+          categoryName = transactionData.expenseCategoryName || transactionData.expenseCategory;
+        } else if (type === 'income' && transactionData.incomeCategory) {
+          // Try to get category name from the income categories
+          categoryName = transactionData.incomeCategoryName || transactionData.incomeCategory;
+        }
+
         const transactionDataToSave = {
           accountId: accountId,
           date: transactionData.paidOn || new Date().toISOString(),
+          createdAt: new Date(), // Add createdAt timestamp
+          category: categoryName || '', // Add category field
           description: type === 'expense' ? 
-            `Expense: ${transactionData.expenseNote || 'No description'}` :
-            `Income: ${transactionData.incomeNote || 'No description'}`,
+            `Expense: ${categoryName} - ${transactionData.expenseNote || 'No description'}` :
+            `Income: ${categoryName} - ${transactionData.incomeNote || 'No description'}`,
           paymentMethod: transactionData.paymentMethod,
           paymentDetails: '',
           note: type === 'expense' ? transactionData.expenseNote : transactionData.incomeNote,
           addedBy: transactionData.addedByDisplayName || transactionData.addedBy || 'System',
           debit: type === 'expense' ? absoluteAmount : 0,
           credit: type === 'income' ? absoluteAmount : 0,
+          amount: absoluteAmount, // Add amount field for consistency
+          reference: transactionData.referenceNo || transactionId, // Add reference field
           type: type,
           referenceId: transactionId,
+          relatedDocId: transactionId, // Add relatedDocId field
           hasDocument: !!transactionData.document,
           attachmentUrl: transactionData.document || '',
           previousBalance: currentBalance,

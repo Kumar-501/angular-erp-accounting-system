@@ -2,11 +2,34 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Supplier, SupplierService } from '../services/supplier.service';
 import { LocationService } from '../services/location.service';
-import { PurchaseService } from '../services/purchase.service';
+import { Purchase, PurchaseService } from '../services/purchase.service';
 import { GoodsService } from '../services/goods.service';
+import { ProductsService } from '../services/products.service';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../auth.service';
 import { StockService } from '../services/stock.service';
+import { Firestore, collection, doc, setDoc, getDoc, increment } from '@angular/fire/firestore';
+
+// Constants for Firestore collections
+const COLLECTIONS = {
+  PRODUCT_STOCK: 'product-stock',
+  PRODUCTS: 'products',
+  LOCATIONS: 'locations'
+};
+
+interface ProductStock {
+  productId: string;
+  productName: string;
+  sku: string;
+  locationId: string;
+  locationName: string;
+  quantity: number;
+  unitCost?: number;
+  batchNumber?: string;
+  expiryDate?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface PurchaseOrder {
   id: string;
@@ -17,17 +40,11 @@ interface PurchaseOrder {
   status: string;
   products: any[];
   invoiceNo?: string;
-}
-
-interface Purchase {
-  id?: string;
-  referenceNo: string;
-  supplierId: string;
-  supplierName?: string;
-  purchaseDate: string | Date;
-  status?: string;
-  products?: any[];
-  invoiceNo?: string;
+  businessLocation: {
+    id: string;
+    name: string;
+  };
+  reciviedDate?: string | Date;
 }
 
 interface ExtendedSupplier extends Supplier {
@@ -60,17 +77,16 @@ isProcessing: boolean = false;
   selectedSupplier: ExtendedSupplier | null = null;
 
   purchaseOrders: any[] = [];
-  private subscriptions: Subscription[] = [];
-
-  constructor(
+  private subscriptions: Subscription[] = [];  constructor(
     private fb: FormBuilder,
     private supplierService: SupplierService,
     private locationService: LocationService,
     private purchaseService: PurchaseService,
     private goodsService: GoodsService,
+    private productsService: ProductsService,
     private authService: AuthService,
-      private stockService: StockService
-
+    private stockService: StockService,
+    private firestore: Firestore
   ) { }
 
   ngOnInit(): void {
@@ -85,21 +101,22 @@ isProcessing: boolean = false;
   ngOnDestroy(): void {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
-
-  initForm(): void {
-    this.goodsReceivedForm = this.fb.group({
-      supplier: ['', Validators.required],
-      businessLocation: ['', Validators.required],
-      purchaseDate: ['', Validators.required],
-      purchaseOrder: [''], // Optional field
-      additionalNotes: [''], // Optional field
-      invoiceNo: [''], // Optional field
-      addedBy: [''] // This will be set automatically
-    });
-
-    // Subscribe to form changes - REMOVED THE PROBLEMATIC VALUE CHANGES SUBSCRIPTIONS
-    // These were causing circular updates and form sync issues
-  }
+  todayISOString(): string {
+  return new Date().toISOString().slice(0, 16);
+}
+initForm(): void {
+  this.goodsReceivedForm = this.fb.group({
+    supplier: ['', Validators.required],
+    businessLocation: ['', Validators.required],
+    businessLocationName: [''], // Initialize with empty string
+    purchaseDate: ['', Validators.required],
+    purchaseOrder: [''],
+    receivedDate: ['', Validators.required],
+    additionalNotes: [''],
+    invoiceNo: [''],
+    addedBy: ['']
+  });
+}
 
   setAddedByField(): void {
     const currentUser = this.authService.currentUserValue;
@@ -128,15 +145,15 @@ isProcessing: boolean = false;
     );
   }
 
+// In your component
 loadPurchaseOrders(): void {
   this.subscriptions.push(
     this.purchaseService.getPurchases().subscribe((orders: Purchase[]) => {
       this.purchaseOrders = orders
         .filter(order => 
-          (order.status === undefined || order.status !== 'Completed') && 
+          (order['status'] === undefined || order['status'] !== 'completed') && 
           order.referenceNo &&
-          order.id !== undefined &&
-          !this.isOrderReceived(order.id)
+          order.id !== undefined
         )
         .map(order => ({
           id: order.id,
@@ -144,15 +161,16 @@ loadPurchaseOrders(): void {
           supplierId: order.supplierId,
           supplierName: order.supplierName || 'Unknown Supplier',
           purchaseDate: order.purchaseDate,
-          status: order.status || 'Pending',
+          status: order['status'] || 'pending',
           products: order.products || [],
-          invoiceNo: order.invoiceNo
+          invoiceNo: order.invoiceNo,
+          businessLocation: order.businessLocation // Add this line
         }));
-      
       this.filteredPurchaseOrders = [...this.purchaseOrders];
     })
   );
 }
+
 
 private isOrderReceived(orderId: string): boolean {
   // You might want to check against a service or local list of received orders
@@ -204,54 +222,53 @@ private isOrderReceived(orderId: string): boolean {
     }
   }
 
-  // FIXED: Simplified purchase order change handler
-  onPurchaseOrderChange(event: any): void {
-    const orderId = event?.target?.value || event;
-    
-    console.log('Purchase order changed:', orderId);
-    
-    // Update form control value explicitly
-    this.goodsReceivedForm.get('purchaseOrder')?.setValue(orderId);
-    
-    if (!orderId) {
-      this.selectedPurchaseOrder = null;
-      this.products = [];
-      this.calculateTotals();
-      return;
-    }
-
-    const order = this.purchaseOrders.find(o => o.id === orderId);
-    if (order) {
-      this.selectedPurchaseOrder = order;
-      
-      // Auto-fill form fields from purchase order
-      this.goodsReceivedForm.patchValue({
-        supplier: order.supplierId,
-        invoiceNo: order.invoiceNo || '',
-        purchaseDate: order.purchaseDate ? 
-          this.formatDateForInput(order.purchaseDate) : ''
-      });
-      
-      // Update supplier details
-      const supplier = this.suppliers.find(s => s.id === order.supplierId);
-      if (supplier) {
-        this.selectedSupplier = { ...supplier };
-        this.selectedSupplier.formattedAddress = this.getFormattedAddress(supplier);
-      }
-      
-      this.populateProductsFromOrder(order);
-      console.log('Selected purchase order:', this.selectedPurchaseOrder);
-    }
+async onPurchaseOrderChange(event: any): Promise<void> {
+  const orderId = event?.target?.value || event;
+  this.goodsReceivedForm.get('purchaseOrder')?.setValue(orderId);
+  
+  if (!orderId) {
+    this.selectedPurchaseOrder = null;
+    this.products = [];
+    this.calculateTotals();
+    return;
   }
 
-  onInvoiceNoChange(invoiceNo: string): void {
+  const order = this.purchaseOrders.find(o => o.id === orderId);
+  
+  if (order) {
+    this.selectedPurchaseOrder = order;
+    
+    // Get the location name from the order or find it in locations array
+    let locationName = '';
+    if (order.businessLocation && order.businessLocation.name) {
+      locationName = order.businessLocation.name;
+    } else {
+      const location = this.locations.find(l => l.id === order.businessLocation?.id);
+      locationName = location?.name || '';
+    }
+    
+    this.goodsReceivedForm.patchValue({
+      supplier: order.supplierId,
+      businessLocation: order.businessLocation?.id,
+      businessLocationName: locationName, // Ensure this is set
+      invoiceNo: order.invoiceNo || '',
+      purchaseDate: order.purchaseDate ? 
+        this.formatDateForInput(order.purchaseDate) : ''
+    });
+    
+    const supplier = this.suppliers.find(s => s.id === order.supplierId);    if (supplier) {
+      this.selectedSupplier = { ...supplier };
+      this.selectedSupplier.formattedAddress = this.getFormattedAddress(supplier);    }
+      await this.populateProductsFromOrder(order);
+  }
+}  async onInvoiceNoChange(invoiceNo: string): Promise<void> {
     if (!invoiceNo) return;
     
     // Update form control value explicitly
     this.goodsReceivedForm.get('invoiceNo')?.setValue(invoiceNo);
     
     this.subscriptions.push(
-      this.purchaseService.getPurchases().subscribe((purchases: Purchase[]) => {
+      this.purchaseService.getPurchases().subscribe(async (purchases: Purchase[]) => {
         const purchase = purchases.find(p => p.invoiceNo === invoiceNo);
         if (purchase) {
           this.goodsReceivedForm.patchValue({
@@ -267,37 +284,91 @@ private isOrderReceived(orderId: string): boolean {
           }
           
           if (purchase.products) {
-            this.products = purchase.products.map((product: any) => ({
-              id: product.id || product.productId,
-              name: product.productName || product.name,
-              orderQuantity: product.quantity || 0,
-              receivedQuantity: product.quantity || 0,
-              unitPrice: product.unitCost || product.price || 0,
-              lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
-              batchNumber: product.batchNumber || '',
-              expiryDate: product.expiryDate || '',
-              taxRate: product.taxRate || 0
-            }));
+            // Fetch complete product details for each product to get SKU and other info
+            const productPromises = purchase.products.map(async (product: any) => {
+              const productId = product.id || product.productId;
+              
+              try {
+                // Fetch complete product details to get SKU
+                const productDetails = await this.productsService.getProductById(productId);
+                
+                return {
+                  id: productId,
+                  name: productDetails?.productName || product.productName || product.name,
+                  sku: productDetails?.sku || product.sku || `SKU-${productId}`,
+                  orderQuantity: product.quantity || 0,
+                  receivedQuantity: product.quantity || 0,
+                  unitPrice: product.unitCost || product.price || 0,
+                  lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
+                  batchNumber: product.batchNumber || '',
+                  expiryDate: product.expiryDate || '',
+                  taxRate: product.taxRate || 0
+                };
+              } catch (error) {
+                console.error(`Error fetching details for product ${productId}:`, error);
+                // Return basic product info if fetch fails
+                return {
+                  id: productId,
+                  name: product.productName || product.name || 'Unknown Product',
+                  sku: product.sku || `SKU-${productId}`,
+                  orderQuantity: product.quantity || 0,
+                  receivedQuantity: product.quantity || 0,
+                  unitPrice: product.unitCost || product.price || 0,
+                  lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
+                  batchNumber: product.batchNumber || '',
+                  expiryDate: product.expiryDate || '',
+                  taxRate: product.taxRate || 0
+                };
+              }
+            });
+            
+            this.products = await Promise.all(productPromises);
             this.calculateTotals();
           }
         }
       })
     );
-  }
-
-  populateProductsFromOrder(order: PurchaseOrder): void {
+  }async populateProductsFromOrder(order: PurchaseOrder): Promise<void> {
     if (order.products && order.products.length) {
-      this.products = order.products.map((product: any) => ({
-        id: product.id || product.productId,
-        name: product.productName || product.name,
-        orderQuantity: product.quantity || 0,
-        receivedQuantity: product.quantity || 0,
-        unitPrice: product.unitCost || product.price || 0,
-        lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
-        batchNumber: product.batchNumber || '',
-        expiryDate: product.expiryDate || '',
-        taxRate: product.taxRate || 0
-      }));
+      // Fetch complete product details for each product to get SKU and other info
+      const productPromises = order.products.map(async (product: any) => {
+        const productId = product.id || product.productId;
+        
+        try {
+          // Fetch complete product details to get SKU
+          const productDetails = await this.productsService.getProductById(productId);
+          
+          return {
+            id: productId,
+            name: productDetails?.productName || product.productName || product.name,
+            sku: productDetails?.sku || product.sku || `SKU-${productId}`,
+            orderQuantity: product.quantity || 0,
+            receivedQuantity: product.quantity || 0,
+            unitPrice: product.unitCost || product.price || 0,
+            lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
+            batchNumber: product.batchNumber || '',
+            expiryDate: product.expiryDate || '',
+            taxRate: product.taxRate || 0
+          };
+        } catch (error) {
+          console.error(`Error fetching details for product ${productId}:`, error);
+          // Return basic product info if fetch fails
+          return {
+            id: productId,
+            name: product.productName || product.name || 'Unknown Product',
+            sku: product.sku || `SKU-${productId}`,
+            orderQuantity: product.quantity || 0,
+            receivedQuantity: product.quantity || 0,
+            unitPrice: product.unitCost || product.price || 0,
+            lineTotal: (product.quantity || 0) * (product.unitCost || product.price || 0),
+            batchNumber: product.batchNumber || '',
+            expiryDate: product.expiryDate || '',
+            taxRate: product.taxRate || 0
+          };
+        }
+      });
+      
+      this.products = await Promise.all(productPromises);
       this.calculateTotals();
     } else {
       this.products = [];
@@ -373,15 +444,17 @@ private isOrderReceived(orderId: string): boolean {
       }
     }
   }
-
   addProduct(): void {
     this.products.push({
       id: this.products.length + 1,
       name: '',
+      sku: '',
       orderQuantity: 0,
       receivedQuantity: 0,
       unitPrice: 0,
-      lineTotal: 0
+      lineTotal: 0,
+      batchNumber: '',
+      expiryDate: '',      taxRate: 0
     });
     this.calculateTotals();
   }
@@ -422,6 +495,8 @@ async saveForm(): Promise<void> {
     this.isProcessing = false;
     return;
   }
+  
+    receivedDate: new Date(this.goodsReceivedForm.get('receivedDate')?.value),
 
   // Mark all fields as touched first to trigger validation display
   this.goodsReceivedForm.markAllAsTouched();
@@ -435,9 +510,10 @@ async saveForm(): Promise<void> {
   // Check each required field individually
   const requiredFields = ['supplier', 'businessLocation', 'purchaseDate'];
   const fieldErrors: any = {};
+  
   let hasErrors = false;
 
-  requiredFields.forEach(fieldName => {
+  requiredFields.forEach(async fieldName => {
     const control = this.goodsReceivedForm.get(fieldName);
     if (control) {
       console.log(`${fieldName}:`, {
@@ -447,11 +523,21 @@ async saveForm(): Promise<void> {
         touched: control.touched,
         dirty: control.dirty
       });
-      
+       const goodsReceivedRef = await this.goodsService.addGoodsReceived({
+      ...formData,
+      receivedDate: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    // Remove the purchase order from the dropdown lists if it was used
+    if (formData.purchaseOrder) {
+      this.removePurchaseOrderFromLists(formData.purchaseOrder);
+    }
       if (control.invalid) {
         fieldErrors[fieldName] = control.errors;
         hasErrors = true;
       }
+      
     } else {
       console.error(`Field ${fieldName} not found in form`);
     }
@@ -463,6 +549,7 @@ async saveForm(): Promise<void> {
     locations: this.locations.length,
     selectedSupplier: this.selectedSupplier,
     products: this.products.length
+    
   });
 
   // ENHANCED: Better error handling and user feedback
@@ -519,7 +606,6 @@ async saveForm(): Promise<void> {
     this.isProcessing = false;
     return;
   }
-
   // Validate products if needed
   if (this.products.length === 0) {
     const proceed = confirm('No products added. Do you want to continue anyway?');
@@ -527,17 +613,38 @@ async saveForm(): Promise<void> {
       this.isProcessing = false;
       return;
     }
+  } else {
+    // Validate that products have valid IDs for stock updates
+    const productsWithoutIds = this.products.filter(p => !p.id && p.receivedQuantity > 0);
+    if (productsWithoutIds.length > 0) {
+      console.error('Some products do not have valid IDs:', productsWithoutIds);
+      alert(`${productsWithoutIds.length} product(s) do not have valid IDs and cannot be processed for stock updates. Please check the product selection.`);
+      this.isProcessing = false;
+      return;
+    }
+    
+    // Count products that will actually be processed for stock updates
+    const validProducts = this.products.filter(p => p.id && p.receivedQuantity > 0);
+    console.log(`✓ Products validation: ${validProducts.length} valid products will be processed for stock updates`);
   }
-
   // Validate business location
   const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
+  if (!locationId) {
+    console.error('No business location selected');
+    alert('Please select a business location before saving. This is required for stock updates.');
+    this.isProcessing = false;
+    return;
+  }
+  
   const selectedLocation = this.locations.find(l => l.id === locationId);
   if (!selectedLocation) {
-    console.error('Selected location not found');
+    console.error('Selected location not found in locations array');
     alert('Selected business location is invalid. Please refresh and try again.');
     this.isProcessing = false;
     return;
   }
+  
+  console.log(`✓ Business location validated: ${selectedLocation.name} (ID: ${locationId})`);
 
   // Prepare form data - MERGED VERSION with enhanced product mapping
   const formData = {
@@ -546,7 +653,10 @@ async saveForm(): Promise<void> {
     supplierName: selectedSupplier.isIndividual 
       ? `${selectedSupplier.firstName} ${selectedSupplier.lastName || ''}`.trim()
       : selectedSupplier.businessName,
-    locationName: selectedLocation.name || selectedLocation.address,
+    businessLocation: {
+      id: this.goodsReceivedForm.get('businessLocation')?.value,
+      name: selectedLocation?.name || this.goodsReceivedForm.get('businessLocationName')?.value || 'Unknown Location'
+    },
     products: this.products.filter(p => p.name && p.name.trim() !== '').map(p => ({
       id: p.id,
       productId: p.id, // Ensure productId is set for stock updates
@@ -570,8 +680,15 @@ async saveForm(): Promise<void> {
 
   console.log('=== FINAL FORM DATA ===');
   console.log(JSON.stringify(formData, null, 2));
-
   try {
+    // Validate products for stock update
+    const productValidationErrors = this.validateProductsForStockUpdate();
+    if (productValidationErrors.length > 0) {
+      console.error('Product validation errors:', productValidationErrors);
+      alert('Product validation errors:\n' + productValidationErrors.join('\n'));
+      return;
+    }
+
     // First save the goods received note
     const goodsReceivedRef = await this.goodsService.addGoodsReceived({
       ...formData,
@@ -581,41 +698,65 @@ async saveForm(): Promise<void> {
     });
  if (formData.purchaseOrder) {
       this.removePurchaseOrderFromLists(formData.purchaseOrder);
-    }
-    // Then update stock for each product (using INCREMENT operation)
+    }    // Then update stock for each product using per-location stock system
     if (formData.products && formData.products.length > 0) {
+      console.log(`=== STARTING STOCK UPDATES FOR ${formData.products.length} PRODUCTS ===`);
       const processedProducts = new Set(); 
+      const locationId = formData.businessLocation.id;
+      const locationName = formData.businessLocation.name;
       
-      const stockUpdatePromises = formData.products.map(async (product: any) => {
+      console.log(`Target location: ${locationName} (ID: ${locationId})`);
+      
+      const stockUpdatePromises = formData.products.map(async (product: any, index: number) => {
         // Skip if invalid or already processed
         if (!product.id || product.receivedQuantity <= 0 || processedProducts.has(product.id)) {
-          console.log(`Skipping product: ${product.id} - Invalid or already processed`);
+          console.log(`Skipping product ${index + 1}: ${product.id || 'No ID'} - ${product.receivedQuantity <= 0 ? 'Zero quantity' : 'Already processed'}`);
           return;
         }
         processedProducts.add(product.id); // Mark as processed
         
-        console.log(`Updating stock for product ${product.id}: +${product.receivedQuantity}`);
+        console.log(`Processing product ${index + 1}/${formData.products.length}: ${product.productName || product.name} (ID: ${product.id})`);
         
-        await this.stockService.adjustProductStock(
-          product.id,
-          product.receivedQuantity, // Only this quantity gets added
-          'add', // Ensures we INCREMENT rather than replace
-          formData.businessLocation,
-          `GRN-${goodsReceivedRef.id}`,
-          formData.addedBy,
-          {
-            purchaseOrder: formData.purchaseOrder,
-            invoiceNo: formData.invoiceNo || formData.referenceNo,
-            supplierName: formData.supplierName
-          }
-        );
+        try {
+          // Fetch complete product details to get SKU
+          const productDetails = await this.productsService.getProductById(product.id);
+          const productSku = productDetails?.sku || product.sku || `SKU-${product.id}`;
+          const productName = productDetails?.productName || product.productName || product.name;
+          
+          console.log(`Product details: SKU=${productSku}, Name="${productName}", Quantity to add=${product.receivedQuantity}`);
+          
+          // Update stock using the new per-location system
+          await this.updateProductStockAtLocation(
+            product.id,
+            productName,
+            productSku,
+            locationId,
+            locationName,
+            product.receivedQuantity,
+            product.unitPrice,
+            product.batchNumber,
+            product.expiryDate
+          );
+        } catch (error) {
+          console.error(`✗ Error updating stock for product ${product.id}:`, error);
+          // Continue with other products even if one fails
+          throw new Error(`Failed to update stock for product ${product.productName || product.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
       });
 
       await Promise.all(stockUpdatePromises);
-    }
-
-    console.log('Goods received note saved and stock updated successfully');
-    alert('Goods received successfully! Received quantities added to current stock.');
+      console.log('=== ALL STOCK UPDATES COMPLETED SUCCESSFULLY ===');
+    } else {
+      console.log('No products to update stock for');
+    }    console.log('Goods received note saved and stock updated successfully');
+    
+    // Count successful stock updates
+    const validProducts = formData.products?.filter((p: any) => p.id && p.receivedQuantity > 0) || [];
+    const successMessage = validProducts.length > 0 
+      ? `Goods received successfully! Stock updated for ${validProducts.length} product(s) at ${formData.businessLocation.name}.`
+      : 'Goods received successfully!';
+    
+    alert(successMessage);
     this.resetForm();
     
   } catch (error: any) {
@@ -632,15 +773,16 @@ async saveForm(): Promise<void> {
     }
     
     alert(errorMessage);
-    
-    // Additional error handling for specific scenarios
-    if (error.code === 'stock-update-failed') {
+      // Additional error handling for specific scenarios
+    if (error.message?.includes('Failed to update stock')) {
       console.error('Stock update failed for one or more products');
-      alert('Goods received note was saved, but stock update failed. Please check stock levels manually.');
+      alert('Goods received note was saved, but stock update failed for some products. Please check stock levels manually.');
     } else if (error.code === 'permission-denied') {
       alert('You do not have permission to perform this operation. Please contact your administrator.');
     } else if (error.code === 'network-request-failed') {
       alert('Network error occurred. Please check your internet connection and try again.');
+    } else if (error.code === 'firestore/permission-denied') {
+      alert('Permission denied. You may not have access to update stock at this location.');
     }
     
   } finally {
@@ -648,7 +790,7 @@ async saveForm(): Promise<void> {
     console.log('=== SAVE FORM DEBUG END ===');
   }
   }
-  private removePurchaseOrderFromLists(purchaseOrderId: string): void {
+private removePurchaseOrderFromLists(purchaseOrderId: string): void {
   // Remove from main purchaseOrders array
   this.purchaseOrders = this.purchaseOrders.filter(order => order.id !== purchaseOrderId);
   
@@ -663,6 +805,8 @@ async saveForm(): Promise<void> {
   
   console.log('Purchase order removed from selection lists:', purchaseOrderId);
 }
+
+
   resetForm(): void {
     this.goodsReceivedForm.reset();
     this.products = [];
@@ -699,5 +843,203 @@ async saveForm(): Promise<void> {
       suppliers: this.suppliers.length,
       locations: this.locations.length
     });
+  }
+
+  /**
+   * Update stock for a product at a specific location using PRODUCT_STOCK collection
+   */  private async updateProductStockAtLocation(
+    productId: string,
+    productName: string,
+    sku: string,
+    locationId: string,
+    locationName: string,
+    quantityToAdd: number,
+    unitCost?: number,
+    batchNumber?: string,
+    expiryDate?: string
+  ): Promise<void> {
+    try {
+      // Validate inputs
+      if (!productId || !locationId || quantityToAdd <= 0) {
+        throw new Error(`Invalid parameters: productId=${productId}, locationId=${locationId}, quantityToAdd=${quantityToAdd}`);
+      }
+
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      
+      console.log(`Processing stock update: Product ${sku} at ${locationName}, adding ${quantityToAdd} units`);
+      
+      // Get current stock document
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        // Update existing stock - increment quantity
+        const currentData = stockDoc.data();
+        const currentQuantity = currentData?.['quantity'] || 0;
+        
+        await setDoc(stockDocRef, {
+          quantity: increment(quantityToAdd),
+          unitCost: unitCost || currentData?.['unitCost'],
+          batchNumber: batchNumber || currentData?.['batchNumber'] || '',
+          expiryDate: expiryDate || currentData?.['expiryDate'] || null,
+          updatedAt: new Date()
+        }, { merge: true });
+        
+        console.log(`✓ Updated existing stock for ${sku} at ${locationName}: ${currentQuantity} → ${currentQuantity + quantityToAdd} (+${quantityToAdd})`);
+      } else {
+        // Create new stock entry
+        const stockData: ProductStock = {
+          productId: productId,
+          productName: productName,
+          sku: sku,
+          locationId: locationId,
+          locationName: locationName,
+          quantity: quantityToAdd,
+          unitCost: unitCost,
+          batchNumber: batchNumber || '',
+          expiryDate: expiryDate || null,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        await setDoc(stockDocRef, stockData);
+        console.log(`✓ Created new stock entry for ${sku} at ${locationName}: 0 → ${quantityToAdd} (+${quantityToAdd})`);
+      }
+    } catch (error) {
+      console.error(`✗ Error updating stock for product ${productId} at location ${locationId}:`, error);
+      throw new Error(`Failed to update stock for ${productName} at ${locationName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Get current stock quantity for a product at a specific location
+   */
+  private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      
+      if (stockDoc.exists()) {
+        const data = stockDoc.data();
+        return data?.['quantity'] || 0;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting stock at location:', error);
+      return 0;
+    }  }
+
+  /**
+   * Handle business location change to update current stock for all products
+   */async onBusinessLocationChange(locationId: string): Promise<void> {
+    if (locationId && this.products.length > 0) {
+      console.log('Business location changed');
+      const selectedLocation = this.locations.find(l => l.id === locationId);
+      if (selectedLocation) {
+        console.log(`New location selected: ${selectedLocation.name} (ID: ${locationId})`);
+      }
+    }
+  }
+  /**
+   * Display stock summary for debugging and user feedback
+   */
+  async displayStockSummary(): Promise<void> {
+    if (this.products.length === 0) {
+      console.log('No products to display stock summary for');
+      return;
+    }
+
+    const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
+    const selectedLocation = this.locations.find(l => l.id === locationId);
+    
+    if (!selectedLocation) {
+      console.log('No location selected for stock summary');
+      return;
+    }
+
+    console.log(`=== STOCK SUMMARY FOR ${selectedLocation.name.toUpperCase()} ===`);
+    
+    for (let index = 0; index < this.products.length; index++) {
+      const product = this.products[index];
+      if (product.id && product.name) {
+        // Get current stock from PRODUCT_STOCK collection
+        const currentStock = await this.getCurrentStockAtLocation(product.id, locationId);
+        const receivedQty = product.receivedQuantity || 0;
+        const newStock = currentStock + receivedQty;
+        
+        console.log(`${index + 1}. ${product.name}`);
+        console.log(`   Current: ${currentStock} | Receiving: ${receivedQty} | New Total: ${newStock}`);
+      }
+    }
+    console.log('=== END STOCK SUMMARY ===');
+  }
+
+  /**
+   * Get current stock for display in UI (async method for template use)
+   * This method can be called from the template to show current stock
+   */
+  async getCurrentStockDisplay(productId: string): Promise<string> {
+    if (!productId) return '0';
+    
+    const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
+    if (!locationId) return 'Select location first';
+    
+    try {
+      const stock = await this.getCurrentStockAtLocation(productId, locationId);
+      return stock.toString();
+    } catch (error) {
+      console.error('Error getting stock display:', error);
+      return 'Error';
+    }
+  }
+
+  /**
+   * Check if we have valid stock data for a product at current location
+   */
+  async hasStockData(productId: string): Promise<boolean> {
+    if (!productId) return false;
+    
+    const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
+    if (!locationId) return false;
+    
+    try {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockDocRef);
+      return stockDoc.exists();
+    } catch (error) {
+      console.error('Error checking stock data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate that all products have the necessary data for stock updates
+   */
+  private validateProductsForStockUpdate(): string[] {
+    const errors: string[] = [];
+    
+    for (let i = 0; i < this.products.length; i++) {
+      const product = this.products[i];
+      
+      if (!product.id) {
+        errors.push(`Product ${i + 1}: Missing product ID`);
+      }
+      
+      if (!product.name || product.name.trim() === '') {
+        errors.push(`Product ${i + 1}: Missing product name`);
+      }
+        // SKU validation is optional here since we can fetch it from product details later
+      // if (!product.sku || product.sku.trim() === '') {
+      //   errors.push(`Product ${i + 1}: Missing SKU`);
+      // }
+      
+      if (!product.receivedQuantity || product.receivedQuantity <= 0) {
+        errors.push(`Product ${i + 1}: Invalid received quantity (${product.receivedQuantity})`);
+      }
+    }
+      return errors;
   }
 }

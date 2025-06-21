@@ -61,6 +61,7 @@ interface EditingTransaction extends Omit<Transaction, 'balance'> {
   providers: [DatePipe]
 })
 export class AccountBookComponent implements OnInit, OnDestroy {
+  openingBalance: number = 0;
   private subscriptions: Subscription[] = [];
   private accountTransactionsUnsubscribe: () => void = () => { };
   private expensesUnsubscribe: () => void = () => { };
@@ -201,6 +202,7 @@ private loadRecentTransactions(): void {
             number: account.accountNumber || '',
             balance: account.openingBalance || 0
           };
+         this.openingBalance = account.openingBalance || 0;
         }
         this.loading = false;
       },
@@ -231,13 +233,8 @@ private loadSalesData(): void {
   if (this.saleService.getSalesByPaymentAccount) {
     const saleSub = this.saleService.getSalesByPaymentAccount(this.accountId).subscribe({
       next: (sales: any[]) => {
-        const completedSales = sales.filter(sale =>
-          sale.status === 'Completed' ||
-          sale.paymentStatus === 'Paid' ||
-          sale.paymentStatus === 'Partial'
-        );
-      
-        const accountSales = completedSales.map(sale => this.mapSaleToTransaction(sale));
+        // Include all sales for this account
+        const accountSales = sales.map(sale => this.mapSaleToTransaction(sale));
         this.transactions = [
           ...this.transactions.filter(t => t.source !== 'sale'),
           ...accountSales
@@ -257,67 +254,10 @@ private loadSalesData(): void {
 }
 
 private loadPurchasesData(): void {
-  if (this.purchaseService['getPurchasesByAccount']) {
-    this.purchasesUnsubscribe = this.purchaseService['getPurchasesByAccount'](
-      this.accountId, 
-      (purchases: any[]) => {
-        const accountPurchases = purchases.map(purchase => this.mapPurchaseToTransaction(purchase));
-        this.transactions = [
-          ...this.transactions.filter(t => t.source !== 'purchase'),
-          ...accountPurchases
-        ];
-        this.combineAndProcessTransactions();
-      }
-    );
-  } else {
-    const purchaseSub = this.purchaseService.getPurchases().subscribe(purchases => {
-      const accountPurchases = purchases
-        .filter((purchase: any) => 
-          purchase.paymentAccount?.id === this.accountId || 
-          purchase.paymentAccount === this.accountId
-        )
-        .map(purchase => this.mapPurchaseToTransaction(purchase));
-      this.transactions = [
-        ...this.transactions.filter(t => t.source !== 'purchase'),
-        ...accountPurchases
-      ];
-      this.combineAndProcessTransactions();
-    });
-    this.subscriptions.push(purchaseSub);
-    this.purchasesUnsubscribe = () => purchaseSub.unsubscribe();
-  }
+  // Purchases are excluded from account book - skip loading
+  this.combineAndProcessTransactions();
+}
 
-
-    // Listen to sales for this account
-    if (this.saleService.getSalesByPaymentAccount) {
-      const saleSub = this.saleService.getSalesByPaymentAccount(this.accountId).subscribe({
-        next: (sales: any[]) => {
-          // Filter for completed sales only
-          const completedSales = sales.filter(sale =>
-            sale.status === 'Completed' ||
-            sale.paymentStatus === 'Paid' ||
-            sale.paymentStatus === 'Partial'
-          );
-        
-          const accountSales = completedSales.map(sale => this.mapSaleToTransaction(sale));
-          this.transactions = [
-            ...this.transactions.filter(t => t.source !== 'sale'),
-            ...accountSales
-          ];
-          this.combineAndProcessTransactions();
-        },
-        error: (error) => {
-          console.error('Error loading sales:', error);
-          this.loadSalesFallback();
-        }
-      });
-      this.subscriptions.push(saleSub);
-      this.salesUnsubscribe = () => saleSub.unsubscribe();
-    } else {
-      this.loadSalesFallback();
-    }
-  }
-  
 private processAccountBookTransactions(transactions: any[]): void {
   const accountTransactions = transactions.map(t => ({
     id: t.id,
@@ -341,7 +281,6 @@ private processAccountBookTransactions(transactions: any[]): void {
     ...accountTransactions
   ];
 }
-
   // Properly define the loadSalesFallback method as a class method
   private loadSalesFallback(): void {
     // Listen to sales for this account
@@ -421,64 +360,11 @@ private processAccountBookTransactions(transactions: any[]): void {
     this.expensesUnsubscribe = () => expenseSub.unsubscribe();
   }
 
-  // Listen to incomes for this account
-  if (this.expenseService.getIncomesByAccount) {
-    this.incomesUnsubscribe = this.expenseService.getIncomesByAccount(
-      this.accountId, 
-      (incomes: Expense[]) => {
-        const accountIncomes = incomes.map(income => this.mapIncomeToTransaction(income));
-        this.transactions = [
-          ...this.transactions.filter(t => t.source !== 'income'),
-          ...accountIncomes
-        ];
-        this.combineAndProcessTransactions();
-      }
-    );
-  } else {
-    const incomeSub = this.expenseService.getIncomes().subscribe(incomes => {
-      const accountIncomes = incomes
-        .filter((income: any) => income.paymentAccount === this.accountId)
-        .map(income => this.mapIncomeToTransaction(income));
-      this.transactions = [
-        ...this.transactions.filter(t => t.source !== 'income'),
-        ...accountIncomes
-      ];
-      this.combineAndProcessTransactions();
-    });
-    this.subscriptions.push(incomeSub);
-    this.incomesUnsubscribe = () => incomeSub.unsubscribe();
-  }
+  // Incomes are now handled through transactions collection only
+  // No need to load from incomes collection separately
+  this.incomesUnsubscribe = () => {};
 
-  // Listen to purchases for this account
-  if (this.purchaseService['getPurchasesByAccount']) {
-    this.purchasesUnsubscribe = this.purchaseService['getPurchasesByAccount'](
-      this.accountId, 
-      (purchases: any[]) => {
-        const accountPurchases = purchases.map(purchase => this.mapPurchaseToTransaction(purchase));
-        this.transactions = [
-          ...this.transactions.filter(t => t.source !== 'purchase'),
-          ...accountPurchases
-        ];
-        this.combineAndProcessTransactions();
-      }
-    );
-  } else {
-    const purchaseSub = this.purchaseService.getPurchases().subscribe(purchases => {
-      const accountPurchases = purchases
-        .filter((purchase: any) => 
-          purchase.paymentAccount?.id === this.accountId || 
-          purchase.paymentAccount === this.accountId
-        )
-        .map(purchase => this.mapPurchaseToTransaction(purchase));
-      this.transactions = [
-        ...this.transactions.filter(t => t.source !== 'purchase'),
-        ...accountPurchases
-      ];
-      this.combineAndProcessTransactions();
-    });
-    this.subscriptions.push(purchaseSub);
-    this.purchasesUnsubscribe = () => purchaseSub.unsubscribe();
-  }
+  // Purchases are excluded from account book
 }
 
   // Map Expense to Transaction
@@ -503,30 +389,6 @@ private processAccountBookTransactions(transactions: any[]): void {
       source: 'expense'
     };
   }
-
-  // Map Income to Transaction
-  mapIncomeToTransaction(income: any): Transaction {
-    return {
-      id: income.id,
-      date: this.convertToDate(income.paidOn || income.date),
-      description: `${income.incomeCategory || 'Income'}: ${income.incomeNote || 'No description'}`,
-      paymentMethod: income.paymentMethod || '',
-      paymentDetails: income.referenceNo || '',
-      note: income.incomeNote || '',
-      addedBy: income.addedByDisplayName || income.addedBy || 'System',
-      debit: 0,
-      credit: Number(income.paymentAmount || 0),
-      balance: 0,
-      hasDocument: !!income.document,
-      type: 'income',
-      attachmentUrl: income.document || '',
-      referenceNo: income.referenceNo,
-      category: income.incomeCategory,
-      totalAmount: income.totalAmount,
-      source: 'income'
-    };
-  }
-
   // Map Purchase to Transaction
   mapPurchaseToTransaction(purchase: any): Transaction {
     return {
@@ -598,35 +460,71 @@ private getEmptyTransaction(): Transaction {
     source: ''
   };
 }
-
   processAccountTransactions(transactions: any[]): void {
+    console.log('Raw account transactions:', transactions); // Debug log
     const accountTransactions = transactions.map(t => this.mapAccountTransaction(t));
+    console.log('Mapped account transactions:', accountTransactions); // Debug log
     this.transactions = [
       ...this.transactions.filter(t => t.source !== 'account'),
       ...accountTransactions
     ];
-  }
-
-  mapAccountTransaction(t: any): Transaction {
+  }mapAccountTransaction(t: any): Transaction {
     const transactionDate = this.convertToDate(t.date);
     
     let description = t.description;
     let paymentMethod = t.paymentMethod || '';
     let type = t.type || '';
+    let debit = 0;
+    let credit = 0;
     
-    // Handle purchase payment transactions
-    if (type === 'purchase_payment') {
-      description = `Purchase Payment: ${t.referenceNo || ''}`;
-      paymentMethod = t.paymentMethod || 'Cash';
-    }
-    // Handle transfer transactions
-    else if (type === 'transfer' || type === 'transfer_in' || type === 'transfer_out') {
-      if (t.fromAccountId === this.accountId || type === 'transfer_out') {
-        description = `Transfer to ${this.getAccountName(t.toAccountId)}`;
-        paymentMethod = 'Fund Transfer';
-      } else if (t.toAccountId === this.accountId || type === 'transfer_in') {
-        description = `Transfer from ${this.getAccountName(t.fromAccountId)}`;
-        paymentMethod = 'Fund Transfer';
+    // If transaction already has debit/credit fields, use them
+    if (t.debit !== undefined && t.credit !== undefined) {
+      debit = Number(t.debit || 0);
+      credit = Number(t.credit || 0);
+    } else {
+      // Calculate debit/credit from amount and type
+      const amount = Number(t.amount || 0);
+      
+      // Handle purchase payment transactions
+      if (type === 'purchase_payment') {
+        description = `Purchase Payment: ${t.reference || ''}`;
+        paymentMethod = t.paymentMethod || 'Cash';
+        debit = amount; // Purchase payments are debits (money going out)
+      }
+      // Handle purchase return transactions
+      else if (type === 'purchase_return') {
+        description = `Purchase Return: ${t.reference || ''}`;
+        paymentMethod = t.paymentMethod || 'Purchase Return';
+        credit = amount; // Purchase returns are credits (money coming back)
+      }
+      // Handle expense transactions
+      else if (type === 'expense') {
+        debit = amount; // Expenses are debits (money going out)
+      }
+      // Handle income transactions
+      else if (type === 'income') {
+        credit = amount; // Income is credit (money coming in)
+      }
+      // Handle transfer transactions
+      else if (type === 'transfer' || type === 'transfer_in' || type === 'transfer_out') {
+        if (t.fromAccountId === this.accountId || type === 'transfer_out') {
+          description = `Transfer to ${this.getAccountName(t.toAccountId)}`;
+          paymentMethod = 'Fund Transfer';
+          debit = amount; // Outgoing transfer is debit
+        } else if (t.toAccountId === this.accountId || type === 'transfer_in') {
+          description = `Transfer from ${this.getAccountName(t.fromAccountId)}`;
+          paymentMethod = 'Fund Transfer';
+          credit = amount; // Incoming transfer is credit
+        }
+      }
+      // Default handling for other transaction types
+      else {
+        // If no specific rule, assume expense types are debits, others are credits
+        if (type.includes('expense') || type.includes('payment')) {
+          debit = amount;
+        } else {
+          credit = amount;
+        }
       }
     }
     
@@ -635,23 +533,19 @@ private getEmptyTransaction(): Transaction {
       date: transactionDate,
       description: description,
       paymentMethod: paymentMethod,
-      paymentDetails: t.paymentDetails || '',
+      paymentDetails: t.reference || t.paymentDetails || '',
       note: t.note || '',
       addedBy: t.addedBy || 'System',
-      debit: type === 'expense' ? Number(t.amount || t.debit || 0) :
-             (type === 'transfer' || type === 'transfer_out') && (t.fromAccountId === this.accountId) ?
-             Number(t.amount || t.debit || 0) : Number(t.debit || 0),
-      credit: type === 'income' ? Number(t.amount || t.credit || 0) :
-              (type === 'transfer' || type === 'transfer_in') && (t.toAccountId === this.accountId) ?
-              Number(t.amount || t.credit || 0) : Number(t.credit || 0),
+      debit: debit,
+      credit: credit,
       balance: 0,
       hasDocument: t.hasDocument || false,
       type: type,
       attachmentUrl: t.attachmentUrl,
       fromAccountId: t.fromAccountId,
       toAccountId: t.toAccountId,
-      referenceNo: t.referenceId || t.referenceNo || '',
-      source: type === 'purchase_payment' ? 'purchase' : 'account'
+      referenceNo: t.reference || t.referenceNo || '',
+      source: 'account'
     };
   }
 
@@ -670,12 +564,13 @@ private getEmptyTransaction(): Transaction {
   }
 
 calculateRunningBalance(): void {
-  // Sort by date (oldest first) for balance calculation
-  const sorted = [...this.transactions].sort((a, b) => {
-    return a.date.getTime() - b.date.getTime();
-  });
+  // Sort by date (oldest first) for balance calculation, excluding purchase transactions
+  const sorted = [...this.transactions]
+    .filter(t => t.type !== 'purchase' && t.source !== 'purchase')
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
   
-  let balance = this.accountDetails.balance;
+  // Start from the original opening balance, not current accountDetails.balance
+  let balance = this.openingBalance;
 
   sorted.forEach(t => {
     // Ensure we're working with numbers
@@ -705,11 +600,15 @@ calculateRunningBalance(): void {
 }
 
 combineAndProcessTransactions(): void {
-  // Create a unique key for each transaction to prevent duplicates
+  // Create a unique key for each transaction to prevent duplicates and exclude purchases
   const transactionMap = new Map<string, Transaction>();
     this.accountService.setAccountTransactions(this.accountId, this.transactions);
 
   this.transactions.forEach(t => {
+    // Skip purchase transactions completely
+    if (t.type === 'purchase' || t.source === 'purchase') {
+      return;
+    }
     const key = `${t.source}-${t.id}`;
     if (!transactionMap.has(key)) {
       transactionMap.set(key, t);
@@ -727,11 +626,21 @@ combineAndProcessTransactions(): void {
 }
 
 filterTransactions(): void {
-  // Apply date filter first
+  // Apply date filter first and exclude purchase transactions
+  // Properly set date boundaries to ensure consistent filtering
+  const fromDate = new Date(this.dateRange.from);
+  fromDate.setHours(0, 0, 0, 0);
+  
+  const toDate = new Date(this.dateRange.to);
+  toDate.setHours(23, 59, 59, 999);
+  
   this.filteredTransactions = this.transactions.filter(t => {
     const transactionDate = t.date;
-    return transactionDate >= this.dateRange.from && 
-           transactionDate <= this.dateRange.to;
+    // Exclude purchase transactions completely
+    if (t.type === 'purchase' || t.source === 'purchase') {
+      return false;
+    }
+    return transactionDate >= fromDate && transactionDate <= toDate;
   });
   
   // Apply search filter if exists
@@ -748,8 +657,7 @@ filterTransactions(): void {
       (t.customer && t.customer.toLowerCase().includes(query))
     );
   }
-  
-  // Apply transaction type filter
+    // Apply transaction type filter
   if (this.transactionType !== 'All') {
     this.filteredTransactions = this.filteredTransactions.filter(t => {
       switch(this.transactionType) {
@@ -763,10 +671,10 @@ filterTransactions(): void {
           return t.type === 'expense';
         case 'Income': 
           return t.type === 'income';
-        case 'Purchase': 
-          return t.type === 'purchase';
         case 'Sale': 
           return t.type === 'sale';
+        case 'Purchase Return':
+          return t.type === 'purchase_return';
         default: 
           return true;
       }
@@ -779,8 +687,8 @@ filterTransactions(): void {
 }
 
 calculateTotals(): void {
-  this.totalDebit = this.filteredTransactions.reduce((sum, t) => sum + (Number(t.debit) || 0), 0);
-  this.totalCredit = this.filteredTransactions.reduce((sum, t) => sum + (Number(t.credit) || 0), 0);
+  this.totalDebit = this.filteredTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
+  this.totalCredit = this.filteredTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
 }
 getTransactionTypeDisplay(type: string | undefined): string {
   if (!type) return 'Unknown';
@@ -794,6 +702,8 @@ getTransactionTypeDisplay(type: string | undefined): string {
       return 'Expense';
     case 'purchase': 
       return 'Purchase';
+    case 'purchase_return':
+      return 'Purchase Return';
     case 'transfer': 
       return 'Transfer';
     case 'transfer_in': 
@@ -825,23 +735,19 @@ getTransactionTypeDisplay(type: string | undefined): string {
       this.currentPage++;
       this.updatePagedTransactions();
     }
+  }  onDateRangeChange(): void {
+    // Use the same filtering logic as filterTransactions()
+    this.filterTransactions();
   }
 
-  onDateRangeChange(): void {
-    const fromDate = new Date(this.dateRange.from);
-    fromDate.setHours(0, 0, 0, 0);
-    
-    const toDate = new Date(this.dateRange.to);
-    toDate.setHours(23, 59, 59, 999);
-    
-    this.filteredTransactions = this.transactions.filter(t => {
-      const transactionDate = t.date;
-      return transactionDate >= fromDate && transactionDate <= toDate;
-    });
-    
-    this.calculateTotals();
-    this.currentPage = 1;
-    this.updatePagedTransactions();
+  onDateFromChange(dateString: string): void {
+    this.dateRange.from = new Date(dateString);
+    this.onDateRangeChange();
+  }
+
+  onDateToChange(dateString: string): void {
+    this.dateRange.to = new Date(dateString);
+    this.onDateRangeChange();
   }
 
   onTransactionTypeChange(): void {
@@ -865,8 +771,7 @@ deleteTransaction(id: string): void {
             console.error('Error deleting transaction:', error);
             alert('Failed to delete transaction');
           });
-      }
-      // Handle expense source transactions
+      }      // Handle expense source transactions
       else if (transaction.source === 'expense') {
         if (transaction.type === 'expense') {
           this.expenseService.deleteExpense(id)
@@ -884,24 +789,8 @@ deleteTransaction(id: string): void {
             });
         }
       }
-      // Handle income source transactions
-      else if (transaction.source === 'income') {
-        this.expenseService.deleteTransaction(id, 'income')
-          .then(() => console.log('Income deleted successfully'))
-          .catch(error => {
-            console.error('Error deleting income:', error);
-            alert('Failed to delete income');
-          });
-      }
-      // Handle purchase transactions
-      else if (transaction.source === 'purchase') {
-        this.purchaseService.deletePurchase(id)
-          .then(() => console.log('Purchase deleted successfully'))
-          .catch(error => {
-            console.error('Error deleting purchase:', error);
-            alert('Failed to delete purchase');
-          });
-      }
+      // Income transactions are now handled through the transactions collection only
+      // Purchase transactions are not displayed in account book
       // Handle sale transactions
       else if (transaction.source === 'sale') {
         this.saleService.deleteSale(id)
@@ -1091,6 +980,7 @@ saveTransaction(): void {
       timestamp: new Date().getTime()
     };
     
+    // Create fund transfer data
     if (this.selectedFile) {
       console.log('File would be uploaded here:', this.selectedFile.name);
     }
