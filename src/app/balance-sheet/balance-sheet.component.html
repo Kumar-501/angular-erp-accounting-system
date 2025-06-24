@@ -53,20 +53,15 @@
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
-            </thead>
-            <tbody>
+            </thead>            <tbody>
               <tr *ngFor="let item of balanceSheetData.equity">
                 <td class="account-name">{{ item.name }}</td>
                 <td class="account-head">{{ item.accountHead }}</td>
                 <td class="amount">{{ formatCurrency(item.value) }}</td>
               </tr>
-              <tr *ngIf="profitLossData" class="profit-loss-row" [ngClass]="{'profit': profitLossData.netProfit >= 0, 'loss': profitLossData.netProfit < 0}">
-                <td colspan="2">{{ profitLossData.netProfit >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss' }}</td>
-                <td class="amount">{{ formatCurrency(profitLossData.netProfit) }}</td>
-              </tr>
               <tr class="total-row">
                 <td colspan="2">Total Equity</td>
-                <td class="amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0)) }}</td>
+                <td class="amount">{{ formatCurrency(balanceSheetData.totals.equity) }}</td>
               </tr>
             </tbody>
           </table>
@@ -137,11 +132,10 @@
     <!-- Summary Section -->
     <div class="summary-section">
       <h3>Financial Summary</h3>
-      <table>
-        <tbody>
+      <table>        <tbody>
           <tr>
             <td class="summary-label">Total Equity</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0)) }}</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity) }}</td>
           </tr>
           <tr>
             <td class="summary-label">Total Liabilities</td>
@@ -149,7 +143,7 @@
           </tr>
           <tr class="summary-total">
             <td>Total Equity + Liabilities</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + (profitLossData?.netProfit || 0) + balanceSheetData.totals.liabilities) }}</td>
+            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + balanceSheetData.totals.liabilities) }}</td>
           </tr>
           <tr class="summary-total">
             <td>Total Assets</td>

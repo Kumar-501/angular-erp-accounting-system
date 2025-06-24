@@ -572,10 +572,18 @@
         <small class="text-muted">Accepted formats: CSV, Excel (.xlsx, .xls)</small>
       </div>
 
-      <div *ngIf="importError" class="alert alert-danger">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        {{ importError }}
-      </div>
+  <div *ngIf="importError" class="alert alert-danger">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  {{ importError }}
+  <div *ngIf="importResults?.errors?.length" class="mt-2">
+    <strong>Common issues:</strong>
+    <ul>
+      <li>Make sure email addresses match exactly with system records</li>
+      <li>Date formats should be YYYY-MM-DD HH:MM:SS</li>
+      <li>First row should contain headers exactly as in the template</li>
+    </ul>
+  </div>
+</div>
 
       <div *ngIf="importSuccess" class="alert alert-success">
         <i class="bi bi-check-circle-fill me-2"></i>

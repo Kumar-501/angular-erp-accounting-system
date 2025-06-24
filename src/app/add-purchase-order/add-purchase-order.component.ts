@@ -8,6 +8,7 @@ import { ProductsService } from '../services/products.service';
 import { UserService } from '../services/user.service';
 import { TaxRate } from '../tax/tax.model';
 import { TaxService } from '../services/tax.service';
+import { AuthService } from '../auth.service';
 
 
 interface Supplier {
@@ -88,6 +89,8 @@ export class AddPurchaseOrderComponent implements OnInit {
     private productsService: ProductsService,
     private router: Router,
     private userService: UserService,
+      private authService: AuthService, // Add this line
+
     private taxService: TaxService // Add this line
 
   ) { }
@@ -113,9 +116,10 @@ export class AddPurchaseOrderComponent implements OnInit {
       orderDate: [new Date().toISOString().split('T')[0], Validators.required],
       deliveryDate: [''],
       shippingDate: [''],
+          addedBy: [this.authService.getCurrentUserName(), Validators.required], // Add this line
+
       purchaseOrder: [''],
       requiredDate: [''],
-      addedBy: [''],
       businessLocation: ['', Validators.required],
       payTerm: [''],
       products: this.fb.array([]), // Empty array by default
@@ -889,11 +893,13 @@ calculateLineTotal(index: number): void {
       // Format products data correctly
       formData.items = formData.products.map((product: any) => {
         const foundProduct = this.productsList.find(p => p.id === product.productId);
+        
         return {
           productId: product.productId,
           productName: foundProduct?.productName || 'Unknown Product',
           quantity: product.quantity,
           requiredQuantity: product.quantity,
+          
           unitCost: product.unitCost,
           unitPurchasePrice: product.unitCost,
           unitCostBeforeTax: product.unitCostBeforeTax,
@@ -914,7 +920,12 @@ calculateLineTotal(index: number): void {
       formData.status = 'pending';
       formData.supplierName = this.getSupplierDisplayName(this.selectedSupplierDetails);
       formData.locationName = formData.businessLocation;
-    
+        formData.requiredDate = formData.requiredDate || formData.orderDate;
+  formData.addedById = this.authService.getCurrentUserId(); // Add user ID
+  formData.addedByName = formData.addedBy; // Already in the form
+
+        formData.requiredDate = formData.requiredDate; // Add this line
+
       // Calculate and add totals
       formData.totalItems = this.totalItems;
       formData.subTotal = this.productsFormArray.controls.reduce((total, control) => {
@@ -941,7 +952,16 @@ calculateLineTotal(index: number): void {
       this.purchaseOrderForm.get('referenceNo')?.disable();
     }
   }
-
+validateDates(): void {
+  const orderDate = this.purchaseOrderForm.get('orderDate')?.value;
+  const requiredDate = this.purchaseOrderForm.get('requiredDate')?.value;
+  
+  if (orderDate && requiredDate && new Date(requiredDate) < new Date(orderDate)) {
+    this.purchaseOrderForm.get('requiredDate')?.setErrors({ invalidDate: true });
+  } else {
+    this.purchaseOrderForm.get('requiredDate')?.setErrors(null);
+  }
+}
   private highlightInvalidFields() {
     // Get all form controls
     const formControls = this.purchaseOrderForm.controls;

@@ -20,10 +20,13 @@ import { type } from 'node:os';
 export class LeaveComponent implements OnInit {
   @ViewChild('editLeaveModal') editLeaveModalRef!: ElementRef;
   leaveForm!: FormGroup;
+  
   statusForm: FormGroup;
   searchQuery: string = '';
   selectedFile: File | null = null;
   bulkApproveForm: FormGroup;
+  selectedLeave: any = null;
+isLoadingActivities = false;
   bulkRejectForm: FormGroup;
   editLeaveForm!: FormGroup;
 selectedLeaveId: string | null = null;
@@ -47,7 +50,7 @@ currentUserName: string = '';
   
 isLoading: boolean = false;
 importError: string | null = null;
-  filterForm: FormGroup; // Added for filter sidebar
+  filterForm!: FormGroup; // Added for filter sidebar
   showForm = false;
   showFilterSidebar = false; // Added for filter sidebar toggle
 
@@ -57,7 +60,6 @@ importError: string | null = null;
   users: any[] = [];
   leaves: any[] = [];
   filteredLeaves: any[] = []; // Added for filtered leaves display
-  selectedLeave: any;
   leaveActivities: any[] = [];
   columns = [
     { field: 'select', header: 'Select', visible: true },
@@ -102,49 +104,45 @@ importError: string | null = null;
   private addLeaveModalInstance!: Modal;
   leaveTableRef: any;
 
-  constructor(
-    private fb: FormBuilder,
-    private leaveService: LeaveService,
-    private userService: UserService,
-      private authService: AuthService // Add this
+constructor(
+  private fb: FormBuilder,
+  private leaveService: LeaveService,
+  private userService: UserService,
+  private authService: AuthService
+) {
+  // Initialize forms
+  this.statusForm = this.fb.group({
+    status: ['pending', Validators.required],
+    note: [''],
+    approvedBy: ['']
+  });
+  
+  this.bulkApproveForm = this.fb.group({
+    approvedBy: ['', Validators.required],
+    note: ['']
+  });
+  
+  this.bulkRejectForm = this.fb.group({
+    rejectedBy: ['', Validators.required],
+    note: ['']
+  });
 
-  ) {
-    this.statusForm = this.fb.group({
-      status: ['pending', Validators.required],
-      note: [''],
-      approvedBy: ['']
-    });
-    
-    this.bulkApproveForm = this.fb.group({
-      approvedBy: ['', Validators.required],
-      note: ['']
-    });
-    
-    this.bulkRejectForm = this.fb.group({
-      rejectedBy: ['', Validators.required],
-      note: ['']
-    });
+  // Initialize filter form
+  this.initFilterForm();
+}
+initFilterForm() {
+  this.filterForm = this.fb.group({
+    employee: [''],
+    status: [''],
+    leaveType: [''],
+    startDate: [''],
+    endDate: ['']
+  });
 
-    // Initialize filter form
-    this.filterForm = this.fb.group({
-      employee: [''],
-          department: ['', Validators.required], // Add department field
+  // Load initial data when filters are initialized
+  this.loadInitialData();
+}
 
-      status: [''],
-      leaveType: [''],
-      approvalStatus: [''],
-      startDate: [''],
-      endDate: ['']
-    });
-    {
-      this.statusForm = this.fb.group({
-        status: ['pending', Validators.required],
-        approvedBy: [''],
-        approvalLeaveType: [''],
-        note: ['']
-      });
-    }
-  }
 // Add this method to open the edit modal with data
 openEditModal(leave: any) {
   this.selectedLeaveId = leave.id;
@@ -184,9 +182,16 @@ private formatDateForInput(date: Date | string): string {
      this.leaveForm.get('leaveTypeId')?.valueChanges.subscribe(leaveTypeId => {
     this.updateMaxLeaveCount(leaveTypeId);
      });
+    this.statusForm = this.fb.group({
+  status: ['', Validators.required],
+  note: [''],
+  approvedBy: ['']
+});
       this.editLeaveModalInstance = new Modal(this.editLeaveModalRef.nativeElement);
-
+  this.currentUser = this.authService.currentUserValue;
+  this.currentUserName = this.currentUser?.displayName || this.currentUser?.username || '';
   }
+  
   initializeEditForm() {
   this.editLeaveForm = this.fb.group({
     leaveTypeId: ['', Validators.required],
@@ -302,21 +307,53 @@ updateMaxLeaveCount(leaveTypeId: string): void {
     doc.save('leaves_export.pdf');
   }
 
-  printTable(): void {
-    const printContent = this.leaveTableRef.nativeElement.innerHTML;
-    const originalContent = document.body.innerHTML;
-    
-    document.body.innerHTML = `
-      <h2>Leaves Report</h2>
-      <p>Generated on: ${new Date().toLocaleDateString()}</p>
-      ${printContent}
-    `;
-    
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload();
+printTable(): void {
+  // Get the table HTML
+  const printContent = document.getElementById('leaveTable')?.innerHTML;
+  
+  if (!printContent) {
+    console.error('Could not find table to print');
+    return;
   }
 
+  // Create a print window
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Popup blocker might be preventing the print window from opening. Please allow popups for this site.');
+    return;
+  }
+
+  // Write the print content
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Leaves Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          @page { size: auto; margin: 5mm; }
+        </style>
+      </head>
+      <body>
+        <h2>Leaves Report</h2>
+        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        ${printContent}
+        <script>
+          // Print automatically when loaded
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+              window.close();
+            }, 100);
+          };
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
   updateColumnVisibility(): void {
     // This method is triggered when column visibility checkboxes are changed
     // No need to do anything as the template uses *ngIf to show/hide columns
@@ -455,7 +492,19 @@ loadInitialData() {
   this.leaveService.getLeaveTypes().subscribe((types) => {
     this.leaveTypes = types;
   });
-
+// In loadInitialData() - make sure leaves have proper references
+this.leaveService.getLeaves().subscribe((leaves) => {
+  this.leaves = leaves.map(leave => {
+    return {
+      ...leave,
+      employee: this.users.find(u => u.id === leave.employeeId),
+      leaveType: this.leaveTypes.find(t => t.id === leave.leaveTypeId),
+      startDate: new Date(leave.startDate),
+      endDate: leave.endDate ? new Date(leave.endDate) : new Date(leave.startDate)
+    };
+  });
+  this.filteredLeaves = [...this.leaves];
+});
   this.userService.getUsers().subscribe((users) => {
     this.users = users;
     const user = this.users.find(u => 
@@ -470,7 +519,9 @@ loadInitialData() {
       });
     }
   });
-
+this.filteredLeaves = [...this.leaves];
+    this.isLoading = false;
+    this.resetSelections();
 this.leaveService.getLeaves().subscribe((leaves) => {
     this.leaves = leaves.map(leave => {
       const processedLeave = {
@@ -488,86 +539,73 @@ this.leaveService.getLeaves().subscribe((leaves) => {
 }
 
   
-
-  // Update the applyFilters method to include search
-  applyFilters() {
-    const filters = this.filterForm.value;
-    
-    let filtered = [...this.leaves];
-    
-    // Apply form filters
-    filtered = filtered.filter(leave => {
-      // Employee filter
-      if (filters.employee && leave.employeeId !== filters.employee) {
-        return false;
-      }
-      
-      // Status filter
-      if (filters.status && leave.status !== filters.status) {
-        return false;
-      }
-      
-      // Leave type filter
-      if (filters.leaveType && leave.leaveTypeId !== filters.leaveType) {
-        return false;
-      }
-      
-      // Approval status filter
-      if (filters.approvalStatus && leave.approvalStatus !== filters.approvalStatus) {
-        return false;
-      }
-      
-      // Date range filter
-      if (filters.startDate && filters.endDate) {
-        const leaveDate = new Date(leave.startDate);
-        const filterStartDate = new Date(filters.startDate);
-        const filterEndDate = new Date(filters.endDate);
-        
-        filterStartDate.setHours(0, 0, 0, 0);
-        filterEndDate.setHours(23, 59, 59, 999);
-        
-        if (leaveDate < filterStartDate || leaveDate > filterEndDate) {
-          return false;
-        }
-      } else if (filters.startDate) {
-        const leaveDate = new Date(leave.startDate);
-        const filterStartDate = new Date(filters.startDate);
-        filterStartDate.setHours(0, 0, 0, 0);
-        
-        if (leaveDate < filterStartDate) {
-          return false;
-        }
-      } else if (filters.endDate) {
-        const leaveDate = new Date(leave.startDate);
-        const filterEndDate = new Date(filters.endDate);
-        filterEndDate.setHours(23, 59, 59, 999);
-        
-        if (leaveDate > filterEndDate) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-    
-    // Apply search if there's a query
-    if (this.searchQuery) {
-      const query = this.searchQuery.toLowerCase();
-      filtered = filtered.filter(leave => {
-        return (
-          (leave.referenceNo?.toLowerCase().includes(query)) ||
-          (leave.employeeName?.toLowerCase().includes(query)) ||
-          (leave.leaveType?.toLowerCase().includes(query)) ||
-          (leave.reason?.toLowerCase().includes(query)) ||
-          (leave.status?.toLowerCase().includes(query)) ||
-          (leave.session?.toLowerCase().includes(query)) ||
-          (this.formatDate(leave.startDate)?.includes(query))
-        );
-      });
-    }
+// Updated applyFilters method
+applyFilters() {
+  const filters = this.filterForm.value;
   
-    this.filteredLeaves = filtered;
+  this.filteredLeaves = this.leaves.filter(leave => {
+    // Employee filter - compare IDs
+    if (filters.employee && leave.employeeId !== filters.employee) {
+      return false;
+    }
+    
+    // Status filter
+    if (filters.status && leave.status !== filters.status) {
+      return false;
+    }
+    
+    // Leave type filter - compare IDs
+    if (filters.leaveType && leave.leaveTypeId !== filters.leaveType) {
+      return false;
+    }
+    
+    // Date range filter - proper date comparison
+    if (filters.startDate || filters.endDate) {
+      const leaveStartDate = this.parseDate(leave.startDate);
+      const leaveEndDate = this.parseDate(leave.endDate || leave.startDate);
+      
+      const filterStartDate = filters.startDate ? this.parseDate(filters.startDate) : null;
+      const filterEndDate = filters.endDate ? this.parseDate(filters.endDate) : null;
+      
+      // Check if leave is completely before filter start date
+      if (filterStartDate && leaveEndDate < filterStartDate) {
+        return false;
+      }
+      
+      // Check if leave is completely after filter end date
+      if (filterEndDate && leaveStartDate > filterEndDate) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+}
+
+// Improved parseDate method
+private parseDate(date: any): Date {
+  if (!date) return new Date(0); // Return epoch if no date
+  
+  // If already a Date object and valid
+  if (date instanceof Date && !isNaN(date.getTime())) {
+    return date;
   }
+  
+  // If string or number, try to parse
+  try {
+    const parsed = new Date(date);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  } catch (e) {
+    console.warn('Date parsing error:', e);
+  }
+  
+  // Fallback to current date
+  return new Date();
+}
+
+
   
   // Template and import methods
   async downloadTemplate() {
@@ -1000,7 +1038,8 @@ handleFileInput(event: Event): void {
     
     this.bulkApproveForm.reset({
       approvedBy: '',
-      note: ''
+      note: '',
+
     });
     
     this.bulkApproveModalInstance = new Modal(this.bulkApproveModalRef.nativeElement);
@@ -1022,45 +1061,52 @@ handleFileInput(event: Event): void {
     this.bulkRejectModalInstance.show();
   }
   
-  async approveBulkLeaves() {
-    if (this.bulkApproveForm.invalid) {
-      this.bulkApproveForm.markAllAsTouched();
-      return;
-    }
-    
-    const { approvedBy, note } = this.bulkApproveForm.value;
-    const selectedLeaveIds = Object.entries(this.selectedLeaves)
-      .filter(([_, selected]) => selected)
-      .map(([id, _]) => id);
-    
-    try {
-      await this.leaveService.bulkApproveLeaves(selectedLeaveIds, approvedBy, note);
-      this.bulkApproveModalInstance.hide();
-      this.resetSelections();
-    } catch (error) {
-      console.error('Error approving leaves:', error);
-    }
+async approveBulkLeaves() {
+  if (this.bulkApproveForm.invalid) {
+    this.bulkApproveForm.markAllAsTouched();
+    return;
   }
+  
+  const { approvedBy, note } = this.bulkApproveForm.value;
+  const currentUser = this.authService.currentUserValue;
+  const userName = currentUser?.displayName || currentUser?.username || approvedBy;
+  
+  const selectedLeaveIds = Object.entries(this.selectedLeaves)
+    .filter(([_, selected]) => selected)
+    .map(([id, _]) => id);
+  
+  try {
+    await this.leaveService.bulkApproveLeaves(selectedLeaveIds, userName, note);
+    this.bulkApproveModalInstance.hide();
+    this.resetSelections();
+  } catch (error) {
+    console.error('Error approving leaves:', error);
+  }
+}
 
-  async rejectBulkLeaves() {
-    if (this.bulkRejectForm.invalid) {
-      this.bulkRejectForm.markAllAsTouched();
-      return;
-    }
-    
-    const { rejectedBy, note } = this.bulkRejectForm.value;
-    const selectedLeaveIds = Object.entries(this.selectedLeaves)
-      .filter(([_, selected]) => selected)
-      .map(([id, _]) => id);
-    
-    try {
-      await this.leaveService.bulkRejectLeaves(selectedLeaveIds, rejectedBy, note);
-      this.bulkRejectModalInstance.hide();
-      this.resetSelections();
-    } catch (error) {
-      console.error('Error rejecting leaves:', error);
-    }
+
+async rejectBulkLeaves() {
+  if (this.bulkRejectForm.invalid) {
+    this.bulkRejectForm.markAllAsTouched();
+    return;
   }
+  
+  const { rejectedBy, note } = this.bulkRejectForm.value;
+  const currentUser = this.authService.currentUserValue;
+  const userName = currentUser?.displayName || currentUser?.username || rejectedBy;
+  
+  const selectedLeaveIds = Object.entries(this.selectedLeaves)
+    .filter(([_, selected]) => selected)
+    .map(([id, _]) => id);
+  
+  try {
+    await this.leaveService.bulkRejectLeaves(selectedLeaveIds, userName, note);
+    this.bulkRejectModalInstance.hide();
+    this.resetSelections();
+  } catch (error) {
+    console.error('Error rejecting leaves:', error);
+  }
+}
 getCurrentUserName(): string {
   const currentUser = this.authService.currentUserValue;
   if (!currentUser) return '';
@@ -1154,26 +1200,28 @@ async submitForm() {
     }
   }
 
-  openStatusModal(leave: any) {
-    this.selectedLeave = leave;
-    this.statusForm.patchValue({
-      status: leave.status,
-      note: leave.note || '',
-      approvedBy: leave.approvedBy || ''
-    });
-    
-    // Update validation based on current status
+async openStatusModal(leave: any) {
+  this.selectedLeave = leave;
+  this.statusForm.reset({
+    status: leave.status,
+    approvedBy: this.currentUserName
+  });
+
+  // Update validation based on status selection
+  this.statusForm.get('status')?.valueChanges.subscribe(status => {
     const approvedByControl = this.statusForm.get('approvedBy');
-    if (leave.status === 'approved') {
+    if (status === 'approved') {
       approvedByControl?.setValidators([Validators.required]);
     } else {
       approvedByControl?.clearValidators();
     }
     approvedByControl?.updateValueAndValidity();
+  });
 
-    this.bootstrapModalInstance = new Modal(this.statusModalRef.nativeElement);
-    this.bootstrapModalInstance.show();
-  }
+  // Show the modal
+  this.bootstrapModalInstance = new Modal(this.statusModalRef.nativeElement);
+  this.bootstrapModalInstance.show();
+}
 
 // Update leave method
 async updateLeave() {
@@ -1219,96 +1267,68 @@ async updateLeave() {
     alert('Failed to update leave. Please try again.');
   }
 }
-  async updateStatus() {
-    if (this.statusForm.invalid) return;
+async updateStatus() {
+  if (this.statusForm.invalid || !this.selectedLeave) return;
 
-    const { status, note, approvedBy, approvalLeaveType } = this.statusForm.value;
-    try {
-      if (status === 'approved' || status === 'rejected') {
-        if (!approvedBy) {
-          alert('Please select an approver/rejector');
-          return;
-        }
-        await this.leaveService.updateLeaveStatus(
-          this.selectedLeave.id, 
-          status, 
-          note, 
-          approvedBy,
-          this.selectedLeave.status // Pass current status for activity log
-        );
-      } else {
-        await this.leaveService.updateLeaveStatus(
-          this.selectedLeave.id, 
-          status, 
-          note,
-          '',
-          this.selectedLeave.status
-        );
-      }
-      this.bootstrapModalInstance.hide();
-    } catch (error) {
-      console.error('Error updating leave status:', error);
-    }
-    const updateData = {
-      status,
-      note,
-      approvedBy,
-      approvalLeaveType: status === 'approved' ? approvalLeaveType : null
-    };
+  const { status, note, approvedBy } = this.statusForm.value;
+  const changedBy = approvedBy || this.currentUserName;
+
+  try {
+    await this.leaveService.updateLeaveStatus(
+      this.selectedLeave.id,
+      {
+        status,
+        changedBy,
+        note
+      },
+      this.selectedLeave.status
+    );
+
+    // Close modal and refresh data
+    this.bootstrapModalInstance.hide();
+    this.loadInitialData();
+  } catch (error) {
+    console.error('Error updating status:', error);
   }
+}
 
-  async viewActivity(leave: any) {
-    this.selectedLeave = leave;
-    
-    try {
-      // Show loading state
-      this.leaveActivities = [];
-      
-      // Load activities from service
-      this.leaveActivities = await this.leaveService.getLeaveActivities(leave.id);
-      
-      // If no activities found, create a default one
-      if (this.leaveActivities.length === 0) {
-        this.leaveActivities = [{
-          action: 'created',
-          status: leave.status || 'pending',
-          timestamp: leave.createdAt || new Date(),
-          by: leave.employeeName || 'System',
-          note: 'Leave request was created'
-        }];
-      }
-      
-      // Format activities for display
-      this.leaveActivities = this.leaveActivities.map(activity => ({
-        ...activity,
-        action: this.formatActivityAction(activity),
-        timestamp: activity.timestamp instanceof Date ? activity.timestamp : 
-                  activity.timestamp?.toDate ? activity.timestamp.toDate() : 
-                  new Date(activity.timestamp)
-      }));
+
+async viewActivity(leave: any) {
+  this.selectedLeave = leave;
+  this.isLoadingActivities = true;
   
-      // Show the modal
-      if (!this.activityModalInstance) {
-        this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
-      }
-      this.activityModalInstance.show();
-    } catch (error) {
-      console.error('Error loading activities:', error);
-      // Create a fallback activity if there's an error
+  try {
+    this.leaveActivities = await this.leaveService.getLeaveActivities(leave.id);
+    
+    // If no activities found, create a default one
+    if (this.leaveActivities.length === 0) {
       this.leaveActivities = [{
-        action: 'error',
-        status: leave.status || 'unknown',
-        timestamp: new Date(),
-        by: 'System',
-        note: 'Failed to load activity history. Showing current status.'
+        action: 'created',
+        status: leave.status || 'pending',
+        timestamp: leave.createdAt || new Date(),
+        by: leave.employeeName || 'System',
+        note: 'Leave request was created'
       }];
-      
-      if (!this.activityModalInstance) {
-        this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
-      }
-      this.activityModalInstance.show();
     }
+  } catch (error) {
+    console.error('Error loading activities:', error);
+    // Create a fallback activity if there's an error
+    this.leaveActivities = [{
+      action: 'error',
+      status: leave.status || 'unknown',
+      timestamp: new Date(),
+      by: 'System',
+      note: 'Failed to load activity history. Showing current status.'
+    }];
+  } finally {
+    this.isLoadingActivities = false;
   }
+
+  // Show the modal
+  this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
+  this.activityModalInstance.show();
+}
+
   private hideModal(): void {
     const modalElement = document.getElementById('importModal');
     if (modalElement) {
@@ -1341,33 +1361,32 @@ async updateLeave() {
       return '';
     }
   }
-  private formatActivityAction(activity: any): string {
-    if (activity.action === 'status_change') {
-      if (activity.newStatus === 'approved') return 'approved';
-      if (activity.newStatus === 'rejected') return 'rejected';
-      return 'status updated';
-    }
-    return activity.action || 'updated';
+
+formatActivityAction(activity: any): string {
+  if (activity.action === 'status_change') {
+    if (activity.newStatus === 'approved') return 'approved';
+    if (activity.newStatus === 'rejected') return 'rejected';
+    return 'status updated';
   }
-  
-  getStatusBadgeClass(status: string): string {
-    switch (status) {
-      case 'approved': return 'bg-success';
-      case 'rejected': return 'bg-danger';
-      case 'pending': return 'bg-warning text-dark';
-      default: return 'bg-secondary';
-    }
+  return activity.action || 'updated';
+}
+getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'approved': return 'bg-success';
+    case 'rejected': return 'bg-danger';
+    case 'pending': return 'bg-warning text-dark';
+    default: return 'bg-secondary';
   }
-  
-  getActivityIcon(action: string): string {
-    switch (action) {
-      case 'created': return 'bi-plus-circle';
-      case 'approved': return 'bi-check-circle';
-      case 'rejected': return 'bi-x-circle';
-      case 'updated': return 'bi-pencil';
-      default: return 'bi-clock-history';
-    }
+}
+getActivityIcon(action: string): string {
+  switch (action) {
+    case 'created': return 'bi-plus-circle';
+    case 'approved': return 'bi-check-circle';
+    case 'rejected': return 'bi-x-circle';
+    case 'updated': return 'bi-pencil';
+    default: return 'bi-clock-history';
   }
+}
 
   // New methods for filtering functionality
   toggleFilterSidebar() {
@@ -1375,156 +1394,66 @@ async updateLeave() {
   }
 
 
-  resetFilters() {
-    this.filterForm.reset();
-    this.filteredLeaves = [...this.leaves];
-  }
 
-  applyDateFilter(filter: string) {
-    const today = new Date();
-    const startDate = new Date();
-    const endDate = new Date();
-    
-    switch (filter) {
-      case 'today':
-        // Today
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'yesterday':
-        // Yesterday
-        startDate.setDate(today.getDate() - 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setDate(today.getDate() - 1);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'last7days':
-        // Last 7 days
-        startDate.setDate(today.getDate() - 6);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'last30days':
-        // Last 30 days
-        startDate.setDate(today.getDate() - 29);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'thisMonth':
-        // This month
-        startDate.setDate(1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setMonth(today.getMonth() + 1, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'lastMonth':
-        // Last month
-        startDate.setMonth(today.getMonth() - 1, 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setMonth(today.getMonth(), 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'thisYear':
-        // This year
-        startDate.setMonth(0, 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setMonth(11, 31);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'lastYear':
-        // Last year
-        startDate.setFullYear(today.getFullYear() - 1, 0, 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setFullYear(today.getFullYear() - 1, 11, 31);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'currentFinancialYear':
-        // Current financial year (assuming April to March)
-        if (today.getMonth() >= 3) { // April or later
-          startDate.setFullYear(today.getFullYear(), 3, 1);
-        } else { // January to March
-          startDate.setFullYear(today.getFullYear() - 1, 3, 1);
-        }
-        startDate.setHours(0, 0, 0, 0);
-        
-        if (today.getMonth() >= 3) { // April or later
-          endDate.setFullYear(today.getFullYear() + 1, 2, 31);
-        } else { // January to March
-          endDate.setFullYear(today.getFullYear(), 2, 31);
-        }
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'lastFinancialYear':
-        // Last financial year (assuming April to March)
-        if (today.getMonth() >= 3) { // April or later
-          startDate.setFullYear(today.getFullYear() - 1, 3, 1);
-          endDate.setFullYear(today.getFullYear(), 2, 31);
-        } else { // January to March
-          startDate.setFullYear(today.getFullYear() - 2, 3, 1);
-          endDate.setFullYear(today.getFullYear() - 1, 2, 31);
-        }
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'customRange':
-        // Don't set anything, just clear the current dates to let user select custom range
-        this.filterForm.patchValue({
-          startDate: '',
-          endDate: ''
-        });
-        return;
-    }
-    
-    // Format dates for form input (YYYY-MM-DD)
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    
-    // Update form values
-    this.filterForm.patchValue({
-      startDate: formatDate(startDate),
-      endDate: formatDate(endDate)
-    });
-    
-    // Apply the filters with the new date range
-    this.applyFilters();
-  }
-  calculateLeaveDetails(leave: any): any {
-  // Calculate days taken
-  const startDate = leave.startDate instanceof Date ? leave.startDate : new Date(leave.startDate);
-  const endDate = leave.endDate instanceof Date ? leave.endDate : new Date(leave.endDate || leave.startDate);
+ // Replace your existing resetFilters method with this:
+resetFilters() {
+  this.filterForm.reset({
+    employee: '',
+    status: '',
+    leaveType: '',
+    approvalStatus: '',
+    startDate: '',
+    endDate: ''
+  });
   
-  // Calculate difference in days
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  let daysTaken = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
+  // Also reset search query
+  this.searchQuery = '';
   
-  // Adjust for half-day sessions
-  if (leave.session === 'First Half' || leave.session === 'Second Half') {
-    daysTaken = daysTaken - 0.5;
-  }
+  // Reapply filters (which will now show all data)
+  this.applyFilters();
+}
+
+// Replace your existing applyDateFilter method with this:
+
+calculateLeaveDetails(leave: any): any {
+  // Get all APPROVED leaves of this type for THIS USER ONLY
+  const userApprovedLeaves = this.leaves.filter(l => 
+    l.employeeId === leave.employeeId && 
+    l.leaveTypeId === leave.leaveTypeId && 
+    l.status === 'approved' &&
+    l.id !== leave.id // Exclude current leave if it's not approved yet
+  );
+
+  // Calculate total days already taken from approved leaves
+  const totalDaysTaken = userApprovedLeaves.reduce((sum, l) => sum + l.daysTaken, 0);
+  
+  // Current leave days (only count if approved)
+  const currentLeaveDays = leave.status === 'approved' ? this.calculateDaysForLeave(leave) : 0;
   
   // Calculate remaining leave
   const maxLeaveCount = leave.maxLeaveCount || 0;
-  const remainingLeave = maxLeaveCount - daysTaken;
+  const remainingLeave = maxLeaveCount - (totalDaysTaken + currentLeaveDays);
   
   return {
     ...leave,
-    daysTaken,
-    remainingLeave: remainingLeave > 0 ? remainingLeave : 0
+    daysTaken: totalDaysTaken, // Shows total approved days taken before this leave
+    daysTakenForThisLeave: this.calculateDaysForLeave(leave), // Days for this specific leave
+    remainingLeave: Math.max(remainingLeave, 0) // Don't show negative values
   };
+}
+
+private calculateDaysForLeave(leave: any): number {
+  const startDate = new Date(leave.startDate);
+  const endDate = new Date(leave.endDate || leave.startDate);
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
+  
+  // Adjust for half-day sessions
+  if (leave.session === 'First Half' || leave.session === 'Second Half') {
+    days -= 0.5;
+  }
+  
+  return days;
 }
   calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
     if (!startDate || !endDate) return 0;

@@ -358,4 +358,130 @@ body {
     margin-right: 0.5rem !important;
     margin-bottom: 0.5rem;
   }
+}@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  // Hide action buttons column
+  .hide-actions-on-print {
+    td:last-child, th:last-child {
+      display: none !important;
+    }
+  }
+}.timeline {
+  position: relative;
+  padding: 20px 0;
+  
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 25px;
+    width: 2px;
+    background: #dee2e6;
+  }
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 20px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.timeline-badge {
+  position: absolute;
+  left: 15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  
+  &.primary {
+    background-color: #0d6efd;
+  }
+  
+  &.success {
+    background-color: #198754;
+  }
+  
+  &.danger {
+    background-color: #dc3545;
+  }
+  
+  &.warning {
+    background-color: #ffc107;
+  }
+  
+  &.info {
+    background-color: #0dcaf0;
+  }
+}
+
+.timeline-panel {
+  margin-left: 50px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.timeline-heading {
+  margin-bottom: 10px;
+}
+
+.timeline-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.timeline-body {
+  p:last-child {
+    margin-bottom: 0;
+  }
+}/* Add to your component's CSS or global styles */
+.timeline {
+  position: relative;
+  padding-left: 50px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 20px;
+  border-left: 2px solid #dee2e6;
+  padding-left: 20px;
+}
+
+.timeline-item:last-child {
+  border-left: 2px solid transparent;
+}
+
+.timeline-icon {
+  position: absolute;
+  left: -16px;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #dee2e6;
+}
+
+.timeline-icon i {
+  font-size: 1.2rem;
+}
+
+.timeline-content {
+  background: white;
 }

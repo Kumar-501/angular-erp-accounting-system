@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { SaleService } from '../services/sale.service';
 import { collection, doc, Firestore, getDoc, onSnapshot, orderBy, query, updateDoc } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
@@ -153,11 +153,17 @@ export class ShipmentsComponent implements OnInit {
 [x: string]: any;
   serviceMap: Map<string, any> = new Map<string, any>();
 private unsubscribeShipments!: () => void;
-private invoiceModal: any; // Add this property
+  private invoiceModal: any; // Add this property
+  showActionPopup = false;
+  currentActionPopup: string | null = null;
+
+selectedShipment: Shipment | null = null;
 private prescriptionModal: any; // Add this property
 shipments: Shipment[] = [];
   selectedShipments: string[] = []; // Array to store selected shipment IDs
-isUpdating = false;
+  isUpdating = false;
+  openedActionMenuId: string | null = null;
+
 // Add these to your component class
 combinedAddress: string = '';
 currentPrescriptionData: PrescriptionData | null = null; // Add this property
@@ -258,6 +264,25 @@ printPrescriptionPDF(): void {
   };
 }
 
+openActionPopup(shipment: Shipment, event: Event): void {
+  event.stopPropagation();
+  this.currentActionPopup = shipment.id;
+}
+
+closeActionPopup(): void {
+  this.currentActionPopup = null;
+}
+@HostListener('document:keydown.escape', ['$event'])
+onKeydownHandler(event: KeyboardEvent) {
+  this.closeActionPopup();
+}
+viewShipment(): void {
+  if (this.selectedShipment) {
+    this.router.navigate(['/shipments/view', this.selectedShipment.id]);
+    this.closeActionPopup();
+  }
+  }
+  
 // Add method to download prescription as PDF
 downloadPrescriptionPDF(): void {
   if (!this.currentPrescriptionData) return;
@@ -266,7 +291,17 @@ downloadPrescriptionPDF(): void {
   // you would need a PDF library like jsPDF or pdfmake
   this.printPrescriptionPDF();
 }
+toggleActionMenu(shipmentId: string): void {
+  if (this.openedActionMenuId === shipmentId) {
+    this.openedActionMenuId = null;
+  } else {
+    this.openedActionMenuId = shipmentId;
+  }
+}
 
+closeActionMenu(): void {
+  this.openedActionMenuId = null;
+}
 // Generate prescription PDF content
 private generatePrescriptionPDFContent(prescription: PrescriptionData): string {
   const formattedDate = prescription.date ? 

@@ -7,6 +7,7 @@ import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { SaleService } from '../services/sale.service';
 import { EndOfDayService } from '../services/end-of-day.service';
+import { DailyStockService } from '../services/daily-stock.service';
 import { COLLECTIONS } from '../../utils/constants';
 
 interface StockHistoryEntry {
@@ -21,7 +22,8 @@ interface StockHistoryEntry {
   userId: string;
   referenceNo?: string;
   notes?: string;
-  // Transfer specific fields  locationFrom?: string;
+  // Transfer specific fields  
+  locationFrom?: string;
   locationTo?: string;
   transferId?: string;
 }
@@ -137,8 +139,6 @@ export class StockReportComponent implements OnInit, OnDestroy {
   openingStockStartTime: Date = new Date();
   closingStockEndTime: Date = new Date();
   
-  // Location filtering - removed since locations are now columns
-  
   // Pagination
   currentPage = 1;
   itemsPerPage = 10;
@@ -164,19 +164,19 @@ export class StockReportComponent implements OnInit, OnDestroy {
     private locationService: LocationService,
     private router: Router,
     private saleService: SaleService,
-    private endOfDayService: EndOfDayService // Add this injection
+    private endOfDayService: EndOfDayService,
+    private dailyStockService: DailyStockService // Add this injection
   ) {}
 
   async ngOnInit() {
-    this.setDateFilter('today'); // Initialize with today's filter
+    this.setDateFilter('today'); // Initialize with today's filter, this will call loadStockReport()
     await this.loadLocations();  // Load locations first
-    await this.loadStockReport();
-      this.loadStockReport();
 
-   this.stockUpdateSubscription = this.stockService.stockUpdated$.subscribe(() => {
-    this.loadStockReport(); // Refresh the report when stock changes
-  });
-}
+    this.stockUpdateSubscription = this.stockService.stockUpdated$.subscribe(() => {
+      this.loadStockReport(); // Refresh the report when stock changes
+    });
+  }
+
   ngOnDestroy() {
     if (this.stockUpdateSubscription) {
       this.stockUpdateSubscription.unsubscribe();
@@ -285,51 +285,91 @@ export class StockReportComponent implements OnInit, OnDestroy {
     if (this.selectedDateFilter === 'all') return 'Current';
     return this.closingStockEndTime.toLocaleString();
   }
+
   async loadStockReport() {
     try {
       this.isLoading = true;
       
+      // Initialize daily snapshots for the selected date if needed
+      await this.dailyStockService.initializeDailySnapshotsIfNeeded(this.closingStockEndTime);
+      
       // Get all products
       const products = await this.productsService.fetchAllProducts();
+      console.log('Products loaded:', products.length);
       
       // Get all product-stock documents
       const productStockCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK);
       const productStockSnapshot = await getDocs(productStockCollection);
-      
+      console.log('Product stock documents:', productStockSnapshot.docs.length);
+        
       // Create a map to store stock information by product ID and location ID
       const stockMap: { [productId: string]: { [locationId: string]: LocationStockInfo } } = {};
-        // Process product-stock documents
+      const processedDocs = new Set<string>(); // Track processed documents to avoid duplicates
+      
+      // Process product-stock documents
       for (const doc of productStockSnapshot.docs) {
         const data = doc.data();
         const docId = doc.id;
         
+        // Skip if already processed
+        if (processedDocs.has(docId)) {
+          console.log('Skipping duplicate document:', docId);
+          continue;
+        }
+        processedDocs.add(docId);
+        
+        console.log('Processing stock document:', docId, data);
+        
         // Parse document ID format: productId_locationId
-        const [productId, locationId] = docId.split('_');
-          if (productId && locationId) {
-          if (!stockMap[productId]) {
-            stockMap[productId] = {};
+        const parts = docId.split('_');
+        console.log('Document ID parts:', parts);
+        
+        if (parts.length >= 2) {
+          const productId = parts[0];
+          const locationId = parts.slice(1).join('_'); // Handle location IDs that might contain underscores
+            
+          console.log('Parsed productId:', productId, 'locationId:', locationId, 'type:', typeof locationId);
+          
+          // Filter out invalid location IDs
+          if (productId && locationId && typeof locationId === 'string' && locationId !== '[object Object]' && !locationId.includes('object')) {
+            if (!stockMap[productId]) {
+              stockMap[productId] = {};
+            }
+            
+            const location = this.locations.find(l => l.id === locationId);
+            const currentStock = data['quantity'] || 0;
+              
+            console.log(`Stock for product ${productId} at location ${locationId}:`, currentStock);
+          
+            // Get opening and closing stock from daily snapshots
+            const openingStock = await this.dailyStockService.getOpeningStock(
+              productId, 
+              locationId, 
+              this.openingStockStartTime
+            );
+            
+            const closingStock = await this.dailyStockService.getClosingStock(
+              productId, 
+              locationId, 
+              this.closingStockEndTime
+            );
+            
+            // Calculate total sold for the period
+            const totalSold = Math.max(0, openingStock + 0 - closingStock); // Simplified calculation
+            
+            stockMap[productId][locationId] = {
+              locationId: locationId,
+              locationName: location?.name || `Location ${locationId}`,
+              currentStock: currentStock,
+              openingStock: openingStock,
+              closingStock: closingStock,
+              totalSold: totalSold
+            };
           }
-          
-          const location = this.locations.find(l => l.id === locationId);
-          const currentStock = data['quantity'] || 0;
-          
-          // Calculate opening stock (stock at beginning of today)
-          const openingStock = await this.getOpeningStockForDate(productId, locationId, new Date());
-          
-          // Calculate closing stock (current stock - it will be the closing stock at end of day)
-          const closingStock = currentStock;
-          
-          stockMap[productId][locationId] = {
-            locationId: locationId,
-            locationName: location?.name || `Location ${locationId}`,
-            currentStock: currentStock,
-            openingStock: openingStock,
-            closingStock: closingStock,
-            totalSold: 0 // TODO: Calculate actual sales for the day
-          };
         }
       }
-        // Create stock report items
+        
+      // Create stock report items
       this.stockData = products.map((product: Product) => {
         const productStocks = stockMap[product.id || ''] || {};
         
@@ -346,6 +386,10 @@ export class StockReportComponent implements OnInit, OnDestroy {
           overallOpeningStock += stock.openingStock || 0;
           overallClosingStock += stock.closingStock || 0;
         });
+        
+        const totalCurrentStock = Object.values(productStocks).reduce((total, stock) => total + (stock.currentStock || 0), 0);
+        
+        console.log(`Product ${product.productName} - Opening: ${overallOpeningStock}, Closing: ${overallClosingStock}, Current: ${totalCurrentStock}`, productStocks);
         
         return {
           id: product.id || '',
@@ -369,6 +413,8 @@ export class StockReportComponent implements OnInit, OnDestroy {
         };
       });
       
+      console.log('Final stock data:', this.stockData);
+      
       this.applyFilter();
       
     } catch (error) {
@@ -377,6 +423,7 @@ export class StockReportComponent implements OnInit, OnDestroy {
       this.isLoading = false;
     }
   }
+
   applyFilter() {
     let filtered = [...this.stockData];
 
@@ -473,6 +520,7 @@ export class StockReportComponent implements OnInit, OnDestroy {
       this.updatePaginatedData();
     }
   }
+
   // Method to clear all filters
   clearFilters() {
     this.searchTerm = '';
@@ -490,7 +538,7 @@ export class StockReportComponent implements OnInit, OnDestroy {
    * Get total stock across all locations for a product
    */
   getTotalStock(item: StockReportItem): number {
-    return Object.values(item.locationStocks || {}).reduce((total, stock) => total + stock.currentStock, 0);
+    return Object.values(item.locationStocks || {}).reduce((total, stock) => total + (stock.currentStock || 0), 0);
   }
 
   /**
@@ -508,7 +556,7 @@ export class StockReportComponent implements OnInit, OnDestroy {
   getTotalStockForLocation(locationId: string): number {
     return this.paginatedStockData.reduce((total, item) => {
       const stock = this.getStockForLocation(item, locationId);
-      return total + (stock ? stock.currentStock : 0);
+      return total + (stock ? (stock.currentStock || 0) : 0);
     }, 0);
   }
 
@@ -524,7 +572,9 @@ export class StockReportComponent implements OnInit, OnDestroy {
    */
   getLowStockProducts(): StockReportItem[] {
     return this.filteredData.filter(item => this.hasLowStockAlert(item));
-  }  /**
+  }
+
+  /**
    * Get locations with low stock for a specific product
    */
   getLocationsWithLowStock(item: StockReportItem): string[] {
@@ -583,34 +633,6 @@ export class StockReportComponent implements OnInit, OnDestroy {
     return stock ? stock.closingStock : 0;
   }
 
-  /**
-   * Get opening stock for a product at a location for a specific date
-   * This would typically look at stock transactions to find the stock at the beginning of the day
-   */
-  private async getOpeningStockForDate(productId: string, locationId: string, date: Date): Promise<number> {
-    try {
-      // For now, return current stock as opening stock
-      // In a real implementation, you would:
-      // 1. Query stock history/transactions for this product-location
-      // 2. Find the last known stock before the start of the day
-      // 3. Return that value
-      
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      const stockDoc = await getDoc(stockDocRef);
-      
-      if (stockDoc.exists()) {
-        // For demonstration, return current stock as opening stock
-        // You can enhance this to query stock history if you have it
-        return stockDoc.data()['quantity'] || 0;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error getting opening stock:', error);
-      return 0;
-    }
-  }
-
   // End of Day Processing Method
   async processEndOfDay() {
     this.eodProcessing = true;
@@ -619,6 +641,10 @@ export class StockReportComponent implements OnInit, OnDestroy {
     
     try {
       await this.endOfDayService.processEndOfDay();
+      
+      // Also process end of day in DailyStockService
+      await this.dailyStockService.processEndOfDay(new Date());
+      
       this.eodSuccess = true;
       // Refresh the report after EOD processing
       await this.loadStockReport();

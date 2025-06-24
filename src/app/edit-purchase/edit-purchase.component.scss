@@ -47,7 +47,7 @@ button:hover {
 
 /* Main Table Styling */
 .table {
-  min-width: 1600px; /* Increased for responsive columns */
+  min-width: 1200px; /* Increased for responsive columns */
   margin-bottom: 0;
   font-size: 14px;
   border-collapse: separate;
@@ -420,4 +420,25 @@ input[type="date"].form-control, input[type="date"].form-control-sm {
 
 .table-responsive::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}/* Add to your edit-purchase.component.scss */
+.form-control.ng-invalid.ng-touched {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.form-control.ng-invalid.ng-dirty {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.is-invalid {
+  border-color: #dc3545 !important;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #dc3545;
+}/* Add to your CSS */
+tr.ng-invalid {
+  background-color: rgba(220, 53, 69, 0.1);
 }

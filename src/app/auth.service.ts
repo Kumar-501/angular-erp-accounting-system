@@ -48,7 +48,11 @@ export class AuthService {
     this.loadUserFromStorage();
   }
 
-
+// In your auth.service.ts
+isAdmin(): boolean {
+  const user = this.currentUserSubject.value;
+  return user?.role?.toLowerCase() === 'admin'; // Make sure your role field matches
+}
   private async loadUserFromStorage(): Promise<void> {
     const storedUser = sessionStorage.getItem('currentUser'); // Change from localStorage to sessionStorage
     if (storedUser) {
@@ -131,11 +135,7 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
-  // Role checking methods
-  isAdmin(): boolean {
-    const user = this.currentUserSubject.value;
-    return user?.role === 'admin';
-  }
+
 
   isAccountant(): boolean {
     const user = this.currentUserSubject.value;

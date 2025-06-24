@@ -1,0 +1,340 @@
+<!-- components/stock-price-log/list-stock-price-log.component.html -->
+<div class="container-fluid">
+  <div class="card my-3">
+    <div class="card-header bg-light py-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">Purchase Stock Price Logs</h4>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-primary" (click)="exportToExcel()">
+            <i class="fas fa-download me-1"></i> Export Excel
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="toggleFilterSidebar()">
+            <i class="fas fa-filter me-1"></i> Filter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <!-- Summary Cards -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-database fa-2x me-3"></i>
+                <div>
+                  <h5 class="card-title mb-0">{{ summary.totalRecords }}</h5>
+                  <p class="card-text">Total Records</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-boxes fa-2x me-3"></i>
+                <div>
+                  <h5 class="card-title mb-0">{{ summary.totalStockReceived | number:'1.0-0' }}</h5>
+                  <p class="card-text">Total Stock Received</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-rupee-sign fa-2x me-3"></i>
+                <div>
+                  <h5 class="card-title mb-0">₹{{ summary.totalPurchaseValue | number:'1.2-2' }}</h5>
+                  <p class="card-text">Total Purchase Value</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-white">
+            <div class="card-body">
+              <div class="d-flex align-items-center">
+                <i class="fas fa-percentage fa-2x me-3"></i>
+                <div>
+                  <h5 class="card-title mb-0">₹{{ summary.averageUnitPrice | number:'1.2-2' }}</h5>
+                  <p class="card-text">Average Unit Price</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Filters -->
+      <div class="row mb-3">
+        <div class="col-12">
+          <div class="btn-group btn-group-sm me-3" role="group">
+            <button type="button" class="btn btn-outline-secondary" (click)="filterByLastDays(7)">Last 7 Days</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="filterByLastDays(30)">Last 30 Days</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="filterByCurrentMonth()">This Month</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="filterByCurrentYear()">This Year</button>
+            <button type="button" class="btn btn-outline-danger" (click)="resetFilters()">Clear Filters</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search and Controls -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex align-items-center">
+          <label class="me-2">Show</label>
+          <select class="form-select form-select-sm me-2" style="width: 70px;" [(ngModel)]="pageSize" (change)="changePageSize()">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+          <label>entries</label>
+        </div>
+        
+        <div class="form-group mb-0">
+          <input type="text" class="form-control form-control-sm" 
+                 placeholder="Search logs..." 
+                 [(ngModel)]="searchText" 
+                 (input)="applyFilters()"
+                 style="width: 250px;">
+        </div>
+      </div>
+
+      <!-- Main Table -->
+      <div class="table-responsive">
+        <table class="table table-hover" *ngIf="!isLoading">
+          <thead class="table-light">
+            <tr>
+              <th>Actions</th>
+              <th (click)="sortBy('grnCreatedDate')" style="cursor: pointer;">
+                GRN Date <i class="fas" [ngClass]="getSortIcon('grnCreatedDate')"></i>
+              </th>
+              <th (click)="sortBy('purchaseRefNo')" style="cursor: pointer;">
+                Purchase Ref <i class="fas" [ngClass]="getSortIcon('purchaseRefNo')"></i>
+              </th>
+              <th (click)="sortBy('invoiceNo')" style="cursor: pointer;">
+                Invoice No <i class="fas" [ngClass]="getSortIcon('invoiceNo')"></i>
+              </th>
+              <th (click)="sortBy('productName')" style="cursor: pointer;">
+                Product <i class="fas" [ngClass]="getSortIcon('productName')"></i>
+              </th>
+              <th (click)="sortBy('locationName')" style="cursor: pointer;">
+                Location <i class="fas" [ngClass]="getSortIcon('locationName')"></i>
+              </th>
+              <th (click)="sortBy('supplierName')" style="cursor: pointer;">
+                Supplier <i class="fas" [ngClass]="getSortIcon('supplierName')"></i>
+              </th>
+              <th (click)="sortBy('batchNumber')" style="cursor: pointer;">
+                Batch No <i class="fas" [ngClass]="getSortIcon('batchNumber')"></i>
+              </th>
+              <th (click)="sortBy('unitPurchasePrice')" style="cursor: pointer;">
+                Unit Price <i class="fas" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
+              </th>
+              <th (click)="sortBy('receivedStockFromGrn')" style="cursor: pointer;">
+                Received Qty <i class="fas" [ngClass]="getSortIcon('receivedStockFromGrn')"></i>
+              </th>
+              <th (click)="sortBy('totalCost')" style="cursor: pointer;">
+                Total Cost <i class="fas" [ngClass]="getSortIcon('totalCost')"></i>
+              </th>
+              <th (click)="sortBy('taxRate')" style="cursor: pointer;">
+                Tax Rate <i class="fas" [ngClass]="getSortIcon('taxRate')"></i>
+              </th>
+              <th (click)="sortBy('taxAmount')" style="cursor: pointer;">
+                Tax Amount <i class="fas" [ngClass]="getSortIcon('taxAmount')"></i>
+              </th>
+              <th (click)="sortBy('paymentType')" style="cursor: pointer;">
+                Payment Type <i class="fas" [ngClass]="getSortIcon('paymentType')"></i>
+              </th>
+              <th>Expiry Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let log of paginatedLogs">
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-info btn-sm" 
+                          (click)="viewPurchaseDetails(log.purchaseRefNo)"
+                          title="View Purchase">
+                    <i class="fas fa-eye"></i>
+                  </button>
+                  <button class="btn btn-outline-primary btn-sm" 
+                          (click)="viewProductDetails(log.productId)"
+                          title="View Product">
+                    <i class="fas fa-box"></i>
+                  </button>
+                  <button class="btn btn-outline-danger btn-sm" 
+                          (click)="deleteLog(log.id!)"
+                          title="Delete">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+              <td>{{ log.grnCreatedDate | date:'dd/MM/yyyy' }}</td>
+              <td>
+                <span class="text-primary" style="cursor: pointer;" 
+                      (click)="viewPurchaseDetails(log.purchaseRefNo)">
+                  {{ log.purchaseRefNo }}
+                </span>
+              </td>
+              <td>{{ log.invoiceNo || 'N/A' }}</td>
+              <td>
+                <span class="text-primary" style="cursor: pointer;" 
+                      (click)="viewProductDetails(log.productId)">
+                  {{ log.productName }}
+                </span>
+              </td>
+              <td>{{ log.locationName || 'N/A' }}</td>
+              <td>{{ log.supplierName || 'N/A' }}</td>
+              <td>{{ log.batchNumber || 'N/A' }}</td>
+              <td>₹{{ log.unitPurchasePrice | number:'1.2-2' }}</td>
+              <td>{{ log.receivedStockFromGrn | number:'1.0-0' }}</td>
+              <td>₹{{ log.totalCost | number:'1.2-2' }}</td>
+              <td>{{ log.taxRate }}%</td>
+              <td>₹{{ log.taxAmount | number:'1.2-2' }}</td>
+              <td>
+                <span class="badge" 
+                      [ngClass]="{
+                        'bg-success': log.paymentType === 'Cash',
+                        'bg-primary': log.paymentType === 'Bank Transfer',
+                        'bg-warning': log.paymentType === 'Cheque',
+                        'bg-secondary': log.paymentType === 'Other'
+                      }">
+                  {{ log.paymentType }}
+                </span>
+              </td>
+              <td>
+                <span *ngIf="log.expiryDate" 
+                      [ngClass]="{
+                        'text-danger': isExpiringSoon(log.expiryDate),
+                        'text-warning': isNearExpiry(log.expiryDate)
+                      }">
+                  {{ log.expiryDate | date:'dd/MM/yyyy' }}
+                </span>
+                <span *ngIf="!log.expiryDate" class="text-muted">N/A</span>
+              </td>
+            </tr>
+            <tr *ngIf="paginatedLogs.length === 0">
+              <td colspan="15" class="text-center">No stock price logs found</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Loading Spinner -->
+        <div *ngIf="isLoading" class="text-center py-5">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="!isLoading">
+        <div>
+          Showing {{ startItem }} to {{ endItem }} of {{ filteredLogs.length }} entries
+        </div>
+        <nav aria-label="Page navigation">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <a class="page-link" (click)="changePage(currentPage - 1)">Previous</a>
+            </li>
+            <li class="page-item" 
+                *ngFor="let page of getPageNumbers()" 
+                [class.active]="page === currentPage">
+              <a class="page-link" (click)="changePage(page)">{{ page }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <a class="page-link" (click)="changePage(currentPage + 1)">Next</a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Sidebar -->
+<div class="filter-sidebar" [class.show]="showFilterSidebar">
+  <div class="filter-header">
+    <h5>Filter Stock Price Logs</h5>
+    <button class="btn btn-sm btn-close" (click)="toggleFilterSidebar()"></button>
+  </div>
+  
+  <div class="filter-body">
+    <div class="mb-3">
+      <label class="form-label">Date Range</label>
+      <div class="row">
+        <div class="col-6">
+          <input type="date" class="form-control form-control-sm" 
+                 [(ngModel)]="filter.startDate" placeholder="Start Date">
+        </div>
+        <div class="col-6">
+          <input type="date" class="form-control form-control-sm" 
+                 [(ngModel)]="filter.endDate" placeholder="End Date">
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Product</label>
+      <select class="form-select form-select-sm" [(ngModel)]="filter.productId">
+        <option value="">All Products</option>
+        <option *ngFor="let product of products" [value]="product.id">
+          {{ product.name }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Location</label>
+      <select class="form-select form-select-sm" [(ngModel)]="filter.locationId">
+        <option value="">All Locations</option>
+        <option *ngFor="let location of locations" [value]="location.id">
+          {{ location.name }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Payment Type</label>
+      <select class="form-select form-select-sm" [(ngModel)]="filter.paymentType">
+        <option value="">All Payment Types</option>
+        <option *ngFor="let type of paymentTypes" [value]="type">
+          {{ type }}
+        </option>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Purchase Reference</label>
+      <input type="text" class="form-control form-control-sm" 
+             [(ngModel)]="filter.purchaseRefNo" 
+             placeholder="Enter purchase reference">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Supplier Name</label>
+      <input type="text" class="form-control form-control-sm" 
+             [(ngModel)]="filter.supplierName" 
+             placeholder="Enter supplier name">
+    </div>
+  </div>
+  
+  <div class="filter-footer">
+    <button class="btn btn-sm btn-secondary me-2" (click)="resetFilters()">
+      Reset
+    </button>
+    <button class="btn btn-sm btn-primary" (click)="applyAdvancedFilters()">
+      Apply Filters
+    </button>
+  </div>
+</div>
+
+<!-- Overlay when sidebar is open -->
+<div class="sidebar-overlay" [class.show]="showFilterSidebar" (click)="toggleFilterSidebar()"></div>

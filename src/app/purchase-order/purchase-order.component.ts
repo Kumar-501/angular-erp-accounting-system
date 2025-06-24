@@ -23,6 +23,7 @@ supplierAddress?: string; // Add this line
   businessLocation: string;
   businessLocationId: string;
   supplier: string;
+  
     orderTotal?: number;
   supplierName: string;
    batchNumber?: string;  // Add this
@@ -106,6 +107,7 @@ interface Product {
 export class PurchaseOrderComponent implements OnInit, OnDestroy {
   exportToExcel() {
     this.exportExcel();
+    
   }
   exportToPDF() {
     this.exportPDF();
@@ -127,7 +129,8 @@ export class PurchaseOrderComponent implements OnInit, OnDestroy {
   filteredOrders: PurchaseOrder[] = [];
   entriesPerPage: number = 25;
   currentPage: number = 1;
-  showFilterSidebar: boolean = false;
+  // Add this with your other component properties
+  showDateOptions = true;  showFilterSidebar: boolean = false;
 supplierSearchTerm: string = '';
   taxRates: TaxRate[] = []; // Array to store tax rates
 
@@ -283,6 +286,8 @@ selectSupplier(supplier: string): void {
     { name: 'Shipping Status', visible: true }, // Make sure this is included
     { name: 'Purchase Price', visible: true },
     { name: 'Supplier Address', visible: true }, // Add this new column
+      { name: 'Required Date', visible: true }, // Add this line
+
 
 
 
@@ -336,7 +341,7 @@ selectSupplier(supplier: string): void {
   }
 // Add these methods to your component class
 toggleDateDrawer(): void {
-  this.isDateDrawerOpen = !this.isDateDrawerOpen;
+    this.showDateOptions = true; // Always show when toggled
 }
 
 filterByDate(range: string): void {
@@ -499,7 +504,6 @@ loadPurchaseOrders(): void {
         date: order.orderDate || (order.createdAt?.toDate().toLocaleDateString()) || order.date || 'N/A',
         referenceNo: order.referenceNo?.startsWith('PR-') ? order.referenceNo : 
                    (order.referenceNo || 'N/A'),
-        requiredByDate: order.requiredDate || order.requiredByDate || order.required_date || 'N/A',
         businessLocation: order.businessLocation || 'N/A',
         businessLocationId: order.businessLocationId || order.location || 'N/A',
         supplier: order.supplier || 'N/A',
@@ -508,6 +512,7 @@ loadPurchaseOrders(): void {
         supplierName: order.supplierName || order.supplier || 'Unknown Supplier',
         status: order.status || 'Pending',
         orderTotal: order.orderTotal || this.calculatePurchaseTotal(order),
+        requiredByDate: order.requiredDate || order.requiredByDate || order.required_date || 'N/A', // Ensure this is properly mapped
 
         quantityRemaining: order.quantityRemaining || 0,
         shippingStatus: order.shippingStatus || 'Not Shipped',
@@ -1246,7 +1251,16 @@ saveShippingStatusChanges(): void {
       column.visible = !column.visible;
     }
   }
-  
+  // Replace the existing toggleFilterSidebar method with this:
+openFilterSidebar(): void {
+  this.showFilterSidebar = true;
+}
+
+closeFilterSidebar(): void {
+  this.showFilterSidebar = false;
+}
+
+// Then update the template binding to use openFilterSidebar instead of toggleFilterSidebar
   // Check if there are any visible columns
   hasVisibleColumns(): boolean {
     return this.columns.filter(col => col.visible).length > 1;

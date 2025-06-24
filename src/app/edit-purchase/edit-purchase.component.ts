@@ -667,7 +667,8 @@ updatePurchase() {
   if (this.purchaseId) {
     // Get the raw value to include disabled controls
     const formData = this.purchaseForm.getRawValue();
-    
+      this.markFormGroupTouched(this.purchaseForm);
+
     // Format dates properly
     const formatDate = (date: any) => {
       if (!date) return null;
@@ -736,6 +737,15 @@ updatePurchase() {
   } else {
     alert('Purchase ID not found. Cannot update.');
   }
+  }
+  private markFormGroupTouched(formGroup: FormGroup | FormArray) {
+  Object.values(formGroup.controls).forEach(control => {
+    control.markAsTouched();
+
+    if (control instanceof FormGroup || control instanceof FormArray) {
+      this.markFormGroupTouched(control);
+    }
+  });
 }
 
 }

@@ -470,4 +470,28 @@ h3 {
   .btn {
     width: 100%;
   }
+}/* Add these styles to your component's CSS file */
+.required:after {
+  content: " *";
+  color: red;
+}
+
+.invalid {
+  color: #dc3545; /* Bootstrap's danger color */
+}
+
+input.ng-invalid.ng-touched, 
+select.ng-invalid.ng-touched {
+  border-color: #dc3545;
+}
+
+.validation-error {
+  color: #dc3545;
+  font-size: 0.875em;
+  margin-top: 0.25rem;
+}
+
+.form-group {
+  position: relative;
+  margin-bottom: 1rem;
 }

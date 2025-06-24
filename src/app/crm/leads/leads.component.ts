@@ -1045,7 +1045,6 @@ closeAssignModal() {
   this.availableUsers = [];
   this.selectedUserId = '';
 }
-// Update the assignSelectedLeads method
 async assignSelectedLeads() {
   if (this.selectedLeads.size === 0) {
     alert('Please select leads to assign');
@@ -1053,55 +1052,105 @@ async assignSelectedLeads() {
   }
 
   try {
-    // Prepare update data - only include fields we want to change
-    const updateData: any = {};
-    
-    // Only include assignedTo if a user is selected (for random assignment)
-    if (this.selectedUserId) {
-      const selectedUser = this.availableUsers.find(u => u.id === this.selectedUserId);
-      if (selectedUser) {
-        updateData.assignedTo = selectedUser.name || selectedUser.email;
-        updateData.assignedToId = selectedUser.id;
-      }
-    }
-    
-    // Include life stage if selected
-    if (this.selectedLifeStage) {
-      updateData.lifeStage = this.selectedLifeStage;
-    }
-
-    // Get all selected leads first
+    // Get all selected leads
     const leadsToUpdate = this.allLeads.filter(lead => this.selectedLeads.has(lead.id));
     
-    // Update all selected leads with merged data
-    const updatePromises = leadsToUpdate.map(lead => {
-      // Create a new object with existing lead data and new updates
-      const mergedData = {
-        ...lead, // Spread all existing lead properties
-        ...updateData, // Override with new updates
-        updatedAt: new Date() // Add update timestamp
-      };
+    if (this.randomAssignMode) {
+      // Random assignment logic
+      const availableUsers = [...this.availableUsers];
+      const assignments: {[userId: string]: number} = {}; // Track assignments per user
       
-      return this.leadService.updateLead(lead.id, mergedData);
-    });
-    
-    await Promise.all(updatePromises);
-    
-    // Update local data
-    leadsToUpdate.forEach(lead => {
-      if (updateData.assignedTo) {
-        lead.assignedTo = updateData.assignedTo;
-        lead.assignedToId = updateData.assignedToId;
+      // Initialize assignment counts
+      availableUsers.forEach(user => {
+        assignments[user.id] = 0;
+      });
+
+      // Assign leads randomly but evenly
+      const shuffledLeads = [...leadsToUpdate].sort(() => 0.5 - Math.random());
+      
+      for (const lead of shuffledLeads) {
+        // Find user with least assignments who hasn't been assigned this lead before
+        let selectedUser = null;
+        let minAssignments = Infinity;
+        
+        // Shuffle users to randomize selection among those with same min assignments
+        const shuffledUsers = [...availableUsers].sort(() => 0.5 - Math.random());
+        
+        for (const user of shuffledUsers) {
+          // Check if this user has the least assignments and hasn't been assigned this lead before
+          if (assignments[user.id] < minAssignments) {
+            selectedUser = user;
+            minAssignments = assignments[user.id];
+          }
+        }
+        
+        if (selectedUser) {
+          // Prepare update data
+          const updateData = {
+            assignedTo: selectedUser.name,
+            assignedToId: selectedUser.id,
+            department: selectedUser.department,
+            updatedAt: new Date()
+          };
+
+          // Update the lead
+          await this.leadService.updateLead(lead.id, updateData);
+          
+          // Update local data
+          Object.assign(lead, updateData);
+          
+          // Increment assignment count
+          assignments[selectedUser.id]++;
+        }
       }
-      if (updateData.lifeStage) {
-        lead.lifeStage = updateData.lifeStage;
+    } else {
+      // Manual assignment to a single user
+      if (!this.selectedUserId) {
+        alert('Please select a user to assign leads to');
+        return;
       }
-      lead.updatedAt = new Date();
-    });
+      
+      const selectedUser = this.availableUsers.find(u => u.id === this.selectedUserId);
+      if (!selectedUser) {
+        alert('Selected user not found');
+        return;
+      }
+
+      // Prepare update data for all selected leads
+      const updateData: {
+        assignedTo: any;
+        assignedToId: any;
+        department: any;
+        updatedAt: Date;
+        lifeStage?: string;
+      } = {
+        assignedTo: selectedUser.name,
+        assignedToId: selectedUser.id,
+        department: selectedUser.department,
+        updatedAt: new Date()
+      };
+
+      // Include life stage if selected
+      if (this.selectedLifeStage) {
+        updateData.lifeStage = this.selectedLifeStage;
+      }
+
+      // Update all selected leads
+      const updatePromises = leadsToUpdate.map(lead => 
+        this.leadService.updateLead(lead.id, updateData)
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Update local data
+      leadsToUpdate.forEach(lead => {
+        Object.assign(lead, updateData);
+      });
+    }
 
     // Show success message
     this.validationMessage = {
-      text: 'Leads updated successfully',
+      text: 'Leads assigned successfully',
       type: 'success'
     };
     
@@ -1482,51 +1531,36 @@ async openAssignModal(randomMode: boolean): Promise<void> {
   const currentUserRole = this.authService.currentUserValue?.role || '';
   const currentUserDepartment = this.authService.currentUserValue?.department || '';
 
-  if (randomMode) {
-    try {
-      // For random assignment, only show users from PC1-PC8 departments
-      this.availableUsers = this.usersList.filter(user => 
-        user.role === 'Executive' && 
-        user.department && 
-        user.department.match(/^PC[1-8]$/i) // Matches PC1 through PC8
-      );
+  try {
+    // For random assignment, only show users from PC1-PC8 departments
+    this.availableUsers = this.usersList.filter(user => 
+      user.role === 'Executive' && 
+      user.department && 
+      user.department.match(/^PC[1-8]$/i) // Matches PC1 through PC8
+    );
 
-      // If current user is supervisor, filter to their department only
-      if (currentUserRole === 'Supervisor' && currentUserDepartment) {
-        this.availableUsers = this.availableUsers.filter(user => 
-          user.department === currentUserDepartment
-        );
-      }
-
-      // Randomly select 3 users if available
-      if (this.availableUsers.length > 0) {
-        const randomUsers = [...this.availableUsers]
-          .sort(() => 0.5 - Math.random())
-          .slice(0, 3);
-        this.availableUsers = randomUsers;
-        this.selectedUserId = randomUsers[0]?.id || '';
-      }
-    } catch (error) {
-      console.error('Error getting random users:', error);
-      return;
-    }
-  } else {
-    // For manual assignment, show all executive users
-    if (currentUserRole === 'Supervisor') {
-      this.availableUsers = this.usersList.filter(user => 
-        user.role === 'Executive' && 
+    // If current user is supervisor, filter to their department only
+    if (currentUserRole === 'Supervisor' && currentUserDepartment) {
+      this.availableUsers = this.availableUsers.filter(user => 
         user.department === currentUserDepartment
       );
-    } else {
-      this.availableUsers = this.usersList.filter(user => 
-        user.role === 'Executive'
-      );
     }
+
+    // For random assignment, shuffle the users and select 3
+    if (randomMode && this.availableUsers.length > 0) {
+      const shuffledUsers = [...this.availableUsers]
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 3);
+      this.availableUsers = shuffledUsers;
+      this.selectedUserId = shuffledUsers[0]?.id || '';
+    }
+  } catch (error) {
+    console.error('Error getting users:', error);
+    return;
   }
   
   this.showAssignModal = true;
 }
-  
 
   loadConvertedCustomer() {
     // Check if there's a recently converted customer in local storage

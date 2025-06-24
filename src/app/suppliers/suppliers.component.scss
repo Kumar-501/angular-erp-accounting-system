@@ -628,7 +628,7 @@ textarea:focus {
 }
 
 .btn-cancel {
-  background-color: #f5f5f5;
+  background-color: #0e0e0e;
   border: 1px solid #ddd;
   border-radius: 4px;
   padding: 8px 16px;
@@ -636,9 +636,7 @@ textarea:focus {
   cursor: pointer;
 }
 
-.btn-cancel:hover {
-  background-color: #e5e5e5;
-}
+
 
 .btn-save {
   background-color: #0047b3;
@@ -1452,4 +1450,13 @@ margin-top: -5%;
 
 .summary-row.highlight span:last-child {
   color: #e53935; /* Red color for emphasis */
+}/* Add to your component's CSS */
+.spinner-border {
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+.btn-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }

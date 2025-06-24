@@ -5,6 +5,7 @@ import { StockService } from './stock.service';
 import { ProductsService } from './products.service';
 import { ExpenseService } from './expense.service';
 import { SaleService } from './sale.service';
+import { DailyStockService } from './daily-stock.service';
 import { DatePipe } from '@angular/common';
 
 // Type definitions
@@ -22,9 +23,6 @@ interface Sale {
   status?: string;
   [key: string]: any;
 }
-
-// Remove local Income and Expense interfaces since we'll use the imported ones
-// or create compatible ones if needed
 
 interface ProfitLossReport {
   openingStock: number;
@@ -57,11 +55,12 @@ export class ProfitLossService {
     private productsService: ProductsService,
     private expenseService: ExpenseService,
     private saleService: SaleService,
+    private dailyStockService: DailyStockService, // Add this injection
     private datePipe?: DatePipe
   ) {}
 
   /**
-   * Get real-time profit/loss report with caching
+   * Get real-time profit/loss report with caching and corrected stock calculations
    */
   async getProfitLossReport(startDate: Date, endDate: Date, forceRefresh = false): Promise<ProfitLossReport> {
     try {
@@ -90,6 +89,10 @@ export class ProfitLossService {
         start: normalizedStartDate,
         end: adjustedEndDate
       });
+
+      // Initialize daily snapshots if needed
+      await this.dailyStockService.initializeDailySnapshotsIfNeeded(normalizedStartDate);
+      await this.dailyStockService.initializeDailySnapshotsIfNeeded(adjustedEndDate);
 
       // Get all data in parallel for better performance
       const [stockData, purchases, sales, incomeExpenseData] = await Promise.all([
@@ -170,46 +173,59 @@ export class ProfitLossService {
   }
 
   /**
-   * Get stock values with enhanced error handling and validation
+   * Get stock values using DailyStockService for accurate calculations
    */
   private async getStockValues(startDate: Date, endDate: Date): Promise<{ openingStock: number; closingStock: number }> {
     try {
-      const previousDay = new Date(startDate);
-      previousDay.setDate(previousDay.getDate() - 1);
+      console.log('Getting stock values for P&L:', { startDate, endDate });
       
-      // Get stock snapshots
-      const [openingSnapshot, closingSnapshot] = await Promise.all([
-        this.stockService.getDailyStockSnapshot(previousDay).catch(err => {
-          console.warn(`Opening stock snapshot not found for ${previousDay.toDateString()}:`, err);
-          return {};
-        }),
-        this.stockService.getDailyStockSnapshot(endDate).catch(err => {
-          console.warn(`Closing stock snapshot not found for ${endDate.toDateString()}:`, err);
-          return {};
-        })
+      // Use DailyStockService for accurate opening and closing stock values
+      const [openingStockValue, closingStockValue] = await Promise.all([
+        this.dailyStockService.getStockValueForDate(startDate, 'opening'),
+        this.dailyStockService.getStockValueForDate(endDate, 'closing')
       ]);
       
-      // Validate snapshots
-      if (!openingSnapshot || Object.keys(openingSnapshot).length === 0) {
-        console.warn(`No opening stock data available for ${previousDay.toDateString()}`);
-      }
-      
-      if (!closingSnapshot || Object.keys(closingSnapshot).length === 0) {
-        console.warn(`No closing stock data available for ${endDate.toDateString()}`);
-      }
+      console.log('Stock values calculated:', {
+        opening: openingStockValue,
+        closing: closingStockValue
+      });
       
       return {
-        openingStock: await this.calculateStockValue(openingSnapshot || {}),
-        closingStock: await this.calculateStockValue(closingSnapshot || {})
+        openingStock: openingStockValue,
+        closingStock: closingStockValue
       };
     } catch (error) {
       console.error('Error getting stock values:', error);
-      throw new Error(`Failed to retrieve stock values: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Fallback to legacy method if DailyStockService fails
+      try {
+        const previousDay = new Date(startDate);
+        previousDay.setDate(previousDay.getDate() - 1);
+        
+        const [openingSnapshot, closingSnapshot] = await Promise.all([
+          this.stockService.getDailyStockSnapshot(previousDay).catch(err => {
+            console.warn(`Opening stock snapshot not found for ${previousDay.toDateString()}:`, err);
+            return {};
+          }),
+          this.stockService.getDailyStockSnapshot(endDate).catch(err => {
+            console.warn(`Closing stock snapshot not found for ${endDate.toDateString()}:`, err);
+            return {};
+          })
+        ]);
+        
+        return {
+          openingStock: await this.calculateStockValue(openingSnapshot || {}),
+          closingStock: await this.calculateStockValue(closingSnapshot || {})
+        };
+      } catch (fallbackError) {
+        console.error('Fallback stock calculation also failed:', fallbackError);
+        return { openingStock: 0, closingStock: 0 };
+      }
     }
   }
 
   /**
-   * Calculate stock value from snapshot
+   * Calculate stock value from snapshot (legacy method)
    */
   private async calculateStockValue(snapshot: any): Promise<number> {
     let totalValue = 0;

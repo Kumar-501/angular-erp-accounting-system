@@ -124,6 +124,9 @@ interface HistoryEntry {
   providedIn: 'root'
 })
 export class ProductsService {
+  getProducts() {
+    throw new Error('Method not implemented.');
+  }
  getProductPurchaseHistory(productId: string): Observable<any[]> {
   return new Observable(observer => {
     const purchaseOrdersRef = collection(this.firestore, 'purchase_orders');

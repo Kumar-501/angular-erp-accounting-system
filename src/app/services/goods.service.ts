@@ -18,6 +18,8 @@ import {
 } from '@angular/fire/firestore';
 import { Observable, from, Subject, BehaviorSubject } from 'rxjs';
 import { StockService } from './stock.service';
+import { PurchaseStockPriceLogService } from './purchase-stock-price-log.service';
+
 
 @Injectable({
    providedIn: 'root'
@@ -29,7 +31,9 @@ export class GoodsService {
 
   constructor(
     private firestore: Firestore,
-    private stockService: StockService
+    private stockService: StockService,
+        private purchaseStockLogService: PurchaseStockPriceLogService
+
   ) {
     this.setupGoodsListener();
   }
@@ -45,38 +49,25 @@ export class GoodsService {
     });
   }
 
-  // Add new goods received note with stock update
-// Add new goods received note with stock update
-// goods.service.ts
 async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
   const goodsCollection = collection(this.firestore, 'goodsReceived');
   
-  // Add timestamps
   const completeData = {
     ...goodsData,
     createdAt: serverTimestamp(),
-        receivedDate: serverTimestamp(), // This ensures the server timestamp is used
-
+    receivedDate: serverTimestamp(),
     status: 'received',
-    linkedPurchaseId: goodsData.purchaseOrder || null // Add this field to link to purchase
+    linkedPurchaseId: goodsData.purchaseOrder || null,
+    paymentAccount: goodsData.paymentAccount || null,
+    paymentMethod: goodsData.paymentMethod || null
   };
 
-  // Save the goods received note first
   const docRef = await addDoc(goodsCollection, completeData);
-
-  // Update stock for each product
+  
   if (completeData.products && completeData.products.length > 0) {
     const updatePromises = completeData.products.map(async (product: any) => {
       if (product.id && product.receivedQuantity > 0) {
         // Update product stock
-        const productRef = doc(this.firestore, `products/${product.id}`);
-        await updateDoc(productRef, {
-          currentStock: increment(product.receivedQuantity),
-          totalQuantity: increment(product.receivedQuantity),
-          updatedAt: serverTimestamp()
-        });
-
-        // Record stock adjustment
         await this.stockService.adjustProductStock(
           product.id,
           product.receivedQuantity,
@@ -85,13 +76,31 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
           `Goods received (Ref: ${docRef.id})`,
           completeData.addedBy || 'system'
         );
+
+        // Log the purchase stock price details
+        await this.purchaseStockLogService.addLogEntry({
+          productId: product.id,
+          productName: product.productName || product.name,
+          sku: product.sku,
+          locationId: completeData.businessLocation.id,
+          locationName: completeData.businessLocation.name,
+          receivedQuantity: product.receivedQuantity,
+          unitPurchasePrice: product.unitPrice || 0,
+          paymentAccountId: completeData.paymentAccount?.id || null,
+          paymentType: completeData.paymentMethod || null,
+          taxRate: product.taxRate || 0,
+          shippingCharge: completeData.shippingCharges || 0,
+          purchaseRefNo: completeData.purchaseOrder,
+          grnRefNo: docRef.id,
+          grnCreatedDate: new Date()
+        }).toPromise();
       }
     });
     
     await Promise.all(updatePromises);
   }
   
-  // If this goods receipt is linked to a purchase, update the purchase status
+  // Update purchase status if linked
   if (completeData.linkedPurchaseId) {
     const purchaseRef = doc(this.firestore, `purchases/${completeData.linkedPurchaseId}`);
     await updateDoc(purchaseRef, {
@@ -102,7 +111,7 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
   
   return docRef;
 }
-  
+
 
   private async updateStockQuantities(goodsData: any, referenceId: string) {
   const updatePromises = goodsData.products.map(async (product: any) => {
@@ -148,9 +157,17 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
     });
   }
 
-  getAllGoodsReceived(): Observable<DocumentData[]> {
+// In goods.service.ts
+getAllGoodsReceived(id?: string): Observable<DocumentData[]> {
+  if (id) {
+    // If you need specific functionality when an ID is provided
+    const goodsDoc = doc(this.firestore, this.collectionName, id);
+    return from(getDoc(goodsDoc).then(doc => doc.exists() ? [{ id: doc.id, ...doc.data() }] : []));
+  } else {
+    // Return all goods when no ID is provided
     return this.goods$;
   }
+}
 
   getGoodsBySupplier(supplierId: string): Observable<DocumentData[]> {
     return new Observable(observer => {

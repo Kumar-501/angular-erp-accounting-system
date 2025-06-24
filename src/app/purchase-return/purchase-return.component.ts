@@ -6,6 +6,7 @@
  * Key Features:
  * - Location-aware stock returns using product-stock collection
  * - Stock history tracking for all return transactions
+ * - Purchase return logging for audit trail
  * - Validation of return quantities against available stock
  * - Bulk return processing capabilities
  * - Integration with existing purchase return workflow
@@ -13,6 +14,7 @@
  * Stock Management:
  * - Uses product-stock collection with document IDs: {productId}_{locationId}
  * - Creates history entries in product-stock-history collection
+ * - Creates log entries in purchase-return-log collection
  * - Validates stock availability before processing returns
  * - Updates stock quantities when returns are marked as 'completed'
  * 
@@ -32,7 +34,7 @@ import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Firestore, collection, doc, getDoc, setDoc, updateDoc } from '@angular/fire/firestore';
+import { Firestore, collection, doc, getDoc, setDoc, updateDoc, addDoc } from '@angular/fire/firestore';
 import { COLLECTIONS } from '../../utils/constants';
 
 interface PurchaseReturn {
@@ -46,7 +48,7 @@ interface PurchaseReturn {
   supplier: string;
   returnStatus: string;
   paymentStatus: string;
-  products: any[]; // Keep flexible for compatibility
+  products: any[];
   reason: string;
   grandTotal: number;
   createdAt: Date;
@@ -58,10 +60,29 @@ interface PurchaseReturnProduct {
   productName: string;
   sku: string;
   quantity: number;
-  unitCost: number;
+  unitPrice: number;
   totalCost: number;
   batchNumber?: string;
   expiryDate?: Date;
+  returnQuantity?: number;
+  subtotal?: number;
+  name?: string;
+  id?: string;
+}
+
+interface PurchaseReturnLog {
+  id?: string;
+  purchaseRefNo: string;
+  returnDate: string | Date;
+  purchasedQuantity: number;
+  returnQuantity: number;
+  subTotal: number;
+  productId: string;
+  productName: string;
+  businessLocation: string;
+  businessLocationId: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 @Component({
@@ -82,7 +103,9 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
 
   selectedReturn!: PurchaseReturn;
   tempStatus: string = '';
-  private subscription!: Subscription;  constructor(
+  private subscription!: Subscription;
+
+  constructor(
     private purchaseReturnService: PurchaseReturnService,
     private accountService: AccountService,
     private purchaseService: PurchaseService,
@@ -95,8 +118,15 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
 
   loadPurchaseReturns(): void {
     this.subscription = this.purchaseReturnService.getPurchaseReturns().subscribe({
-      next: (data) => {
+      next: async (data) => {
         this.purchaseReturns = data;
+        
+        // Fetch product details for each unique parent purchase
+        const uniqueParentPurchaseIds = [...new Set(data.map(item => item.parentPurchaseId))];
+        await Promise.all(
+          uniqueParentPurchaseIds.map(id => this.fetchProductDetailsFromParentPurchase(id))
+        );
+        
         this.sortData();
         this.isLoading = false;
         this.errorMessage = null;
@@ -122,6 +152,49 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
 
   get totalPaymentDue(): number {
     return this.purchaseReturns.reduce((sum, item) => sum + item.grandTotal, 0);
+  }
+
+  async fetchProductDetailsFromParentPurchase(parentPurchaseId: string): Promise<void> {
+    try {
+      // Get the parent purchase
+      const parentPurchase = await this.purchaseService.getPurchaseById(parentPurchaseId);
+      
+      if (!parentPurchase) {
+        console.error('Parent purchase not found');
+        return;
+      }
+
+      // Update purchase returns with product details
+      this.purchaseReturns = this.purchaseReturns.map(returnItem => {
+        if (returnItem.parentPurchaseId === parentPurchaseId) {
+          // Map products with names and unit prices
+          const productsWithDetails = returnItem.products.map(returnProduct => {
+            // Find matching product in parent purchase
+            const parentProduct = parentPurchase.products?.find(
+              p => p.productId === returnProduct.productId
+            );
+            
+            return {
+              ...returnProduct,
+              productName: parentProduct?.productName || 'Unknown Product',
+              unitPrice: parentProduct?.unitCost || 0
+            };
+          });
+
+          return {
+            ...returnItem,
+            products: productsWithDetails
+          };
+        }
+        return returnItem;
+      });
+
+      // Update sorted purchase returns
+      this.sortData();
+      
+    } catch (error) {
+      console.error('Error fetching parent purchase details:', error);
+    }
   }
 
   getStatusClass(status: string): string {
@@ -175,8 +248,10 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         : String(bValue).localeCompare(String(aValue));
     });
   }
+
   /**
    * Process purchase return and update stock at specific location
+   * Updated to include log creation in both collections
    */
   async processPurchaseReturn(returnData: PurchaseReturn): Promise<void> {
     try {
@@ -188,15 +263,47 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         returnData.businessLocationId = location;
       }
 
+      // Get the original purchase details for proper logging
+      const originalPurchase = await this.purchaseService.getPurchaseById(returnData.parentPurchaseId);
+      
+      if (!originalPurchase) {
+        throw new Error('Original purchase not found');
+      }
+
       // Process each product in the return
       for (const product of returnData.products) {
+        // Find the original purchased quantity from the parent purchase
+        const originalProduct = originalPurchase.products?.find(
+          p => p.productId === (product.productId || product.id)
+        );
+        
+        const purchasedQuantity = originalProduct?.quantity || 0;
+        const returnQuantity = product.quantity || product.returnQuantity || 0;
+        const subTotal = returnQuantity * (product.unitPrice || originalProduct?.unitCost || 0);
+
+        // Update stock
         await this.returnProductStock(
           product.productId || product.id,
           returnData.businessLocationId!,
-          product.quantity,
+          returnQuantity,
           returnData.referenceNo,
           `Purchase return: ${returnData.reason}`
         );
+
+        // Create individual log entry for each product
+        await this.createPurchaseReturnLogEntry({
+          purchaseRefNo: returnData.parentPurchaseRef,
+          returnDate: returnData.returnDate,
+          purchasedQuantity: purchasedQuantity,
+          returnQuantity: returnQuantity,
+          subTotal: subTotal,
+          productId: product.productId || product.id!,
+          productName: product.productName || product.name!,
+          businessLocation: returnData.businessLocation,
+          businessLocationId: returnData.businessLocationId!,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
       }
 
       // Create transaction record for the purchase return
@@ -208,6 +315,20 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error processing purchase return:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Create individual log entry for purchase return
+   */
+  private async createPurchaseReturnLogEntry(logData: PurchaseReturnLog): Promise<void> {
+    try {
+      const logCollection = collection(this.firestore, 'purchase-return-log');
+      await addDoc(logCollection, logData);
+      console.log('Purchase return log entry created:', logData);
+    } catch (error) {
+      console.error('Error creating purchase return log entry:', error);
+      throw error; // Re-throw to handle in the calling function
     }
   }
 
@@ -485,6 +606,7 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
     this.selectedReturn = returnItem;
     this.tempStatus = returnItem.returnStatus;
   }
+
   async updateReturnStatus(id: string, newStatus: string): Promise<void> {
     this.isUpdating = true;
     
@@ -522,6 +644,7 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
       this.isUpdating = false;
     }
   }
+
   /**
    * Create transaction record for purchase return
    */
@@ -555,7 +678,9 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         returnStatus: returnData.returnStatus,
         paymentStatus: returnData.paymentStatus,
         originalPurchaseId: returnData.parentPurchaseId
-      };      // Use the payment account from the original purchase
+      };
+
+      // Use the payment account from the original purchase
       const paymentAccountId = typeof originalPurchase.paymentAccount === 'object' 
         ? originalPurchase.paymentAccount.id 
         : originalPurchase.paymentAccount;
@@ -569,5 +694,6 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Error creating return transaction:', error);
       // Don't throw here to avoid breaking the return process
-    }  }
+    }
+  }
 }

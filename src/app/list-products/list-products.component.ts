@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { LocationService } from '../services/location.service';
 import { StockService } from '../services/stock.service';
 import { FileUploadService } from '../services/file-upload.service';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
@@ -14,6 +14,8 @@ import { TaxService } from '../services/tax.service';
 import { Component, HostListener, OnInit } from '@angular/core';
 import { EventEmitter } from '@angular/core';
 import { PurchaseService } from '../services/purchase.service';
+import { Firestore, doc, getDoc, collection, getDocs, query, where } from '@angular/fire/firestore';
+import { COLLECTIONS } from '../../utils/constants';
 
 @Component({
   selector: 'app-list-products',
@@ -29,7 +31,8 @@ export class ListProductsComponent implements OnInit {
   brands: any[] = [];
   taxRates: any[] = [];
 
-  // Image modal properties
+  // Image modal propertie  locations: any[] = [];
+  private locationsSubscription: Subscription | undefined;s: any
   showImageModal = false;
   selectedProductForImage: any = null;
   selectedProductImageUrl: string = '';
@@ -103,8 +106,8 @@ export class ListProductsComponent implements OnInit {
     private taxService: TaxService,
     private purchaseService: PurchaseService,
     private fileUploadService: FileUploadService,
+    private firestore: Firestore
   ) {}
-
   ngOnInit(): void {
     this.loadUsers();
     this.loadLocations().then(() => {
@@ -324,10 +327,13 @@ export class ListProductsComponent implements OnInit {
     }
   }
 
-  // Enhanced loadProducts method
-  loadProducts(): void {
-    this.productService.getProductsRealTime().subscribe((data: any[]) => {
-      this.products = data.map(product => {
+async loadProducts(): Promise<void> {
+  this.isLoading = true;
+  
+  try {
+    this.productService.getProductsRealTime().subscribe(async (data: any[]) => {
+      // Process each product and load its stock per location
+      const processedProducts = await Promise.all(data.map(async (product) => {
         if (product.isActive === undefined) {
           product.isActive = true;
         }
@@ -350,15 +356,41 @@ export class ListProductsComponent implements OnInit {
           product.displayTax = '-';
         }
         
+        // Load stock per location for this product
+        if (product.id) {
+          try {
+            product.locationStocks = await this.getProductStockAtAllLocations(product.id);
+            product.totalStock = this.getTotalStockAcrossLocations(product);
+            
+            // Set displayStock to show total across all locations
+            product.displayStock = product.totalStock;
+          } catch (error) {
+            console.error(`Error loading stock for product ${product.id}:`, error);
+            product.locationStocks = {};
+            product.totalStock = 0;
+            product.displayStock = '0';
+          }
+        }
+        
         return product;
-      });
+      }));
       
-      this.originalProducts = [...this.products];
-      this.filteredProducts = [...this.products];
+      this.products = processedProducts;
+      
+      // Filter out "Not for Selling" products by default
+      this.originalProducts = [...this.products].filter(p => !p.notForSelling);
+      this.filteredProducts = [...this.originalProducts];
+      
+      this.isLoading = false;
     }, error => {
       console.error('Error loading products:', error);
+      this.isLoading = false;
     });
+  } catch (error) {
+    console.error('Error in loadProducts:', error);
+    this.isLoading = false;
   }
+}
 
   // Toggle all products selection
   toggleAllProducts(event: Event): void {
@@ -446,12 +478,11 @@ export class ListProductsComponent implements OnInit {
 
     this.filteredProducts.sort((a, b) => {
       const valA = a[column] === undefined || a[column] === null ? '' : a[column];
-      const valB = b[column] === undefined || b[column] === null ? '' : b[column];
-
-      // Special handling for numeric fields
+      const valB = b[column] === undefined || b[column] === null ? '' : b[column];      // Special handling for numeric fields
       if (column === 'defaultPurchasePriceExcTax' || 
           column === 'defaultSellingPriceExcTax' || 
-          column === 'currentStock') {
+          column === 'currentStock' || 
+          column === 'totalStock') {
         const numA = Number(valA) || 0;
         const numB = Number(valB) || 0;
         return this.isAscending ? numA - numB : numB - numA;
@@ -789,18 +820,91 @@ export class ListProductsComponent implements OnInit {
     }
   }
 
-  getLocationName(locationId: string): string {
-    if (!locationId) return '-';
+  // Helper method for template to access Object.keys
+  getObjectKeys(obj: any): string[] {
+    return Object.keys(obj || {});
+  }  // Fetch stock data for a product at all locations
+  async getProductStockAtAllLocations(productId: string): Promise<{[key: string]: number}> {
+    try {
+      const stockQuery = query(
+        collection(this.firestore, COLLECTIONS.PRODUCT_STOCK),
+        where('productId', '==', productId)
+      );
+      const stockSnapshot = await getDocs(stockQuery);
+      
+      const locationStocks: {[key: string]: number} = {};
+      
+      stockSnapshot.forEach((doc: any) => {
+        const stockData = doc.data() as any;
+        if (stockData.locationId && stockData.quantity !== undefined) {
+          locationStocks[stockData.locationId] = stockData.quantity;
+        }
+      });
+      
+      return locationStocks;
+    } catch (error) {
+      console.error('Error fetching product stock at all locations:', error);
+      return {};
+    }
+  }
+
+  // Calculate total stock across all locations for a product
+  getTotalStockAcrossLocations(product: any): number {
+    if (!product.locationStocks) return 0;
     
-    if (this.selectedProduct?.locationNames?.length) {
-      const index = this.selectedProduct.locations.indexOf(locationId);
-      if (index >= 0 && this.selectedProduct.locationNames[index]) {
-        return this.selectedProduct.locationNames[index];
-      }
+    return Object.values(product.locationStocks)
+      .filter(stock => typeof stock === 'number')
+      .reduce((total: number, stock: number) => total + stock, 0);
+  }
+
+  // Format date helper method
+  formatDate(date: any): string {
+    if (!date) return '-';
+    
+    // Handle Firestore timestamp
+    if (date.toDate) {
+      return date.toDate().toLocaleDateString();
     }
     
+    // Handle regular Date object
+    if (date instanceof Date) {
+      return date.toLocaleDateString();
+    }
+    
+    // Handle string dates
+    if (typeof date === 'string') {
+      const parsedDate = new Date(date);
+      return isNaN(parsedDate.getTime()) ? '-' : parsedDate.toLocaleDateString();
+    }
+    
+    return '-';
+  }
+
+  // Get location stock entries for display
+  getLocationStockEntries(locationStocks: {[key: string]: number}): {locationId: string, stock: number}[] {
+    if (!locationStocks) return [];
+    
+    return Object.entries(locationStocks)
+      .filter(([locationId, stock]) => stock > 0)
+      .map(([locationId, stock]) => ({ locationId, stock }))
+      .sort((a, b) => b.stock - a.stock); // Sort by stock descending
+  }
+
+  // Enhanced location name method
+  getLocationName(locationId: string): string {
+    if (!locationId) return '-';
     const location = this.locations.find(l => l.id === locationId);
     return location ? location.name : 'Unknown Location';
+  }
+
+  // Helper method to get location stock summary for exports/display
+  getLocationStockSummary(product: any): string {
+    if (!product.locationStocks) return '';
+    
+    const entries = this.getLocationStockEntries(product.locationStocks);
+    return entries.map(entry => 
+      `${this.getLocationName(entry.locationId)}: ${entry.stock}`
+    ).join('; ');
   }
 
   loadLocations(): Promise<void> {
@@ -819,17 +923,13 @@ export class ListProductsComponent implements OnInit {
     this.showInactiveProducts = !this.showInactiveProducts;
     this.loadProducts();
   }
-
   applyLocationFilter(): void {
     if (!this.selectedLocation) {
       this.filteredProducts = [...this.originalProducts];
     } else {
       this.filteredProducts = this.originalProducts.filter(product => {
-        const hasLocation = 
-          (product.locationIds && product.locationIds.includes(this.selectedLocation)) ||
-          (product.location === this.selectedLocation);
-        
-        return hasLocation;
+        // Check if product has stock at the selected location
+        return product.locationStocks && product.locationStocks[this.selectedLocation] > 0;
       });
     }
 
@@ -842,8 +942,8 @@ export class ListProductsComponent implements OnInit {
           product.category,
           product.brand,
           product.productType,
-          ...product.locationNames,
-          product.displayStock?.toString(),
+          this.getLocationStockSummary(product),
+          product.totalStock?.toString(),
           product.defaultPurchasePriceExcTax?.toString(),
           product.defaultSellingPriceExcTax?.toString()
         ]
@@ -859,470 +959,24 @@ export class ListProductsComponent implements OnInit {
     this.currentPage = 1;
   }
 
-  viewProductSales(product: any): void {
-    this.router.navigate(['/product-sales'], { 
-      queryParams: { 
-        productId: product.id,
-        productName: product.productName 
-      } 
-    });
-  }
-
-  filterProducts(): void {
-    this.currentPage = 1;
-    
-    if (!this.searchText || this.searchText.trim() === '') {
-      this.applyLocationFilter();
-      return;
-    }
-
-    const searchLower = this.searchText.toLowerCase().trim();
-    const sourceProducts = this.selectedLocation ? 
-      this.originalProducts.filter(p => p.location === this.selectedLocation) : 
-      this.originalProducts;
-      
-    this.filteredProducts = sourceProducts.filter(product => {
-      const searchString = [
-        product.productName,
-        product.sku,
-        product.hsnCode,
-        product.barcode,
-        product.category,
-        product.brand,
-        product.productType,
-        product.locationName,
-        product.displayStock?.toString(),
-        product.defaultPurchasePriceExcTax?.toString(),
-        product.defaultSellingPriceExcTax?.toString()
-      ]
-      .filter(field => field)
-      .join(' ')
-      .toLowerCase();
-      
-      return searchString.includes(searchLower);
-    });
-    
-    this.sortBy(this.currentSortColumn);
-  }
-
-  onSearchInput(): void {
-    if (this.searchTimeout) {
-      clearTimeout(this.searchTimeout);
-    }
-    
-    this.searchTimeout = setTimeout(() => {
-      this.filterProducts();
-    }, 300);
-  }
-
-  getPages(): number[] {
-    const pageCount = Math.ceil(this.filteredProducts.length / this.itemsPerPage);
-    return Array.from({length: pageCount}, (_, i) => i + 1);
+  // Navigation and UI methods
+  navigateToAddProduct(): void {
+    this.router.navigate(['/add-product']);
   }
 
   updatePaginatedProducts(): void {
     this.currentPage = 1;
   }
 
-  deleteProduct(productId: string): void {
-    if (confirm('Are you sure you want to delete this product?')) {
-      this.productService.deleteProduct(productId).then(() => {
-        // Product will be automatically removed due to real-time subscription
-      }).catch(error => {
-        console.error('Error deleting product:', error);
-      });
-    }
-  }
-
-  navigateToAddProduct(): void {
-    this.router.navigate(['/add-product']);
-  }
-
-  closeHistoryModal(): void {
-    this.showHistoryModal = false;
-    this.selectedProduct = null;
-    this.productHistory = [];
-  }
-
-  formatDate(timestamp: any): string {
-    if (!timestamp) return '';
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-      return date.toLocaleString();
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      return '';
-    }
-  }
-
-  getHistoryIcon(action: string): string {
-    switch (action) {
-      case 'add': return '➕';
-      case 'update': return '🔄';
-      case 'stock_update': return '📦';
-      case 'stock_in': return '⬆️';
-      case 'stock_out': return '⬇️';
-      case 'transfer': return '↔️';
-      case 'delete': return '🗑️';
-      case 'adjustment': return '⚖️';
-      case 'purchase': return '🛒';
-      case 'sale': return '💰';
-      default: return '📝';
-    }
-  }
-
-  editProduct(productId: string): void {
-    this.router.navigate(['/products/edit', productId]);
-  }
-
-  closeProductDetailsModal(): void {
-    this.showProductDetailsModal = false;
-    this.selectedProduct = null;
-  }
-  
-  getHistoryClass(action: string): string {
-    switch (action) {
-      case 'add': return 'text-success';
-      case 'update': return 'text-primary';
-      case 'stock_update': return 'text-info';
-      case 'stock_in': return 'text-success';
-      case 'stock_out': return 'text-warning';
-      case 'transfer': return 'text-info';
-      case 'delete': return 'text-danger';
-      case 'adjustment': return 'text-secondary';
-      case 'purchase': return 'text-success';
-      case 'sale': return 'text-primary';
-      default: return '';
-    }
-  }
-  
-  calculateStockValue(quantity: number, price: number): number {
-    return quantity * price;
-  }
-  
-  exportToCSV(): void {
-    try {
-      if (this.filteredProducts.length === 0) {
-        alert('No products to export');
-        return;
-      }
-
-      const data = this.filteredProducts.map(product => ({
-        'Product Name': product.productName || '',
-        'SKU': product.sku || '',
-        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
-        'Alert Quantity': product.alertQuantity || 0,
-        'Selling Price': product.defaultSellingPriceExcTax || 0,
-        'Current Stock': product.displayStock || '0',
-        'Location': product.locationName || '-',
-        'Product Type': product.productType || '-',
-        'Unit Purchase Price': product.unitPurchasePrice || 0,
-        'Unit Selling Price': product.unitSellingPrice || 0,
-        'Category': product.category || '-',
-        'Brand': product.brand || '-',
-        'Tax': product.displayTax || '-',
-        'Expiry Date': product.formattedExpiryDate || 'No expiry'
-      }));
-    
-      const csvRows = [];
-      const headers = Object.keys(data[0]);
-      csvRows.push(headers.join(','));
-    
-      for (const row of data) {
-        const values = headers.map(header => {
-          const value = (row as any)[header];
-          const escaped = ('' + value).replace(/"/g, '\\"');
-          return `"${escaped}"`;
-        });
-        csvRows.push(values.join(','));
-      }
-    
-      const csvString = csvRows.join('\n');
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      saveAs(blob, 'products_' + new Date().toISOString().slice(0, 10) + '.csv');
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      alert('Failed to export CSV. Please try again.');
-    }
-  }
-  
-  exportToExcel(): void {
-    try {
-      if (this.filteredProducts.length === 0) {
-        alert('No products to export');
-        return;
-      }
-
-      const data = this.filteredProducts.map(product => ({
-        'Product Name': product.productName || '',
-        'SKU': product.sku || '',
-        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
-        'Selling Price': product.defaultSellingPriceExcTax || 0,
-        'Current Stock': product.displayStock || '0',
-        'Location': product.locationName || '-',
-        'Product Type': product.productType || '-',
-        'Alert Quantity': product.alertQuantity || 0,
-        'Category': product.category || '-',
-        'Brand': product.brand || '-',
-        'Tax': product.displayTax || '-',
-        'Expiry Date': product.formattedExpiryDate || 'No expiry'
-      }));
-  
-      const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data);
-      const workbook: XLSX.WorkBook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
-      const excelBuffer: any = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      this.saveAsExcelFile(excelBuffer, 'products');
-    } catch (error) {
-      console.error('Error exporting Excel:', error);
-      alert('Failed to export Excel. Please try again.');
-    }
-  }
-  
-  private saveAsExcelFile(buffer: any, fileName: string): void {
-    const data: Blob = new Blob([buffer], { type: 'application/octet-stream' });
-    saveAs(data, fileName + '_' + new Date().toISOString().slice(0, 10) + '.xlsx');
-  }
-  
-  exportToPDF(): void {
-    try {
-      if (this.filteredProducts.length === 0) {
-        alert('No products to export');
-        return;
-      }
-
-      const doc = new jsPDF();
-      const title = 'Products Report - ' + new Date().toLocaleDateString();
-      
-      doc.text(title, 14, 16);
-      
-      (doc as any).autoTable({
-        head: [['Product', 'SKU', 'Purchase Price', 'Selling Price', 'Stock', 'Location', 'Expiry Date']],
-        body: this.filteredProducts.map(product => [
-          product.productName || '',
-          product.sku || '',
-          '₹' + (product.defaultPurchasePriceExcTax || 0).toFixed(2),
-          '₹' + (product.defaultSellingPriceExcTax || 0).toFixed(2),
-          product.displayStock || '0',
-          product.locationName || '-',
-          product.formattedExpiryDate || 'No expiry'
-        ]),
-        startY: 20,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255 }
-      });
-  
-      doc.save('products_' + new Date().toISOString().slice(0, 10) + '.pdf');
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      alert('Failed to export PDF. Please try again.');
-    }
-  }
-
-  duplicateProduct(productId: string): void {
-    this.productService.getProductById(productId).then((product) => {
-      if (product) {
-        const duplicatedProduct = {
-          ...product,
-          id: undefined,
-          productName: `${product.productName} (Copy)`,
-          sku: product.sku ? `${product.sku}-COPY` : '',
-        };
-  
-        this.router.navigate(['/add-product'], {
-          queryParams: { duplicate: JSON.stringify(duplicatedProduct) },
-        });
-      }
-    });
-  }
-
-  hasSelectedProducts(): boolean {
-    return this.filteredProducts.some(product => product.selected);
-  }
-
-  getSelectedCount(): number {
-    return this.filteredProducts.filter(product => product.selected).length;
-  }
-
-  async deleteSelectedProducts(): Promise<void> {
-    const selectedProducts = this.filteredProducts.filter(product => product.selected);
-    
-    if (selectedProducts.length === 0) {
-      alert('No products selected');
-      return;
-    }
-
-    if (!confirm(`Are you sure you want to delete ${selectedProducts.length} selected products?`)) {
-      return;
-    }
-
-    try {
-      this.isLoading = true;
-      
-      const deletePromises = selectedProducts.map(product => 
-        this.productService.deleteProduct(product.id)
-      );
-      
-      await Promise.all(deletePromises);
-      
-      alert(`${selectedProducts.length} products deleted successfully`);
-      
-      this.filteredProducts.forEach(product => product.selected = false);
-      
-    } catch (error) {
-      console.error('Error deleting selected products:', error);
-      alert('Error deleting some products. Please try again.');
-    } finally {
-      this.isLoading = false;
-    }
-  }
-
-  applyFilters(): void {
-    this.currentPage = 1;
-    
-    this.filteredProducts = this.originalProducts.filter(product => {
-      // Location filter
-      if (this.selectedLocation) {
-        const hasLocation = 
-          (product.locationIds && product.locationIds.includes(this.selectedLocation)) ||
-          (product.location === this.selectedLocation) ||
-          (product.primaryLocationId === this.selectedLocation);
-        
-        if (!hasLocation) return false;
-      }
-      
-      // Brand filter
-      if (this.selectedBrand) {
-        if (product.brandId === this.selectedBrand) {
-          // Simple case where product has brandId that matches
-        } else if (product.brand && typeof product.brand === 'object' && product.brand.id === this.selectedBrand) {
-          // Case where brand is an object with id property
-        } else if (product.brand === this.selectedBrand) {
-          // Case where brand is just the ID as a string
-        } else {
-          return false;
-        }
-      }
-      
-      // Category filter
-      if (this.selectedCategory) {
-        if (product.categoryId === this.selectedCategory) {
-          // Simple case where product has categoryId that matches
-        } else if (product.category && typeof product.category === 'object' && product.category.id === this.selectedCategory) {
-          // Case where category is an object with id property
-        } else if (product.category === this.selectedCategory) {
-          // Case where category is just the ID as a string
-        } else {
-          return false;
-        }
-      }
-      
-      // Tax filter
-      if (this.selectedTax) {
-        if (typeof product.applicableTax === 'string') {
-          if (product.applicableTax !== this.selectedTax) {
-            return false;
-          }
-        } else if (product.applicableTax?.id !== this.selectedTax) {
-          return false;
-        }
-      }
-      
-      // Status filter
-      if (this.selectedStatus) {
-        if (this.selectedStatus === 'active' && (!product.isActive || product.notForSelling)) {
-          return false;
-        }
-        if (this.selectedStatus === 'notForSelling' && !product.notForSelling) {
-          return false;
-        }
-        if (this.selectedStatus === 'inactive' && product.isActive) {
-          return false;
-        }
-      }
-      
-      // Date filter
-      if (this.isDateFilterActive && this.filterOptions.fromDate && this.filterOptions.toDate) {
-        let productDate: Date | null = null;
-        
-        if (product.createdDate?.toDate) {
-          productDate = product.createdDate.toDate();
-        } else if (product.createdDate) {
-          productDate = new Date(product.createdDate);
-        } else if (product.addedDate) {
-          productDate = new Date(product.addedDate);
-        }
-        
-        if (!productDate || isNaN(productDate.getTime())) {
-          return false;
-        }
-        
-        const fromDate = new Date(this.filterOptions.fromDate);
-        fromDate.setHours(0, 0, 0, 0);
-        
-        const toDate = new Date(this.filterOptions.toDate);
-        toDate.setHours(23, 59, 59, 999);
-        
-        productDate.setHours(12, 0, 0, 0);
-        
-        if (productDate < fromDate || productDate > toDate) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-
-    // Apply search filter
-    if (this.searchText && this.searchText.trim() !== '') {
-      const searchLower = this.searchText.toLowerCase().trim();
-      this.filteredProducts = this.filteredProducts.filter(product => {
-        const searchString = [
-          product.productName,
-          product.sku,
-          product.category,
-          product.brand,
-          product.productType,
-          product.locationName,
-          product.displayStock?.toString(),
-          product.defaultPurchasePriceExcTax?.toString(),
-          product.defaultSellingPriceExcTax?.toString()
-        ]
-        .filter(field => field)
-        .join(' ')
-        .toLowerCase();
-        
-        return searchString.includes(searchLower);
-      });
+  // Search and filtering methods
+  onSearchInput(): void {
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
     }
     
-    this.sortBy(this.currentSortColumn);
-  }
-
-  resetFilters(): void {
-    this.selectedBrand = '';
-    this.selectedCategory = '';
-    this.selectedTax = '';
-    this.selectedLocation = '';
-    this.selectedStatus = '';
-    this.searchText = '';
-    
-    this.clearDateFilter();
-    
-    this.filterOptions = {
-      brandId: '',
-      categoryId: '',
-      taxId: '',
-      locationId: '',
-      statusId: '',
-      fromDate: null,
-      toDate: null
-    };
-    
-    this.isDateFilterActive = false;
-    this.selectedRange = '';
-    this.dateRangeLabel = '';
-    
-    this.applyFilters();
+    this.searchTimeout = setTimeout(() => {
+      this.applyLocationFilter();
+    }, 300);
   }
 
   // Date filter methods
@@ -1414,6 +1068,157 @@ export class ListProductsComponent implements OnInit {
     this.toggleDateDrawer();
   }
 
+  // Main filtering method
+  applyFilters(): void {
+    this.currentPage = 1;
+    
+    // Start with all products that are not marked as "Not for Selling"
+    let filtered = this.originalProducts.filter(p => !p.notForSelling);
+    
+    // Only include "Not for Selling" products if explicitly requested
+    if (this.selectedStatus === 'notForSelling') {
+      filtered = this.originalProducts.filter(p => p.notForSelling);
+    }
+    
+    this.filteredProducts = filtered.filter(product => {
+      // Location filter
+      if (this.selectedLocation) {
+        const hasLocation = product.locationStocks && product.locationStocks[this.selectedLocation] > 0;
+        if (!hasLocation) return false;
+      }
+      
+      // Brand filter
+      if (this.selectedBrand) {
+        if (product.brandId === this.selectedBrand) {
+          // Simple case where product has brandId that matches
+        } else if (product.brand && typeof product.brand === 'object' && product.brand.id === this.selectedBrand) {
+          // Case where brand is an object with id property
+        } else if (product.brand === this.selectedBrand) {
+          // Case where brand is just the ID as a string
+        } else {
+          return false;
+        }
+      }
+      
+      // Category filter
+      if (this.selectedCategory) {
+        if (product.categoryId === this.selectedCategory) {
+          // Simple case where product has categoryId that matches
+        } else if (product.category && typeof product.category === 'object' && product.category.id === this.selectedCategory) {
+          // Case where category is an object with id property
+        } else if (product.category === this.selectedCategory) {
+          // Case where category is just the ID as a string
+        } else {
+          return false;
+        }
+      }
+      
+      // Tax filter
+      if (this.selectedTax) {
+        if (typeof product.applicableTax === 'string') {
+          if (product.applicableTax !== this.selectedTax) {
+            return false;
+          }
+        } else if (product.applicableTax?.id !== this.selectedTax) {
+          return false;
+        }
+      }
+      
+      // Status filter
+      if (this.selectedStatus) {
+        if (this.selectedStatus === 'active' && !product.isActive) {
+          return false;
+        }
+        if (this.selectedStatus === 'inactive' && product.isActive) {
+          return false;
+        }
+      }
+      
+      // Date filter
+      if (this.isDateFilterActive && this.filterOptions.fromDate && this.filterOptions.toDate) {
+        let productDate: Date | null = null;
+        
+        if (product.createdDate?.toDate) {
+          productDate = product.createdDate.toDate();
+        } else if (product.createdDate) {
+          productDate = new Date(product.createdDate);
+        } else if (product.addedDate) {
+          productDate = new Date(product.addedDate);
+        }
+        
+        if (!productDate || isNaN(productDate.getTime())) {
+          return false;
+        }
+        
+        const fromDate = new Date(this.filterOptions.fromDate);
+        fromDate.setHours(0, 0, 0, 0);
+        
+        const toDate = new Date(this.filterOptions.toDate);
+        toDate.setHours(23, 59, 59, 999);
+        
+        productDate.setHours(12, 0, 0, 0);
+        
+        if (productDate < fromDate || productDate > toDate) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+
+    // Apply search filter
+    if (this.searchText && this.searchText.trim() !== '') {
+      const searchLower = this.searchText.toLowerCase().trim();
+      this.filteredProducts = this.filteredProducts.filter(product => {
+        const searchString = [
+          product.productName,
+          product.sku,
+          product.category,
+          product.brand,
+          product.productType,
+          this.getLocationStockSummary(product),
+          product.totalStock?.toString(),
+          product.defaultPurchasePriceExcTax?.toString(),
+          product.defaultSellingPriceExcTax?.toString()
+        ]
+        .filter(field => field)
+        .join(' ')
+        .toLowerCase();
+        
+        return searchString.includes(searchLower);
+      });
+    }
+    
+    this.sortBy(this.currentSortColumn);
+  }
+
+  resetFilters(): void {
+    this.selectedBrand = '';
+    this.selectedCategory = '';
+    this.selectedTax = '';
+    this.selectedLocation = '';
+    this.selectedStatus = '';
+    this.searchText = '';
+    
+    this.clearDateFilter();
+    
+    this.filterOptions = {
+      brandId: '',
+      categoryId: '',
+      taxId: '',
+      locationId: '',
+      statusId: '',
+      fromDate: null,
+      toDate: null
+    };
+    
+    this.isDateFilterActive = false;
+    this.selectedRange = '';
+    this.dateRangeLabel = '';
+    
+    this.applyFilters();
+  }
+
   clearDateFilter(): void {
     this.selectedRange = '';
     this.dateRangeLabel = '';
@@ -1421,6 +1226,196 @@ export class ListProductsComponent implements OnInit {
     this.filterOptions.fromDate = null;
     this.filterOptions.toDate = null;
     this.applyFilters();
+  }
+
+  // Selection methods
+  hasSelectedProducts(): boolean {
+    return this.filteredProducts.some(product => product.selected);
+  }
+
+  getSelectedCount(): number {
+    return this.filteredProducts.filter(product => product.selected).length;
+  }
+
+  // Product action methods
+  editProduct(productId: string): void {
+    this.router.navigate(['/products/edit', productId]);
+  }
+
+  deleteProduct(productId: string): void {
+    if (confirm('Are you sure you want to delete this product?')) {
+      this.productService.deleteProduct(productId).then(() => {
+        // Product will be automatically removed due to real-time subscription
+      }).catch(error => {
+        console.error('Error deleting product:', error);
+      });
+    }
+  }
+
+  duplicateProduct(productId: string): void {
+    this.productService.getProductById(productId).then((product) => {
+      if (product) {
+        const duplicatedProduct = {
+          ...product,
+          id: undefined,
+          productName: `${product.productName} (Copy)`,
+          sku: product.sku ? `${product.sku}-COPY` : '',
+        };
+  
+        this.router.navigate(['/add-product'], {
+          queryParams: { duplicate: JSON.stringify(duplicatedProduct) },
+        });
+      }
+    });
+  }
+
+  viewProductSales(product: any): void {
+    this.router.navigate(['/product-sales'], { 
+      queryParams: { 
+        productId: product.id,
+        productName: product.productName 
+      } 
+    });
+  }
+
+  async viewProductAndPurchaseData(product: any): Promise<void> {
+    try {
+      const purchases = await this.purchaseService.getPurchasesByProductId(product.id);
+      
+      this.router.navigate(['/product-details', product.id], {
+        state: {
+          productData: product,
+          purchaseData: purchases
+        }
+      });
+    } catch (error) {
+      console.error('Error loading product and purchase data:', error);
+      alert('Error loading product details. Please try again.');
+    }
+  }
+
+  async deleteSelectedProducts(): Promise<void> {
+    const selectedProducts = this.filteredProducts.filter(product => product.selected);
+    
+    if (selectedProducts.length === 0) {
+      alert('No products selected');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedProducts.length} selected products?`)) {
+      return;
+    }
+
+    try {
+      this.isLoading = true;
+      
+      const deletePromises = selectedProducts.map(product => 
+        this.productService.deleteProduct(product.id)
+      );
+      
+      await Promise.all(deletePromises);
+      
+      alert(`${selectedProducts.length} products deleted successfully`);
+      
+      this.filteredProducts.forEach(product => product.selected = false);
+      
+    } catch (error) {
+      console.error('Error deleting selected products:', error);
+      alert('Error deleting some products. Please try again.');
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  closeProductDetailsModal(): void {
+    this.showProductDetailsModal = false;
+    this.selectedProduct = null;
+  }
+
+  // Pagination method
+  getPages(): number[] {
+    const pageCount = Math.ceil(this.filteredProducts.length / this.itemsPerPage);
+    return Array.from({length: pageCount}, (_, i) => i + 1);
+  }
+
+  // Export methods
+  exportToCSV(): void {
+    try {
+      if (this.filteredProducts.length === 0) {
+        alert('No products to export');
+        return;
+      }
+
+      const data = this.filteredProducts.map(product => ({
+        'Product Name': product.productName || '',
+        'SKU': product.sku || '',
+        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
+        'Alert Quantity': product.alertQuantity || 0,
+        'Selling Price': product.defaultSellingPriceExcTax || 0,
+        'Total Stock': product.totalStock || 0,
+        'Stock by Location': this.getLocationStockSummary(product),
+        'Category': product.category || '-',
+        'Brand': product.brand || '-',
+        'Tax': product.displayTax || '-',
+        'Expiry Date': product.formattedExpiryDate || 'No expiry'
+      }));
+    
+      const csvRows = [];
+      const headers = Object.keys(data[0]);
+      csvRows.push(headers.join(','));
+    
+      for (const row of data) {
+        const values = headers.map(header => {
+          const value = (row as any)[header];
+          const escaped = ('' + value).replace(/"/g, '\\"');
+          return `"${escaped}"`;
+        });
+        csvRows.push(values.join(','));
+      }
+    
+      const csvString = csvRows.join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      // saveAs(blob, 'products_' + new Date().toISOString().slice(0, 10) + '.csv');
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'products_' + new Date().toISOString().slice(0, 10) + '.csv';
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Failed to export CSV. Please try again.');
+    }
+  }
+  
+  exportToExcel(): void {
+    try {
+      if (this.filteredProducts.length === 0) {
+        alert('No products to export');
+        return;
+      }
+
+      const data = this.filteredProducts.map(product => ({
+        'Product Name': product.productName || '',
+        'SKU': product.sku || '',
+        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
+        'Selling Price': product.defaultSellingPriceExcTax || 0,
+        'Total Stock': product.totalStock || 0,
+        'Stock by Location': this.getLocationStockSummary(product),
+        'Category': product.category || '-',
+        'Brand': product.brand || '-',
+        'Tax': product.displayTax || '-',
+        'Expiry Date': product.formattedExpiryDate || 'No expiry'
+      }));
+  
+      // For now, just export as CSV until XLSX is properly configured
+      this.exportToCSV();
+    } catch (error) {
+      console.error('Error exporting Excel:', error);
+      alert('Failed to export Excel. Please try again.');
+    }
   }
 
   print(): void {
@@ -1439,10 +1434,8 @@ export class ListProductsComponent implements OnInit {
           <tr>
             <th>Product</th>
             <th>SKU</th>
-            <th>Purchase Price</th>
-            <th>Selling Price</th>
-            <th>Stock</th>
-            <th>Location</th>
+            <th>Total Stock</th>
+            <th>Stock by Location</th>
             <th>Category</th>
             <th>Brand</th>
             <th>Expiry Date</th>
@@ -1454,10 +1447,8 @@ export class ListProductsComponent implements OnInit {
             <tr>
               <td>${product.productName || ''}</td>
               <td>${product.sku || '-'}</td>
-              <td>₹${(product.defaultPurchasePriceExcTax || 0).toFixed(2)}</td>
-              <td>₹${(product.defaultSellingPriceExcTax || 0).toFixed(2)}</td>
-              <td>${product.displayStock || '0'}</td>
-              <td>${product.locationName || '-'}</td>
+              <td>${product.totalStock || '0'}</td>
+              <td>${this.getLocationStockSummary(product) || '-'}</td>
               <td>${product.category || '-'}</td>
               <td>${product.brand || '-'}</td>
               <td>${product.formattedExpiryDate || 'No expiry'}</td>
@@ -1499,22 +1490,6 @@ export class ListProductsComponent implements OnInit {
     } catch (error) {
       console.error('Error printing:', error);
       alert('Failed to print. Please try again.');
-    }
-  }
-  
-  async viewProductAndPurchaseData(product: any): Promise<void> {
-    try {
-      const purchases = await this.purchaseService.getPurchasesByProductId(product.id);
-      
-      this.router.navigate(['/product-details', product.id], {
-        state: {
-          productData: product,
-          purchaseData: purchases
-        }
-      });
-    } catch (error) {
-      console.error('Error loading product and purchase data:', error);
-      alert('Error loading product details. Please try again.');
     }
   }
 }

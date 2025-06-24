@@ -57,16 +57,16 @@
         </div>
         
     
-        
+<!--         
         <div class="detail-row">
           <span class="detail-label">Required By Date:</span>
           <span class="detail-value">{{ order.requiredByDate || order.requiredDate || order.required_date || 'N/A' | date:'mediumDate' }}</span>
-        </div>
-        
+        </div> -->
+<!--         
         <div class="detail-row">
           <span class="detail-label">Added By:</span>
           <span class="detail-value">{{ order.addedBy || 'N/A' }}</span>
-        </div>
+        </div> -->
 
         <div class="detail-row" *ngIf="order.brand">
           <span class="detail-label">Brand:</span>
@@ -88,8 +88,7 @@
             <tr>
               <th>S.No</th>
               <th>Product Name</th>
-              <th>SKU</th>
-              <th>HSN Code</th>
+      
               <th>Tax Rate</th>
               <th>Quantity</th>
               <th>Unit Price</th>
@@ -110,8 +109,7 @@
                   <strong>Expiry:</strong> {{ item.expiryDate | date:'mediumDate' }}
                 </div>
               </td>
-              <td>{{ getProductDetails(item.productId).sku || 'N/A' }}</td>
-              <td>{{ getProductDetails(item.productId).hsnCode || 'N/A' }}</td>
+          
               <td>{{ getProductDetails(item.productId).taxPercentage|| 'N/A' }}</td>
               <td>{{ item.quantity || item.requiredQuantity || 0 }}</td>
               <td>{{ (item.unitCost || item.unitPurchasePrice || getProductDetails(item.productId).defaultPurchasePrice || 0) | currency:'INR' }}</td>

@@ -27,14 +27,15 @@
     <div class="spinner"></div>
     <span>Generating trial balance...</span>
   </div>
-
   <div *ngIf="!isLoading && trialBalanceData.length > 0" class="trial-balance-content">
     <div class="company-header">
       <h2>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h2>
       <p>Trial Balance as on {{ asOfDate | date:'longDate' }}</p>
-    </div>
-
-    <div class="table-wrapper">
+      <div class="info-note">
+        <i class="fas fa-info-circle"></i>
+        <span>This trial balance shows the debit and credit balances for each account in a simplified format.</span>
+      </div>
+    </div><div class="table-wrapper">
       <table class="trial-balance-table">
         <thead>
           <tr>
@@ -46,52 +47,68 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of trialBalanceData">
+          <tr *ngFor="let item of trialBalanceData" [class]="'account-type-' + item.accountType.toLowerCase()">
             <td class="account-name">{{ item.accountName }}</td>
             <td class="account-number">{{ item.accountNumber }}</td>
             <td class="account-head">{{ item.accountHead }}</td>
-            <td class="debit-amount">{{ item.debit | number:'1.2-2' }}</td>
-            <td class="credit-amount">{{ item.credit | number:'1.2-2' }}</td>
+            <td class="debit-amount">{{ item.debit > 0 ? (item.debit | number:'1.2-2') : '-' }}</td>
+            <td class="credit-amount">{{ item.credit > 0 ? (item.credit | number:'1.2-2') : '-' }}</td>
           </tr>
         </tbody>
         <tfoot>
           <tr class="total-row">
-            <td colspan="3">Total</td>
-            <td class="debit-amount">{{ totalDebit | number:'1.2-2' }}</td>
-            <td class="credit-amount">{{ totalCredit | number:'1.2-2' }}</td>
+            <td colspan="3"><strong>Total</strong></td>
+            <td class="debit-amount"><strong>{{ totalDebit | number:'1.2-2' }}</strong></td>
+            <td class="credit-amount"><strong>{{ totalCredit | number:'1.2-2' }}</strong></td>
           </tr>
-          <tr class="difference-row" *ngIf="difference !== 0">
-            <td colspan="3">Difference</td>
-            <td colspan="2" [class.positive]="difference > 0" [class.negative]="difference < 0">
-              {{ difference | number:'1.2-2' }}
+          <tr class="difference-row" *ngIf="!isBalanced">
+            <td colspan="3"><strong>Difference</strong></td>
+            <td class="debit-amount">
+              <strong>{{ difference > 0 ? (difference | number:'1.2-2') : '-' }}</strong>
+            </td>
+            <td class="credit-amount">
+              <strong>{{ difference < 0 ? (absDifference | number:'1.2-2') : '-' }}</strong>
             </td>
           </tr>
         </tfoot>
       </table>
-    </div>
-
-    <div class="summary-section">
+    </div><div class="summary-section">
       <div class="summary-card">
-        <h3>Summary</h3>
+        <h3>Trial Balance Summary</h3>
         <div class="summary-item">
           <span>Total Debit:</span>
-          <span>{{ totalDebit | number:'1.2-2' }}</span>
+          <span>₹{{ totalDebit | number:'1.2-2' }}</span>
         </div>
         <div class="summary-item">
           <span>Total Credit:</span>
-          <span>{{ totalCredit | number:'1.2-2' }}</span>
+          <span>₹{{ totalCredit | number:'1.2-2' }}</span>
         </div>
-        <div class="summary-item" *ngIf="difference !== 0">
+        <div class="summary-item" *ngIf="!isBalanced">
           <span>Difference:</span>
           <span [class.positive]="difference > 0" [class.negative]="difference < 0">
-            {{ difference | number:'1.2-2' }}
+            ₹{{ absDifference | number:'1.2-2' }} {{ difference > 0 ? '(Debit excess)' : '(Credit excess)' }}
           </span>
         </div>
         <div class="summary-item status">
           <span>Status:</span>
-          <span [class.balanced]="difference === 0" [class.unbalanced]="difference !== 0">
-            {{ difference === 0 ? 'Balanced' : 'Unbalanced' }}
+          <span [class.balanced]="isBalanced" [class.unbalanced]="!isBalanced">
+            {{ isBalanced ? '✅ Balanced' : '⚠️ Unbalanced' }}
           </span>
+        </div>
+      </div>
+
+      <!-- Account Type Summary -->
+      <div class="summary-card account-types">
+        <h3>Account Type Breakdown</h3>
+        <div *ngFor="let group of accountTypeGroups" class="type-summary">
+          <div class="type-header">
+            <span class="type-badge" [class]="'type-' + group.type.toLowerCase()">{{ group.type }}</span>
+            <span class="account-count">({{ group.accounts.length }} accounts)</span>
+          </div>
+          <div class="type-totals">
+            <span>Debit: ₹{{ group.totalDebit | number:'1.2-2' }}</span>
+            <span>Credit: ₹{{ group.totalCredit | number:'1.2-2' }}</span>
+          </div>
         </div>
       </div>
     </div>

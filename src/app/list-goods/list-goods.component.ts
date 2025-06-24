@@ -16,13 +16,10 @@ export class ListGoodsComponent implements OnInit, OnDestroy {
   goodsReceived: any[] = [];
   filteredGoodsReceived: any[] = [];
   paginatedGoodsReceived: any[] = [];
-  selectedGrnForAction: any = null;
-
   suppliers: any[] = [];
-    currentGrn: any; // or your specific GRN type
-  grnList: any[] = []; 
-selectedGrn: any = null;
-showPopup = false;
+  locations: any[] = [];
+  selectedGrn: any = null;
+
   currentPage: number = 1;
   pageSize: number = 10;
   totalPages: number = 1;
@@ -42,15 +39,13 @@ showPopup = false;
   grnToDelete: string | null = null;
 
   private subscriptions: Subscription[] = [];
-  locations: any;
 
   constructor(
     private goodsService: GoodsService,
-    private stockService:StockService,
+    private stockService: StockService,
     private locationService: LocationService,
     private router: Router,
-      private supplierService: SupplierService, // Add this
-
+    private supplierService: SupplierService
   ) {
     this.endDate = new Date();
     this.startDate = new Date();
@@ -59,101 +54,237 @@ showPopup = false;
 
   ngOnInit(): void {
     this.loadGoodsReceived();
+    this.loadLocations();
     
-      this.loadGoodsReceived(); // Refresh the list when stock changes
-  this.subscriptions.push(
-    this.stockService.stockUpdated$.subscribe(() => {
-      this.loadGoodsReceived(); // Refresh the list when stock changes
-    })
-  );
-
+    this.subscriptions.push(
+      this.stockService.stockUpdated$.subscribe(() => {
+        this.loadGoodsReceived();
+      })
+    );
   }
-viewProducts(grn: any): void {
-  this.selectedGrn = grn;
-}
 
   ngOnDestroy(): void {
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
-loadGoodsReceived(): void {
-  // Load suppliers first
-  const supplierSub = this.supplierService.getSuppliers().subscribe(suppliers => {
-    this.suppliers = suppliers;
-    
-    // Then load GRNs
-    const grnSub = this.goodsService.getAllGoodsReceived().subscribe(goods => {
-      this.goodsReceived = goods.map(grn => ({
-        ...grn,
-        referenceNo: grn['referenceNo'] || this.generateReferenceNo(grn),
-        invoiceNo: grn['invoiceNo'] || grn['invoiceRef'] || 'N/A',
-        addedBy: grn['addedBy'] || grn['createdBy'] || 'N/A',
-        // Ensure dates are properly formatted
-        purchaseDate: this.parseDate(grn['purchaseDate']),
-        receivedDate: this.parseDate(grn['receivedDate']),
-        // Ensure products array exists
-        products: grn['products'] || []
-      }));
-      this.applyFilters();
-    });
-    this.subscriptions.push(grnSub);
-  });
-  this.subscriptions.push(supplierSub);
-}
 
-private parseDate(dateValue: any): Date {
-  if (!dateValue) return new Date(); // Fallback to current date if not available
-  
-  // If it's already a Date object
-  if (dateValue instanceof Date) {
-    return dateValue;
+  loadGoodsReceived(): void {
+    const supplierSub = this.supplierService.getSuppliers().subscribe(suppliers => {
+      this.suppliers = suppliers;
+      
+      const grnSub = this.goodsService.getAllGoodsReceived().subscribe(goods => {
+        this.goodsReceived = goods.map(grn => ({
+          ...grn,
+          referenceNo: grn['referenceNo'] || this.generateReferenceNo(grn),
+          invoiceNo: grn['invoiceNo'] || grn['invoiceRef'] || 'N/A',
+          addedBy: grn['addedBy'] || grn['createdBy'] || 'N/A',
+          purchaseDate: this.parseDate(grn['purchaseDate']),
+          receivedDate: this.parseDate(grn['receivedDate']),
+          products: grn['products'] || []
+        }));
+        this.applyFilters();
+      });
+      this.subscriptions.push(grnSub);
+    });
+    this.subscriptions.push(supplierSub);
   }
-  
-  // If it's a Firestore Timestamp
-  if (dateValue.toDate) {
-    return dateValue.toDate();
+
+  private loadLocations(): void {
+    this.locationService.getLocations().subscribe(locations => {
+      this.locations = locations;
+    });
   }
-  
-  // If it's a string or number
-  return new Date(dateValue);
-}
-  // Generate a reference number if none exists
+
+  private parseDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    
+    if (dateValue instanceof Date) {
+      return dateValue;
+    }
+    
+    if (dateValue.toDate) {
+      return dateValue.toDate();
+    }
+    
+    return new Date(dateValue);
+  }
+
   private generateReferenceNo(grn: any): string {
     if (grn.purchaseOrderDetails?.referenceNo) {
       return `GRN-${grn.purchaseOrderDetails.referenceNo}`;
     }
     return `GRN-${grn.id.substring(0, 8).toUpperCase()}`;
   }
-sortBy(column: string): void {
-  if (this.sortColumn === column) {
-    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-  } else {
-    this.sortColumn = column;
-    this.sortDirection = 'asc';
+
+  // Product view methods
+  viewProducts(grn: any): void {
+    this.selectedGrn = grn;
   }
-  
-  // Special handling for date columns
-  if (column === 'purchaseDate' || column === 'receivedDate') {
-    this.filteredGoodsReceived.sort((a, b) => {
-      const dateA = this.parseDate(a[column]).getTime();
-      const dateB = this.parseDate(b[column]).getTime();
-      return this.sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-    });
-  } else {
-    // Existing sorting logic for other columns
-    this.applyFilters();
+
+  closeProductsView(): void {
+    this.selectedGrn = null;
   }
-  
-  this.updatePagination();
-}
+
+  getTotalQuantity(products: any[]): number {
+    if (!products) return 0;
+    return products.reduce((total, product) => {
+      return total + (product.quantity || product.receivedQuantity || 0);
+    }, 0);
+  }
+
+  getTotalValue(products: any[]): number {
+    if (!products) return 0;
+    return products.reduce((total, product) => {
+      return total + this.getProductLineTotal(product);
+    }, 0);
+  }
+
+  getProductLineTotal(product: any): number {
+    const quantity = product.quantity || product.receivedQuantity || 0;
+    const unitPrice = product.unitCost || product.unitPrice || 0;
+    return quantity * unitPrice;
+  }
+
+  getProductStatus(product: any): string {
+    const ordered = product.orderQuantity || product.orderedQty || 0;
+    const received = product.quantity || product.receivedQuantity || 0;
+    
+    if (received === 0) return 'Not Received';
+    if (received < ordered) return 'Partial';
+    if (received === ordered) return 'Complete';
+    if (received > ordered) return 'Over Received';
+    
+    return 'Received';
+  }
+
+  getProductStatusClass(product: any): string {
+    const status = this.getProductStatus(product);
+    switch (status) {
+      case 'Complete': return 'status-complete';
+      case 'Partial': return 'status-partial';
+      case 'Over Received': return 'status-over';
+      case 'Not Received': return 'status-not-received';
+      default: return 'status-received';
+    }
+  }
+
+  getProductRowClass(product: any): string {
+    const received = product.quantity || product.receivedQuantity || 0;
+    return received > 0 ? 'product-received' : 'product-not-received';
+  }
+
+  printProductsList(): void {
+    if (!this.selectedGrn) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      const html = this.generatePrintHTML(this.selectedGrn);
+      printWindow.document.write(html);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  }
+
+  private generatePrintHTML(grn: any): string {
+    const productsRows = grn.products?.map((product: any, index: number) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${product.productName || product.name}</td>
+        <td>${product.sku || product.code || 'N/A'}</td>
+        <td>${product.orderQuantity || product.orderedQty || 0}</td>
+        <td>${product.quantity || product.receivedQuantity || 0}</td>
+        <td>₹${(product.unitCost || product.unitPrice || 0).toFixed(2)}</td>
+        <td>₹${this.getProductLineTotal(product).toFixed(2)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">No products found</td></tr>';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>GRN Products - ${grn.referenceNo}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          .header { text-align: center; margin-bottom: 30px; }
+          .info { margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          .total-row { font-weight: bold; background-color: #f9f9f9; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>Goods Received Note - Products Details</h2>
+          <h3>${grn.referenceNo}</h3>
+        </div>
+        <div class="info">
+          <p><strong>Supplier:</strong> ${this.getSupplierName(grn)}</p>
+          <p><strong>Location:</strong> ${this.getLocationName(grn)}</p>
+          <p><strong>Received Date:</strong> ${this.formatDate(grn.receivedDate)}</p>
+          <p><strong>Invoice No:</strong> ${grn.invoiceNo || 'N/A'}</p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>SKU/Code</th>
+              <th>Order Qty</th>
+              <th>Received Qty</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${productsRows}
+            <tr class="total-row">
+              <td colspan="4">Total</td>
+              <td>${this.getTotalQuantity(grn.products)}</td>
+              <td></td>
+              <td>₹${this.getTotalValue(grn.products).toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+  }
+
+  private formatDate(date: any): string {
+    if (!date) return 'N/A';
+    const parsedDate = this.parseDate(date);
+    return formatDate(parsedDate, 'dd-MM-yyyy HH:mm', 'en-US');
+  }
+
+  // Sorting and filtering methods
+  sortBy(column: string): void {
+    if (this.sortColumn === column) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
+    
+    if (column === 'purchaseDate' || column === 'receivedDate') {
+      this.filteredGoodsReceived.sort((a, b) => {
+        const dateA = this.parseDate(a[column]).getTime();
+        const dateB = this.parseDate(b[column]).getTime();
+        return this.sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      });
+    } else {
+      this.applyFilters();
+    }
+    
+    this.updatePagination();
+  }
+
   applyFilters(): void {
-    // Filter by date range
     this.filteredGoodsReceived = this.goodsReceived.filter(grn => {
       const purchaseDate = grn.purchaseDate instanceof Date ? 
         grn.purchaseDate : new Date(grn.purchaseDate);
       return purchaseDate >= this.startDate && purchaseDate <= this.endDate;
     });
 
-    // Apply search filter
     if (this.searchQuery && this.searchQuery.trim() !== '') {
       const query = this.searchQuery.toLowerCase().trim();
       this.filteredGoodsReceived = this.filteredGoodsReceived.filter(grn => {
@@ -167,25 +298,16 @@ sortBy(column: string): void {
         );
       });
     }
-    this.loadLocations(); // Load locations first
 
-    // Apply sorting
     this.filteredGoodsReceived.sort((a, b) => {
       let valueA: any;
       let valueB: any;
 
       switch(this.sortColumn) {
         case 'purchaseDate':
-          valueA = a.purchaseDate instanceof Date ? a.purchaseDate : new Date(a.purchaseDate);
-          valueB = b.purchaseDate instanceof Date ? b.purchaseDate : new Date(b.purchaseDate);
-          break;
-        case 'referenceNo':
-          valueA = a.referenceNo || '';
-          valueB = b.referenceNo || '';
-          break;
-        case 'invoiceNo':
-          valueA = a.invoiceNo || '';
-          valueB = b.invoiceNo || '';
+        case 'receivedDate':
+          valueA = a[this.sortColumn] instanceof Date ? a[this.sortColumn] : new Date(a[this.sortColumn]);
+          valueB = b[this.sortColumn] instanceof Date ? b[this.sortColumn] : new Date(b[this.sortColumn]);
           break;
         case 'locationName':
           valueA = this.getLocationName(a) || '';
@@ -194,14 +316,6 @@ sortBy(column: string): void {
         case 'supplierName':
           valueA = this.getSupplierName(a) || '';
           valueB = this.getSupplierName(b) || '';
-          break;
-        case 'status':
-          valueA = a.status || '';
-          valueB = b.status || '';
-          break;
-        case 'addedBy':
-          valueA = a.addedBy || '';
-          valueB = b.addedBy || '';
           break;
         default:
           valueA = a[this.sortColumn] || '';
@@ -217,82 +331,50 @@ sortBy(column: string): void {
 
     this.updatePagination();
   }
-openActionModal(grn: any, index: number): void {
-  this.selectedGrnForAction = grn;
-  // Open the modal (you can use Bootstrap modal or Angular Material)
-  const modal = document.getElementById('grnActionModal');
-  if (modal) {
-    // For Bootstrap modal
-    const bootstrapModal = new (window as any).bootstrap.Modal(modal);
-    bootstrapModal.show();
-  }
-}
-// In your list-goods.component.ts
 
-closeActionModal(): void {
-  this.selectedGrnForAction = null;
-  // Close the modal
-  const modal = document.getElementById('grnActionModal');
-  if (modal) {
-    const bootstrapModal = (window as any).bootstrap.Modal.getInstance(modal);
-    if (bootstrapModal) {
-      bootstrapModal.hide();
-    }
-  }
-}
   applySearch(): void {
     this.currentPage = 1;
     this.applyFilters();
   }
 
-getSupplierName(grn: any): string {
-  // If supplier details are embedded directly in the GRN
-  if (grn.supplierName) {
-    return grn.supplierName;
-  }
-  
-  // If supplier details are embedded as an object
-  if (grn.supplierDetails) {
-    return grn.supplierDetails.isIndividual ? 
-      `${grn.supplierDetails.firstName} ${grn.supplierDetails.lastName || ''}`.trim() :
-      grn.supplierDetails.businessName;
-  }
-  
-  // If supplier is just a reference ID (old format)
-  if (typeof grn.supplier === 'string') {
-    // Try to find the supplier in the loaded suppliers list
-    const foundSupplier = this.suppliers.find(s => s.id === grn.supplier);
-    if (foundSupplier) {
-      return foundSupplier.isIndividual ? 
-        `${foundSupplier.firstName} ${foundSupplier.lastName || ''}`.trim() :
-        foundSupplier.businessName;
+  // Helper methods
+  getSupplierName(grn: any): string {
+    if (grn.supplierName) {
+      return grn.supplierName;
     }
-    return 'Supplier Not Found';
+    
+    if (grn.supplierDetails) {
+      return grn.supplierDetails.isIndividual ? 
+        `${grn.supplierDetails.firstName} ${grn.supplierDetails.lastName || ''}`.trim() :
+        grn.supplierDetails.businessName;
+    }
+    
+    if (typeof grn.supplier === 'string') {
+      const foundSupplier = this.suppliers.find(s => s.id === grn.supplier);
+      if (foundSupplier) {
+        return foundSupplier.isIndividual ? 
+          `${foundSupplier.firstName} ${foundSupplier.lastName || ''}`.trim() :
+          foundSupplier.businessName;
+      }
+      return 'Supplier Not Found';
+    }
+    
+    return 'N/A';
   }
-  
-  return 'N/A';
-}
 
   getLocationName(grn: any): string {
-    // If location details are embedded
     if (grn.businessLocationDetails) {
       return grn.businessLocationDetails.name || 
              grn.businessLocationDetails.address || 
              'N/A';
     }
-    // If location is just an ID, try to find it in locations
-    else if (grn.businessLocation) {
-      const location = this.locations.find((loc: { id: any; }) => loc.id === grn.businessLocation);
+    
+    if (grn.businessLocation) {
+      const location = this.locations.find(loc => loc.id === grn.businessLocation);
       return location?.name || location?.address || 'N/A';
     }
+    
     return 'N/A';
-  }
-  private loadLocations(): void {
-    this.locationService.getLocations().subscribe(locations => {
-      this.locations = locations;
-      // After loading locations, refresh the data display
-      this.applyFilters();
-    });
   }
 
   formatStatus(status: string): string {
@@ -407,13 +489,5 @@ getSupplierName(grn: any): string {
           this.grnToDelete = null;
         });
     }
-  }
-
-  viewGrn(id: string): void {
-    this.router.navigate(['/view-grn', id]);
-  }
-
-  printGrn(id: string): void {
-    // Implementation for printing the GRN
   }
 }

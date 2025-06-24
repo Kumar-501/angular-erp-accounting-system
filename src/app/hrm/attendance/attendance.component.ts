@@ -4,7 +4,12 @@ import { UserService, User } from '../../services/user.service';
 import { Subscription, Observable } from 'rxjs';
 import { Papa } from 'ngx-papaparse';
 import { AuthService } from '../../auth.service';
-
+import * as XLSX from 'xlsx';
+interface ImportResults {
+  total: number;
+  success: number;
+  errors: string[];
+}
 export interface Shift {
   shiftName: string;
   startTime: string;
@@ -105,15 +110,20 @@ export class AttendanceComponent implements OnInit, OnDestroy {
 
   // For import attendance
   selectedFile: File | null = null;
-  importColumns: ImportColumn[] = [
-    { number: 1, name: 'Email', required: true, description: 'Email id of the user' },
-    { number: 2, name: 'Clock in time', required: true, description: 'Clock in time in "Y-m-d H:i:s" format', format: '(2025-04-15 04:45:14)' },
-    { number: 3, name: 'Clock out time', required: false, description: 'Clock out time in "Y-m-d H:i:s" format', format: '(2025-04-15 04:45:14)' },
-    { number: 4, name: 'Clock in note', required: false, description: 'Clock in note' },
-    { number: 5, name: 'Clock out note', required: false, description: 'Clock out note' },
-    { number: 6, name: 'IP Address', required: false, description: 'IP Address' }
-  ];
-  
+importColumns: ImportColumn[] = [
+  { number: 1, name: 'Employee', required: true, description: 'Employee email or username' },
+  { number: 2, name: 'Clock In', required: true, description: 'Clock in time in "Y-m-d H:i:s" format', format: '(2023-01-01 09:00:00)' },
+  { number: 3, name: 'Clock Out', required: false, description: 'Clock out time in "Y-m-d H:i:s" format', format: '(2023-01-01 17:00:00)' },
+  { number: 4, name: 'Duration', required: false, description: 'Work duration in HH:MM:SS format', format: '(08:00:00)' },
+  { number: 5, name: 'Shift', required: false, description: 'Shift name' },
+  { number: 6, name: 'Clock In Location', required: false, description: 'Latitude,Longitude (Address)' },
+  { number: 7, name: 'Clock Out Location', required: false, description: 'Latitude,Longitude (Address)' },
+  { number: 8, name: 'IP Address', required: false, description: 'IP address used for clock in/out' },
+  { number: 9, name: 'Clock In Note', required: false, description: 'Optional note for clock in' },
+  { number: 10, name: 'Clock Out Note', required: false, description: 'Optional note for clock out' },
+  { number: 11, name: 'Clock In Image', required: false, description: 'Filename of clock in image' },
+  { number: 12, name: 'Clock Out Image', required: false, description: 'Filename of clock out image' }
+];
   importError: string = '';
   importSuccess: string = '';
   isImporting: boolean = false;
@@ -1004,152 +1014,248 @@ export class AttendanceComponent implements OnInit, OnDestroy {
       }
     }, 1500);
   }
+async uploadFile() {
+  if (!this.selectedFile) {
+    this.importError = 'Please select a file to import';
+    return;
+  }
 
-  async uploadFile() {
-    if (!this.selectedFile) {
-      this.importError = 'Please select a file to import';
-      return;
+  // Make sure users are loaded
+  if (this.users.length === 0) {
+    this.importError = 'User data not loaded yet. Please wait and try again.';
+    return;
+  }
+
+  this.isImporting = true;
+  this.importError = '';
+  this.importSuccess = '';
+  this.importResults = null;
+
+  try {
+    if (this.selectedFile.name.endsWith('.csv')) {
+      await this.parseCSVFile(this.selectedFile);
+    } else if (this.selectedFile.name.endsWith('.xlsx') || this.selectedFile.name.endsWith('.xls')) {
+      await this.parseExcelFile(this.selectedFile);
+    } else {
+      this.importError = 'Unsupported file format. Please upload a CSV or Excel file.';
     }
+  } catch (error) {
+    console.error('Error importing file:', error);
+    this.importError = 'Error processing file. Please check the format and try again.';
+  } finally {
+    this.isImporting = false;
+  }
+}
 
-    this.isImporting = true;
-    this.importError = '';
-    this.importSuccess = '';
-    this.importResults = null;
-
-    try {
-      if (this.selectedFile.name.endsWith('.csv')) {
-        await this.parseCSVFile(this.selectedFile);
-      } else if (this.selectedFile.name.endsWith('.xlsx') || this.selectedFile.name.endsWith('.xls')) {
-        await this.parseExcelFile(this.selectedFile);
-      } else {
-        this.importError = 'Unsupported file format. Please upload a CSV or Excel file.';
+private parseCSVFile(file: File): Promise<void> {
+  return new Promise((resolve, reject) => {
+    this.papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        this.processImportData(results.data);
+        resolve();
+      },
+      error: (error) => {
+        reject(error);
       }
-    } catch (error) {
-      console.error('Error importing file:', error);
-      this.importError = 'Error processing file. Please check the format and try again.';
-    } finally {
-      this.isImporting = false;
-    }
-  }
-
-  private parseCSVFile(file: File): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          this.processImportData(results.data);
-          resolve();
-        },
-        error: (error) => {
-          reject(error);
-        }
-      });
     });
-  }
+  });
+}
+ 
 
-  private async parseExcelFile(file: File): Promise<void> {
-    // In a real app, you would use a library like xlsx to parse Excel files
-    // This is a simplified version for demonstration
-    this.importError = 'Excel file parsing not implemented in this demo. Please use CSV.';
-    throw new Error('Excel parsing not implemented');
-  }
-
-  private async processImportData(data: any[]) {
-    const results = {
-      total: data.length,
-      success: 0,
-      errors: [] as string[]
-    };
-
-    for (const [index, row] of data.entries()) {
+ private parseExcelFile(file: File): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
       try {
-        // Validate required fields
-        if (!row['Email']) {
-          throw new Error('Missing email');
-        }
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Get first sheet
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        this.processImportData(jsonData);
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsArrayBuffer(file);
+  });
+}
 
-        if (!row['Clock in time']) {
-          throw new Error('Missing clock in time');
-        }
+private async processImportData(data: any[]) {
+  const results = {
+    total: data.length,
+    success: 0,
+    errors: [] as string[]
+  };
 
-        // Find user by email
-        const user = this.users.find(u => u.email === row['Email']);
-        if (!user) {
-          throw new Error('User not found');
-        }
+  for (const [index, row] of data.entries()) {
+    try {
+      // Validate required fields
+      if (!row['Employee']) {
+        throw new Error('Missing employee identifier');
+      }
 
-        // Parse dates
-        const clockInTime = new Date(row['Clock in time']);
+      // Find employee (can be email or username)
+      const employee = row['Employee'].toString().trim();
+      const user = this.users.find(u => 
+        u.email?.toLowerCase() === employee.toLowerCase() || 
+        u.username?.toLowerCase() === employee.toLowerCase()
+      );
+      
+      if (!user) {
+        throw new Error(`Employee "${employee}" not found in system`);
+      }
+
+      // Parse clock in time
+      let clockInTime: Date;
+      try {
+        clockInTime = new Date(row['Clock In']);
         if (isNaN(clockInTime.getTime())) {
-          throw new Error('Invalid clock in time format');
+          throw new Error('Invalid date format');
         }
+      } catch (e) {
+        throw new Error('Invalid clock in time format. Expected format: YYYY-MM-DD HH:MM:SS');
+      }
 
-        let clockOutTime = null;
-        if (row['Clock out time']) {
-          clockOutTime = new Date(row['Clock out time']);
+      // Parse clock out time if exists
+      let clockOutTime: Date | null = null;
+      if (row['Clock Out']) {
+        try {
+          clockOutTime = new Date(row['Clock Out']);
           if (isNaN(clockOutTime.getTime())) {
-            throw new Error('Invalid clock out time format');
+            throw new Error('Invalid date format');
+          }
+        } catch (e) {
+          throw new Error('Invalid clock out time format. Expected format: YYYY-MM-DD HH:MM:SS');
+        }
+      }
+
+      // Parse location data if exists
+      let clockInLocation = null;
+      if (row['Clock In Location']) {
+        const locParts = row['Clock In Location'].toString().split('(');
+        const coords = locParts[0].trim();
+        const address = locParts[1]?.replace(')', '').trim();
+        
+        if (coords) {
+          const [latitude, longitude] = coords.split(',').map(Number);
+          if (!isNaN(latitude) && !isNaN(longitude)) {
+            clockInLocation = {
+              latitude: latitude.toString(),
+              longitude: longitude.toString(),
+              address: address || ''
+            };
           }
         }
-
-        // Prepare attendance record
-        const attendance: any = {
-          employee: user.username || user.email,
-          clockInTime: clockInTime.toISOString(),
-          clockOutTime: clockOutTime ? clockOutTime.toISOString() : '',
-          shift: user.shift || '',
-          ipAddress: row['IP Address'] || '',
-          clockInNote: row['Clock in note'] || '',
-          clockOutNote: row['Clock out note'] || ''
-        };
-
-        // Save to database
-        await this.attendanceService.addAttendance(attendance);
-        results.success++;
-      } catch (error) {
-        const errorMsg = `Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        results.errors.push(errorMsg);
-        console.error(`Error processing row ${index + 1}:`, error);
       }
-    }
 
-    this.importResults = results;
-    if (results.success > 0) {
-      this.importSuccess = `Successfully imported ${results.success} of ${results.total} records`;
-      // Refresh attendance data
-      this.loadAttendance();
-    } else {
-      this.importError = `Failed to import any records. ${results.errors[0] || 'Unknown error'}`;
+      // Prepare attendance record
+      const attendance: any = {
+        employee: user.username || user.email,
+        clockInTime: clockInTime.toISOString(),
+        clockOutTime: clockOutTime ? clockOutTime.toISOString() : '',
+        shift: row['Shift'] || user.shift || '',
+        ipAddress: row['IP Address'] || '',
+        clockInNote: row['Clock In Note'] || '',
+        clockOutNote: row['Clock Out Note'] || '',
+        location: clockInLocation
+      };
+
+      // Save to database
+      await this.attendanceService.addAttendance(attendance);
+      results.success++;
+    } catch (error) {
+      const errorMsg = `Row ${index + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      results.errors.push(errorMsg);
+      console.error(`Error processing row ${index + 1}:`, error);
     }
   }
 
-  downloadTemplateFile() {
-    // CSV header row
-    let csvContent = "Email,Clock in time,Clock out time,Clock in note,Clock out note,IP Address\n";
-    
-    // Example data row
-    const exampleDate = new Date();
-    const clockInTime = exampleDate.toISOString().replace('T', ' ').replace(/\..+/, '');
-    
-    exampleDate.setHours(exampleDate.getHours() + 8);
-    const clockOutTime = exampleDate.toISOString().replace('T', ' ').replace(/\..+/, '');
-    
-    csvContent += `user@example.com,${clockInTime},${clockOutTime},Morning check-in,Left office,192.168.1.1\n`;
-    
-    // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'attendance_template.csv');
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  this.importResults = results;
+  if (results.success > 0) {
+    this.importSuccess = `Successfully imported ${results.success} of ${results.total} records`;
+    this.loadAttendance(); // Refresh data
+  } else {
+    this.importError = `Failed to import any records. ${results.errors[0] || 'Unknown error'}`;
   }
+}
+downloadTemplateFile() {
+  // Create sample data with current date/time
+  const now = new Date();
+  const clockInTime = new Date(now);
+  clockInTime.setHours(9, 0, 0); // 9:00 AM
+  
+  const clockOutTime = new Date(now);
+  clockOutTime.setHours(17, 0, 0); // 5:00 PM
+
+  // Calculate duration in HH:MM:SS format
+  const durationMs = clockOutTime.getTime() - clockInTime.getTime();
+  const duration = new Date(durationMs).toISOString().substr(11, 8);
+
+  const data = [{
+    'Employee': 'john.doe@example.com',
+    'Clock In': clockInTime.toISOString().replace('T', ' ').replace(/\..+/, ''),
+    'Clock Out': clockOutTime.toISOString().replace('T', ' ').replace(/\..+/, ''),
+    'Duration': duration,
+    'Shift': 'Morning Shift',
+    'Clock In Location': '12.3456,78.9012 (Office Entrance)',
+    'Clock Out Location': '12.3456,78.9012 (Office Exit)',
+    'IP Address': '192.168.1.100',
+    'Clock In Note': 'Started work',
+    'Clock Out Note': 'Finished work',
+    'Clock In Image': 'image1.jpg',
+    'Clock Out Image': 'image2.jpg'
+  }];
+
+  // Create CSV version
+  this.downloadCSVTemplate(data);
+  
+  // Create Excel version
+  this.downloadExcelTemplate(data);
+}
+
+private downloadExcelTemplate(data: any[]) {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+  
+  // Generate Excel file
+  XLSX.writeFile(workbook, 'attendance_template.xlsx');
+}
+/**
+ * Utility to download a CSV template file from sample data.
+ */
+private downloadCSVTemplate(data: any[]) {
+  // CSV header row
+  let csvContent = Object.keys(data[0]).join(',') + '\n';
+  
+  // Add data rows
+  data.forEach(row => {
+    csvContent += Object.values(row).join(',') + '\n';
+  });
+  
+  // Create download link
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'attendance_import_template.csv');
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 
   calculateWorkDuration(clockIn: string | undefined, clockOut: string | undefined): string {
     if (!clockIn || !clockOut) return '-';

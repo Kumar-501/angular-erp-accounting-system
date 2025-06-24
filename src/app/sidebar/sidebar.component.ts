@@ -48,7 +48,6 @@ export class SidebarComponent implements OnInit {
         { name: 'Import Contacts', route: '/import-contacts', roles: ['admin','accounts hod','accounts hod','accounts executives', 'costing executives','sales hod','executive','supervisor'] }
       ],
       roles: ['admin', 'manager',  'supervisor','accounts executives','sales hod','accounts hod','costing executives','executive','auditing executives']
-   
     },
 
 
@@ -61,6 +60,7 @@ export class SidebarComponent implements OnInit {
       isExpanded: false,
       subItems: [
         { name: 'List Products', route: '/list-products', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
+        { name: 'Not for selling Products', route: '/not-selling', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
 
         { name: 'Add Product', route: '/add-product', roles: ['admin', 'accounts hod','manager','costing executives','purchase team'] },
         { name: 'Update Price', route: '/update-price', roles: ['admin', 'accounts hod','manager','purchase team'] },
@@ -87,9 +87,7 @@ export class SidebarComponent implements OnInit {
         { name: 'Purchase Order', route: '/purchase-order', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod', 'executive','accountant','accounts hod','costing executives','supervisor','auditing executives'] },
         { name: 'List Purchases', route: '/list-purchase', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod','costing executives', 'executive','accounts hod','accountant','supervisor','auditing executives'] },
         { name: 'Add Purchase', route: '/add-purchase', roles: ['admin', 'manager','logistics hod','logistics prepaid','logistics cod','accountant','costing executives','accounts hod','supervisor','purchase team'] },
-        { name: 'List Purchase Return', route: '/purchase-return', roles: ['admin','logistics hod', 'logistics cod','manager','accountant','costing executives','accounts hod','supervisor','purchase team'] },
-              { name: 'Not For Selling Products', route: '/not-for-selling-products', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
-
+        { name: 'List Purchase Return', route: '/purchase-return', roles: ['admin','logistics hod', 'logistics cod','manager','accountant','costing executives','accounts hod','supervisor','purchase team'] }
       ]
     },
     {
@@ -167,7 +165,7 @@ export class SidebarComponent implements OnInit {
       subItems: [
         { name: 'List Accounts', route: '/list-accounts', roles: ['admin','accounts hod', 'auditing executives', 'accounts executives','accountant','supervisor'] },
         { name: 'Balance Sheet', route: '/balance-sheet', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
-        { name: 'Trial Balance', route: '/trial-balance', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
+        // { name: 'Trial Balance', route: '/trial-balance', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
 
        
         { name: 'Profit and Loss Report', route: '/profit-loss', roles: ['admin', 'manager', 'accounts hod','accountant','supervisor'] },

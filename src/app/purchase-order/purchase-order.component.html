@@ -53,125 +53,112 @@
       <button class="close-sidebar" (click)="toggleFilterSidebar()">&times;</button>
     </div>
     
-    <div class="sidebar-content">
-      <!-- Date Filter -->
-      <div class="filter-group">
-        <label>Date Range:</label>
-        <div class="date-filter-container">
-          <div class="input-group">
-            <input type="text" class="form-control date-range-input" 
-                  [value]="dateRangeLabel || 'Select date range'" 
-                  readonly (click)="toggleDateDrawer()">
-            <button class="btn btn-outline-secondary date-filter-button" (click)="toggleDateDrawer()">
-            </button>
-          </div>
-          
-          <!-- Date Filter Drawer -->
-          <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
-            <div class="drawer-header">
-              <h5>Date Range Filter</h5>
-              <button class="btn-close" (click)="toggleDateDrawer()"></button>
-            </div>
-            
-            <div class="drawer-body">
-              <!-- Predefined Date Ranges -->
-         <!-- In your date filter drawer section -->
-<div class="date-options">
-  <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
-    <span>Today</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
-    <span>Yesterday</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
-    <span>Last 7 Days</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
-    <span>Last 30 Days</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
-    <span>Last Month</span>
-  </div>
-  <!-- Add these new options -->
-  <div class="date-option" [class.active]="selectedRange === 'thisMonth'" (click)="filterByDate('thisMonth')">
-    <span>This Month</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'thisFinancialYear'" (click)="filterByDate('thisFinancialYear')">
-    <span>This Financial Year</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'lastFinancialYear'" (click)="filterByDate('lastFinancialYear')">
-    <span>Last Financial Year</span>
-  </div>
-  <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
-    <span>Custom Range</span>
-  </div>
-</div>
-              
-              <!-- Custom Date Range Picker -->
-              <div class="custom-date-container" *ngIf="isCustomDate">
-                <div class="mb-3">
-                  <label class="form-label">From Date</label>
-                  <input type="date" class="form-control" [(ngModel)]="fromDate">
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">To Date</label>
-                  <input type="date" class="form-control" [(ngModel)]="toDate">
-                </div>
-              </div>
-            </div>
-            
-            <div class="drawer-footer" *ngIf="isCustomDate">
-              <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
-              <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
-            </div>
-          </div>
-          
-          <!-- Backdrop when drawer is open -->
-          <div class="drawer-backdrop" [class.backdrop-visible]="isDateDrawerOpen" (click)="toggleDateDrawer()"></div>
-        </div>
+ <div class="sidebar-content">
+  <!-- Date Filter - Now directly in the sidebar -->
+  <div class="filter-group">
+    <label>Date Range:</label>
+    <div class="date-filter-container">
+      <div class="input-group">
+        <input type="text" class="form-control date-range-input" 
+              [value]="dateRangeLabel || 'Select date range'" 
+              readonly>
+        <button class="btn btn-outline-secondary date-filter-button">
+        </button>
       </div>
       
-      <div class="filter-group">
-        <label for="businessLocation">Business Location:</label>
-        <select id="businessLocation" [(ngModel)]="selectedLocation" (change)="applyFilters()">
-          <option *ngFor="let location of businessLocations" [value]="location">{{ location }}</option>
-        </select>
-      </div>
-      
-      <div class="filter-group">
-        <label for="supplier">Supplier:</label>
-        <div class="searchable-dropdown">
-          <input type="text" 
-                [(ngModel)]="supplierSearchTerm" 
-                (input)="filterSuppliers()"
-                (focus)="showSupplierDropdown = true"
-                placeholder="Type to search suppliers...">
-          
-          <div class="dropdown-options" *ngIf="showSupplierDropdown">
-            <div *ngFor="let supplier of filteredSuppliers" 
-                (click)="selectSupplier(supplier)"
-                [class.selected]="selectedSupplier === supplier">
-              {{ supplier }}
-            </div>
-            <div *ngIf="filteredSuppliers.length === 0" class="no-results">
-              No matching suppliers found
-            </div>
+      <!-- Date options - now directly in the sidebar -->
+      <div class="date-options-container" *ngIf="showDateOptions">
+        <div class="date-options">
+          <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+            <span>Today</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+            <span>Yesterday</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+            <span>Last 7 Days</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+            <span>Last 30 Days</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+            <span>Last Month</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'thisMonth'" (click)="filterByDate('thisMonth')">
+            <span>This Month</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'thisFinancialYear'" (click)="filterByDate('thisFinancialYear')">
+            <span>This Financial Year</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'lastFinancialYear'" (click)="filterByDate('lastFinancialYear')">
+            <span>Last Financial Year</span>
+          </div>
+          <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+            <span>Custom Range</span>
           </div>
         </div>
-      </div>
-      
-      <div class="filter-group">
-        <label for="status">Status:</label>
-        <select id="status" [(ngModel)]="selectedStatus" (change)="applyFilters()">
-          <option *ngFor="let status of statuses" [value]="status">{{ status }}</option>
-        </select>
-      </div>
-      
-      <div class="filter-actions">
-        <button class="apply-filters" (click)="applyFilters()">Apply Filters</button>
-        <button class="reset-filters" (click)="resetFilters()">Reset</button>
+        
+        <!-- Custom Date Range Picker - always visible when custom is selected -->
+        <div class="custom-date-container" *ngIf="selectedRange === 'custom'">
+          <div class="mb-3">
+            <label class="form-label">From Date</label>
+            <input type="date" class="form-control" [(ngModel)]="fromDate">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">To Date</label>
+            <input type="date" class="form-control" [(ngModel)]="toDate">
+          </div>
+          <div class="custom-date-actions">
+            <button class="btn btn-outline-secondary me-2" (click)="selectedRange = ''; fromDate = null; toDate = null">Cancel</button>
+            <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
+  
+  <!-- Rest of your filter groups (location, supplier, status) -->
+  <div class="filter-group">
+    <label for="businessLocation">Business Location:</label>
+    <select id="businessLocation" [(ngModel)]="selectedLocation" (change)="applyFilters()">
+      <option *ngFor="let location of businessLocations" [value]="location">{{ location }}</option>
+    </select>
+  </div>
+  
+  <div class="filter-group">
+    <label for="supplier">Supplier:</label>
+    <div class="searchable-dropdown">
+      <input type="text" 
+            [(ngModel)]="supplierSearchTerm" 
+            (input)="filterSuppliers()"
+            (focus)="showSupplierDropdown = true"
+            placeholder="Type to search suppliers...">
+      
+      <div class="dropdown-options" *ngIf="showSupplierDropdown">
+        <div *ngFor="let supplier of filteredSuppliers" 
+            (click)="selectSupplier(supplier)"
+            [class.selected]="selectedSupplier === supplier">
+          {{ supplier }}
+        </div>
+        <div *ngIf="filteredSuppliers.length === 0" class="no-results">
+          No matching suppliers found
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="filter-group">
+    <label for="status">Status:</label>
+    <select id="status" [(ngModel)]="selectedStatus" (change)="applyFilters()">
+      <option *ngFor="let status of statuses" [value]="status">{{ status }}</option>
+    </select>
+  </div>
+  
+  <div class="filter-actions">
+    <button class="apply-filters" (click)="applyFilters()">Apply Filters</button>
+    <button class="reset-filters" (click)="resetFilters()">Reset</button>
+  </div>
+</div>
   </div>
   
   <!-- Main Table -->
@@ -183,6 +170,9 @@
         <th *ngIf="columns[0].visible" (click)="sortTable('date')">
           Date <i class="fa" [ngClass]="getSortIcon('date')"></i>
         </th>
+          <th *ngIf="columns[2].visible" (click)="sortTable('requiredByDate')">
+      Required Date <i class="fa" [ngClass]="getSortIcon('requiredByDate')"></i>
+    </th>
         <th *ngIf="columns[1].visible" (click)="sortTable('referenceNo')">
           Reference No <i class="fa" [ngClass]="getSortIcon('referenceNo')"></i>
         </th>
@@ -272,6 +262,8 @@
 </div>
         </td>
         <td *ngIf="columns[0].visible">{{ order.date | date }}</td>
+            <td *ngIf="columns[2].visible">{{ order.requiredByDate | date }}</td>
+
         <td *ngIf="columns[1].visible">{{ order.referenceNo }}</td>      
         <td *ngIf="columns[4].visible">{{ order.locationName }}</td>
         <td *ngIf="columns[5].visible">

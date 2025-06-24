@@ -453,12 +453,14 @@
                     (click)="viewRequisition(row.id, $event)">
               <i class="fa fa-eye"></i>
             </button>
-            <button class="btn-approve" 
-                    title="Approve" 
-                    *ngIf="row.status !== 'Approved'" 
-                    (click)="approveRequisition(row, $event)">
-              <i class="fa fa-check"></i>
-            </button>
+      <!-- In your purchase-requisition.component.html -->
+<!-- In your purchase-requisition.component.html -->
+<button class="btn-approve" 
+        title="Approve" 
+        *ngIf="row.status !== 'Approved' && isAdmin" 
+        (click)="approveRequisition(row, $event)">
+  <i class="fa fa-check"></i>
+</button>
             <button class="btn-delete" 
                     title="Delete" 
                     (click)="deleteRequisition(row.id, $event)">

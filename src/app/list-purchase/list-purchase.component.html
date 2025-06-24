@@ -215,28 +215,64 @@
             </tr>
             
             <tr *ngFor="let purchase of filteredPurchases">
-              <td>
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-outline-secondary action-btn" type="button" 
-                          id="dropdownMenuButton{{purchase.id}}" 
-                          data-bs-toggle="dropdown" 
-                          aria-expanded="false"
-                          aria-haspopup="true">
-                    Actions
-                  </button>
-                  <ul class="dropdown-menu" [attr.aria-labelledby]="'dropdownMenuButton' + purchase.id">
-                    <li><a class="dropdown-item" [routerLink]="['/view-purchase', purchase.id]"><i class="fas fa-eye text-primary me-2"></i>View</a></li>
-                    <li><a class="dropdown-item" [routerLink]="['/edit-purchase', purchase.id]"><i class="fas fa-edit text-warning me-2"></i>Edit</a></li>
-                    <li><a class="dropdown-item" (click)="deletePurchase(purchase.id)"><i class="fas fa-trash text-danger me-2"></i>Delete</a></li>
-                    <li><a class="dropdown-item" (click)="openReturnModal(purchase)"><i class="fas fa-undo text-info me-2"></i>Purchase Return</a></li>
-                    <li><a class="dropdown-item" (click)="printPurchase(purchase)"><i class="fas fa-print text-secondary me-2"></i>Print</a></li>
-                    <!-- New payment related options -->
-                    <li><hr class="dropdown-divider"></li>
-<li><a class="dropdown-item" (click)="addPayment(purchase)"><i class="fas fa-money-bill-wave text-success me-2"></i> Add Payment</a></li>                  
-  <li><a class="dropdown-item" (click)="updateStatus(purchase)"><i class="fas fa-sync-alt text-info me-2"></i>Update Status</a></li>
-                  </ul>
-                </div>
-              </td>
+            <td>
+  <!-- Action Button -->
+  <button class="action-button" (click)="openActionPopup(purchase, $event)">Actions</button>
+
+  <!-- Action Popup -->
+  <div class="action-popup-overlay" *ngIf="currentActionPopup === purchase.id" (click)="closeActionPopup()">
+    <div class="action-popup" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h4>Purchase #{{purchase.referenceNo}}</h4>
+        <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+      </div>
+      
+      <div class="popup-body">
+        <div class="action-item" (click)="viewPurchase(purchase); closeActionPopup()">
+          <i class="fas fa-eye text-info"></i>
+          <span>View</span>
+        </div>
+        
+        <div class="action-item" (click)="editPurchase(purchase); closeActionPopup()">
+          <i class="fas fa-edit text-primary"></i>
+          <span>Edit</span>
+        </div>
+        
+        <div class="action-item" (click)="addPayment(purchase); closeActionPopup()">
+          <i class="fas fa-money-bill-wave text-success"></i>
+          <span>Add Payment</span>
+        </div>
+        
+        <div class="action-item" (click)="updateStatus(purchase); closeActionPopup()">
+          <i class="fas fa-sync-alt text-info"></i>
+          <span>Update Status</span>
+        </div>
+        
+        <div class="action-item" (click)="openReturnModal(purchase); closeActionPopup()">
+          <i class="fas fa-undo text-warning"></i>
+          <span>Purchase Return</span>
+        </div>
+        
+        <div class="action-item" (click)="printPurchase(purchase); closeActionPopup()">
+          <i class="fas fa-print text-secondary"></i>
+          <span>Print</span>
+        </div>
+        
+        <div class="action-item" (click)="viewPayments(purchase); closeActionPopup()">
+          <i class="fas fa-history text-secondary"></i>
+          <span>View Payments</span>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div class="action-item text-danger" (click)="confirmDelete(purchase); closeActionPopup()">
+          <i class="fas fa-trash-alt"></i>
+          <span>Delete</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</td>
               <td>{{ purchase.purchaseDate || 'N/A' }}</td>
               <td>{{ purchase.referenceNo || 'N/A' }}</td>
               <td>{{ purchase.invoiceNo || 'N/A' }}</td>
@@ -370,34 +406,34 @@
             </div>
           </div>
 
-        <div class="table-responsive mb-4 return-products-table">
-        <table class="table">
-          <thead>
-            <tr>
-              <th class="product-col">Product</th>
-              <th class="qty-col">Purchased Qty</th>
-              <th class="return-col">Return Qty</th>
-              <th class="price-col">Unit Price (₹)</th>
-              <th class="subtotal-col">Subtotal (₹)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let product of returnData.products; let i = index">
-              <td class="product-name">{{ product.name || product.productName }}</td>
-              <td class="purchased-qty">{{ product.quantity }}</td>
-              <td class="return-qty-input">
-                <input type="number" class="form-control" 
-                       [(ngModel)]="returnData.products[i].returnQuantity" 
-                       (change)="calculateReturnSubtotal(i)"
-                       min="0" [max]="product.quantity || 0" [disabled]="isDisabled">
-              </td>
-              <td class="unit-price">{{ product.price | number:'1.2-2' }}</td>
-              <td class="subtotal">{{ returnData.products[i].subtotal | number:'1.2-2' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
+          <!-- Products Table -->
+          <div class="table-responsive mb-4 return-products-table">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th class="product-col">Product</th>
+                  <th class="qty-col">Purchased Qty</th>
+                  <th class="return-col">Return Qty</th>
+                  <th class="price-col">Unit Price</th>
+                  <th class="subtotal-col">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let product of selectedPurchase.products; let i = index">
+                  <td class="product-name">{{ product.name || product.productName }}</td>
+                  <td class="purchased-qty">{{ product.quantity }}</td>
+                  <td class="return-qty-input">
+                    <input type="number" class="form-control" 
+                           [(ngModel)]="returnData.products[i].returnQuantity" 
+                           (change)="calculateReturnSubtotal(i)"
+                           min="0" [max]="product.quantity || 0" [disabled]="isDisabled">
+                  </td>
+                  <td class="unit-price">₹ {{ product.price | number:'1.2-2' }}</td>
+                  <td class="subtotal">₹ {{ returnData.products[i].subtotal | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
           <!-- Return Reason -->
           <div class="mb-4 return-reason-section">

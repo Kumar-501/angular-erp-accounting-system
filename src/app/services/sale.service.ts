@@ -27,8 +27,19 @@ import { map } from 'rxjs/operators';
 import { ProductsService } from './products.service';
 import { Papa } from 'ngx-papaparse';
 import { BehaviorSubject, Subject } from 'rxjs';
+import { ReturnService } from './return.service'; // Add this import
 
+// Removed duplicate SalesReturnLog interface to resolve type conflict
 
+interface SalesReturnLogItem {
+  productId: string;
+  productName: string;
+  quantity: number;      // Original quantity sold
+  returnQuantity: number; // Quantity returned
+  unitPrice: number;     // Price per unit
+  subtotal: number;      // returnQuantity * unitPrice
+  reason?: string;       // Optional reason for return
+}
 // Type Interfaces
 interface DepartmentExecutive {
   id: string;
@@ -36,7 +47,49 @@ interface DepartmentExecutive {
   email: string;
   department: string;
 }
+// Update your ReturnItem interface to match what restoreProductStockForReturn expects
+interface ReturnItem {
+  productId: string;
+  name: string;
+  quantity: number;
+  originalQuantity: number;
+  unitPrice: number;
+  reason?: string;
+  subtotal: number;
+}
 
+// Update Return interface to use ReturnItem
+interface Return {
+  id?: string;
+  originalSaleId: string;
+  invoiceNo: string;
+  customer: string;
+  returnedItems: ReturnItem[];
+  totalRefund: number;
+  returnDate: Date;
+  status: string;
+  returnReason?: string;
+  createdAt?: Date;
+  processedBy?: string;
+}
+
+// Make sure SalesReturnLogItem matches what ReturnService expects
+interface SalesReturnLogItem {
+  productId: string;
+  productName: string;
+  quantity: number;       // Original quantity
+  returnQuantity: number; // Returned quantity
+  unitPrice: number;
+  subtotal: number;
+  reason?: string;
+}
+
+interface SalesReturnLog {
+  saleId: string;
+  returnDate: Date;
+  paymentAccountId: string;
+  items: SalesReturnLogItem[];
+}
 interface Return {
   id?: string;
   originalSaleId: string;
@@ -221,6 +274,24 @@ interface Medicine {
   quantity?: string;
 }
 
+// Add interface for sales-stock-price-log
+interface SalesStockPriceLog {
+  saleId: string;
+  invoiceNo: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  sellingPrice: number;
+  location: string;
+  paymentAccountId: string;
+  paymentType: string;
+  taxRate: number;
+  packingCharge: number;
+  shippingCharge: number;
+  saleCreatedDate: Date;
+  createdAt: Date;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -244,8 +315,65 @@ export class SaleService {
   constructor(
     private firestore: Firestore,
     private productsService: ProductsService,
-    private papa: Papa
+    private papa: Papa,
+        private returnService: ReturnService, // Add this injection
+
   ) {}
+
+  // Add method to save to sales-stock-price-log collection
+  async addSalesStockPriceLog(logEntries: SalesStockPriceLog[]): Promise<void> {
+    try {
+      const batch = writeBatch(this.firestore);
+      const logCollection = collection(this.firestore, 'sales-stock-price-log');
+
+      logEntries.forEach(logEntry => {
+        const docRef = doc(logCollection);
+        batch.set(docRef, {
+          ...logEntry,
+          createdAt: new Date()
+        });
+      });
+
+      await batch.commit();
+      console.log('Sales stock price log entries saved successfully');
+    } catch (error) {
+      console.error('Error saving sales stock price log:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to create log entries from sale data
+  createSalesStockPriceLogEntries(saleData: any, saleId: string): SalesStockPriceLog[] {
+    const logEntries: SalesStockPriceLog[] = [];
+    
+    if (!saleData.products || saleData.products.length === 0) {
+      return logEntries;
+    }
+
+    saleData.products.forEach((product: any) => {
+      const logEntry: SalesStockPriceLog = {
+        saleId: saleId,
+        invoiceNo: saleData.invoiceNo || '',
+        productId: product.id || product.productId || '',
+        productName: product.name || product.productName || '',
+        quantity: product.quantity || 0,
+        sellingPrice: product.unitPrice || 0,
+        location: saleData.businessLocation || saleData.location || '',
+        paymentAccountId: saleData.paymentAccountId || saleData.paymentAccount || '',
+        paymentType: saleData.paymentMethod || '',
+        taxRate: product.taxRate || 0,
+        packingCharge: saleData.ppServiceData?.packingCharge || saleData.codData?.packingCharge || 0,
+        shippingCharge: saleData.shippingCharges || 0,
+        saleCreatedDate: saleData.saleDate || new Date(),
+        createdAt: new Date()
+      };
+      
+      logEntries.push(logEntry);
+    });
+
+    return logEntries;
+  }
+
 notifySalesUpdated() {
   this.salesUpdated.next();
 }
@@ -376,7 +504,22 @@ getShippedSales(): Observable<any[]> {
       return () => unsubscribe();
     });
   }
-
+getReturnLogsBySale(saleId: string): Observable<any[]> {
+  const returnLogRef = collection(this.firestore, 'sales-return-log');
+  const q = query(returnLogRef, where('saleId', '==', saleId));
+  
+  return new Observable(observer => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const logs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        returnDate: doc.data()['returnDate']?.toDate() // Convert Firestore timestamp
+      }));
+      observer.next(logs);
+    });
+    return () => unsubscribe();
+  });
+}
   async getReturnsByDateRange(startDate: Date, endDate: Date): Promise<Return[]> {
     try {
       const returnsCollection = collection(this.firestore, 'returns');
@@ -889,6 +1032,15 @@ getShippedSales(): Observable<any[]> {
         ...saleData,
         createdAt: new Date()
       });
+      
+      // Create sales stock price log entries
+      const logEntries = this.createSalesStockPriceLogEntries(saleData, docRef.id);
+      
+      // Save to sales-stock-price-log collection
+      if (logEntries.length > 0) {
+        await this.addSalesStockPriceLog(logEntries);
+      }
+      
       return docRef.id;
     } catch (error) {
       console.error('Error adding sale:', error);
@@ -1071,6 +1223,29 @@ getShippedSales(): Observable<any[]> {
     });
   }
 
+  async logReturnTransaction(returnData: any): Promise<void> {
+    try {
+      const returnLogCollection = collection(this.firestore, 'sales-return-log');
+      
+      const logData = {
+        saleId: returnData.originalSaleId,
+        returnDate: new Date(), // Current timestamp
+        paymentAccountId: returnData.paymentAccountId || returnData.paymentAccount || '',
+        items: returnData.returnedItems.map((item: any) => ({
+          quantity: item.originalQuantity,
+          returnQuantity: item.quantity || item.returnQuantity,
+          subtotal: item.subtotal || (item.unitPrice * (item.quantity || item.returnQuantity))
+        }))
+      };
+
+      await addDoc(returnLogCollection, logData);
+      console.log('Return transaction logged successfully');
+    } catch (error) {
+      console.error('Error logging return transaction:', error);
+      throw error;
+    }
+  }
+
   async deleteSale(saleId: string): Promise<void> {
     try {
       const saleDocRef = doc(this.firestore, 'sales', saleId);
@@ -1185,6 +1360,7 @@ getShippedSales(): Observable<any[]> {
     }
   }
 
+// In your SaleService, update the processReturn method to use the correct interface
 async processReturn(returnData: any): Promise<any> {
   try {
     console.log('Processing return with data:', returnData);
@@ -1204,8 +1380,11 @@ async processReturn(returnData: any): Promise<any> {
     if (!returnData.returnedItems || !Array.isArray(returnData.returnedItems) || returnData.returnedItems.length === 0) {
       throw new Error('No items selected for return');
     }
-
-    const validatedItems = returnData.returnedItems.map((item: any, index: number) => {
+ const paymentAccountId = returnData.paymentAccountId || 
+                           returnData.paymentAccount || 
+                           await this.getPaymentAccountFromSale(returnData.originalSaleId);
+    // Process items with proper typing
+    const validatedItems: SalesReturnLogItem[] = returnData.returnedItems.map((item: any) => {
       const productId = item.productId || item.id || item.itemId || item.product_id;
       const productName = item.name || item.productName || item.itemName || item.product_name;
       const unitPrice = parseFloat(item.unitPrice || item.price || item.unit_price || item.selling_price || 0);
@@ -1213,52 +1392,37 @@ async processReturn(returnData: any): Promise<any> {
       const originalQuantity = parseInt(item.originalQuantity || 0);
 
       if (!productId) {
-        throw new Error(`Item ${index + 1}: Missing product ID. Please ensure the product has a valid identifier.`);
+        throw new Error(`Missing product ID for ${productName || 'Unknown item'}`);
       }
       
       if (!productName || productName.trim() === '') {
-        throw new Error(`Item ${index + 1} (ID: ${productId}): Missing product name`);
+        throw new Error(`Missing product name for ID ${productId}`);
       }
       
       if (isNaN(quantity) || quantity <= 0) {
-        throw new Error(`Item ${index + 1} (${productName}): Invalid return quantity (${item.quantity}). Must be a positive number.`);
+        throw new Error(`Invalid return quantity (${item.quantity}). Must be a positive number.`);
       }
       
       if (isNaN(originalQuantity) || originalQuantity <= 0) {
-        throw new Error(`Item ${index + 1} (${productName}): Invalid original quantity (${item.originalQuantity})`);
+        throw new Error(`Invalid original quantity (${item.originalQuantity})`);
       }
       
       if (quantity > originalQuantity) {
-        throw new Error(`Item ${index + 1} (${productName}): Return quantity (${quantity}) cannot exceed original quantity (${originalQuantity})`);
+        throw new Error(`Return quantity (${quantity}) cannot exceed original quantity (${originalQuantity})`);
       }
       
       if (isNaN(unitPrice) || unitPrice <= 0) {
-        throw new Error(`Item ${index + 1} (${productName}): Invalid unit price (${item.unitPrice || item.price}). Must be a positive number.`);
+        throw new Error(`Invalid unit price (${item.unitPrice || item.price}). Must be a positive number.`);
       }
 
       return {
-        id: productId,
-        productId: productId,
-        name: productName.trim(),
+        productId,
         productName: productName.trim(),
-        quantity: quantity,
-        originalQuantity: originalQuantity,
-        unitPrice: unitPrice,
-        price: unitPrice,
+        quantity: originalQuantity,
+        returnQuantity: quantity,
+        unitPrice,
         subtotal: unitPrice * quantity,
-        total: unitPrice * quantity,
-        reason: item.reason || returnData.returnReason || 'Return processed',
-        returnReason: item.returnReason || returnData.returnReason || 'Return processed',
-        sku: item.sku || '',
-        barcode: item.barcode || '',
-        category: item.category || '',
-        brand: item.brand || '',
-        itemId: productId,
-        product_id: productId,
-        itemName: productName.trim(),
-        product_name: productName.trim(),
-        unit_price: unitPrice,
-        selling_price: unitPrice
+        reason: item.reason || returnData.returnReason || 'Return processed'
       };
     });
 
@@ -1267,101 +1431,94 @@ async processReturn(returnData: any): Promise<any> {
       throw new Error('Return reason is required');
     }
 
-    const calculatedRefund = validatedItems.reduce((sum: any, item: { subtotal: any; }) => sum + item.subtotal, 0);
-    const providedRefund = parseFloat(returnData.totalRefund || returnData.refundAmount || 0);
-    
-    if (Math.abs(calculatedRefund - providedRefund) > 0.01) {
-      console.warn(`Refund amount mismatch: calculated ${calculatedRefund}, provided ${providedRefund}. Using calculated amount.`);
-    }
+    const calculatedRefund = validatedItems.reduce((sum: number, item) => sum + item.subtotal, 0);
+    const isFullReturn = validatedItems.every(item => item.returnQuantity === item.quantity);
+    const returnStatus = isFullReturn ? 'Returned' : 'Partial Return';
 
-    // Determine return status based on the logic from returnData
-    const isFullReturn = returnData.isFullReturn || false;
-    const returnStatus = returnData.returnStatus || (isFullReturn ? 'Returned' : 'Partial Return');
-
-    const processedReturnData = {
+    // Prepare the return document with proper typing
+    const returnDoc = {
       originalSaleId: returnData.originalSaleId,
       invoiceNo: returnData.invoiceNo,
       customer: returnData.customer,
       returnedItems: validatedItems,
       totalRefund: calculatedRefund,
-      refundAmount: calculatedRefund,
       returnDate: new Date(),
-      returnReason: returnReason,
-      reason: returnReason,
+      returnReason,
       status: 'Processed',
-      returnStatus: returnStatus,
-      isFullReturn: isFullReturn,
       processedBy: returnData.processedBy || 'system',
       createdAt: new Date()
     };
 
-    console.log('Validated return data:', processedReturnData);
+    // 1. First add the return document
+    const returnsCollection = collection(this.firestore, 'returns');
+    const returnDocRef = await addDoc(returnsCollection, returnDoc);
+    const returnId = returnDocRef.id;
 
-    // First, update the original sale status
+    // 2. Then log the return transaction with proper typing
+    const returnLog: SalesReturnLog = {
+      saleId: returnData.originalSaleId,
+      returnDate: new Date(),
+      paymentAccountId: paymentAccountId, // Make sure this is properly set
+      items: validatedItems // validatedItems is already SalesReturnLogItem[]
+    };
+
+    await this.returnService.logReturn(returnLog);
+
+    // 3. Update the original sale status
     const saleUpdateData = {
       status: returnStatus,
       updatedAt: new Date(),
-      returnReason: returnReason,
-      returnDate: new Date(),
-      returnId: '', // Will be updated after return doc is created
-      isReturned: true,
-      returnType: isFullReturn ? 'Full' : 'Partial'
+      returnReason,
+      returnId
     };
 
-    console.log('Updating sale status to:', returnStatus);
-    
-    // Update the sale record first
-    try {
-      await this.updateSale(returnData.originalSaleId, saleUpdateData);
-      console.log('Sale status updated successfully');
-    } catch (saleUpdateError) {
-      console.error('Error updating sale status:', saleUpdateError);
-      throw new Error(`Failed to update sale status: ${saleUpdateError}`);
-    }
+    await this.updateSale(returnData.originalSaleId, saleUpdateData);
 
-    // Create return record
-    const returnsCollection = collection(this.firestore, 'returns');
-    const returnDocRef = await addDoc(returnsCollection, processedReturnData);
-    
-    // Update the sale record with the return ID
-    const finalSaleUpdate = {
-      returnId: returnDocRef.id
-    };
-    await this.updateSale(returnData.originalSaleId, finalSaleUpdate);
-    
-    const returnWithId = { ...processedReturnData, id: returnDocRef.id };
-    
-    // Restore product stock for returned items
-    try {
-      await this.restoreProductStockForReturn(returnWithId);
-      console.log('Product stock restored successfully');
-    } catch (stockError) {
-      console.error('Error restoring product stock:', stockError);
-      // Don't throw error here as the return is already processed
-      console.warn('Return processed successfully but stock restoration failed');
-    }
+    // 4. Restore product stock
+    // Map validatedItems (SalesReturnLogItem[]) to ReturnItem[]
+    const returnItems: ReturnItem[] = validatedItems.map(item => ({
+      productId: item.productId,
+      name: item.productName, // Map productName to name
+      quantity: item.returnQuantity,
+      originalQuantity: item.quantity,
+      unitPrice: item.unitPrice,
+      reason: item.reason,
+      subtotal: item.subtotal
+    }));
 
-    console.log('Return processed successfully with ID:', returnDocRef.id);
-      
+    await this.restoreProductStockForReturn({
+      ...returnDoc,
+      id: returnId,
+      returnedItems: returnItems
+    });
+
     return {
       success: true,
-      returnId: returnDocRef.id,
+      returnId,
       totalRefund: calculatedRefund,
-      returnStatus: returnStatus,
-      isFullReturn: isFullReturn,
+      returnStatus,
+      isFullReturn,
       message: `Return processed successfully - Sale marked as ${returnStatus}`
     };
+
   } catch (error) {
     console.error('Error processing return:', error);
-    
-    if (error instanceof Error) {
-      throw new Error(`Return processing failed: ${error.message}`);
-    } else {
-      throw new Error('Return processing failed due to an unknown error');
+    throw new Error(`Return processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+  }
+  private async getPaymentAccountFromSale(saleId: string): Promise<string> {
+  try {
+    const saleDoc = await getDoc(doc(this.firestore, 'sales', saleId));
+    if (saleDoc.exists()) {
+      const saleData = saleDoc.data() as SalesOrder;
+      return saleData.paymentAccountId || saleData.paymentAccount || '';
     }
+    return '';
+  } catch (error) {
+    console.error('Error fetching sale:', error);
+    return '';
   }
 }
-
 // Helper method to update sale record
 async updateSale(saleId: string, updateData: any): Promise<void> {
   try {

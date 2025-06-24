@@ -11,7 +11,7 @@ import { SupplierService } from '../services/supplier.service';
 import { AuthService } from '../auth.service';
 import { Firestore, collection, doc, getDoc } from '@angular/fire/firestore';
 
-import { Subscription } from 'rxjs';
+import { async, Subscription } from 'rxjs';
 
 // Constants for Firestore collections
 const COLLECTIONS = {
@@ -84,7 +84,16 @@ allSelected = false;  constructor(
     this.initializeForm();
     this.loadData();
     this.generateReferenceNumber();
-        this.setCurrentUser(); // Add this line
+    this.setCurrentUser(); // Add this line
+this.purchaseForm.get('location')?.valueChanges.subscribe(async locationId => {
+  // Refresh search results if they're visible
+  if (this.showSearchResults && this.searchTerm) {
+    await this.searchProducts({ target: { value: this.searchTerm } });
+  }
+  
+  // Update stock for all products in the list
+  this.updateStockForAllProducts(locationId);
+});
 
   }
 onSearchInput(event: any): void {
@@ -96,7 +105,7 @@ onSearchInput(event: any): void {
     this.searchProducts(event);
   }, 300);
 }
-searchProducts(event: any) {
+async searchProducts(event: any) {
   const searchTerm = event.target.value.toLowerCase().trim();
   this.searchTerm = searchTerm;
   
@@ -106,11 +115,9 @@ searchProducts(event: any) {
     return;
   }
   
-  this.searchResults = this.productsList.filter(product => {
-    // Skip products marked as not for selling
-    if (product.notForSelling) {
-      return false;
-    }
+  // Filter products first
+  const filtered = this.productsList.filter(product => {
+    if (product.notForSelling) return false;
     
     const searchString = [
       product.productName,
@@ -123,12 +130,39 @@ searchProducts(event: any) {
     
     return searchString.includes(searchTerm);
   });
+
+  // Get current location
+  const locationId = this.purchaseForm.get('location')?.value;
+
+  // Enhance with stock information
+  this.searchResults = await Promise.all(filtered.map(async product => {
+    const currentStock = locationId ? 
+      await this.getCurrentStockAtLocation(product.id, locationId) : 
+      product.currentStock || 0;
+    
+    return {
+      ...product,
+      currentStock: currentStock
+    };
+  }));
   
   this.showSearchResults = this.searchResults.length > 0;
 }
 onSearchFocus() {
   if (this.searchTerm && this.searchTerm.length >= 2) {
     this.showSearchResults = true;
+  }
+  }
+  // Add this method
+async updateStockForAllProducts(locationId: string) {
+  if (!locationId) return;
+  
+  for (let i = 0; i < this.products.length; i++) {
+    const productId = this.products.at(i).get('productId')?.value;
+    if (productId) {
+      const currentStock = await this.getCurrentStockAtLocation(productId, locationId);
+      this.products.at(i).get('currentStock')?.setValue(currentStock);
+    }
   }
 }
 
@@ -225,24 +259,35 @@ handleKeyDown(event: KeyboardEvent) {
     this.purchaseForm.get('addedBy')?.setValue(userName);
   }
 }
-  private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
-    try {
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      const stockDoc = await getDoc(stockDocRef);
-      
-      if (stockDoc.exists()) {
-        const data = stockDoc.data();
-        return data?.['quantity'] || 0;
-      }
-      
-      return 0;
-    } catch (error) {
-      console.error('Error getting stock at location:', error);
-      return 0;
+private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
+  try {
+    // First try to get location-specific stock
+    const stockDocId = `${productId}_${locationId}`;
+    const stockDocRef = doc(this.firestore, 'product-stock', stockDocId);
+    const stockDoc = await getDoc(stockDocRef);
+    
+    if (stockDoc.exists()) {
+      return stockDoc.data()?.['quantity'] || 0;
     }
+    
+    // If location-specific stock not found, get the product's main stock
+    const productDocRef = doc(this.firestore, 'products', productId);
+    const productDoc = await getDoc(productDocRef);
+    
+    if (productDoc.exists()) {
+      const productData = productDoc.data();
+      // Check if product is at this location
+      if (productData['location'] === locationId) {
+        return productData['currentStock'] || 0;
+      }
+    }
+    
+    return 0; // Default to 0 if stock not found
+  } catch (error) {
+    console.error('Error getting stock:', error);
+    return 0;
   }
-
+}
 async addProductFromSearch(product: any) {
   // Double-check that the product is not marked as "not for selling"
   if (product.notForSelling) {
@@ -295,7 +340,6 @@ async addProductFromSearch(product: any) {
   
   this.clearSearch();
 }
-
 clearSearch() {
   this.searchTerm = '';
   this.searchResults = [];
@@ -319,29 +363,19 @@ initializeForm(): void {
     brand: ['', Validators.required],
     category: ['', Validators.required],
     location: ['', Validators.required],
-        supplierAddress: [''], // Add this line
-
+    supplierAddress: [''],
     locationName: [''],
     referenceNo: ['', Validators.required],
-    requiredByDate: [''], // Removed Validators.required
+    requiredByDate: [''],
     date: [today, Validators.required],
     addedBy: ['', Validators.required],
     status: ['pending', Validators.required],
     shippingStatus: ['not_shipped'],
-    supplier:  ['', Validators.required],
-    shippingDate: [''], // Removed Validators.required
-    products: this.fb.array([])
+    supplier: ['', Validators.required],
+    shippingDate: [''],
+    products: this.fb.array([], Validators.required) // Add validation for products array
   });
-    
-    this.purchaseForm.get('location')?.valueChanges.subscribe((locationId) => {
-      if (locationId && this.businessLocations.length > 0) {
-        const selectedLocation = this.businessLocations.find(loc => loc.id === locationId);
-        if (selectedLocation) {
-          this.purchaseForm.get('locationName')?.setValue(selectedLocation.name);
-        }
-      }
-    });
-  }
+}
 
   async loadData(): Promise<void> {
     try {
@@ -460,7 +494,7 @@ addProduct(): void {
       productId: ['', Validators.required],
       productName: ['', Validators.required],
       alertQuantity: ['', [Validators.required, Validators.min(0)]],
-      currentStock: ['', [Validators.required, Validators.min(0)]],
+      currentStock: ['', [Validators.required, Validators.min(0)]], // Add this line
       unitPurchasePrice: ['', [Validators.required, Validators.min(0)]],
       purchasePriceIncTax: ['', [Validators.required, Validators.min(0)]],
       requiredQuantity: ['', [Validators.required, Validators.min(1)]],
@@ -520,12 +554,11 @@ async onProductSelect(index: number): Promise<void> {
   const currentStock = selectedLocationId ? 
     await this.getCurrentStockAtLocation(selectedProduct.id, selectedLocationId) : 0;
   
-  // Rest of your existing code...
+  // Calculate purchase price including tax
   const unitPurchasePrice = selectedProduct.unitPurchasePrice || 
                           selectedProduct.defaultPurchasePrice || 
                           0;
   
-  // Calculate purchase price including tax
   const taxPercentage = selectedProduct.taxPercentage || 0;
   const purchasePriceIncTax = selectedProduct.defaultPurchasePriceIncTax || 
                             (unitPurchasePrice * (1 + (taxPercentage / 100)));
@@ -533,16 +566,14 @@ async onProductSelect(index: number): Promise<void> {
   this.products.at(index).patchValue({
     productName: selectedProduct.productName,
     alertQuantity: selectedProduct.alertQuantity || 0,
-    currentStock: currentStock,
+    currentStock: currentStock, // This will update the table
     unitPurchasePrice: unitPurchasePrice,
     purchasePriceIncTax: purchasePriceIncTax,
-    requiredQuantity: 1 // Default to 1 when selecting a product
+    requiredQuantity: 1
   });
   
-  // Calculate initial subtotal
   this.calculateSubtotal(index);
 }
-
   
 
 async savePurchase(): Promise<void> {
@@ -595,5 +626,19 @@ async savePurchase(): Promise<void> {
   } finally {
     this.isSaving = false;
   }
+  }
+  // Add this helper method to mark all controls as touched
+private markAllAsTouched(): void {
+  // Mark main form controls
+  Object.values(this.purchaseForm.controls).forEach(control => {
+    control.markAsTouched();
+  });
+
+  // Mark all product form array controls
+  this.products.controls.forEach(productGroup => {
+    Object.values((productGroup as FormGroup).controls).forEach(control => {
+      control.markAsTouched();
+    });
+  });
 }
 }

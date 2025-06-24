@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, HostListener } from '@angular/core';
 import { PurchaseService } from '../services/purchase.service';
 import { PurchaseReturnService } from '../services/purchase-return.service';
 import { DatePipe } from '@angular/common';
@@ -29,6 +29,7 @@ interface ProductItem {
   productName?: string;
   quantity?: number;
   price?: number;
+  unitCost?: number;
   code?: string;
   batchNumber?: string;
   expiryDate?: Date | string;
@@ -68,8 +69,7 @@ interface User {
 interface Purchase {
   id: string;
   purchaseDate?: Date | string | { toDate: () => Date };
-    receivedDate?: Date | string | { toDate: () => Date }; // Add this line
-
+  receivedDate?: Date | string | { toDate: () => Date };
   referenceNo?: string;
   businessLocation?: string;
   productsTotal?: number;
@@ -119,6 +119,7 @@ interface PurchaseReturn {
   parentPurchaseId: string;
   parentPurchaseRef: string;
   businessLocation: string;
+  businessLocationId?: string;
   supplier: string;
   returnStatus: string;
   paymentStatus: string;
@@ -128,6 +129,7 @@ interface PurchaseReturn {
   createdAt: Date;
   createdBy: string;
 }
+
 @Component({
   selector: 'app-list-purchase',
   templateUrl: './list-purchase.component.html',
@@ -139,15 +141,16 @@ export class ListPurchaseComponent implements OnInit, AfterViewInit {
   filteredPurchases: Purchase[] = [];
   isLoading = true;
   paymentAccounts: any[] = [];
-    goodsReceivedNotes: any[] = [];
+  goodsReceivedNotes: any[] = [];
+  currentActionPopup: string | null = null;
 
   paymentAccountsLoading = false;
   errorMessage = '';
   showFilterSidebar = false;
   statusFilter = '';
   selectedDateRange: string = '';
-isDisabled: boolean = false;
-disabledMessage: string = "Processing your request...";
+  isDisabled: boolean = false;
+  disabledMessage: string = "Processing your request...";
   selectedPurchaseForAction: Purchase | null = null;
   actionModal: Modal | null = null;
   paymentStatusFilter = '';
@@ -169,7 +172,6 @@ disabledMessage: string = "Processing your request...";
   paymentForm: FormGroup;
   supplierSearchText: string = '';
   filteredSuppliers: string[] = [];
-   // Date range
   showDateRangeDrawer = false;
 
   returnModal: Modal | null = null;
@@ -186,7 +188,8 @@ disabledMessage: string = "Processing your request...";
   selectedPurchaseForStatus: Purchase | null = null;
   newPurchaseStatus: string = 'ordered';
   totalReturnsAmount = 0;
-constructor(
+
+  constructor(
     private purchaseService: PurchaseService,
     private purchaseReturnService: PurchaseReturnService,
     private datePipe: DatePipe,
@@ -197,10 +200,8 @@ constructor(
     private fb: FormBuilder,
     private locationService: LocationService,
     private supplierService: SupplierService,
-  private accountService: AccountService,
-  private goodsService: GoodsService,
-
-
+    private accountService: AccountService,
+    private goodsService: GoodsService,
   ) {
     this.paymentForm = this.fb.group({
       purchaseId: [''],
@@ -213,8 +214,8 @@ constructor(
       amount: [0, [Validators.required, Validators.min(0.01)]]
     });
   }
+
   openModal(modalId: string): void {
-    // Close any currently open modal
     if (this.currentOpenModal) {
       this.currentOpenModal.hide();
     }
@@ -225,139 +226,135 @@ constructor(
       this.currentOpenModal.show();
     }
   }
+
   closeCurrentModal(): void {
     if (this.currentOpenModal) {
       this.currentOpenModal.hide();
       this.currentOpenModal = null;
     }
   }
+
   openActionModal(purchase: Purchase): void {
-  this.selectedPurchaseForAction = purchase;
-  
-  // Initialize modal if not already done
-  if (!this.actionModal) {
-    const modalElement = document.getElementById('actionModal');
-    if (modalElement) {
-      this.actionModal = new Modal(modalElement);
+    this.selectedPurchaseForAction = purchase;
+    
+    if (!this.actionModal) {
+      const modalElement = document.getElementById('actionModal');
+      if (modalElement) {
+        this.actionModal = new Modal(modalElement);
+      }
+    }
+    
+    if (this.actionModal) {
+      this.actionModal.show();
     }
   }
-  
-  // Show the modal
-  if (this.actionModal) {
-    this.actionModal.show();
+
+  loadPaymentAccounts(): void {
+    this.paymentAccountsLoading = true;
+    this.accountService.getAccounts((accounts: any[]) => {
+      this.paymentAccounts = accounts;
+      this.paymentAccountsLoading = false;
+    });
   }
-}
 
-loadPaymentAccounts(): void {
-  this.paymentAccountsLoading = true;
-  this.accountService.getAccounts((accounts: any[]) => {
-    this.paymentAccounts = accounts; // No filtering applied
-    this.paymentAccountsLoading = false;
-  });
-}
-
-  
   addPayment(purchase: Purchase): void {
-  this.currentPaymentPurchase = purchase;
-  this.showPaymentForm = true;
-  
-  // Set form values
-  this.paymentForm.patchValue({
-    purchaseId: purchase.id,
-    referenceNo: purchase.referenceNo || '',
-    supplierName: purchase.supplier || '',
-    amount: Math.min(purchase.paymentDue || 0, purchase.grandTotal || 0),
-    paidDate: new Date().toISOString().slice(0, 16)
-  });
-  
-  // Load payment accounts if not already loaded
-  if (this.paymentAccounts.length === 0) {
-    this.loadPaymentAccounts();
+    this.currentPaymentPurchase = purchase;
+    this.showPaymentForm = true;
+    
+    this.paymentForm.patchValue({
+      purchaseId: purchase.id,
+      referenceNo: purchase.referenceNo || '',
+      supplierName: purchase.supplier || '',
+      amount: Math.min(purchase.paymentDue || 0, purchase.grandTotal || 0),
+      paidDate: new Date().toISOString().slice(0, 16)
+    });
+    
+    if (this.paymentAccounts.length === 0) {
+      this.loadPaymentAccounts();
+    }
   }
-}
 
-setDateRange(range: string): void {
-  this.selectedDateRange = range;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  switch(range) {
-    case 'today':
-      this.dateFilter.startDate = this.formatDate(today);
-      this.dateFilter.endDate = this.formatDate(today);
-      break;
-      
-    case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      this.dateFilter.startDate = this.formatDate(yesterday);
-      this.dateFilter.endDate = this.formatDate(yesterday);
-      break;
-      
-    case 'last7days':
-      const last7days = new Date(today);
-      last7days.setDate(last7days.getDate() - 6);
-      this.dateFilter.startDate = this.formatDate(last7days);
-      this.dateFilter.endDate = this.formatDate(today);
-      break;
-      
-    case 'last30days':
-      const last30days = new Date(today);
-      last30days.setDate(last30days.getDate() - 29);
-      this.dateFilter.startDate = this.formatDate(last30days);
-      this.dateFilter.endDate = this.formatDate(today);
-      break;
-      
-    case 'lastMonth':
-      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      this.dateFilter.startDate = this.formatDate(firstDayLastMonth);
-      this.dateFilter.endDate = this.formatDate(lastDayLastMonth);
-      break;
-      
-    case 'thisMonth':
-      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      this.dateFilter.startDate = this.formatDate(firstDayThisMonth);
-      this.dateFilter.endDate = this.formatDate(today);
-      break;
-      
-    case 'thisFinancialYear':
-      // Adjust based on your financial year start (April in this example)
-      const financialYearStartMonth = 3; // April (0-based)
-      let startYear = today.getFullYear();
-      if (today.getMonth() < financialYearStartMonth) {
-        startYear--;
-      }
-      const firstDayFinancialYear = new Date(startYear, financialYearStartMonth, 1);
-      this.dateFilter.startDate = this.formatDate(firstDayFinancialYear);
-      this.dateFilter.endDate = this.formatDate(today);
-      break;
-      
-    case 'lastFinancialYear':
-      const lastFYStartMonth = 3; // April (0-based)
-      let lastFYStartYear = today.getFullYear() - 1;
-      if (today.getMonth() < lastFYStartMonth) {
-        lastFYStartYear--;
-      }
-      const firstDayLastFY = new Date(lastFYStartYear, lastFYStartMonth, 1);
-      const lastDayLastFY = new Date(lastFYStartYear + 1, lastFYStartMonth, 0);
-      this.dateFilter.startDate = this.formatDate(firstDayLastFY);
-      this.dateFilter.endDate = this.formatDate(lastDayLastFY);
-      break;
-      
-    case 'custom':
-      // Reset dates - user will set them manually
-      this.dateFilter.startDate = '';
-      this.dateFilter.endDate = '';
-      return;
+  setDateRange(range: string): void {
+    this.selectedDateRange = range;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch(range) {
+      case 'today':
+        this.dateFilter.startDate = this.formatDate(today);
+        this.dateFilter.endDate = this.formatDate(today);
+        break;
+        
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        this.dateFilter.startDate = this.formatDate(yesterday);
+        this.dateFilter.endDate = this.formatDate(yesterday);
+        break;
+        
+      case 'last7days':
+        const last7days = new Date(today);
+        last7days.setDate(last7days.getDate() - 6);
+        this.dateFilter.startDate = this.formatDate(last7days);
+        this.dateFilter.endDate = this.formatDate(today);
+        break;
+        
+      case 'last30days':
+        const last30days = new Date(today);
+        last30days.setDate(last30days.getDate() - 29);
+        this.dateFilter.startDate = this.formatDate(last30days);
+        this.dateFilter.endDate = this.formatDate(today);
+        break;
+        
+      case 'lastMonth':
+        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        this.dateFilter.startDate = this.formatDate(firstDayLastMonth);
+        this.dateFilter.endDate = this.formatDate(lastDayLastMonth);
+        break;
+        
+      case 'thisMonth':
+        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        this.dateFilter.startDate = this.formatDate(firstDayThisMonth);
+        this.dateFilter.endDate = this.formatDate(today);
+        break;
+        
+      case 'thisFinancialYear':
+        const financialYearStartMonth = 3;
+        let startYear = today.getFullYear();
+        if (today.getMonth() < financialYearStartMonth) {
+          startYear--;
+        }
+        const firstDayFinancialYear = new Date(startYear, financialYearStartMonth, 1);
+        this.dateFilter.startDate = this.formatDate(firstDayFinancialYear);
+        this.dateFilter.endDate = this.formatDate(today);
+        break;
+        
+      case 'lastFinancialYear':
+        const lastFYStartMonth = 3;
+        let lastFYStartYear = today.getFullYear() - 1;
+        if (today.getMonth() < lastFYStartMonth) {
+          lastFYStartYear--;
+        }
+        const firstDayLastFY = new Date(lastFYStartYear, lastFYStartMonth, 1);
+        const lastDayLastFY = new Date(lastFYStartYear + 1, lastFYStartMonth, 0);
+        this.dateFilter.startDate = this.formatDate(firstDayLastFY);
+        this.dateFilter.endDate = this.formatDate(lastDayLastFY);
+        break;
+        
+      case 'custom':
+        this.dateFilter.startDate = '';
+        this.dateFilter.endDate = '';
+        return;
+    }
+    
+    this.applyAdvancedFilters();
   }
-  
-  this.applyAdvancedFilters();
-}
 
-private formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
+  private formatDate(date: Date): string {
+    return date.toISOString().split('T')[0];
+  }
+
   sortTable(column: string): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -370,7 +367,6 @@ private formatDate(date: Date): string {
       let valueA: any;
       let valueB: any;
   
-      // Special handling for different column types
       switch(column) {
         case 'date':
           valueA = this.getDateValue(a.purchaseDate);
@@ -385,10 +381,10 @@ private formatDate(date: Date): string {
           valueA = Number(a[column]) || 0;
           valueB = Number(b[column]) || 0;
           break;
-          case 'supplierAddress':
-  valueA = (a.supplierAddress || '').toLowerCase();
-  valueB = (b.supplierAddress || '').toLowerCase();
-  break;
+        case 'supplierAddress':
+          valueA = (a.supplierAddress || '').toLowerCase();
+          valueB = (b.supplierAddress || '').toLowerCase();
+          break;
         case 'purchaseStatus':
         case 'paymentStatus':
           valueA = (a[column] || '').toLowerCase();
@@ -399,7 +395,6 @@ private formatDate(date: Date): string {
           valueB = b[column as keyof Purchase] || '';
       }
   
-      // Compare values
       if (valueA < valueB) {
         return this.sortDirection === 'asc' ? -1 : 1;
       } else if (valueA > valueB) {
@@ -425,6 +420,7 @@ private formatDate(date: Date): string {
       return 0;
     }
   }
+
   loadBusinessLocations(): void {
     this.locationService.getLocations().subscribe({
       next: (locations: any[]) => {
@@ -435,54 +431,56 @@ private formatDate(date: Date): string {
       }
     });
   }
+
   getSortIcon(column: string): string {
     if (this.sortColumn !== column) {
       return 'fa-sort';
     }
     return this.sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
   }
-  // Modify the loadPurchases method or create a new method to load suppliers
-// Modify your loadSuppliers method to initialize filteredSuppliers
-loadSuppliers(): void {
-  this.supplierService.getSuppliers().subscribe({
-    next: (suppliers: any[]) => {
-      this.uniqueSuppliers = suppliers
-        .map(s => this.getSupplierDisplayName(s))
-        .filter((name, index, self) => name && self.indexOf(name) === index)
-        .sort();
-      
-      this.filteredSuppliers = [...this.uniqueSuppliers];
-    },
-    error: (error) => {
-      console.error('Error loading suppliers:', error);
-    }
-  });
-}
 
-getSupplierDisplayName(supplier: any): string {
-  if (!supplier) return 'Unknown Supplier';
-  
-  if (supplier.isIndividual) {
-    return `${supplier.firstName || ''} ${supplier.lastName || ''}`.trim();
+  loadSuppliers(): void {
+    this.supplierService.getSuppliers().subscribe({
+      next: (suppliers: any[]) => {
+        this.uniqueSuppliers = suppliers
+          .map(s => this.getSupplierDisplayName(s))
+          .filter((name, index, self) => name && self.indexOf(name) === index)
+          .sort();
+        
+        this.filteredSuppliers = [...this.uniqueSuppliers];
+      },
+      error: (error) => {
+        console.error('Error loading suppliers:', error);
+      }
+    });
   }
-  return supplier.businessName || 'Unknown Supplier';
-}
-// Add this method to filter suppliers based on search text
-filterSuppliers(): void {
-  if (!this.supplierSearchText) {
-    this.filteredSuppliers = [...this.uniqueSuppliers];
-    return;
+
+  getSupplierDisplayName(supplier: any): string {
+    if (!supplier) return 'Unknown Supplier';
+    
+    if (supplier.isIndividual) {
+      return `${supplier.firstName || ''} ${supplier.lastName || ''}`.trim();
+    }
+    return supplier.businessName || 'Unknown Supplier';
   }
-  
-  const searchText = this.supplierSearchText.toLowerCase();
-  this.filteredSuppliers = this.uniqueSuppliers.filter(supplier => 
-    supplier.toLowerCase().includes(searchText)
-  );
+
+  filterSuppliers(): void {
+    if (!this.supplierSearchText) {
+      this.filteredSuppliers = [...this.uniqueSuppliers];
+      return;
+    }
+    
+    const searchText = this.supplierSearchText.toLowerCase();
+    this.filteredSuppliers = this.uniqueSuppliers.filter(supplier => 
+      supplier.toLowerCase().includes(searchText)
+    );
   }
+
   toggleFilterDrawer() {
-  this.showFilterDrawer = !this.showFilterDrawer;
-}
- ngOnInit(): void {
+    this.showFilterDrawer = !this.showFilterDrawer;
+  }
+
+  ngOnInit(): void {
     this.loadPurchases();
     this.loadPurchaseReturns();
     this.loadPaymentAccounts();
@@ -492,30 +490,26 @@ filterSuppliers(): void {
       if (this.router.url === '/list-purchase') {
         this.loadPurchases();
         this.loadPurchaseReturns();
-          this.loadGoodsReceivedNotes(); // Add this line
-
+        this.loadGoodsReceivedNotes();
       }
     });
   }
 
- ngAfterViewInit(): void {
-  const modalElement = document.getElementById('returnModal');
-  if (modalElement && !this.returnModal) {
-    this.returnModal = new Modal(modalElement);
-    
-    // Add event listener to remove backdrop when modal is hidden
-    modalElement.addEventListener('hidden.bs.modal', () => {
-      const backdrops = document.getElementsByClassName('modal-backdrop');
-      if (backdrops.length > 0) {
-        document.body.removeChild(backdrops[0]);
-      }
-    });
+  ngAfterViewInit(): void {
+    const modalElement = document.getElementById('returnModal');
+    if (modalElement && !this.returnModal) {
+      this.returnModal = new Modal(modalElement);
+      
+      modalElement.addEventListener('hidden.bs.modal', () => {
+        const backdrops = document.getElementsByClassName('modal-backdrop');
+        if (backdrops.length > 0) {
+          document.body.removeChild(backdrops[0]);
+        }
+      });
+    }
   }
-}
-  
 
-
-   initReturnData() {
+  initReturnData() {
     return {
       returnDate: new Date().toISOString().split('T')[0],
       reason: '',
@@ -549,7 +543,6 @@ filterSuppliers(): void {
       const newPaymentAmount = (this.currentPaymentPurchase.paymentAmount || 0) + paymentData.amount;
       const newPaymentDue = (this.currentPaymentPurchase.grandTotal || 0) - newPaymentAmount;
       
-      // Update purchase record
       await this.purchaseService.updatePurchase(this.currentPaymentPurchase.id, {
         paymentAmount: newPaymentAmount,
         paymentDue: newPaymentDue,
@@ -557,7 +550,6 @@ filterSuppliers(): void {
         paymentAccount: paymentData.paymentAccount
       });
 
-      // Update supplier's balance
       if (this.currentPaymentPurchase.supplierId) {
         await this.supplierService.updateSupplierBalance(
           this.currentPaymentPurchase.supplierId,
@@ -566,13 +558,11 @@ filterSuppliers(): void {
         );
       }
 
-      // Update account balance
       await this.accountService.updateAccountBalance(
         paymentData.paymentAccount.id,
         -paymentData.amount
       );
 
-      // Record transaction
       await this.accountService.recordTransaction(paymentData.paymentAccount.id, {
         amount: paymentData.amount,
         type: 'expense',
@@ -583,12 +573,11 @@ filterSuppliers(): void {
         paymentMethod: paymentData.paymentMethod
       });
 
-      // Add payment record
       await this.paymentService.addPayment(paymentData);
 
       this.showSnackbar('Payment added successfully!', 'success');
-      this.closePaymentForm(); // Close the form after successful submission
-      this.loadPurchases(); // Refresh the list
+      this.closePaymentForm();
+      this.loadPurchases();
       
     } catch (error) {
       console.error('Error processing payment:', error);
@@ -596,55 +585,52 @@ filterSuppliers(): void {
     }
   }
 
-closePaymentForm(): void {
-  this.showPaymentForm = false;
-  this.paymentForm.reset({
-    paymentMethod: 'Cash',
-    paidDate: new Date().toISOString().slice(0, 16),
-    amount: 0
-  });
-}
-
+  closePaymentForm(): void {
+    this.showPaymentForm = false;
+    this.paymentForm.reset({
+      paymentMethod: 'Cash',
+      paidDate: new Date().toISOString().slice(0, 16),
+      amount: 0
+    });
+  }
 
   toggleFilterSidebar(): void {
     this.showFilterSidebar = !this.showFilterSidebar;
   }
- resetFilters(): void {
-  this.selectedDateRange = '';
-  this.dateFilter = { startDate: '', endDate: '' };
-  this.statusFilter = '';
-  this.paymentStatusFilter = '';
-  this.supplierFilter = '';
-  this.locationFilter = '';
-  this.applyAdvancedFilters();
-}
-  
 
-// In list-purchase.component.ts where you navigate to product details:
-viewProductDetails(product: any) {
-  // Get the original purchases data from the service to ensure we have the raw date objects
-  this.purchaseService.getPurchasesByProductId(product.id).then(purchasesData => {
-    this.router.navigate(['/product-purchase-details', product.id], {
-      state: {
-        productData: product,
-        purchaseData: purchasesData // Pass the raw purchase data with original date objects
-      }
+  resetFilters(): void {
+    this.selectedDateRange = '';
+    this.dateFilter = { startDate: '', endDate: '' };
+    this.statusFilter = '';
+    this.paymentStatusFilter = '';
+    this.supplierFilter = '';
+    this.locationFilter = '';
+    this.applyAdvancedFilters();
+  }
+
+  viewProductDetails(product: any) {
+    this.purchaseService.getPurchasesByProductId(product.id).then(purchasesData => {
+      this.router.navigate(['/product-purchase-details', product.id], {
+        state: {
+          productData: product,
+          purchaseData: purchasesData
+        }
+      });
+    }).catch(error => {
+      console.error('Error fetching purchase data for product:', error);
+      const filteredPurchaseData = this.purchases.filter(p => 
+        p.products?.some(prod => prod.id === product.id || prod.productId === product.id)
+      );
+      
+      this.router.navigate(['/product-purchase-details', product.id], {
+        state: {
+          productData: product,
+          purchaseData: filteredPurchaseData
+        }
+      });
     });
-  }).catch(error => {
-    console.error('Error fetching purchase data for product:', error);
-    // Fallback to filtered purchases if service call fails
-    const filteredPurchaseData = this.purchases.filter(p => 
-      p.products?.some(prod => prod.id === product.id || prod.productId === product.id)
-    );
-    
-    this.router.navigate(['/product-purchase-details', product.id], {
-      state: {
-        productData: product,
-        purchaseData: filteredPurchaseData
-      }
-    });
-  });
-}
+  }
+
   viewPayments(purchase: Purchase): void {
     if (!purchase.id || !purchase.supplierId) {
       this.showSnackbar('Purchase data is incomplete', 'error');
@@ -657,245 +643,217 @@ viewProductDetails(product: any) {
         purchaseRef: purchase.referenceNo,
         supplierId: purchase.supplierId,
         supplierName: purchase.supplier,
-        
       }
     });
   }
-// Replace your existing updateStatus method with this:
-updateStatus(purchase: Purchase): void {
-  this.selectedPurchaseForStatus = purchase;
-  this.newPurchaseStatus = purchase.purchaseStatus || 'ordered';
-  this.openModal('statusModal');
-}
 
-
-async updatePurchaseStatus(): Promise<void> {
-  if (!this.selectedPurchaseForStatus || !this.selectedPurchaseForStatus.id) {
-    this.showSnackbar('No purchase selected for status update', 'error');
-    return;
+  updateStatus(purchase: Purchase): void {
+    this.selectedPurchaseForStatus = purchase;
+    this.newPurchaseStatus = purchase.purchaseStatus || 'ordered';
+    this.openModal('statusModal');
   }
 
-  try {
-    await this.purchaseService.updatePurchase(this.selectedPurchaseForStatus.id, {
-      purchaseStatus: this.newPurchaseStatus,
-      updatedAt: new Date()
-    });
-
-    this.showSnackbar('Purchase status updated successfully', 'success');
-    
-    // Update the local data
-    const purchaseIndex = this.purchases.findIndex(p => p.id === this.selectedPurchaseForStatus?.id);
-    if (purchaseIndex !== -1) {
-      this.purchases[purchaseIndex].purchaseStatus = this.newPurchaseStatus;
-      this.filteredPurchases = [...this.purchases]; // Refresh filtered list
+  async updatePurchaseStatus(): Promise<void> {
+    if (!this.selectedPurchaseForStatus || !this.selectedPurchaseForStatus.id) {
+      this.showSnackbar('No purchase selected for status update', 'error');
+      return;
     }
 
-    // Close the modal
-    this.closeCurrentModal();
-    // OR if you prefer using the specific modal reference:
-    // if (this.statusModal) {
-    //   this.statusModal.hide();
-    // }
-  } catch (error) {
-    console.error('Error updating purchase status:', error);
-    this.showSnackbar('Failed to update purchase status', 'error');
+    try {
+      await this.purchaseService.updatePurchase(this.selectedPurchaseForStatus.id, {
+        purchaseStatus: this.newPurchaseStatus,
+        updatedAt: new Date()
+      });
+
+      this.showSnackbar('Purchase status updated successfully', 'success');
+      
+      const purchaseIndex = this.purchases.findIndex(p => p.id === this.selectedPurchaseForStatus?.id);
+      if (purchaseIndex !== -1) {
+        this.purchases[purchaseIndex].purchaseStatus = this.newPurchaseStatus;
+        this.filteredPurchases = [...this.purchases];
+      }
+
+      this.closeCurrentModal();
+    } catch (error) {
+      console.error('Error updating purchase status:', error);
+      this.showSnackbar('Failed to update purchase status', 'error');
+    }
   }
-}
 
-loadPurchases(): void {
-  this.isLoading = true;
-  this.errorMessage = '';
-        this.loadGoodsReceivedNotes();
+  loadPurchases(): void {
+    this.isLoading = true;
+    this.errorMessage = '';
+    this.loadGoodsReceivedNotes();
 
-  this.purchaseService.getPurchases().subscribe({
-    next: (purchases: any[]) => {
-      this.purchases = purchases.map(purchase => {
-         let totalTax = 0;
-        let cgst = 0;
-        let sgst = 0;
-        let igst = 0;
-        let taxRate = 0;
-        let isInterState = purchase.isInterState || false;
-        let productsTotal = 0;
+    this.purchaseService.getPurchases().subscribe({
+      next: (purchases: any[]) => {
+        this.purchases = purchases.map(purchase => {
+          let totalTax = 0;
+          let cgst = 0;
+          let sgst = 0;
+          let igst = 0;
+          let taxRate = 0;
+          let isInterState = purchase.isInterState || false;
+          let productsTotal = 0;
 
-        // Calculate taxes and product totals if products exist
-       if (purchase.products && purchase.products.length > 0) {
-          // Calculate total tax and product values
-          const taxCalculations = purchase.products.reduce((acc: any, product: any) => {
-            const quantity = product.quantity || 0;
-            const price = product.unitCost || product.price || 0;
-            const productTotal = quantity * price;
-            // Calculate tax amount if not provided
-            const productTaxRate = product.taxRate || 0;
-            let taxAmount = product.taxAmount || 0;
-            
-            
-            // If tax amount isn't provided but rate is, calculate it
-            if (taxAmount === 0 && productTaxRate > 0) {
-              taxAmount = productTotal * (productTaxRate / 100);
-            }
-
-          
-            acc.totalTax += taxAmount;
-            acc.productsTotal += productTotal;
-            
-            // Track tax rates (use the first non-zero rate if multiple exist)
-            if (productTaxRate > 0 && acc.taxRate === 0) {
-              acc.taxRate = productTaxRate;
-            }
-            
-            return acc;
-          }, { totalTax: 0, productsTotal: 0, taxRate: 0 });
-
-          totalTax = taxCalculations.totalTax;
-          productsTotal = taxCalculations.productsTotal;
-         taxRate = taxCalculations.taxRate;
-         
-
-          // Split tax for CGST/SGST or IGST based on interstate status
-          if (isInterState) {
-            igst = totalTax;
-          } else {
-            cgst = totalTax / 2;
-            sgst = totalTax / 2;
-          }
-        }
-
-   const shippingCharges = purchase.shippingCharges || 0;
-        const grandTotal = productsTotal + totalTax + shippingCharges;
-        const paymentAmount = Number(purchase.paymentAmount) || 0;
-        const paymentDue = Math.max(0, grandTotal - paymentAmount);
-
-
-              const productsWithNames = Array.isArray(purchase.products)
-          ? purchase.products.map((product: any) => {
+          if (purchase.products && purchase.products.length > 0) {
+            const taxCalculations = purchase.products.reduce((acc: any, product: any) => {
               const quantity = product.quantity || 0;
               const price = product.unitCost || product.price || 0;
               const productTotal = quantity * price;
               const productTaxRate = product.taxRate || 0;
-              let taxAmount = productTotal * (productTaxRate / 100);
-
+              let taxAmount = product.taxAmount || 0;
               
-              // Calculate tax if not provided but rate is available
               if (taxAmount === 0 && productTaxRate > 0) {
                 taxAmount = productTotal * (productTaxRate / 100);
               }
 
-              return {
-                id: product.id || product.productId || '',
-                name: product.productName || product.name || 'Unnamed',
-                productName: product.productName || product.name || 'Unnamed',
-                quantity: quantity,
-                price: price,
-                code: product.productCode || product.code || '',
-                batchNumber: product.batchNumber || '',
-                expiryDate: product.expiryDate || '',
-                taxAmount: taxAmount,
-                taxRate: productTaxRate,
-                lineTotal: productTotal + taxAmount,
-                subtotal: productTotal
-              };
-            })
-          : [];
+              acc.totalTax += taxAmount;
+              acc.productsTotal += productTotal;
+              
+              if (productTaxRate > 0 && acc.taxRate === 0) {
+                acc.taxRate = productTaxRate;
+              }
+              
+              return acc;
+            }, { totalTax: 0, productsTotal: 0, taxRate: 0 });
 
+            totalTax = taxCalculations.totalTax;
+            productsTotal = taxCalculations.productsTotal;
+            taxRate = taxCalculations.taxRate;
 
-        // Format addedBy information
-        let addedByValue = 'System';
-        if (purchase.addedBy) {
-          if (typeof purchase.addedBy === 'string') {
-            addedByValue = purchase.addedBy;
-          } else if (typeof purchase.addedBy === 'object') {
-            const addedByObj = purchase.addedBy as any;
-            addedByValue =
-              addedByObj.name ||
-              addedByObj.email ||
-              addedByObj.id ||
-              'Unknown User';
+            if (isInterState) {
+              igst = totalTax;
+            } else {
+              cgst = totalTax / 2;
+              sgst = totalTax / 2;
+            }
           }
-        }
 
-        // Format payment account information
-        let paymentAccount;
-        if (purchase.paymentAccount) {
-          paymentAccount = {
-            id: String(purchase.paymentAccount.id || ''),
-            name: String(purchase.paymentAccount.name || 'Unknown Account'),
-            accountNumber: String(purchase.paymentAccount.accountNumber || ''),
-            accountType: String(purchase.paymentAccount.accountType || '')
+          const shippingCharges = purchase.shippingCharges || 0;
+          const grandTotal = productsTotal + totalTax + shippingCharges;
+          const paymentAmount = Number(purchase.paymentAmount) || 0;
+          const paymentDue = Math.max(0, grandTotal - paymentAmount);
+
+          const productsWithNames = Array.isArray(purchase.products)
+            ? purchase.products.map((product: any) => {
+                const quantity = product.quantity || 0;
+                const price = product.unitCost || product.price || 0;
+                const productTotal = quantity * price;
+                const productTaxRate = product.taxRate || 0;
+                let taxAmount = productTotal * (productTaxRate / 100);
+
+                if (taxAmount === 0 && productTaxRate > 0) {
+                  taxAmount = productTotal * (productTaxRate / 100);
+                }
+
+                return {
+                  id: product.id || product.productId || '',
+                  name: product.productName || product.name || 'Unnamed',
+                  productName: product.productName || product.name || 'Unnamed',
+                  quantity: quantity,
+                  price: price,
+                  code: product.productCode || product.code || '',
+                  batchNumber: product.batchNumber || '',
+                  expiryDate: product.expiryDate || '',
+                  taxAmount: taxAmount,
+                  taxRate: productTaxRate,
+                  lineTotal: productTotal + taxAmount,
+                  subtotal: productTotal
+                };
+              })
+            : [];
+
+          let addedByValue = 'System';
+          if (purchase.addedBy) {
+            if (typeof purchase.addedBy === 'string') {
+              addedByValue = purchase.addedBy;
+            } else if (typeof purchase.addedBy === 'object') {
+              const addedByObj = purchase.addedBy as any;
+              addedByValue =
+                addedByObj.name ||
+                addedByObj.email ||
+                addedByObj.id ||
+                'Unknown User';
+            }
+          }
+
+          let paymentAccount;
+          if (purchase.paymentAccount) {
+            paymentAccount = {
+              id: String(purchase.paymentAccount.id || ''),
+              name: String(purchase.paymentAccount.name || 'Unknown Account'),
+              accountNumber: String(purchase.paymentAccount.accountNumber || ''),
+              accountType: String(purchase.paymentAccount.accountType || '')
+            };
+          } else if (purchase.paymentMethod) {
+            paymentAccount = {
+              id: '',
+              name: String(purchase.paymentMethod),
+              accountNumber: '',
+              accountType: ''
+            };
+          }
+
+          const supplierName = purchase.supplierName ||
+            (purchase.supplier?.businessName ||
+            `${purchase.supplier?.firstName || ''} ${purchase.supplier?.lastName || ''}`.trim() ||
+            'Unknown Supplier');
+
+          return {
+            id: purchase.id || '',
+            purchaseDate: this.getFormattedDate(purchase.purchaseDate),
+            referenceNo: purchase.referenceNo,
+            businessLocation: purchase.businessLocation,
+            supplier: supplierName,
+            supplierName: supplierName,
+            supplierId: purchase.supplierId,
+            receivedDate: this.getFormattedDate(purchase.receivedDate),
+            supplierAddress: purchase.supplier?.addressLine1 ||
+              purchase.address ||
+              purchase.supplierAddress ||
+              'N/A',
+            totalTax,
+            taxRate,
+            cgst,
+            sgst,
+            igst,
+            isInterState,
+            purchaseStatus: purchase.purchaseStatus,
+            paymentStatus: purchase.paymentStatus || purchase.paymentMethod,
+            grandTotal,
+            paymentDue,
+            paymentAmount,
+            addedBy: addedByValue,
+            products: productsWithNames,
+            invoiceNo: purchase.invoiceNo,
+            invoicedDate: purchase.invoicedDate,
+            shippingCharges,
+            payTerm: purchase.payTerm,
+            paymentMethod: purchase.paymentMethod,
+            paymentNote: purchase.paymentNote,
+            additionalNotes: purchase.additionalNotes,
+            document: purchase.document,
+            balance: purchase.balance || paymentDue,
+            totalPayable: purchase.totalPayable || grandTotal,
+            purchaseOrder: purchase.purchaseOrder,
+            linkedPurchaseOrderId: purchase.linkedPurchaseOrderId,
+            paymentAccount,
+            productsTotal
           };
-        } else if (purchase.paymentMethod) {
-          paymentAccount = {
-            id: '',
-            name: String(purchase.paymentMethod),
-            accountNumber: '',
-            accountType: ''
-          };
-        }
+        });
 
-        // Format supplier information
-        const supplierName = purchase.supplierName ||
-          (purchase.supplier?.businessName ||
-          `${purchase.supplier?.firstName || ''} ${purchase.supplier?.lastName || ''}`.trim() ||
-          'Unknown Supplier');
-
-        // Return the complete purchase object
-        return {
-                id: purchase.id || '',
-          purchaseDate: this.getFormattedDate(purchase.purchaseDate),
-          referenceNo: purchase.referenceNo,
-          businessLocation: purchase.businessLocation,
-          supplier: supplierName,
-          supplierName: supplierName,
-          supplierId: purchase.supplierId,
-          
-                    receivedDate: this.getFormattedDate(purchase.receivedDate),
-
-          supplierAddress: purchase.supplier?.addressLine1 ||
-            purchase.address ||
-            purchase.supplierAddress ||
-            'N/A',
-          totalTax,
-          taxRate,
-          cgst,
-          sgst,
-          igst,
-          isInterState,
-          purchaseStatus: purchase.purchaseStatus,
-          paymentStatus: purchase.paymentStatus || purchase.paymentMethod,
-          grandTotal,
-          paymentDue,
-          paymentAmount,
-          addedBy: addedByValue,
-          products: productsWithNames,
-
-          invoiceNo: purchase.invoiceNo,
-          invoicedDate: purchase.invoicedDate,
-          shippingCharges,
-          payTerm: purchase.payTerm,
-          paymentMethod: purchase.paymentMethod,
-          paymentNote: purchase.paymentNote,
-          additionalNotes: purchase.additionalNotes,
-          document: purchase.document,
-          balance: purchase.balance || paymentDue,
-          totalPayable: purchase.totalPayable || grandTotal,
-          purchaseOrder: purchase.purchaseOrder,
-          linkedPurchaseOrderId: purchase.linkedPurchaseOrderId,
-          paymentAccount,
-          productsTotal
-        };
-      });
-
-       this.filteredPurchases = [...this.purchases];
-      this.isLoading = false;
-    },
-    error: (error) => {
-      this.errorMessage = 'An error occurred while loading purchases.';
-      this.isLoading = false;
-      this.showSnackbar('Failed to load purchases', 'error');
-      console.error('Error loading purchases:', error);
-    }
-  });
-}
+        this.filteredPurchases = [...this.purchases];
+        this.isLoading = false;
+      },
+      error: (error) => {
+        this.errorMessage = 'An error occurred while loading purchases.';
+        this.isLoading = false;
+        this.showSnackbar('Failed to load purchases', 'error');
+        console.error('Error loading purchases:', error);
+      }
+    });
+  }
 
   loadPurchaseReturns(): void {
     this.purchaseReturnService.getPurchaseReturns().subscribe({
@@ -907,7 +865,6 @@ loadPurchases(): void {
       }
     });
   }
-
 
   getAddedByName(addedBy: string | User | undefined): string {
     if (!addedBy) return 'System';
@@ -927,100 +884,88 @@ loadPurchases(): void {
     return products.map(p => p.name || p.productName || 'Unnamed').join(', ');
   }
 
-private getFormattedDate(date: any): string {
-  if (!date) return '';
-  
-  try {
-    // Handle Firestore Timestamp
-    if (typeof date === 'object' && 'toDate' in date) {
-      return this.datePipe.transform(date.toDate(), 'mediumDate') || '';
-    } 
-    // Handle JavaScript Date
-    else if (date instanceof Date) {
-      return this.datePipe.transform(date, 'mediumDate') || '';
-    } 
-    // Handle string date
-    else {
-      return this.datePipe.transform(new Date(date), 'mediumDate') || '';
+  private getFormattedDate(date: any): string {
+    if (!date) return '';
+    
+    try {
+      if (typeof date === 'object' && 'toDate' in date) {
+        return this.datePipe.transform(date.toDate(), 'mediumDate') || '';
+      } 
+      else if (date instanceof Date) {
+        return this.datePipe.transform(date, 'mediumDate') || '';
+      } 
+      else {
+        return this.datePipe.transform(new Date(date), 'mediumDate') || '';
+      }
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return '';
     }
-  } catch (e) {
-    console.error('Error formatting date:', e);
-    return '';
   }
-  }
+
   private loadGoodsReceivedNotes(): void {
-  this.goodsService.getAllGoodsReceived().subscribe({
-    next: (goodsNotes: any[]) => {
-      // Create a map of invoice numbers to received dates
-      const invoiceDateMap = new Map<string, Date>();
-      
-      goodsNotes.forEach(goods => {
-        if (goods.invoiceNo && goods.receivedDate) {
-          const receivedDate = goods.receivedDate.toDate 
-            ? goods.receivedDate.toDate() 
-            : new Date(goods.receivedDate);
-          invoiceDateMap.set(goods.invoiceNo, receivedDate);
-        }
-      });
+    this.goodsService.getAllGoodsReceived().subscribe({
+      next: (goodsNotes: any[]) => {
+        const invoiceDateMap = new Map<string, Date>();
+        
+        goodsNotes.forEach(goods => {
+          if (goods.invoiceNo && goods.receivedDate) {
+            const receivedDate = goods.receivedDate.toDate 
+              ? goods.receivedDate.toDate() 
+              : new Date(goods.receivedDate);
+            invoiceDateMap.set(goods.invoiceNo, receivedDate);
+          }
+        });
 
-      // Update purchases with received dates
-      this.purchases = this.purchases.map(purchase => {
-        if (purchase.invoiceNo && invoiceDateMap.has(purchase.invoiceNo)) {
-          return {
-            ...purchase,
-            receivedDate: invoiceDateMap.get(purchase.invoiceNo)
-          };
-        }
-        return purchase;
-      });
+        this.purchases = this.purchases.map(purchase => {
+          if (purchase.invoiceNo && invoiceDateMap.has(purchase.invoiceNo)) {
+            return {
+              ...purchase,
+              receivedDate: invoiceDateMap.get(purchase.invoiceNo)
+            };
+          }
+          return purchase;
+        });
 
-      this.filteredPurchases = [...this.purchases];
-    },
-    error: (error) => {
-      console.error('Error loading goods received notes:', error);
-    }
-  });
-}
+        this.filteredPurchases = [...this.purchases];
+      },
+      error: (error) => {
+        console.error('Error loading goods received notes:', error);
+      }
+    });
+  }
+
   applyAdvancedFilters(): void {
     let filtered = [...this.purchases];
     
-    // Apply date filter
-  if (this.dateFilter.startDate || this.dateFilter.endDate) {
-    filtered = filtered.filter(purchase => {
-      const purchaseDate = this.getDateValue(purchase.purchaseDate);
-      const startDate = this.dateFilter.startDate ? new Date(this.dateFilter.startDate).getTime() : 0;
-      const endDate = this.dateFilter.endDate ? new Date(this.dateFilter.endDate).getTime() + 86400000 : Date.now(); // Add 1 day to include end date
-      
-      return purchaseDate >= startDate && purchaseDate <= endDate;
-    });
-  }
-    // Apply status filter
+    if (this.dateFilter.startDate || this.dateFilter.endDate) {
+      filtered = filtered.filter(purchase => {
+        const purchaseDate = this.getDateValue(purchase.purchaseDate);
+        const startDate = this.dateFilter.startDate ? new Date(this.dateFilter.startDate).getTime() : 0;
+        const endDate = this.dateFilter.endDate ? new Date(this.dateFilter.endDate).getTime() + 86400000 : Date.now();
+        
+        return purchaseDate >= startDate && purchaseDate <= endDate;
+      });
+    }
+
     if (this.statusFilter) {
       filtered = filtered.filter(purchase => 
         purchase.purchaseStatus?.toLowerCase() === this.statusFilter.toLowerCase()
       );
     }
-// Apply supplier filter
-if (this.supplierFilter) {
-  filtered = filtered.filter(purchase => 
-    purchase.supplier === this.supplierFilter
-  );
-}
-    // Apply payment status filter
+
+    if (this.supplierFilter) {
+      filtered = filtered.filter(purchase => 
+        purchase.supplier === this.supplierFilter
+      );
+    }
+
     if (this.paymentStatusFilter) {
       filtered = filtered.filter(purchase => 
         purchase.paymentStatus?.toLowerCase() === this.paymentStatusFilter.toLowerCase()
       );
     }
     
-    // Apply supplier filter
-    if (this.supplierFilter) {
-      filtered = filtered.filter(purchase => 
-        purchase.supplier === this.supplierFilter
-      );
-    }
-    
-    // Apply location filter
     if (this.locationFilter) {
       filtered = filtered.filter(purchase => 
         purchase.businessLocation === this.locationFilter
@@ -1030,7 +975,7 @@ if (this.supplierFilter) {
     this.filteredPurchases = filtered;
     this.toggleFilterSidebar();
   }
-  
+
   applyFilter(): void {
     if (!this.searchText) {
       this.filteredPurchases = [...this.purchases];
@@ -1052,6 +997,34 @@ if (this.supplierFilter) {
       );
   }
 
+  openActionPopup(purchase: Purchase, event: Event): void {
+    event.stopPropagation();
+    this.currentActionPopup = purchase.id;
+  }
+
+  closeActionPopup(): void {
+    this.currentActionPopup = null;
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onKeydownHandler(event: KeyboardEvent) {
+    this.closeActionPopup();
+  }
+
+  viewPurchase(purchase: Purchase): void {
+    this.router.navigate(['/view-purchase', purchase.id]);
+  }
+
+  editPurchase(purchase: Purchase): void {
+    this.router.navigate(['/edit-purchase', purchase.id]);
+  }
+
+  confirmDelete(purchase: Purchase): void {
+    if (confirm(`Are you sure you want to delete purchase ${purchase.referenceNo}?`)) {
+      this.deletePurchase(purchase.id);
+    }
+  }
+
   calculateTotal(property: string): string {
     const total = this.filteredPurchases.reduce((sum, purchase) => {
       return sum + (Number(purchase[property as keyof Purchase]) || 0);
@@ -1067,9 +1040,9 @@ if (this.supplierFilter) {
     const headers = [
       'Date', 'Reference No', 'Invoice No', 'Products', 'Location', 'Supplier', 
       'Purchase Status', 'Payment Status', 'Grand Total', 'Payment Due', 'Added By',
-      'Shipping Charges', 'Pay Term', 'Payment Method', 'Total Tax', 'Balance', 'Tax',    'Date', 'Received Date', 'Reference No', // Add 'Received Date'
-
-          'CGST', 'SGST', 'IGST', 
+      'Shipping Charges', 'Pay Term', 'Payment Method', 'Total Tax', 'Balance', 'Tax',
+      'Date', 'Received Date', 'Reference No',
+      'CGST', 'SGST', 'IGST', 
     ];
     
     const data = this.filteredPurchases.map(purchase => [
@@ -1081,14 +1054,13 @@ if (this.supplierFilter) {
       purchase.businessLocation || 'N/A',
       purchase.supplier || 'N/A',
       purchase.purchaseStatus || 'Unknown',
-        purchase.supplierAddress || 'N/A',
-
+      purchase.supplierAddress || 'N/A',
       purchase.paymentStatus || 'Unknown',
       `₹ ${purchase.grandTotal || '0.00'}`,
-        `₹ ${purchase.totalTax || '0.00'}`,
- `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
-    `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
-    `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
+      `₹ ${purchase.totalTax || '0.00'}`,
+      `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
+      `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
+      `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
       `₹ ${purchase.paymentDue || '0.00'}`,
       this.getAddedByName(purchase.addedBy),
       `₹ ${purchase.shippingCharges || '0.00'}`,
@@ -1096,11 +1068,11 @@ if (this.supplierFilter) {
       purchase.paymentMethod || 'N/A',
       `₹ ${purchase.totalTax || '0.00'}`,
       `₹ ${purchase.balance || '0.00'}`,
-         `₹ ${purchase.totalTax || '0.00'}`,
-    `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
-    `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
-    `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
-    `${purchase.taxRate || '0'}%`,
+      `₹ ${purchase.totalTax || '0.00'}`,
+      `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
+      `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
+      `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
+      `${purchase.taxRate || '0'}%`,
     ]);
 
     let csvContent = "data:text/csv;charset=utf-8," 
@@ -1125,8 +1097,7 @@ if (this.supplierFilter) {
         purchase.products.map(p => p.name || p.productName || 'Unnamed').join(', ') : 'N/A',
       'Location': purchase.businessLocation || 'N/A',
       'Supplier': purchase.supplier || 'N/A', 
-          'Received Date': purchase.receivedDate || 'N/A', // Add this line
-
+      'Received Date': purchase.receivedDate || 'N/A',
       'Purchase Status': purchase.purchaseStatus || 'Unknown',
       'Payment Status': purchase.paymentStatus || 'Unknown',
       'Grand Total': `₹ ${purchase.grandTotal || '0.00'}`,
@@ -1136,9 +1107,9 @@ if (this.supplierFilter) {
       'Pay Term': purchase.payTerm || 'N/A',
       'Payment Method': purchase.paymentMethod || 'N/A',
       'Total Tax': `₹ ${purchase.totalTax || '0.00'}`,
-       'CGST': `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
-    'SGST': `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
-    'IGST': `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
+      'CGST': `₹ ${purchase.cgst?.toFixed(2) || '0.00'}`,
+      'SGST': `₹ ${purchase.sgst?.toFixed(2) || '0.00'}`,
+      'IGST': `₹ ${purchase.igst?.toFixed(2) || '0.00'}`,
       'Balance': `₹ ${purchase.balance || '0.00'}`
     })));
 
@@ -1172,8 +1143,7 @@ if (this.supplierFilter) {
     const data = this.filteredPurchases.map(purchase => [
       purchase.purchaseDate || 'N/A',
       purchase.referenceNo || 'N/A',
-          purchase.receivedDate || 'N/A', // Add this line
-
+      purchase.receivedDate || 'N/A',
       purchase.invoiceNo || 'N/A',
       purchase.products && purchase.products.length > 0 ? 
         purchase.products.map(p => p.name || p.productName || 'Unnamed').join(', ') : 'N/A',
@@ -1197,22 +1167,19 @@ if (this.supplierFilter) {
     doc.save(`purchases_${new Date().toISOString().slice(0,10)}.pdf`);
   }
 
-  // Print individual purchase details
-printPurchase(purchase: Purchase): void {
+  printPurchase(purchase: Purchase): void {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       this.showSnackbar('Please allow pop-ups to print', 'error');
       return;
     }
     
-    // Calculate totals from products if needed
     const totalTax = purchase.totalTax || (purchase.products?.reduce((sum: number, product: any) => {
       return sum + (product.taxAmount || 0);
     }, 0) || 0);
 
     const taxRate = purchase.taxRate || (purchase.products?.[0]?.taxRate || 0);
 
-    // Format products for print
     let productsHTML = '';
     if (purchase.products && purchase.products.length > 0) {
       productsHTML = purchase.products.map(product => 
@@ -1346,13 +1313,11 @@ printPurchase(purchase: Purchase): void {
               <td>${purchase.invoiceNo || 'N/A'}</td>
               <td class="label">Payment Method:</td>
               <td>${purchase.paymentMethod || 'N/A'}</td>
-                          <td>${purchase.receivedDate || 'N/A'}</td>
-
+              <td>${purchase.receivedDate || 'N/A'}</td>
             </tr>
           </table>
         </div>
         
-        <!-- Add location information section -->
         <div class="location-info">
           <div class="location-title">From Location (Supplier Address):</div>
           <div>${purchase.supplierAddress || 'N/A'}</div>
@@ -1444,14 +1409,12 @@ printPurchase(purchase: Purchase): void {
     printWindow.document.write(printContent);
     printWindow.document.close();
     
-    // Wait for content to load then print
     printWindow.onload = function() {
       printWindow.focus();
       printWindow.print();
     };
   }
 
-  // General print method for the entire table
   print(): void {
     window.print();
   }
@@ -1494,52 +1457,57 @@ printPurchase(purchase: Purchase): void {
     }
     return 'status-unknown';
   }
-openReturnModal(purchase: Purchase): void {
-  this.selectedPurchase = purchase;
-  this.returnData = this.initReturnData();
-  this.returnData.returnDate = new Date().toISOString().split('T')[0];
+
+  openReturnModal(purchase: Purchase): void {
+    this.selectedPurchase = purchase;
+    this.returnData = this.initReturnData();
+    this.returnData.returnDate = new Date().toISOString().split('T')[0];
+    
     if (purchase.products && purchase.products.length) {
-    this.returnData.products = purchase.products.map(product => ({
-      ...product,
-      returnQuantity: 0,
-      subtotal: 0,
-      expiryDate: product.expiryDate ? 
-        (typeof product.expiryDate === 'string' ? new Date(product.expiryDate) : product.expiryDate) 
-        : undefined
-    }));
-  }
-  
-  // Close any existing modal first
-  if (this.currentOpenModal) {
-    this.currentOpenModal.hide();
-  }
-  
-  const modalElement = document.getElementById('returnModal');
-  if (modalElement) {
-    // Remove any existing backdrop
-    const existingBackdrops = document.getElementsByClassName('modal-backdrop');
-    while (existingBackdrops.length > 0) {
-      existingBackdrops[0].parentNode?.removeChild(existingBackdrops[0]);
+      this.returnData.products = purchase.products.map(product => ({
+        ...product,
+        returnQuantity: 0,
+        unitCost: product.price || product.unitCost || 0,
+        subtotal: 0,
+        expiryDate: product.expiryDate ? 
+          (typeof product.expiryDate === 'string' ? new Date(product.expiryDate) : product.expiryDate) 
+          : undefined
+      }));
     }
     
-    this.currentOpenModal = new Modal(modalElement);
-    this.currentOpenModal.show();
+    if (this.currentOpenModal) {
+      this.currentOpenModal.hide();
+    }
+    
+    const modalElement = document.getElementById('returnModal');
+    if (modalElement) {
+      const existingBackdrops = document.getElementsByClassName('modal-backdrop');
+      while (existingBackdrops.length > 0) {
+        existingBackdrops[0].parentNode?.removeChild(existingBackdrops[0]);
+      }
+      
+      this.currentOpenModal = new Modal(modalElement);
+      this.currentOpenModal.show();
+    }
   }
-}
+
   applyFilters() {
-  // Your filter logic here
-  // This should match what you previously had in applyAdvancedFilters or applyFilter
-}
+    // Filter logic implementation
+  }
+
   calculateReturnSubtotal(index: number): void {
     if (!this.returnData.products[index]) return;
     const product = this.returnData.products[index];
     product.subtotal = (product.returnQuantity || 0) * (product.price || 0);
   }
-  
+
   calculateTotalReturnAmount(): number {
     return this.returnData.products.reduce((total, product) => total + (product.subtotal || 0), 0);
   }
-  
+
+  /**
+   * Submit return with comprehensive logging to both collections
+   */
   submitReturn(): void {
     if (!this.selectedPurchase) {
       this.showSnackbar('No purchase selected for return', 'error');
@@ -1557,7 +1525,7 @@ openReturnModal(purchase: Purchase): void {
       return;
     }
     
-    const returnRef = `PRN-${Date.now()}`;  // Fixed: Added backticks for template literal
+    const returnRef = `PRN-${Date.now()}`;
     
     const purchaseReturn: PurchaseReturn = {
       returnDate: this.returnData.returnDate,
@@ -1565,6 +1533,7 @@ openReturnModal(purchase: Purchase): void {
       parentPurchaseId: this.selectedPurchase.id,
       parentPurchaseRef: this.selectedPurchase.referenceNo || '',
       businessLocation: this.selectedPurchase.businessLocation || '',
+      businessLocationId: this.selectedPurchase.businessLocation || '', // You may need to map this properly
       supplier: this.selectedPurchase.supplier || '',
       returnStatus: this.returnData.returnStatus,
       paymentStatus: this.returnData.paymentStatus,
@@ -1575,6 +1544,7 @@ openReturnModal(purchase: Purchase): void {
       createdBy: 'System'
     };
     
+    // Use the enhanced service method that handles both collections
     this.purchaseReturnService.addPurchaseReturn(purchaseReturn)
       .then(() => {
         this.showSnackbar('Purchase return submitted successfully', 'success');

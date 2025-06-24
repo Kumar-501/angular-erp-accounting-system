@@ -88,4 +88,39 @@ body {
 .search-results-dropdown .list-group-item:focus {
   background-color: #e9ecef;
   outline: none;
+}.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Highlight for invalid fields */
+.ng-invalid.ng-touched:not(form) {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+/* Highlight for required fields that are empty */
+input.ng-invalid.ng-touched:not(form),
+select.ng-invalid.ng-touched:not(form) {
+  border-left: 4px solid #dc3545;
+}.search-results-dropdown {
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+.highlight {
+  background-color: yellow;
+  font-weight: bold;
+}
+
+.list-group-item {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.list-group-item:hover {
+  background-color: #f8f9fa;
+}
+
+.list-group-item small {
+  font-size: 0.8rem;
 }

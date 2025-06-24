@@ -695,4 +695,58 @@ h1 {
   height: 1px;
   background-color: #e9ecef;
   margin: 8px 0;
+}/* Add these styles to your component's CSS file */
+
+.date-options-container {
+  margin-top: 10px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.date-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.date-option {
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.date-option:hover {
+  background: #f1f1f1;
+}
+
+.date-option.active {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.custom-date-container {
+  margin-top: 15px;
+  padding: 15px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+.custom-date-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+/* Adjust the main filter sidebar if needed */
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }

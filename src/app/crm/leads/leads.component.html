@@ -1107,13 +1107,13 @@ Add this to show the department of selected user -->
 
       <div class="form-group">
         <label for="userSelect">Select User to Assign:</label>
-    <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control" 
-        (change)="onUserSelectionChange($event)">
-  <option value="">Select User</option>
-  <option *ngFor="let user of availableUsers" [value]="user.id">
-    {{ user.name || user.email }} ({{ user.department || 'No Dept' }})
-  </option>
-</select>
+        <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control" 
+            (change)="onUserSelectionChange($event)">
+          <option value="">Select User</option>
+          <option *ngFor="let user of availableUsers" [value]="user.id">
+            {{ user.name || user.email }} ({{ user.department || 'No Dept' }})
+          </option>
+        </select>
       </div>
 
       <div class="form-group">
@@ -1129,7 +1129,7 @@ Add this to show the department of selected user -->
       <div class="selected-leads-info">
         <p>Number of selected leads: <span class="lead-count">{{ selectedLeads.size }}</span></p>
         <p *ngIf="randomAssignMode" class="random-note">
-          <i class="info-icon"></i> Leads will be randomly distributed among available users
+          <i class="info-icon"></i> Leads will be randomly distributed among available users from PC1-PC8 departments
         </p>
       </div>
       

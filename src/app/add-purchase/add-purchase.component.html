@@ -165,7 +165,7 @@
                     </div>
         <div class="col-md-6">
     <div class="form-group">
-        <label>Received Date:</label>
+        <label>Required Date:</label>
         <input type="date" formControlName="receivedDate" class="form-control" 
                [value]="purchaseOrderData?.requiredByDate || requisitionData?.requiredDate || ''" />
     </div>
@@ -419,11 +419,16 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Amount:</label>
-                            <input type="number" formControlName="paymentAmount" class="form-control" required 
-                                   (change)="calculatePaymentBalance()"/>
-                        </div>
+                    <div class="form-group">
+   <label>Amount:</label>
+  <input 
+    type="number" 
+    formControlName="paymentAmount" 
+    class="form-control" 
+    required
+    (input)="calculatePaymentBalance()" 
+  />
+</div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">

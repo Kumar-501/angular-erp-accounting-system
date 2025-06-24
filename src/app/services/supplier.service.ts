@@ -8,6 +8,7 @@ export interface Supplier {
   postalCode?: string;
   address: string;
   id?: string;
+  supplierName?: string;
   contactId?: string;
   district?: string;
   status?: "Active" | "Inactive" | undefined;

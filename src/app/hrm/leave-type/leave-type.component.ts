@@ -207,32 +207,52 @@ export class LeaveTypeComponent implements OnInit {
     doc.save('leave_types.pdf');
   }
 
-  print() {
-    const printContent = document.getElementById('leaveTypeTable');
-    const WindowPrt = window.open('', '', 'left=0,top=0,width=900,height=900,toolbar=0,scrollbars=0,status=0');
-    if (WindowPrt && printContent) {
-      WindowPrt.document.write(`
-        <html>
-          <head>
-            <title>Leave Types</title>
-            <style>
-              table { border-collapse: collapse; width: 100%; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f2f2f2; }
-            </style>
-          </head>
-          <body>
-            <h1>Leave Types Report</h1>
-            ${printContent.outerHTML}
-          </body>
-        </html>
-      `);
-      WindowPrt.document.close();
-      WindowPrt.focus();
-      WindowPrt.print();
-      WindowPrt.close();
-    }
+print() {
+  const originalContent = document.getElementById('leaveTypeTable');
+
+  if (!originalContent) {
+    console.error('Could not find table to print');
+    return;
   }
+
+  // Clone the original table
+  const clonedContent = originalContent.cloneNode(true) as HTMLElement;
+
+  // Remove the action column (assumes it's always the last column)
+  // Remove all <th> and <td> in last column
+  clonedContent.querySelectorAll('tr').forEach(row => {
+    const cells = row.querySelectorAll('th, td');
+    if (cells.length > 0) {
+      cells[cells.length - 1].remove(); // Remove last column cell
+    }
+  });
+
+  const WindowPrt = window.open('', '', 'left=0,top=0,width=900,height=900,toolbar=0,scrollbars=0,status=0');
+  if (WindowPrt) {
+    WindowPrt.document.write(`
+      <html>
+        <head>
+          <title>Leave Types</title>
+          <style>
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+          </style>
+        </head>
+        <body>
+          <h1>Leave Types Report</h1>
+          ${clonedContent.outerHTML}
+        </body>
+      </html>
+    `);
+    WindowPrt.document.close();
+    WindowPrt.focus();
+    WindowPrt.print();
+    WindowPrt.close();
+  }
+}
+
+
 
   toggleColumnVisibility() {
     this.showColumnVisibility = !this.showColumnVisibility;

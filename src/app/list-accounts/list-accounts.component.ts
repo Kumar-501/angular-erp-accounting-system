@@ -1199,7 +1199,7 @@ deposit(account: any): void {
         return;
       }
       
-      // Validate sufficient balance
+      // Validate sufficient balance // Fanisus 
       if ((fromAccount.openingBalance || 0) < formValue.amount) {
         alert('Insufficient balance in the source account');
         return;

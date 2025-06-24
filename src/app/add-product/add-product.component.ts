@@ -7,6 +7,7 @@ import { UnitsService } from '../services/units.service';
 import { TaxService } from '../services/tax.service';
 import { VariationsService } from '../services/variations.service';
 import { FileUploadService } from '../services/file-upload.service';
+import { Inject } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { SkuGeneratorService } from '../services/sku-generator.service';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -90,10 +91,10 @@ export class AddProductComponent implements OnInit, OnDestroy {
     private unitsService: UnitsService,
     private taxService: TaxService,
     private userService: UserService,
-    private variationsService: VariationsService,
     private fileUploadService: FileUploadService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
+    private variationsService: VariationsService
   ) { }
 
   ngOnInit() {

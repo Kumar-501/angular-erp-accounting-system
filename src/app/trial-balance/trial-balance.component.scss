@@ -125,8 +125,7 @@
     }
   }
 
-  .trial-balance-content {
-    .company-header {
+  .trial-balance-content {    .company-header {
       text-align: center;
       margin-bottom: 25px;
 
@@ -140,6 +139,24 @@
         font-weight: 500;
         margin: 0 0 5px 0;
         color: #555;
+      }
+
+      .info-note {
+        background-color: #e8f4f8;
+        border: 1px solid #bee5eb;
+        border-radius: 4px;
+        padding: 8px 12px;
+        margin: 10px auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #0c5460;
+        max-width: 600px;
+
+        i {
+          color: #17a2b8;
+        }
       }
     }
 

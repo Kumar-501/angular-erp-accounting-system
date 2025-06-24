@@ -808,7 +808,7 @@ addProduct(): void {
     shippingCharges: [0, [Validators.min(0)]],
     products: this.fb.array([], Validators.required), // Add validation for at least one product
     purchaseTotal: [0],
-    paymentAmount: [0, [Validators.required, Validators.min(0.0)]], // Ensure payment > 0
+    paymentAmount: [0, [Validators.required, Validators.min(0.0)]], // Initialize with 0
     paidOn: [new Date().toISOString().substring(0, 10), Validators.required],
     paymentMethod: ['', Validators.required],
     paymentAccount: ['', Validators.required], // Make payment account required
@@ -844,16 +844,17 @@ addProduct(): void {
 calculatePaymentBalance(): void {
   const totalPayable = this.purchaseForm.get('totalPayable')?.value || 0;
   const paymentAmount = this.purchaseForm.get('paymentAmount')?.value || 0;
+  
   const balance = Math.max(0, totalPayable - paymentAmount);
   
-  // Update payment status based on amounts
+  // Determine payment status based on amounts
   let paymentStatus = 'due';
   if (paymentAmount >= totalPayable) {
     paymentStatus = 'paid';
   } else if (paymentAmount > 0) {
     paymentStatus = 'partial';
   }
-
+  
   this.purchaseForm.patchValue({
     balance: balance,
     paymentStatus: paymentStatus
@@ -1003,7 +1004,6 @@ calculateLineTotal(index: number): void {
       sellingPrice: sellingPrice.toFixed(2)
     });
   }
-
 calculateTotals(): void {
   this.totalItems = this.productsFormArray.length;
   
@@ -1049,11 +1049,10 @@ calculateTotals(): void {
   const roundedTotal = Math.round(this.netTotalAmount);
   const roundOffAmount = parseFloat((roundedTotal - this.netTotalAmount).toFixed(2));
 
-  // Update form values
+  // Update form values - don't force payment amount to 0 here
   this.purchaseForm.patchValue({
     purchaseTotal: this.netTotalAmount,
     totalPayable: roundedTotal,
-    paymentAmount: roundedTotal,
     roundOffAmount: roundOffAmount,
     roundedTotal: roundedTotal,
     totalTax: this.totalTax
@@ -1061,6 +1060,7 @@ calculateTotals(): void {
 
   this.calculatePaymentBalance();
 }
+
 
   loadBusinessLocations(): void {
     this.locationService.getLocations().subscribe(
@@ -1293,7 +1293,19 @@ async savePurchase() {
     console.error('Error saving purchase:', error);
     alert('Error saving purchase. Please check console for details.');
   }
+  }forceZeroAmount(event: any) {
+  // Force the input value to 0
+  event.target.value = 0;
+  
+  // Update the form control value to 0
+  this.purchaseForm.patchValue({
+    paymentAmount: 0
+  });
+
+  // If needed, trigger balance calculation
+  this.calculatePaymentBalance();
 }
+  
 selectSupplier(supplier: Supplier): void {
   this.selectedSupplier = supplier;
   this.purchaseForm.patchValue({

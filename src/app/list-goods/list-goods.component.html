@@ -1,198 +1,234 @@
 <div class="goods-received-container">
-    <div class="header">
-      <h2>Goods Received Notes</h2>
-      <hr />
+  <div class="header">
+    <h2>Goods Received Notes</h2>
+    <hr />
+  </div>
+
+  <div class="filter-controls">
+    <div class="date-range">
+      <label for="dateRange">Date Range:</label>
+      <input type="text" id="dateRange" class="form-control" readonly [value]="formatDateRange()" />
     </div>
-  
-    <div class="filter-controls">
-      <div class="date-range">
-        <label for="dateRange">Date Range:</label>
-        <input type="text" id="dateRange" class="form-control" readonly [value]="formatDateRange()" />
-      </div>
-      <div class="filter-options">
-        <button class="filter-btn" (click)="openFilters()">
-          <i class="fa fa-filter"></i> Filters
-        </button>
-      </div>
+    <div class="filter-options">
+      <button class="filter-btn" (click)="openFilters()">
+        <i class="fa fa-filter"></i> Filters
+      </button>
     </div>
-  
-    <div class="view-selector">
-      <button [class.active]="currentView === 'all'" (click)="setView('all')">All GRNs</button>
-    </div>
-  
-    <div class="action-bar">
-      <div class="entries-control">
-        <label for="entries">Show:</label>
-        <select id="entries" [(ngModel)]="pageSize" (change)="updatePageSize()">
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
-        <span>entries</span>
-      </div>
-      
-      <div class="search-box">
-        <label for="search">Search:</label>
-        <input type="text" id="search" [(ngModel)]="searchQuery" (input)="applySearch()" class="form-control">
-      </div>
-      
-      <div class="add-button">
-        <button class="btn btn-primary" routerLink="/add-grn">
-          <i class="fa fa-plus"></i> Add
-        </button>
-      </div>
-    </div>
-  
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Action</th>
-            <th (click)="sortBy('purchaseDate')">Date 
-              <i *ngIf="sortColumn === 'purchaseDate'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            <th (click)="sortBy('referenceNo')">Reference No
-              <i *ngIf="sortColumn === 'referenceNo'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            <th (click)="sortBy('invoiceNo')">Invoice No
-              <i *ngIf="sortColumn === 'invoiceNo'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            <th (click)="sortBy('locationName')">Location
-              <i *ngIf="sortColumn === 'locationName'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            <th (click)="sortBy('supplierName')">Supplier
-              <i *ngIf="sortColumn === 'supplierName'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            <th (click)="sortBy('status')">Purchase Status
-              <i *ngIf="sortColumn === 'status'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-            
- <th (click)="sortBy('purchaseDate')">Purchase Date 
-      <i *ngIf="sortColumn === 'purchaseDate'" 
-         [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-    </th>
-<th (click)="sortBy('receivedDate')">Received Date
-  <i *ngIf="sortColumn === 'receivedDate'" 
-     [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-</th>
-            <th (click)="sortBy('addedBy')">Added By
-              <i *ngIf="sortColumn === 'addedBy'" 
-                 [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let grn of paginatedGoodsReceived">
-            <td>
-              <div class="dropdown">
-               <div class="delete-icon-container">
-  <button class="delete-btn" (click)="deleteGrn(grn.id)" title="Delete">
-    <i class="fas fa-trash"></i>
-  </button>
-</div>
-              </div>
-            </td>
-            <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
-            <td>{{ grn.referenceNo || 'N/A' }}</td>
-            <td>{{ grn.invoiceNo || 'N/A' }}</td>
-            <td>{{ getLocationName(grn) }}</td>
-            <td>{{ getSupplierName(grn) }}</td>
-            <td>
-              <span class="status-badge" [ngClass]="getStatusClass(grn.status)">
-                {{ formatStatus(grn.status) }}
-              </span>
-            </td>
-  <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
-<td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>            <td>{{ grn.addedBy || 'N/A' }}</td>
-          </tr>
-          <tr *ngIf="paginatedGoodsReceived.length === 0">
-            <td colspan="8" class="no-data">No data available</td>
-          </tr>
-        </tbody>
-      </table>
+  </div>
+
+  <div class="view-selector">
+    <button [class.active]="currentView === 'all'" (click)="setView('all')">All GRNs</button>
+  </div>
+
+  <div class="action-bar">
+    <div class="entries-control">
+      <label for="entries">Show:</label>
+      <select id="entries" [(ngModel)]="pageSize" (change)="updatePageSize()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      <span>entries</span>
     </div>
     
-    <div class="pagination-controls">
-      <div class="pagination-info">
-        Showing {{ startItem }} to {{ endItem }} of {{ filteredGoodsReceived.length }} entries
-      </div>
-      <div class="pagination-buttons">
-        <button [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
-        <button [class.active]="currentPage === page" *ngFor="let page of pageNumbers" (click)="goToPage(page)">
-          {{ page }}
-        </button>
-        <button [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
-      </div>
+    <div class="search-box">
+      <label for="search">Search:</label>
+      <input type="text" id="search" [(ngModel)]="searchQuery" (input)="applySearch()" class="form-control">
+    </div>
+    
+    <div class="add-button">
+      <button class="btn btn-primary" routerLink="/add-goods">
+        <i class="fa fa-plus"></i> Add
+      </button>
     </div>
   </div>
-  <!-- Add this modal to your template -->
-<div class="modal" *ngIf="selectedGrn">
-  <div class="modal-content">
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Actions</th>
+          <th (click)="sortBy('purchaseDate')">Date 
+            <i *ngIf="sortColumn === 'purchaseDate'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('referenceNo')">Reference No
+            <i *ngIf="sortColumn === 'referenceNo'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('invoiceNo')">Invoice No
+            <i *ngIf="sortColumn === 'invoiceNo'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <!-- <th (click)="sortBy('locationName')">Location
+            <i *ngIf="sortColumn === 'locationName'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th> -->
+          <th (click)="sortBy('supplierName')">Supplier
+            <i *ngIf="sortColumn === 'supplierName'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('status')">Status
+            <i *ngIf="sortColumn === 'status'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('receivedDate')">Received Date
+            <i *ngIf="sortColumn === 'receivedDate'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('addedBy')">Added By
+            <i *ngIf="sortColumn === 'addedBy'" 
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let grn of paginatedGoodsReceived">
+          <td>
+            <div class="action-buttons">
+              <button class="btn btn-sm btn-info" (click)="viewProducts(grn)" title="View Products">
+                <i class="fa fa-eye"></i>
+              </button>
+              <button class="btn btn-sm btn-danger" (click)="deleteGrn(grn.id)" title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </td>
+          <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
+          <td>{{ grn.referenceNo || 'N/A' }}</td>
+          <td>{{ grn.invoiceNo || 'N/A' }}</td>
+          <!-- <td>{{ getLocationName(grn) }}</td> -->
+          <td>{{ getSupplierName(grn) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(grn.status)">
+              {{ formatStatus(grn.status) }}
+            </span>
+          </td>
+          <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
+          <td>{{ grn.addedBy || 'N/A' }}</td>
+        </tr>
+        <tr *ngIf="paginatedGoodsReceived.length === 0">
+          <td colspan="9" class="no-data">No data available</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="pagination-controls">
+    <div class="pagination-info">
+      Showing {{ startItem }} to {{ endItem }} of {{ filteredGoodsReceived.length }} entries
+    </div>
+    <div class="pagination-buttons">
+      <button [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
+      <button [class.active]="currentPage === page" *ngFor="let page of pageNumbers" (click)="goToPage(page)">
+        {{ page }}
+      </button>
+      <button [disabled]="currentPage === totalPages" (click)="nextPage()">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Products View Modal -->
+<div class="modal-overlay" *ngIf="selectedGrn" (click)="closeProductsView()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>Products Details - {{selectedGrn.referenceNo}}</h3>
-      <span class="close" (click)="selectedGrn = null">&times;</span>
+      <h3>Products Details - {{ selectedGrn.referenceNo }}</h3>
+      <div class="grn-summary">
+        <p><strong>Supplier:</strong> {{ getSupplierName(selectedGrn) }}</p>
+        <!-- <p><strong>Location:</strong> {{ getLocationName(selectedGrn) }}</p> -->
+        <p><strong>Received Date:</strong> {{ selectedGrn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</p>
+        <p><strong>Invoice No:</strong> {{ selectedGrn.invoiceNo || 'N/A' }}</p>
+      </div>
+      <button class="close-btn" (click)="closeProductsView()">&times;</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="products-summary">
+        <div class="summary-card">
+          <h4>Total Products: {{ selectedGrn.products?.length || 0 }}</h4>
+          <h4>Total Quantity: {{ getTotalQuantity(selectedGrn.products) }}</h4>
+          <h4>Total Value: {{ getTotalValue(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</h4>
+        </div>
+      </div>
+      
+      <div class="products-table-container">
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>Order Qty</th>
+              <th>Received Qty</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of selectedGrn.products; let i = index" 
+                [ngClass]="getProductRowClass(product)">
+              <td>{{ i + 1 }}</td>
+              <td>
+                <strong>{{ product.productName || product.name }}</strong>
+                <div class="product-details" *ngIf="product.description">
+                  <small>{{ product.description }}</small>
+                </div>
+              </td>
+              <td>{{ product.orderQuantity || product.orderedQty || 0 }}</td>
+              <td>
+                <strong>{{ product.quantity || product.receivedQuantity || 0 }}</strong>
+              </td>
+              <td>{{ product.unitCost || product.unitPrice | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>
+                <strong>{{ getProductLineTotal(product) | currency:'INR':'symbol':'1.2-2' }}</strong>
+              </td>
+              <td>
+                <span class="product-status" [ngClass]="getProductStatusClass(product)">
+                  {{ getProductStatus(product) }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="!selectedGrn.products || selectedGrn.products.length === 0">
+              <td colspan="8" class="no-products">No products found</td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="selectedGrn.products && selectedGrn.products.length > 0">
+            <tr class="total-row">
+              <td colspan="4"><strong>Total</strong></td>
+              <td><strong>{{ getTotalQuantity(selectedGrn.products) }}</strong></td>
+              <td></td>
+              <td><strong>{{ getTotalValue(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeProductsView()">Close</button>
+      <button class="btn btn-primary" (click)="printProductsList()">
+        <i class="fa fa-print"></i> Print
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-overlay" *ngIf="showDeleteModal">
+  <div class="modal-content confirmation-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Confirm Deletion</h3>
+      <button class="close-btn" (click)="cancelDelete()">&times;</button>
     </div>
     <div class="modal-body">
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Product Name</th>
-            <th>Order Qty</th>
-            <th>Received Qty</th>
-            <th>Unit Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let product of selectedGrn.products; let i = index">
-            <td>{{i + 1}}</td>
-            <td>{{product.productName || product.name}}</td>
-            <td>{{product.orderQuantity || 0}}</td>
-            <td>{{product.quantity || product.receivedQuantity || 0}}</td>
-            <td>{{product.unitCost || product.unitPrice | currency:'INR':'symbol':'1.2-2'}}</td>
-            <td>{{product.lineTotal | currency:'INR':'symbol':'1.2-2'}}</td>
-          </tr>
-          <tr *ngIf="!selectedGrn.products || selectedGrn.products.length === 0">
-            <td colspan="6">No products found</td>
-          </tr>
-        </tbody>
-      </table>
+      <p>Are you sure you want to delete this Goods Received Note?</p>
+      <p class="warning-text">This action cannot be undone and may affect your inventory records.</p>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="selectedGrn = null">Close</button>
+      <button class="btn btn-secondary" (click)="cancelDelete()">Cancel</button>
+      <button class="btn btn-danger" (click)="confirmDelete()">Delete</button>
     </div>
   </div>
 </div>
-
-<div class="dropdown">
-  <button class="action-btn">Actions ▼</button>
-  <div class="dropdown-content">
-    <a href="javascript:void(0)" (click)="viewProducts(currentGrn)">View Products</a>
-    <a href="javascript:void(0)" (click)="deleteGrn(currentGrn.id)">Delete</a>
-  </div>
-</div>
-
-  <!-- Confirmation Modal -->
-  <div class="modal" *ngIf="showDeleteModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Confirm Deletion</h3>
-        <span class="close" (click)="cancelDelete()">&times;</span>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to delete this Goods Received Note?</p>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" (click)="cancelDelete()">Cancel</button>
-        <button class="btn btn-danger" (click)="confirmDelete()">Delete</button>
-      </div>
-    </div>
-  </div>

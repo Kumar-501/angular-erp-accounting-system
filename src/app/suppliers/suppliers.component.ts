@@ -137,7 +137,28 @@ paymentSummary = {
 get combinedAddress(): string {
   const form = this.supplierForm.value;
   const parts = [];
-  
+
+  // 1. Add Contact Name (First + Last Name)
+  if (this.isIndividual) {
+    const nameParts = [];
+    if (form.firstName) nameParts.push(form.firstName);
+    if (form.lastName) nameParts.push(form.lastName);
+    if (nameParts.length > 0) {
+      parts.push(nameParts.join(' '));
+    }
+  }
+
+  // 2. Add Business Name (if available)
+  if (form.businessName) {
+    parts.push(form.businessName);
+  }
+
+  // 3. Add Mobile Number
+  if (form.mobile) {
+    parts.push(`Mobile: ${form.mobile}`);
+  }
+
+  // 4. Add Address Details
   if (form.addressLine1) parts.push(form.addressLine1);
   if (form.addressLine2) parts.push(form.addressLine2);
   if (form.city) parts.push(form.city);
@@ -145,10 +166,9 @@ get combinedAddress(): string {
   if (form.state) parts.push(form.state);
   if (form.country) parts.push(form.country);
   if (form.zipCode) parts.push(form.zipCode);
-  
+
   return parts.join(', ');
-  }
-  
+}
   filteredShippingDistricts: string[] = [];
   showLedgerView = false;  // Add this property
   selectedSupplierForLedger: Supplier | null = null;
@@ -257,7 +277,7 @@ filterOptions = {
     });
 
 this.paymentForm = this.fb.group({
-  supplierName: ['', Validators.required],
+  supplierName: [''],
   businessName: [''],
   paymentMethod: ['Cash', Validators.required],
   paymentNote: [''],
@@ -798,7 +818,8 @@ resetForm(): void {
     contactType: 'Supplier',
     openingBalance: 0,
     payTerm: 0,
-    createdAt: currentDateTime // Include current date/time in reset
+    createdAt: currentDateTime, // Include current date/time in reset
+    status: 'Active' // Add this line
   });
   this.supplierData = {};
   this.editingSupplierId = null;
@@ -893,12 +914,13 @@ saveSupplier(): void {
     this.supplierForm.patchValue({ createdAt });
   }
   
-  // Update supplierData from form values
+  // Update supplierData from form values with default status as 'Active'
   this.supplierData = {
     ...this.supplierForm.value,
     isIndividual: this.isIndividual,
     district: this.supplierForm.value.district || null,
-    createdAt: new Date(createdAt) // Ensure this is a Date object
+    createdAt: new Date(createdAt), // Ensure this is a Date object
+    status: 'Active' // Add this line to set default status
   };
   
   if (this.editingSupplierId) {

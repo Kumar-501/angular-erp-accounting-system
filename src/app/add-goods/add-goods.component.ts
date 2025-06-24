@@ -9,6 +9,7 @@ import { Subscription } from 'rxjs';
 import { AuthService } from '../auth.service';
 import { StockService } from '../services/stock.service';
 import { Firestore, collection, doc, setDoc, getDoc, increment } from '@angular/fire/firestore';
+import { PurchaseStockPriceLogService } from '../services/purchase-stock-price-log.service';
 
 // Constants for Firestore collections
 const COLLECTIONS = {
@@ -60,6 +61,9 @@ export class AddGoodsComponent implements OnInit, OnDestroy {
   goodsReceivedForm!: FormGroup;
   products: any[] = [];
   totalItems: number = 0;
+  paymentAccounts: any[] = [];
+  selectedPaymentAccount: any = null;
+  
   netTotalAmount: number = 0;
   purchaseTotal: number = 0;
   filteredPurchaseOrders: PurchaseOrder[] = [];
@@ -86,7 +90,9 @@ isProcessing: boolean = false;
     private productsService: ProductsService,
     private authService: AuthService,
     private stockService: StockService,
-    private firestore: Firestore
+    private firestore: Firestore,
+      private purchaseStockLogService: PurchaseStockPriceLogService
+
   ) { }
 
   ngOnInit(): void {
@@ -95,6 +101,8 @@ isProcessing: boolean = false;
     this.loadLocations();
     this.loadPurchaseOrders();
     this.loadInvoiceNumbers();
+    this.loadPaymentAccounts();
+
     this.setAddedByField();
   }
 
@@ -103,7 +111,8 @@ isProcessing: boolean = false;
   }
   todayISOString(): string {
   return new Date().toISOString().slice(0, 16);
-}
+  }
+  
 initForm(): void {
   this.goodsReceivedForm = this.fb.group({
     supplier: ['', Validators.required],
@@ -112,6 +121,8 @@ initForm(): void {
     purchaseDate: ['', Validators.required],
     purchaseOrder: [''],
     receivedDate: ['', Validators.required],
+     paymentAccount: [''],  // Add this
+    paymentMethod: [''],   // Add this
     additionalNotes: [''],
     invoiceNo: [''],
     addedBy: ['']
@@ -125,6 +136,22 @@ initForm(): void {
       this.goodsReceivedForm.get('addedBy')?.setValue(userName);
     }
   }
+
+async loadPaymentAccounts(): Promise<void> {
+  try {
+    this.paymentAccounts = (await this.purchaseStockLogService.getPaymentAccounts().toPromise()) || [];
+    console.log('Payment accounts loaded:', this.paymentAccounts);
+  } catch (error) {
+    console.error('Error loading payment accounts:', error);
+  }
+}
+
+onPaymentAccountChange(accountId: string): void {
+  this.selectedPaymentAccount = this.paymentAccounts.find(acc => acc.id === accountId);
+  this.goodsReceivedForm.get('paymentAccount')?.setValue(accountId);
+}
+  
+
 
   loadSuppliers(): void {
     this.subscriptions.push(
@@ -328,7 +355,9 @@ async onPurchaseOrderChange(event: any): Promise<void> {
         }
       })
     );
-  }async populateProductsFromOrder(order: PurchaseOrder): Promise<void> {
+  }
+  
+async populateProductsFromOrder(order: PurchaseOrder): Promise<void> {
     if (order.products && order.products.length) {
       // Fetch complete product details for each product to get SKU and other info
       const productPromises = order.products.map(async (product: any) => {
@@ -488,199 +517,186 @@ async saveForm(): Promise<void> {
 
   console.log('=== SAVE FORM DEBUG START ===')
   
-  // Check if form is initialized
-  if (!this.goodsReceivedForm) {
-    console.error('Form is not initialized');
-    alert('Form initialization error. Please refresh the page.');
-    this.isProcessing = false;
-    return;
-  }
-  
-    receivedDate: new Date(this.goodsReceivedForm.get('receivedDate')?.value),
+  try {
+    // Check if form is initialized
+    if (!this.goodsReceivedForm) {
+      console.error('Form is not initialized');
+      alert('Form initialization error. Please refresh the page.');
+      return;
+    }
 
-  // Mark all fields as touched first to trigger validation display
-  this.goodsReceivedForm.markAllAsTouched();
+    // Mark all fields as touched first to trigger validation display
+    this.goodsReceivedForm.markAllAsTouched();
 
-  // Detailed form debugging
-  console.log('Form valid:', this.goodsReceivedForm.valid);
-  console.log('Form status:', this.goodsReceivedForm.status);
-  console.log('Form value:', this.goodsReceivedForm.value);
-  console.log('Form errors:', this.goodsReceivedForm.errors);
+    // Detailed form debugging
+    console.log('Form valid:', this.goodsReceivedForm.valid);
+    console.log('Form status:', this.goodsReceivedForm.status);
+    console.log('Form value:', this.goodsReceivedForm.value);
+    console.log('Form errors:', this.goodsReceivedForm.errors);
 
-  // Check each required field individually
-  const requiredFields = ['supplier', 'businessLocation', 'purchaseDate'];
-  const fieldErrors: any = {};
-  
-  let hasErrors = false;
+    // Check each required field individually
+    const requiredFields = ['supplier', 'businessLocation', 'purchaseDate'];
+    const fieldErrors: any = {};
+    let hasErrors = false;
 
-  requiredFields.forEach(async fieldName => {
-    const control = this.goodsReceivedForm.get(fieldName);
-    if (control) {
-      console.log(`${fieldName}:`, {
-        value: control.value,
-        valid: control.valid,
-        errors: control.errors,
-        touched: control.touched,
-        dirty: control.dirty
-      });
-       const goodsReceivedRef = await this.goodsService.addGoodsReceived({
-      ...formData,
+    requiredFields.forEach(fieldName => {
+      const control = this.goodsReceivedForm.get(fieldName);
+      if (control) {
+        console.log(`${fieldName}:`, {
+          value: control.value,
+          valid: control.valid,
+          errors: control.errors,
+          touched: control.touched,
+          dirty: control.dirty
+        });
+
+        if (control.invalid) {
+          fieldErrors[fieldName] = control.errors;
+          hasErrors = true;
+        }
+      } else {
+        console.error(`Field ${fieldName} not found in form`);
+      }
+    });
+
+    // Check data loading status
+    console.log('Data Status:', {
+      suppliers: this.suppliers.length,
+      locations: this.locations.length,
+      selectedSupplier: this.selectedSupplier,
+      products: this.products.length
+    });
+
+    // ENHANCED: Better error handling and user feedback
+    if (hasErrors) {
+      console.log('=== FORM VALIDATION ERRORS ===');
+      console.log('Field errors:', fieldErrors);
+      
+      // Create detailed error message
+      const errorMessages = [];
+      if (fieldErrors.supplier) {
+        errorMessages.push('• Supplier is required - Please select a supplier from the dropdown');
+      }
+      if (fieldErrors.businessLocation) {
+        errorMessages.push('• Business Location is required - Please select a location');
+      }
+      if (fieldErrors.purchaseDate) {
+        errorMessages.push('• Purchase Date is required - Please select a date and time');
+      }
+      
+      const errorTitle = 'Please fix the following validation errors:';
+      const errorMessage = `${errorTitle}\n\n${errorMessages.join('\n')}`;
+      
+      alert(errorMessage);
+      
+      // Focus on the first invalid field
+      const firstInvalidField = requiredFields.find(field => 
+        this.goodsReceivedForm.get(field)?.invalid
+      );
+      if (firstInvalidField) {
+        const element = document.getElementById(firstInvalidField);
+        if (element) {
+          element.focus();
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      
+      return;
+    }
+
+    // Additional validation checks
+    const supplierId = this.goodsReceivedForm.get('supplier')?.value;
+    if (!supplierId) {
+      console.error('No supplier ID in form value');
+      alert('Please select a supplier from the dropdown');
+      return;
+    }
+
+    const selectedSupplier = this.suppliers.find(s => s.id === supplierId);
+    if (!selectedSupplier) {
+      console.error('Selected supplier not found in suppliers array');
+      alert('Selected supplier is invalid. Please refresh and try again.');
+      return;
+    }
+
+    // Validate products if needed
+    if (this.products.length === 0) {
+      const proceed = confirm('No products added. Do you want to continue anyway?');
+      if (!proceed) {
+        return;
+      }
+    } else {
+      // Validate that products have valid IDs for stock updates
+      const productsWithoutIds = this.products.filter(p => !p.id && p.receivedQuantity > 0);
+      if (productsWithoutIds.length > 0) {
+        console.error('Some products do not have valid IDs:', productsWithoutIds);
+        alert(`${productsWithoutIds.length} product(s) do not have valid IDs and cannot be processed for stock updates. Please check the product selection.`);
+        return;
+      }
+      
+      // Count products that will actually be processed for stock updates
+      const validProducts = this.products.filter(p => p.id && p.receivedQuantity > 0);
+      console.log(`✓ Products validation: ${validProducts.length} valid products will be processed for stock updates`);
+    }
+
+    // Validate business location
+    const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
+    if (!locationId) {
+      console.error('No business location selected');
+      alert('Please select a business location before saving. This is required for stock updates.');
+      return;
+    }
+    
+    const selectedLocation = this.locations.find(l => l.id === locationId);
+    if (!selectedLocation) {
+      console.error('Selected location not found in locations array');
+      alert('Selected business location is invalid. Please refresh and try again.');
+      return;
+    }
+    
+    console.log(`✓ Business location validated: ${selectedLocation.name} (ID: ${locationId})`);
+
+    // Prepare form data - MERGED VERSION with enhanced product mapping
+    const formData = {
+      ...this.goodsReceivedForm.value,
+      supplier: selectedSupplier.id,
+      supplierName: selectedSupplier.isIndividual 
+        ? `${selectedSupplier.firstName} ${selectedSupplier.lastName || ''}`.trim()
+        : selectedSupplier.businessName,
+      businessLocation: {
+        id: this.goodsReceivedForm.get('businessLocation')?.value,
+        name: selectedLocation?.name || this.goodsReceivedForm.get('businessLocationName')?.value || 'Unknown Location'
+      },
+      products: this.products.filter(p => p.name && p.name.trim() !== '').map(p => ({
+        id: p.id,
+        productId: p.id, // Ensure productId is set for stock updates
+        productName: p.name,
+        name: p.name, // Keep both for compatibility
+        quantity: Number(p.receivedQuantity) || 0, // This is the received quantity
+        receivedQuantity: Number(p.receivedQuantity) || 0,
+        unitPrice: Number(p.unitPrice) || 0,
+        lineTotal: Number(p.receivedQuantity) * (Number(p.unitPrice) || 0),
+        orderQuantity: Number(p.orderQuantity) || 0,
+        sku: p.sku || `SKU-${p.id}`, // Ensure SKU is always set
+        batchNumber: p.batchNumber || '',
+        expiryDate: p.expiryDate || null
+      })),
+      totalItems: this.totalItems,
+      netTotalAmount: this.netTotalAmount,
+      purchaseTotal: this.purchaseTotal,
+      purchaseOrder: this.selectedPurchaseOrder?.id || null,
+      status: 'received',
+      addedBy: this.goodsReceivedForm.get('addedBy')?.value || 'System',
+      referenceNo: this.goodsReceivedForm.get('referenceNo')?.value || '',
+      additionalNotes: this.goodsReceivedForm.get('additionalNotes')?.value || '',
       receivedDate: new Date(),
       createdAt: new Date(),
       updatedAt: new Date()
-    });
-    // Remove the purchase order from the dropdown lists if it was used
-    if (formData.purchaseOrder) {
-      this.removePurchaseOrderFromLists(formData.purchaseOrder);
-    }
-      if (control.invalid) {
-        fieldErrors[fieldName] = control.errors;
-        hasErrors = true;
-      }
-      
-    } else {
-      console.error(`Field ${fieldName} not found in form`);
-    }
-  });
+    };
 
-  // Check data loading status
-  console.log('Data Status:', {
-    suppliers: this.suppliers.length,
-    locations: this.locations.length,
-    selectedSupplier: this.selectedSupplier,
-    products: this.products.length
-    
-  });
+    console.log('=== FINAL FORM DATA ===');
+    console.log(JSON.stringify(formData, null, 2));
 
-  // ENHANCED: Better error handling and user feedback
-  if (hasErrors) {
-    console.log('=== FORM VALIDATION ERRORS ===');
-    console.log('Field errors:', fieldErrors);
-    
-    // Create detailed error message
-    const errorMessages = [];
-    if (fieldErrors.supplier) {
-      errorMessages.push('• Supplier is required - Please select a supplier from the dropdown');
-    }
-    if (fieldErrors.businessLocation) {
-      errorMessages.push('• Business Location is required - Please select a location');
-    }
-    if (fieldErrors.purchaseDate) {
-      errorMessages.push('• Purchase Date is required - Please select a date and time');
-    }
-    
-    const errorTitle = 'Please fix the following validation errors:';
-    const errorMessage = `${errorTitle}\n\n${errorMessages.join('\n')}`;
-    
-    alert(errorMessage);
-    
-    // Focus on the first invalid field
-    const firstInvalidField = requiredFields.find(field => 
-      this.goodsReceivedForm.get(field)?.invalid
-    );
-    if (firstInvalidField) {
-      const element = document.getElementById(firstInvalidField);
-      if (element) {
-        element.focus();
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-    
-    this.isProcessing = false;
-    return;
-  }
-
-  // Additional validation checks
-  const supplierId = this.goodsReceivedForm.get('supplier')?.value;
-  if (!supplierId) {
-    console.error('No supplier ID in form value');
-    alert('Please select a supplier from the dropdown');
-    this.isProcessing = false;
-    return;
-  }
-
-  const selectedSupplier = this.suppliers.find(s => s.id === supplierId);
-  if (!selectedSupplier) {
-    console.error('Selected supplier not found in suppliers array');
-    alert('Selected supplier is invalid. Please refresh and try again.');
-    this.isProcessing = false;
-    return;
-  }
-  // Validate products if needed
-  if (this.products.length === 0) {
-    const proceed = confirm('No products added. Do you want to continue anyway?');
-    if (!proceed) {
-      this.isProcessing = false;
-      return;
-    }
-  } else {
-    // Validate that products have valid IDs for stock updates
-    const productsWithoutIds = this.products.filter(p => !p.id && p.receivedQuantity > 0);
-    if (productsWithoutIds.length > 0) {
-      console.error('Some products do not have valid IDs:', productsWithoutIds);
-      alert(`${productsWithoutIds.length} product(s) do not have valid IDs and cannot be processed for stock updates. Please check the product selection.`);
-      this.isProcessing = false;
-      return;
-    }
-    
-    // Count products that will actually be processed for stock updates
-    const validProducts = this.products.filter(p => p.id && p.receivedQuantity > 0);
-    console.log(`✓ Products validation: ${validProducts.length} valid products will be processed for stock updates`);
-  }
-  // Validate business location
-  const locationId = this.goodsReceivedForm.get('businessLocation')?.value;
-  if (!locationId) {
-    console.error('No business location selected');
-    alert('Please select a business location before saving. This is required for stock updates.');
-    this.isProcessing = false;
-    return;
-  }
-  
-  const selectedLocation = this.locations.find(l => l.id === locationId);
-  if (!selectedLocation) {
-    console.error('Selected location not found in locations array');
-    alert('Selected business location is invalid. Please refresh and try again.');
-    this.isProcessing = false;
-    return;
-  }
-  
-  console.log(`✓ Business location validated: ${selectedLocation.name} (ID: ${locationId})`);
-
-  // Prepare form data - MERGED VERSION with enhanced product mapping
-  const formData = {
-    ...this.goodsReceivedForm.value,
-    supplier: selectedSupplier.id,
-    supplierName: selectedSupplier.isIndividual 
-      ? `${selectedSupplier.firstName} ${selectedSupplier.lastName || ''}`.trim()
-      : selectedSupplier.businessName,
-    businessLocation: {
-      id: this.goodsReceivedForm.get('businessLocation')?.value,
-      name: selectedLocation?.name || this.goodsReceivedForm.get('businessLocationName')?.value || 'Unknown Location'
-    },
-    products: this.products.filter(p => p.name && p.name.trim() !== '').map(p => ({
-      id: p.id,
-      productId: p.id, // Ensure productId is set for stock updates
-      productName: p.name,
-      name: p.name, // Keep both for compatibility
-      quantity: Number(p.receivedQuantity) || 0, // This is the received quantity
-      receivedQuantity: Number(p.receivedQuantity) || 0,
-      unitPrice: Number(p.unitPrice) || 0,
-      lineTotal: Number(p.receivedQuantity) * (Number(p.unitPrice) || 0),
-      orderQuantity: Number(p.orderQuantity) || 0
-    })),
-    totalItems: this.totalItems,
-    netTotalAmount: this.netTotalAmount,
-    purchaseTotal: this.purchaseTotal,
-    purchaseOrder: this.selectedPurchaseOrder?.id || null,
-    status: 'received',
-    addedBy: this.goodsReceivedForm.get('addedBy')?.value || 'System',
-    referenceNo: this.goodsReceivedForm.get('referenceNo')?.value || '',
-    additionalNotes: this.goodsReceivedForm.get('additionalNotes')?.value || ''
-  };
-
-  console.log('=== FINAL FORM DATA ===');
-  console.log(JSON.stringify(formData, null, 2));
-  try {
     // Validate products for stock update
     const productValidationErrors = this.validateProductsForStockUpdate();
     if (productValidationErrors.length > 0) {
@@ -690,65 +706,19 @@ async saveForm(): Promise<void> {
     }
 
     // First save the goods received note
-    const goodsReceivedRef = await this.goodsService.addGoodsReceived({
-      ...formData,
-      receivedDate: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
- if (formData.purchaseOrder) {
-      this.removePurchaseOrderFromLists(formData.purchaseOrder);
-    }    // Then update stock for each product using per-location stock system
-    if (formData.products && formData.products.length > 0) {
-      console.log(`=== STARTING STOCK UPDATES FOR ${formData.products.length} PRODUCTS ===`);
-      const processedProducts = new Set(); 
-      const locationId = formData.businessLocation.id;
-      const locationName = formData.businessLocation.name;
-      
-      console.log(`Target location: ${locationName} (ID: ${locationId})`);
-      
-      const stockUpdatePromises = formData.products.map(async (product: any, index: number) => {
-        // Skip if invalid or already processed
-        if (!product.id || product.receivedQuantity <= 0 || processedProducts.has(product.id)) {
-          console.log(`Skipping product ${index + 1}: ${product.id || 'No ID'} - ${product.receivedQuantity <= 0 ? 'Zero quantity' : 'Already processed'}`);
-          return;
-        }
-        processedProducts.add(product.id); // Mark as processed
-        
-        console.log(`Processing product ${index + 1}/${formData.products.length}: ${product.productName || product.name} (ID: ${product.id})`);
-        
-        try {
-          // Fetch complete product details to get SKU
-          const productDetails = await this.productsService.getProductById(product.id);
-          const productSku = productDetails?.sku || product.sku || `SKU-${product.id}`;
-          const productName = productDetails?.productName || product.productName || product.name;
-          
-          console.log(`Product details: SKU=${productSku}, Name="${productName}", Quantity to add=${product.receivedQuantity}`);
-          
-          // Update stock using the new per-location system
-          await this.updateProductStockAtLocation(
-            product.id,
-            productName,
-            productSku,
-            locationId,
-            locationName,
-            product.receivedQuantity,
-            product.unitPrice,
-            product.batchNumber,
-            product.expiryDate
-          );
-        } catch (error) {
-          console.error(`✗ Error updating stock for product ${product.id}:`, error);
-          // Continue with other products even if one fails
-          throw new Error(`Failed to update stock for product ${product.productName || product.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      });
+    console.log('Saving goods received note...');
+    const goodsReceivedRef = await this.goodsService.addGoodsReceived(formData);
+    console.log('Goods received note saved successfully:', goodsReceivedRef.id);
 
-      await Promise.all(stockUpdatePromises);
-      console.log('=== ALL STOCK UPDATES COMPLETED SUCCESSFULLY ===');
-    } else {
-      console.log('No products to update stock for');
-    }    console.log('Goods received note saved and stock updated successfully');
+    // Remove the purchase order from the dropdown lists if it was used
+    if (formData.purchaseOrder) {
+      this.removePurchaseOrderFromLists(formData.purchaseOrder);
+    }
+
+    // Then update stock and log prices
+    await this.updateStockAndLogPrices(formData);
+
+    console.log('Goods received note saved and stock updated successfully');
     
     // Count successful stock updates
     const validProducts = formData.products?.filter((p: any) => p.id && p.receivedQuantity > 0) || [];
@@ -758,7 +728,7 @@ async saveForm(): Promise<void> {
     
     alert(successMessage);
     this.resetForm();
-    
+
   } catch (error: any) {
     console.error('Error saving goods received:', error);
     
@@ -773,7 +743,8 @@ async saveForm(): Promise<void> {
     }
     
     alert(errorMessage);
-      // Additional error handling for specific scenarios
+
+    // Additional error handling for specific scenarios
     if (error.message?.includes('Failed to update stock')) {
       console.error('Stock update failed for one or more products');
       alert('Goods received note was saved, but stock update failed for some products. Please check stock levels manually.');
@@ -784,12 +755,90 @@ async saveForm(): Promise<void> {
     } else if (error.code === 'firestore/permission-denied') {
       alert('Permission denied. You may not have access to update stock at this location.');
     }
-    
   } finally {
     this.isProcessing = false;
     console.log('=== SAVE FORM DEBUG END ===');
   }
+}
+
+private async updateStockAndLogPrices(formData: any): Promise<void> {
+  const locationId = formData.businessLocation.id;
+  const locationName = formData.businessLocation.name;
+  
+  for (const product of formData.products) {
+    try {
+      // Update stock
+      await this.updateProductStockAtLocation(
+        product.id,
+        product.name,
+        product.sku,
+        locationId,
+        locationName,
+        product.receivedQuantity,
+        product.unitPrice,
+        product.batchNumber,
+        product.expiryDate
+      );
+
+      // Log price change with payment account
+      await this.purchaseStockLogService.logPriceChange({
+        productId: product.id,
+        productName: product.name,
+        sku: product.sku,
+        locationId: locationId,
+        locationName: locationName,
+        receivedQuantity: product.receivedQuantity,
+        unitPurchasePrice: product.unitPrice,
+        taxRate: product.taxRate || 0,
+        grnRefNo: formData.referenceNo,
+        grnCreatedDate: new Date(),
+        paymentAccountId: formData.paymentAccount?.id || null,
+        paymentType: formData.paymentMethod || null
+      }).toPromise();
+    } catch (error) {
+      console.error(`Error processing product ${product.id}:`, error);
+      throw error;
+    }
   }
+}
+
+// Helper method to ensure all products have SKUs
+private async ensureAllProductsHaveSkus(): Promise<void> {
+  for (const product of this.products) {
+    if (!product.sku) {
+      try {
+        const productDetails = await this.productsService.getProductById(product.id);
+        product.sku = productDetails?.sku || `SKU-${product.id}`;
+      } catch (error) {
+        console.error(`Error fetching SKU for product ${product.id}:`, error);
+        product.sku = `SKU-${product.id}`;
+      }
+    }
+  }
+}
+
+  private async updateStockForProducts(formData: any): Promise<void> {
+  const locationId = formData.businessLocation.id;
+  const locationName = formData.businessLocation.name;
+
+  for (const product of formData.products) {
+    try {
+      await this.updateProductStockAtLocation(
+        product.id,
+        product.name,
+        product.sku || `SKU-${product.id}`, // Fallback SKU
+        locationId,
+        locationName,
+        product.receivedQuantity,
+        product.unitPrice
+      );
+    } catch (error) {
+      console.error(`Failed to update stock for product ${product.id}:`, error);
+      // Continue with other products even if one fails
+    }
+  }
+  }
+
 private removePurchaseOrderFromLists(purchaseOrderId: string): void {
   // Remove from main purchaseOrders array
   this.purchaseOrders = this.purchaseOrders.filter(order => order.id !== purchaseOrderId);
@@ -805,7 +854,7 @@ private removePurchaseOrderFromLists(purchaseOrderId: string): void {
   
   console.log('Purchase order removed from selection lists:', purchaseOrderId);
 }
-
+  // (Removed misplaced if block that caused syntax errors)
 
   resetForm(): void {
     this.goodsReceivedForm.reset();
@@ -850,12 +899,13 @@ private removePurchaseOrderFromLists(purchaseOrderId: string): void {
    */  private async updateProductStockAtLocation(
     productId: string,
     productName: string,
-    sku: string,
+  sku: string, // Make sure this parameter is included
     locationId: string,
     locationName: string,
     quantityToAdd: number,
     unitCost?: number,
-    batchNumber?: string,
+     batchNumber?: string,
+    
     expiryDate?: string
   ): Promise<void> {
     try {
@@ -898,6 +948,7 @@ private removePurchaseOrderFromLists(purchaseOrderId: string): void {
           unitCost: unitCost,
           batchNumber: batchNumber || '',
           expiryDate: expiryDate || null,
+          
           createdAt: new Date(),
           updatedAt: new Date()
         };
@@ -910,6 +961,7 @@ private removePurchaseOrderFromLists(purchaseOrderId: string): void {
       throw new Error(`Failed to update stock for ${productName} at ${locationName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+  
 
   /**
    * Get current stock quantity for a product at a specific location

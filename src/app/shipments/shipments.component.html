@@ -273,46 +273,68 @@
   <td colspan="11" class="text-center py-3">No data available in table</td>
 </tr>
 <tr *ngFor="let shipment of filteredShipments.slice((currentPage-1)*entriesPerPage, currentPage*entriesPerPage)">              <td><input type="checkbox" [checked]="isSelected(shipment.id)" (change)="toggleSelection(shipment.id)"></td>
-              <td>
-                <div class="dropdown">
-                  <button class="btn  dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                    Actions
-                  </button>
-<!-- Update the dropdown actions to include View Prescription -->
-<ul class="dropdown-menu">
-  <li>
-    <a class="dropdown-item" [routerLink]="['/shipments/view', shipment.id]">View</a>
-  </li>
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="openEditFormModal(shipment)">Edit</a>
-  </li>
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="openEditModal(shipment)">Edit Payment Status</a>
-  </li>
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="generatePackingSlip(shipment.id)">Packing Slip</a>
-  </li>
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="generateInvoice(shipment)">
-      <i class="fas fa-file-invoice"></i> Generate Invoice
-    </a>
-  </li>
-  <!-- Add View Prescription option -->
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="viewPrescription(shipment)" 
-       [class.disabled]="!shipment.prescriptions || shipment.prescriptions.length === 0">
-      <i class="fas fa-file-prescription"></i> View Prescription
-    </a>
-  </li>
-  <li>
-    <a class="dropdown-item" href="javascript:void(0)" (click)="printShipment(shipment)">Print</a>
-  </li>
-  <li>
-    <a class="dropdown-item text-danger" href="javascript:void(0)" (click)="confirmDelete(shipment)">Delete</a>
-  </li>
-</ul>
-                </div>
-              </td>
+          <td>
+  <!-- Action Button -->
+  <button class="action-button" (click)="openActionPopup(shipment, $event)">Actions</button>
+
+  <!-- Action Popup -->
+  <div class="action-popup-overlay" *ngIf="currentActionPopup === shipment.id" (click)="closeActionPopup()">
+    <div class="action-popup" (click)="$event.stopPropagation()">
+      <div class="popup-header">
+        <h4>Shipment #{{shipment.invoiceNo}}</h4>
+        <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+      </div>
+      
+      <div class="popup-body">
+        <div class="action-item" [routerLink]="['/shipments/view', shipment.id]">
+          <i class="fas fa-eye text-info"></i>
+          <span>View</span>
+
+        </div>
+        
+        <div class="action-item" (click)="openEditFormModal(shipment); closeActionPopup()">
+          <i class="fas fa-edit text-primary"></i>
+          <span>Edit</span>
+        </div>
+        
+        <div class="action-item" (click)="openEditModal(shipment); closeActionPopup()">
+          <i class="fas fa-money-bill-wave text-warning"></i>
+          <span>Edit Payment Status</span>
+        </div>
+        
+        <div class="action-item" (click)="generatePackingSlip(shipment.id); closeActionPopup()">
+          <i class="fas fa-box-open text-secondary"></i>
+          <span>Packing Slip</span>
+        </div>
+        
+        <div class="action-item" (click)="generateInvoice(shipment); closeActionPopup()">
+          <i class="fas fa-file-invoice text-success"></i>
+          <span>Generate Invoice</span>
+        </div>
+        
+        <div class="action-item" 
+             (click)="viewPrescription(shipment); closeActionPopup()"
+             [class.disabled]="!shipment.prescriptions || shipment.prescriptions.length === 0"
+             [title]="(!shipment.prescriptions || shipment.prescriptions.length === 0) ? 'No prescription available' : ''">
+          <i class="fas fa-file-prescription text-info"></i>
+          <span>View Prescription</span>
+        </div>
+        
+        <div class="action-item" (click)="printShipment(shipment); closeActionPopup()">
+          <i class="fas fa-print text-secondary"></i>
+          <span>Print</span>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <div class="action-item text-danger" (click)="confirmDelete(shipment); closeActionPopup()">
+          <i class="fas fa-trash-alt"></i>
+          <span>Delete</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</td>
 <td *ngIf="isColumnVisible('date')">
   {{ formatDateForDisplay(shipment.date) }}
 </td>

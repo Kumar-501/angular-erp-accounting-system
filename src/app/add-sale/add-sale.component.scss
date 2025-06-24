@@ -708,3 +708,17 @@ select.form-control {
   white-space: normal !important; /* Allow text to wrap if needed */
   text-overflow: unset;        /* Remove ellipsis */
 }
+.form-select.d-inline-block {
+  display: inline-block;
+  width: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}.is-invalid {
+  border-color: #dc3545 !important;
+}
+
+.invalid-feedback {
+  color: #dc3545;
+  font-size: 0.875em;
+}

@@ -70,6 +70,8 @@ export class PurchaseRequisitionComponent implements OnInit {
   rows: Requisition[] = [];
   filteredRows: Requisition[] = [];
   isLoading: boolean = false;
+isAdmin: boolean = true;
+
   selectedRequisitions: string[] = [];
 allSelected: boolean = false;
 // Add these properties to your component class
@@ -141,7 +143,9 @@ selectedSupplier: string = 'All';
 
   ngOnInit(): void {
     this.loadLocations();
-    
+     this.isAdmin = this.authService.isAdmin(); // This will now properly check admin status
+  console.log("ADMIN STATUS:", this.isAdmin); 
+
     // First load suppliers, then load requisitions
     this.supplierService.getSuppliers().subscribe({
       next: (suppliers) => {
@@ -168,6 +172,7 @@ selectedSupplier: string = 'All';
         this.openActionDropdownId = null;
       }
     });
+    
   }
   calculateTotalRequiredQuantity(items: RequisitionItem[]): number {
     if (!items || items.length === 0) return 0;
@@ -508,6 +513,11 @@ getPaginatedRows(): Requisition[] {
 
 approveRequisition(requisition: Requisition, event?: Event) {
   if (event) event.stopPropagation();
+    
+ if (!this.isAdmin) { // Use the isAdmin property we set
+    alert('Only admin users can approve requisitions');
+    return;
+  }
   
   if (confirm('Are you sure you want to approve this requisition?')) {
     // Get the supplier details including address

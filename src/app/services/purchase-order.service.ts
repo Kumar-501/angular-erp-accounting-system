@@ -18,6 +18,7 @@ export interface PurchaseOrder {
   supplier: string;
     grandTotal?: number; 
   isUsedForPurchase?: boolean;
+  requiredDate?: string | Date;
 
   status: string;
   quantityRemaining: number;

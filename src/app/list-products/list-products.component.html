@@ -189,15 +189,14 @@
           </div>
 
           <!-- Product Status Filter -->
-          <div class="mb-3">
-            <label class="form-label">Product Status</label>
-            <select class="form-select" [(ngModel)]="selectedStatus" (change)="applyFilters()">
-              <option value="">All Products</option>
-              <option value="active">Active Products</option>
-              <option value="notForSelling">Not for Selling</option>
-              <option value="inactive">Inactive Products</option>
-            </select>
-          </div>
+         <div class="mb-3">
+  <label class="form-label">Product Status</label>
+  <select class="form-select" [(ngModel)]="selectedStatus" (change)="applyFilters()">
+    <option value="">All Products</option>
+    <option value="active">Active Products</option>
+    <option value="inactive">Inactive Products</option>
+  </select>
+</div>
 
           <!-- Action Buttons -->
           <div class="d-grid gap-2 mt-4">
@@ -226,10 +225,8 @@
                   'fa-sort': currentSortColumn !== 'productName',
                   'fa-sort-up': currentSortColumn === 'productName' && isAscending,
                   'fa-sort-down': currentSortColumn === 'productName' && !isAscending
-                }"></i>
-              </th>
+                }"></i>              </th>
               <th>Type & Components</th>
-              <th>Locations</th>
               <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
                 Selling Price (Exc Tax)
                 <i class="fas ms-1" [ngClass]="{
@@ -261,13 +258,12 @@
                   'fa-sort-up': currentSortColumn === 'defaultPurchasePriceIncTax' && isAscending,
                   'fa-sort-down': currentSortColumn === 'defaultPurchasePriceIncTax' && !isAscending
                 }"></i>
-              </th>
-              <th class="text-end" (click)="sortBy('currentStock')">
-                Current Stock
+              </th>              <th class="text-end" (click)="sortBy('totalStock')">
+                Stock by Location
                 <i class="fas ms-1" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'currentStock',
-                  'fa-sort-up': currentSortColumn === 'currentStock' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
+                  'fa-sort': currentSortColumn !== 'totalStock',
+                  'fa-sort-up': currentSortColumn === 'totalStock' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'totalStock' && !isAscending
                 }"></i>
               </th>
               <th (click)="sortBy('category')">
@@ -421,33 +417,38 @@
                   <div *ngIf="product.productType === 'Variant' && product.variations?.length > 0" class="mt-1">
                     <small class="text-muted d-block">Variants: {{ product.variations.length }}</small>
                   </div>
-                </div>
-              </td>
+                </div>              </td>
 
               <!-- Files Column -->
          
-              <td>
-                <div *ngIf="product.locationNames?.length > 0">
-                  <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
-                    {{ locName }}
-                  </span>
-                </div>
-                <div *ngIf="!product.locationNames?.length" class="text-muted">
-                  No Location
-                </div>
-              </td>
               <td class="text-end">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</td>
               <td class="text-end">₹{{ product.defaultSellingPriceIncTax || 0 | number:'1.2-2' }}</td>
               <td class="text-end">₹{{ product.unitPurchasePrice || 0 | number:'1.2-2' }}</td>
-              <td class="text-end">₹{{ product.defaultPurchasePriceIncTax || 0 | number:'1.2-2' }}</td>
-              <td class="text-end">
-                <span class="badge" [ngClass]="{
-                  'bg-success': (product.currentStock || 0) > 10,
-                  'bg-warning': (product.currentStock || 0) <= 10 && (product.currentStock || 0) > 0,
-                  'bg-danger': (product.currentStock || 0) <= 0
-                }">
-                  {{ product.currentStock || '0.00' }}
-                </span>
+              <td class="text-end">₹{{ product.defaultPurchasePriceIncTax || 0 | number:'1.2-2' }}</td>              <td class="text-end">
+                <!-- Show total stock with breakdown -->
+                <div class="d-flex flex-column align-items-end">
+                  <span class="badge mb-1" [ngClass]="{
+                    'bg-success': (product.totalStock || 0) > 10,
+                    'bg-warning': (product.totalStock || 0) <= 10 && (product.totalStock || 0) > 0,
+                    'bg-danger': (product.totalStock || 0) <= 0
+                  }">
+                    Total: {{ product.totalStock || '0' }}
+                  </span>
+                  
+                  <!-- Location breakdown - only show if selectedLocation is not filtered -->                  <div *ngIf="!selectedLocation && product.locationStocks && getObjectKeys(product.locationStocks).length > 0" 
+                       class="small text-muted">
+                    <div *ngFor="let locationEntry of getLocationStockEntries(product.locationStocks)" 
+                         class="d-flex justify-content-between">
+                      <span>{{ getLocationName(locationEntry.locationId) }}:</span>
+                      <span class="ms-2">{{ locationEntry.stock }}</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Show only selected location stock if filtered -->
+                  <div *ngIf="selectedLocation && product.locationStocks" class="small text-muted">
+                    <span>{{ getLocationName(selectedLocation) }}: {{ product.locationStocks[selectedLocation] || 0 }}</span>
+                  </div>
+                </div>
               </td>
               <td>{{ product.category || '-' }}</td>
               <td>{{ product.brand || '-' }}</td>
@@ -468,7 +469,7 @@
               <td>{{ product.displayTax || '-' }}</td>
             </tr>
             <tr *ngIf="filteredProducts.length === 0">
-              <td colspan="17" class="text-center py-4 text-muted">
+              <td colspan="16" class="text-center py-4 text-muted">
                 <i class="fas fa-box-open fa-2x mb-2"></i>
                 <p class="mb-0">No products found matching your search criteria</p>
               </td>

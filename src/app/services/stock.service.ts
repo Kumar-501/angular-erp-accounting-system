@@ -23,6 +23,7 @@ import {
 import { Observable, from, map, Subject } from 'rxjs';
 import { ProductsService } from '../services/products.service';
 import { Product } from '../models/product.model';
+import { DailyStockService } from './daily-stock.service';
 
 // Standardized interface for stock history entries
 interface StockHistoryEntry {
@@ -123,9 +124,11 @@ export class StockService {
 
   private stockUpdatedSource = new Subject<void>();
   public stockUpdated$ = this.stockUpdatedSource.asObservable();
+  
   constructor(
     private firestore: Firestore,
-    private productService: ProductsService
+    private productService: ProductsService,
+    private dailyStockService: DailyStockService
   ) {
     this.stockCollection = collection(this.firestore, 'stockTransfers');
     this.usersCollection = collection(this.firestore, 'users');
@@ -163,6 +166,17 @@ export class StockService {
             
               // Update product stock
               await this.productService.updateProductStock(product.product, newStock);
+              
+              // Update daily stock snapshot
+              await this.dailyStockService.updateDailySnapshot(
+                product.product,
+                transfer.locationFrom,
+                new Date(),
+                newStock,
+                'out',
+                product.quantity
+              );
+              
               // Add stock history entry for source location
               await this.addStockHistoryEntry({
                 productId: product.product,
@@ -191,7 +205,9 @@ export class StockService {
       console.error('Error adding stock transfer:', error);
       throw error;
     }
-  }  private async addStockHistoryEntry(historyData: StockHistoryEntry): Promise<void> {
+  }
+
+  private async addStockHistoryEntry(historyData: StockHistoryEntry): Promise<void> {
     try {
       const stockHistoryCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
       
@@ -267,73 +283,33 @@ export class StockService {
     } as Product));
   }
 
-// In stock.service.ts
-async getDailyStockValue(date: Date): Promise<number> {
-  try {
-    const stockSnapshot = await this.getDailyStockSnapshot(date);
-    const products = await this.getAllProductsWithPrices();
-    
-    let totalValue = 0;
-    
-    for (const [productId, stockData] of Object.entries(stockSnapshot)) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        const purchasePrice = product.defaultPurchasePriceExcTax || 0;
-        const stockQty = (stockData as any).closing || 0;
-        totalValue += stockQty * purchasePrice;
-      }
+  // Updated stock value methods using DailyStockService
+  async getDailyStockValue(date: Date): Promise<number> {
+    try {
+      return await this.dailyStockService.getStockValueForDate(date, 'closing');
+    } catch (error) {
+      console.error('Error getting daily stock value:', error);
+      return 0;
     }
-    
-    return totalValue;
-  } catch (error) {
-    console.error('Error getting daily stock value:', error);
-    return 0;
   }
-}
-async getClosingStockValue(date: Date): Promise<number> {
-  try {
-    const stockSnapshot = await this.getDailyStockSnapshot(date);
-    const products = await this.getAllProductsWithPrices();
-    
-    let totalValue = 0;
-    
-    for (const [productId, stockData] of Object.entries(stockSnapshot)) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        const purchasePrice = product.defaultPurchasePriceExcTax || 0;
-        const stockQty = (stockData as any).closing || (stockData as any).closingStock || 0;
-        totalValue += stockQty * purchasePrice;
-      }
+
+  async getClosingStockValue(date: Date): Promise<number> {
+    try {
+      return await this.dailyStockService.getStockValueForDate(date, 'closing');
+    } catch (error) {
+      console.error('Error getting closing stock value:', error);
+      return 0;
     }
-    
-    return totalValue;
-  } catch (error) {
-    console.error('Error getting closing stock value:', error);
-    return 0;
   }
-}
-async getOpeningStockValue(date: Date): Promise<number> {
-  try {
-    const stockSnapshot = await this.getDailyStockSnapshot(date);
-    const products = await this.getAllProductsWithPrices();
-    
-    let totalValue = 0;
-    
-    for (const [productId, stockData] of Object.entries(stockSnapshot)) {
-      const product = products.find(p => p.id === productId);
-      if (product) {
-        const purchasePrice = product.defaultPurchasePriceExcTax || 0;
-        const stockQty = (stockData as any).opening || 0;
-        totalValue += stockQty * purchasePrice;
-      }
+
+  async getOpeningStockValue(date: Date): Promise<number> {
+    try {
+      return await this.dailyStockService.getStockValueForDate(date, 'opening');
+    } catch (error) {
+      console.error('Error getting opening stock value:', error);
+      return 0;
     }
-    
-    return totalValue;
-  } catch (error) {
-    console.error('Error getting opening stock value:', error);
-    return 0;
   }
-}
 
   getStockValue(closingDate: Date): any {
     return this.getDailyStockValue(closingDate);
@@ -393,6 +369,7 @@ async getOpeningStockValue(date: Date): Promise<number> {
       return unsubscribe;
     });
   }
+
   async adjustProductStockWithParams(params: StockAdjustmentParams): Promise<void> {
     // Get current stock from product-stock collection
     const stockDocId = `${params.productId}_${params.locationId}`;
@@ -415,6 +392,16 @@ async getOpeningStockValue(date: Date): Promise<number> {
       lastUpdated: new Date(),
       updatedBy: params.userId
     }, { merge: true });
+
+    // Update daily stock snapshot
+    await this.dailyStockService.updateDailySnapshot(
+      params.productId,
+      params.locationId,
+      new Date(),
+      newStock,
+      params.action === 'add' ? 'in' : 'out',
+      params.quantity
+    );
 
     await this.addStockHistoryEntry({
       productId: params.productId,
@@ -527,6 +514,18 @@ async getOpeningStockValue(date: Date): Promise<number> {
       updatedAt: serverTimestamp()
     });
 
+    const newStock = currentStock + params.receivedQuantity;
+
+    // Update daily stock snapshot
+    await this.dailyStockService.updateDailySnapshot(
+      params.productId,
+      params.locationId,
+      new Date(),
+      newStock,
+      'in',
+      params.receivedQuantity
+    );
+
     // Add to stock history
     await this.addStockHistoryEntry({
       productId: params.productId,
@@ -537,12 +536,13 @@ async getOpeningStockValue(date: Date): Promise<number> {
       userId: params.userId,
       notes: params.notes || `Goods received (Ref: ${params.referenceNo})`,
       oldStock: currentStock,
-      newStock: currentStock + params.receivedQuantity,
+      newStock: newStock,
       timestamp: serverTimestamp()
     });
 
     this.notifyStockUpdate();
   }
+
   getStockHistory(productId: string, locationId?: string): Observable<StockHistoryEntry[]> {
     return new Observable(observer => {
       let q;
@@ -589,114 +589,52 @@ async getOpeningStockValue(date: Date): Promise<number> {
     });
   }
 
+  // Legacy methods for backward compatibility - now use DailyStockService
   private getDailyStockCollectionRef(date: Date) {
     return collection(this.firestore, `dailyStock/${date.toISOString().split('T')[0]}/products`);
   }
 
   async recordDailyStock(productId: string, stockData: { openingStock: number; closingStock: number; date: Date }): Promise<void> {
-    const dailyStockRef = this.getDailyStockCollectionRef(stockData.date);
-    await setDoc(doc(dailyStockRef, productId), {
-      productId,
-      openingStock: stockData.openingStock,
-      closingStock: stockData.closingStock,
-      date: stockData.date,
-      updatedAt: new Date()
-    }, { merge: true });
+    // Delegate to DailyStockService
+    await this.dailyStockService.initializeDailySnapshotsIfNeeded(stockData.date);
   }
 
   async getDailyStockSnapshot(date: Date): Promise<Record<string, { opening: number; closing: number }>> {
-    const snapshot = await getDocs(query(this.getDailyStockCollectionRef(date)));
-    const result: Record<string, { opening: number; closing: number }> = {};
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      result[data['productId']] = {
-        opening: data['openingStock'],
-        closing: data['closingStock']
-      };
-    });
-    return result;
+    try {
+      const snapshots = await this.dailyStockService.getDailySnapshots(date, date);
+      const result: Record<string, { opening: number; closing: number }> = {};
+      
+      snapshots.forEach(snapshot => {
+        const key = `${snapshot.productId}_${snapshot.locationId}`;
+        result[key] = {
+          opening: snapshot.openingStock,
+          closing: snapshot.closingStock
+        };
+      });
+      
+      return result;
+    } catch (error) {
+      console.error('Error getting daily stock snapshot:', error);
+      return {};
+    }
   }
 
   async initializeDailyStock(date: Date): Promise<void> {
-    const products = await this.productService.fetchAllProducts();
-    const yesterday = new Date(date);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStock = await this.getDailyStockSnapshot(yesterday);
-    const dailyStockRef = this.getDailyStockCollectionRef(date);
-    const batch = writeBatch(this.firestore);
-
-    for (const product of products) {
-      if (!product.id) continue;
-      const openingStock = yesterdayStock[product.id]?.closing ?? product.currentStock ?? 0;
-      batch.set(doc(dailyStockRef, product.id), {
-        productId: product.id,
-        openingStock,
-        closingStock: openingStock,
-        date,
-        createdAt: new Date()
-      }, { merge: true });
-    }
-
-    await batch.commit();
+    await this.dailyStockService.createDailySnapshot(date);
   }
 
   async closeBusinessDay(date: Date): Promise<void> {
-    const snapshot = await getDocs(query(this.getDailyStockCollectionRef(date)));
-    const batch = writeBatch(this.firestore);
-    for (const docSnapshot of snapshot.docs) {
-      const data = docSnapshot.data();
-      const product = await this.productService.getProductById(data['productId']);
-      batch.update(docSnapshot.ref, {
-        closingStock: product?.currentStock ?? data['openingStock'],
-        updatedAt: new Date()
-      });
-    }
-    await batch.commit();
+    await this.dailyStockService.processEndOfDay(date);
   }
 
   async recordDailyClosingStock(date: Date): Promise<void> {
-    const products = await this.productService.fetchAllProducts();
-    const dailyStockRef = this.getDailyStockCollectionRef(date);
-    const batch = writeBatch(this.firestore);
-    
-    for (const product of products) {
-      if (!product.id) continue;
-      
-      // Get today's opening stock
-      const todayDoc = await getDoc(doc(dailyStockRef, product.id));
-      const openingStock = todayDoc.exists() ? todayDoc.data()['openingStock'] : product.currentStock || 0;
-      
-      // Record closing stock (current stock)
-      batch.set(doc(dailyStockRef, product.id), {
-        productId: product.id,
-        openingStock,
-        closingStock: product.currentStock || 0,
-        date,
-        updatedAt: new Date()
-      }, { merge: true });
-    }
-    await batch.commit();
+    await this.dailyStockService.processEndOfDay(date);
   }
 
   async initializeNextDayOpeningStock(currentDate: Date): Promise<void> {
     const nextDay = new Date(currentDate);
     nextDay.setDate(nextDay.getDate() + 1);
-    
-    // Get today's closing stock
-    const todayClosing = await this.getDailyStockSnapshot(currentDate);
-    const nextDayRef = this.getDailyStockCollectionRef(nextDay);
-    const batch = writeBatch(this.firestore);
-    
-    for (const [productId, stockData] of Object.entries(todayClosing)) {
-      batch.set(doc(nextDayRef, productId), {
-        productId,
-        openingStock: stockData.closing,
-        closingStock: stockData.closing, // Initialize with same value
-        date: nextDay,
-        createdAt: new Date()
-      }, { merge: true });
-    }
-    await batch.commit();
+    await this.dailyStockService.createDailySnapshot(nextDay);
   }
 
   async reduceStock(params: StockReductionParams): Promise<void> {
@@ -709,6 +647,16 @@ async getOpeningStockValue(date: Date): Promise<number> {
     const newStock = Math.max(0, currentStock - params.quantity);
 
     await updateDoc(productRef, { currentStock: newStock });
+
+    // Update daily stock snapshot
+    await this.dailyStockService.updateDailySnapshot(
+      params.productId,
+      params.locationId,
+      new Date(),
+      newStock,
+      'out',
+      params.quantity
+    );
 
     await addDoc(collection(this.firestore, 'stockMovements'), {
       productId: params.productId,
@@ -749,11 +697,12 @@ async getOpeningStockValue(date: Date): Promise<number> {
         openingStock: currentProduct?.currentStock || 0,
         closingStock: currentProduct?.currentStock || 0,
         createdAt: new Date(),
-        updatedAt: new Date()      });
+        updatedAt: new Date()
+      });
     }
   }
 
-  // Updated adjustProductStock method - merged with your simplified version
+  // Updated adjustProductStock method with daily stock tracking
   async adjustProductStock(
     productId: string,
     quantity: number,
@@ -792,6 +741,19 @@ async getOpeningStockValue(date: Date): Promise<number> {
       lastUpdated: new Date(),
       updatedBy: userId
     }, { merge: true });
+    
+    // Update daily stock snapshot
+    const movementType = newStock > currentStock ? 'in' : 'out';
+    const movementQuantity = Math.abs(newStock - currentStock);
+    
+    await this.dailyStockService.updateDailySnapshot(
+      productId,
+      locationId,
+      new Date(),
+      newStock,
+      movementType,
+      movementQuantity
+    );
     
     // Update legacy product record (for backward compatibility)
     const productRef = doc(this.firestore, `products/${productId}`);
@@ -832,6 +794,7 @@ async getOpeningStockValue(date: Date): Promise<number> {
     await this.addStockHistoryEntry(historyEntry);
     this.notifyStockUpdate(); // This will refresh components listening to stock updates
   }
+
   async initializeProductStock(product: any, initialQuantity: number, locationId: string): Promise<void> {
     if (!product.id || initialQuantity < 0 || !locationId) {
       throw new Error('Invalid product, quantity, or location');
@@ -849,6 +812,16 @@ async getOpeningStockValue(date: Date): Promise<number> {
         lastUpdated: new Date(),
         updatedBy: 'system'
       }, { merge: true });
+
+      // Initialize daily stock snapshot
+      await this.dailyStockService.updateDailySnapshot(
+        product.id,
+        locationId,
+        new Date(),
+        initialQuantity,
+        'in',
+        initialQuantity
+      );
 
       await this.addStockHistoryEntry({
         productId: product.id,
