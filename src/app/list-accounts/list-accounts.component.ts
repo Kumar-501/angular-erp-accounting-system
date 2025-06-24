@@ -305,7 +305,10 @@ clearSearch(): void {
   this.searchTerm = '';
   this.applySearchFilter();
 }
-
+getAccBalance(accountId: string): number {
+  // Return calculated balance if available, otherwise use opening balance
+  return this.accounts.find(acc => acc.id === accountId)?.calculatedBalance
+}
 loadAccountsRealtime(): void {
   this.accountService.getAccounts((accounts: any[]) => {
     // First get all accounts
@@ -425,6 +428,8 @@ loadAccountsRealtime(): void {
       });      // Update accounts with calculated balances
       this.accounts = accounts.map(account => {
         const calculatedBalance = accountBalances.get(account.id) || account.openingBalance || 0;
+        console.log("Fanisus: b: ", this.getAccBalance(account.id))
+        console.log("Fanisus: ", calculatedBalance)
         return {
           ...account,
           calculatedBalance: calculatedBalance

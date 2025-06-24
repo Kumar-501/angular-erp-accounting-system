@@ -170,6 +170,10 @@ interface Prescription {
 }
 
 interface SalesOrder {
+  shippingChargesAfterTax: number;
+  codTaxAmount: number;
+  ppTaxAmount: number;
+  interestedProductIds: boolean;
   productTaxAmount: number;
   shippingTaxAmount: number;
   roundOff: number;
@@ -627,7 +631,11 @@ getReturnLogsBySale(saleId: string): Observable<any[]> {
                   paymentAccount: '',
                   productTaxAmount: 0,
                   shippingTaxAmount: 0,
-                  roundOff: 0
+                  roundOff: 0,
+                  shippingChargesAfterTax: 0,
+                  codTaxAmount: 0,
+                  ppTaxAmount: 0,
+                  interestedProductIds: false
                 };
   
                 if (shipmentData.paymentStatus === 'Paid') {
