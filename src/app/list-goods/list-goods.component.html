@@ -45,74 +45,89 @@
   </div>
 
   <div class="table-responsive">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Actions</th>
-          <th (click)="sortBy('purchaseDate')">Date 
-            <i *ngIf="sortColumn === 'purchaseDate'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <th (click)="sortBy('referenceNo')">Reference No
-            <i *ngIf="sortColumn === 'referenceNo'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <th (click)="sortBy('invoiceNo')">Invoice No
-            <i *ngIf="sortColumn === 'invoiceNo'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <!-- <th (click)="sortBy('locationName')">Location
-            <i *ngIf="sortColumn === 'locationName'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th> -->
-          <th (click)="sortBy('supplierName')">Supplier
-            <i *ngIf="sortColumn === 'supplierName'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <th (click)="sortBy('status')">Status
-            <i *ngIf="sortColumn === 'status'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <th (click)="sortBy('receivedDate')">Received Date
-            <i *ngIf="sortColumn === 'receivedDate'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-          <th (click)="sortBy('addedBy')">Added By
-            <i *ngIf="sortColumn === 'addedBy'" 
-               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let grn of paginatedGoodsReceived">
-          <td>
-            <div class="action-buttons">
-              <button class="btn btn-sm btn-info" (click)="viewProducts(grn)" title="View Products">
-                <i class="fa fa-eye"></i>
-              </button>
-              <button class="btn btn-sm btn-danger" (click)="deleteGrn(grn.id)" title="Delete">
-                <i class="fa fa-trash"></i>
-              </button>
-            </div>
-          </td>
-          <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
-          <td>{{ grn.referenceNo || 'N/A' }}</td>
-          <td>{{ grn.invoiceNo || 'N/A' }}</td>
-          <!-- <td>{{ getLocationName(grn) }}</td> -->
-          <td>{{ getSupplierName(grn) }}</td>
-          <td>
-            <span class="status-badge" [ngClass]="getStatusClass(grn.status)">
-              {{ formatStatus(grn.status) }}
-            </span>
-          </td>
-          <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
-          <td>{{ grn.addedBy || 'N/A' }}</td>
-        </tr>
-        <tr *ngIf="paginatedGoodsReceived.length === 0">
-          <td colspan="9" class="no-data">No data available</td>
-        </tr>
-      </tbody>
-    </table>
+   <table class="table">
+  <thead>
+    <tr>
+      <th>Actions</th>
+      <th (click)="sortBy('purchaseDate')">Purchase Date 
+        <i *ngIf="sortColumn === 'purchaseDate'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('productName')">Product Name
+        <i *ngIf="sortColumn === 'productName'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('referenceNo')">Reference No
+        <i *ngIf="sortColumn === 'referenceNo'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('invoiceNo')">Invoice No
+        <i *ngIf="sortColumn === 'invoiceNo'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <!-- <th (click)="sortBy('locationName')">Location
+        <i *ngIf="sortColumn === 'locationName'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th> -->
+      <th (click)="sortBy('supplierName')">Supplier
+        <i *ngIf="sortColumn === 'supplierName'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('status')">Status
+        <i *ngIf="sortColumn === 'status'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('receivedDate')">Received Date
+        <i *ngIf="sortColumn === 'receivedDate'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+      <th (click)="sortBy('addedBy')">Added By
+        <i *ngIf="sortColumn === 'addedBy'" 
+           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let grn of paginatedGoodsReceived">
+      <td>
+        <div class="action-buttons">
+          <!-- <button class="btn btn-sm btn-info" (click)="viewProducts(grn)" title="View Products">
+            <i class="fa fa-eye"></i>
+          </button> -->
+          <button class="btn btn-sm btn-danger" (click)="deleteGrn(grn.id)" title="Delete">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+      </td>
+      <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
+      <td>
+        <div *ngIf="grn.products && grn.products.length > 0">
+          {{ grn.products[0].productName || grn.products[0].name }}
+          <span *ngIf="grn.products.length > 1" class="more-products">
+            +{{ grn.products.length - 1 }} more
+          </span>
+        </div>
+        <div *ngIf="!grn.products || grn.products.length === 0">
+          N/A
+        </div>
+      </td>
+      <td>{{ grn.referenceNo || 'N/A' }}</td>
+      <td>{{ grn.invoiceNo || 'N/A' }}</td>
+      <!-- <td>{{ getLocationName(grn) }}</td> -->
+      <td>{{ getSupplierName(grn) }}</td>
+      <td>
+        <span class="status-badge" [ngClass]="getStatusClass(grn.status)">
+          {{ formatStatus(grn.status) }}
+        </span>
+      </td>
+      <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
+      <td>{{ grn.addedBy || 'N/A' }}</td>
+    </tr>
+    <tr *ngIf="paginatedGoodsReceived.length === 0">
+      <td colspan="9" class="no-data">No data available</td>
+    </tr>
+  </tbody>
+</table>
   </div>
   
   <div class="pagination-controls">

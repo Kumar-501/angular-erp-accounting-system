@@ -9,6 +9,8 @@ import { Subscription } from 'rxjs';
 import { TaxService } from '../services/tax.service';
 import { AccountService } from '../services/account.service';
 import { ExpenseService } from '../services/expense.service';
+import { Firestore } from '@angular/fire/firestore';
+import { getCalculatedAccountBalance } from '../services/independent.service';
 
 @Component({
   selector: 'app-add-expense',
@@ -47,7 +49,8 @@ export class AddExpenseComponent implements OnInit, OnDestroy {
     private expenseCategoriesService: ExpenseCategoriesService,
     private userService: UserService,
     private customerService: CustomerService,
-    private router: Router
+    private router: Router,
+    private firestore: Firestore
   ) {}
 
   ngOnInit(): void {
@@ -131,15 +134,23 @@ calculateTax() {
       (error: any) => console.error('Error loading tax rates:', error)
     );
   }
-loadPaymentAccounts() {
-  this.accountService.getAccounts((accounts: any[]) => {
-    this.paymentAccounts = accounts.map(account => ({
-      id: account.id,
-      name: account.name,
-      accountType: account.accountType,
-      balance: account.balance || 0 // Add this line to include balance
-    }));
-    console.log('Payment accounts loaded:', this.paymentAccounts); // For debugging
+async loadPaymentAccounts(): Promise<void> {
+  this.accountService.getAccounts(async (accounts: any[]) => {
+    // Calculate balance for each account using the independent function
+    const accountsWithCalculatedBalance = await Promise.all(
+      accounts.map(async (account) => {
+        const calculatedBalance = await getCalculatedAccountBalance(this.firestore, account.id);
+        return {
+          id: account.id,
+          name: account.name,
+          accountType: account.accountType,
+          balance: calculatedBalance
+        };
+      })
+    );
+    
+    this.paymentAccounts = accountsWithCalculatedBalance;
+    console.log('Payment accounts loaded with calculated balances:', this.paymentAccounts);
   });
 }
 
@@ -348,7 +359,7 @@ async saveExpense() {
   const formData = this.expenseForm.getRawValue();
 
   try {
-    // Validate payment account
+    // Validate payment account using independent function
     if (formData.paymentAccount) {
       const account = this.paymentAccounts.find(acc => acc.id === formData.paymentAccount);
       if (!account) {
@@ -357,12 +368,13 @@ async saveExpense() {
 
       // Only check balance for expenses, not for incomes
       if (formData.type === 'expense') {
-        const currentBalance = account.balance || 0;
+        // Get real-time calculated balance
+        const currentBalance = await getCalculatedAccountBalance(this.firestore, formData.paymentAccount);
         const paymentAmount = parseFloat(formData.paymentAmount);
 
         if (currentBalance < paymentAmount) {
           const confirmProceed = confirm(
-            `Insufficient balance in ${account.name}. Available: ${currentBalance}, Required: ${paymentAmount}\n\nDo you want to proceed anyway?`
+            `Insufficient balance in ${account.name}. Available: ₹${currentBalance.toFixed(2)}, Required: ₹${paymentAmount.toFixed(2)}\n\nDo you want to proceed anyway?`
           );
           
           if (!confirmProceed) {
@@ -370,7 +382,9 @@ async saveExpense() {
           }
         }
       }
-    }    // Get category name for description
+    }
+
+    // Get category name for description
     let categoryName = '';
     if (formData.type === 'expense' && formData.expenseCategory) {
       const category = this.expenseCategories.find(cat => cat.id === formData.expenseCategory);
@@ -457,27 +471,31 @@ async saveExpense() {
   }
 }
 
-
-  getSelectedAccountBalance(): number {
+async getSelectedAccountBalance(): Promise<number> {
   const accountId = this.expenseForm.get('paymentAccount')?.value;
   if (!accountId) return 0;
   
-  const account = this.paymentAccounts.find(acc => acc.id === accountId);
-  return account ? account.balance : 0;
+  return await getCalculatedAccountBalance(this.firestore, accountId);
 }
-resetForm() {
-  this.expenseForm.get('accountHead')?.enable(); // Enable the field before reset
-  this.expenseForm.reset();
-  this.selectedFile = null;
-  this.initForm();
-  this.generateReferenceNumber();
-  
-  // Clear file input
-  const fileInput = document.getElementById('document') as HTMLInputElement;
-  if (fileInput) {
-    fileInput.value = '';
+
+// Add helper method to get calculated balance for any account
+async getAccountBalance(accountId: string): Promise<number> {
+  return await getCalculatedAccountBalance(this.firestore, accountId);
+}
+
+  resetForm() {
+    this.expenseForm.get('accountHead')?.enable(); // Enable the field before reset
+    this.expenseForm.reset();
+    this.selectedFile = null;
+    this.initForm();
+    this.generateReferenceNumber();
+    
+    // Clear file input
+    const fileInput = document.getElementById('document') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = '';
+    }
   }
-}
 
   private markFormGroupTouched(formGroup: FormGroup) {
     Object.values(formGroup.controls).forEach(control => {

@@ -482,8 +482,7 @@
         <th>Selling Price (MRP)</th>
         <th>Discount Amount</th>
         <th>Subtotal</th>
-        <th *ngIf="products.length > 0">Action</th>
-      </tr>
+<th *ngIf="products.length > 0">Action</th>      </tr>
     </thead>
     <tbody>
       <!-- Dynamic Product Rows -->
@@ -1185,14 +1184,14 @@
   </div>
 
   <!-- Shipping Charge (before tax) -->
-<div class="col-md-6">
+<!-- <div class="col-md-6">
     <label for="shippingCharges" class="form-label">Shipping Charges (Before Tax):</label>
     <input type="number" id="shippingCharges" formControlName="shippingCharges" 
            class="form-control" min="0" step="0.01">
     <small class="text-muted">
       Base amount before tax
     </small>
-  </div>
+  </div> -->
   <!-- Shipping Tax -->
   <div class="summary-item" *ngIf="saleForm.get('orderTax')?.value > 0">
     <span class="summary-label">

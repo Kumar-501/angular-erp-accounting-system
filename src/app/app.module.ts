@@ -225,6 +225,7 @@ import { CustomerReportComponent } from './customer-report/customer-report.compo
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
 import { NotSellingComponent } from './not-selling/not-selling.component';
 import { ListStockPriceLogComponent } from './list-stock-price-log/list-stock-price-log.component';
+import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.component';
 @NgModule({
   declarations: [
     AppComponent,
@@ -406,6 +407,7 @@ import { ListStockPriceLogComponent } from './list-stock-price-log/list-stock-pr
     SellReturnReportComponent,
     NotSellingComponent,
     ListStockPriceLogComponent,
+    StockMonitoringComponent,
  
 
 

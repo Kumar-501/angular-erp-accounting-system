@@ -66,13 +66,12 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
   
   if (completeData.products && completeData.products.length > 0) {
     const updatePromises = completeData.products.map(async (product: any) => {
-      if (product.id && product.receivedQuantity > 0) {
-        // Update product stock
+      if (product.id && product.receivedQuantity > 0) {        // Update product stock
         await this.stockService.adjustProductStock(
           product.id,
           product.receivedQuantity,
           'add',
-          completeData.businessLocation,
+          completeData.businessLocation?.id || completeData.businessLocation,
           `Goods received (Ref: ${docRef.id})`,
           completeData.addedBy || 'system'
         );
@@ -157,17 +156,9 @@ async addGoodsReceived(goodsData: any): Promise<DocumentReference> {
     });
   }
 
-// In goods.service.ts
-getAllGoodsReceived(id?: string): Observable<DocumentData[]> {
-  if (id) {
-    // If you need specific functionality when an ID is provided
-    const goodsDoc = doc(this.firestore, this.collectionName, id);
-    return from(getDoc(goodsDoc).then(doc => doc.exists() ? [{ id: doc.id, ...doc.data() }] : []));
-  } else {
-    // Return all goods when no ID is provided
+  getAllGoodsReceived(): Observable<DocumentData[]> {
     return this.goods$;
   }
-}
 
   getGoodsBySupplier(supplierId: string): Observable<DocumentData[]> {
     return new Observable(observer => {

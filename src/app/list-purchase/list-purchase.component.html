@@ -484,7 +484,6 @@
   </div>
 </div>
 
-<!-- Payment Modal -->
 <div class="modal" [class.show]="showPaymentForm">
   <div class="modal-content payment-modal">
     <div class="modal-header">
@@ -595,11 +594,11 @@
         
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" (click)="closePaymentForm()">Cancel</button>
-          <button type="button" class="btn btn-primary" (click)="submitPayment()" 
-                  [disabled]="paymentForm.invalid || paymentAccountsLoading">
-            <span *ngIf="paymentAccountsLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            Save Payment
-          </button>
+     <button type="button" class="btn btn-primary" (click)="submitPayment()" 
+        [disabled]="paymentForm.invalid || paymentAccountsLoading || paymentProcessing">
+  <span *ngIf="paymentProcessing" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+  {{ paymentProcessing ? 'Processing...' : 'Save Payment' }}
+</button>
         </div>
       </form>
     </div>

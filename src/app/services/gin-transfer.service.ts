@@ -295,6 +295,40 @@ export class GinTransferService {
       throw error;
     }
   }
+// Add these methods to GinTransferService
+async getGinTransfersByProductId(productId: string): Promise<GinTransfer[]> {
+  try {
+    const allTransfers = await this.getAllGinTransfers();
+    return allTransfers.filter(transfer => 
+      transfer.items?.some(item => item.productId === productId)
+    );
+  } catch (error) {
+    console.error('Error getting transfers by product ID:', error);
+    return [];
+  }
+}
+
+async getGinTransfersByProductName(productName: string): Promise<GinTransfer[]> {
+  try {
+    const allTransfers = await this.getAllGinTransfers();
+    return allTransfers.filter(transfer => 
+      transfer.items?.some(item => item.productName === productName)
+    );
+  } catch (error) {
+    console.error('Error getting transfers by product name:', error);
+    return [];
+  }
+}
+
+private async getAllGinTransfers(): Promise<GinTransfer[]> {
+  try {
+    const querySnapshot = await getDocs(collection(this.firestore, 'ginTransfers'));
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as GinTransfer }));
+  } catch (error) {
+    console.error('Error getting all GIN transfers:', error);
+    return [];
+  }
+}
 
   // Clean up subscriptions when service is destroyed
   ngOnDestroy(): void {

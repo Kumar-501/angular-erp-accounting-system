@@ -256,15 +256,22 @@ export class ListGoodsComponent implements OnInit, OnDestroy {
     return formatDate(parsedDate, 'dd-MM-yyyy HH:mm', 'en-US');
   }
 
-  // Sorting and filtering methods
-  sortBy(column: string): void {
-    if (this.sortColumn === column) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortColumn = column;
-      this.sortDirection = 'asc';
-    }
-    
+sortBy(column: string): void {
+  if (this.sortColumn === column) {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    this.sortColumn = column;
+    this.sortDirection = 'asc';
+  }
+ if (column === 'productName') {
+    this.filteredGoodsReceived.sort((a, b) => {
+      const nameA = (a.products?.[0]?.productName || a.products?.[0]?.name || '').toLowerCase();
+      const nameB = (b.products?.[0]?.productName || b.products?.[0]?.name || '').toLowerCase();
+      return this.sortDirection === 'asc' 
+        ? nameA.localeCompare(nameB) 
+        : nameB.localeCompare(nameA);
+    });
+  } 
     if (column === 'purchaseDate' || column === 'receivedDate') {
       this.filteredGoodsReceived.sort((a, b) => {
         const dateA = this.parseDate(a[column]).getTime();

@@ -17,6 +17,7 @@ h2{
   margin-right: -15px;
   margin-left: -15px;
 }
+
 .location-badge {
   background-color: #e3f2fd;
   padding: 5px 10px;
@@ -30,20 +31,20 @@ h2{
   margin-right: 5px;
   color: #1976d2;
 }
-
-/* Table responsive container */
 .table-responsive {
-  width: 100%;
-  overflow-x: auto;
+  max-height: 400px;   /* adjust as needed */
+  overflow-y: auto;
+  position: relative;  /* necessary for sticky headers */
 }
 
-/* Table width adjustment */
-.table {
-  width: 100%; /* Changed from 150% to 100% */
-  margin-bottom: 1rem;
-  color: #212529;
-  border-collapse: collapse;
+.table-responsive thead th {
+  position: sticky;
+  top: 0;
+  background-color: #fff; /* or your header background color */
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
 }
+
 
 /* Responsive adjustments */
 @media (max-width: 1800px) {

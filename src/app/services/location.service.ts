@@ -78,7 +78,20 @@ export class LocationService {
       deactivatedAt: new Date()
     });
   }
-
+// Add this to your LocationService
+async getAllLocations(): Promise<any[]> {
+  try {
+    const locationsCollection = collection(this.firestore, 'locations');
+    const querySnapshot = await getDocs(locationsCollection);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting all locations:', error);
+    return [];
+  }
+}
   // Hard delete a location (use with caution)
   deleteLocation(id: string) {
     const locationDoc = doc(this.firestore, 'locations', id);

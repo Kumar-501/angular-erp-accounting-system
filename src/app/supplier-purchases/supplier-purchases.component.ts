@@ -25,8 +25,9 @@ interface LedgerEntry {
   amount: number;
   balance: number;
   status: string;
-  purchase?: any;
-  payment?: any;
+  purchase?: any; // Original purchase data (if this is a purchase entry)
+  payment?: any;  // Original payment data (if this is a payment entry)
+  isImmutable: boolean; 
 }
 
 
@@ -318,11 +319,12 @@ generateLedgerEntries(purchases: any[], payments: any[], openingBalance: number 
       balance: runningBalance,
       status: 'Balance',
       purchase: null,
-      payment: null
+      payment: null,
+      isImmutable: false
     });
   }
 
-  // Process purchases (debits)
+  // Process purchases (debits) - these should never be deleted
   purchases.forEach(purchase => {
     const purchaseDate = purchase.purchaseDate?.toDate?.() || purchase.purchaseDate || new Date();
     const entry: LedgerEntry = {
@@ -335,13 +337,14 @@ generateLedgerEntries(purchases: any[], payments: any[], openingBalance: number 
       balance: runningBalance + (purchase.grandTotal || purchase.purchaseTotal || 0),
       status: purchase.purchaseStatus || purchase.status || 'Pending',
       purchase: purchase,
-      payment: null
+      payment: null,
+      isImmutable: false
     };
     entries.push(entry);
     runningBalance += purchase.grandTotal || purchase.purchaseTotal || 0;
   });
 
-  // Process payments (credits)
+  // Process payments (credits) - these should be additional entries, not replacements
   payments.forEach(payment => {
     const paymentDate = payment.date?.toDate?.() || payment.date || new Date();
     const entry: LedgerEntry = {
@@ -354,13 +357,14 @@ generateLedgerEntries(purchases: any[], payments: any[], openingBalance: number 
       balance: runningBalance - (payment.amount || 0),
       status: payment.status || 'Paid',
       purchase: null,
-      payment: payment
+      payment: payment,
+      isImmutable: false
     };
     entries.push(entry);
     runningBalance -= payment.amount || 0;
   });
 
-  // Sort by date
+  // Sort by date while preserving original entries
   return entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 

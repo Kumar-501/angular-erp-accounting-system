@@ -115,11 +115,11 @@ export class AddPurchaseOrderComponent implements OnInit {
       referenceNo: [{ value: '', disabled: true }, Validators.required],
       orderDate: [new Date().toISOString().split('T')[0], Validators.required],
       deliveryDate: [''],
-      shippingDate: [''],
+      shippingDate: [''], // Add shipping date field
           addedBy: [this.authService.getCurrentUserName(), Validators.required], // Add this line
 
       purchaseOrder: [''],
-      requiredDate: [''],
+      requiredDate: ['', Validators.required], // Make required date mandatory
       businessLocation: ['', Validators.required],
       payTerm: [''],
       products: this.fb.array([]), // Empty array by default
@@ -920,11 +920,10 @@ calculateLineTotal(index: number): void {
       formData.status = 'pending';
       formData.supplierName = this.getSupplierDisplayName(this.selectedSupplierDetails);
       formData.locationName = formData.businessLocation;
-        formData.requiredDate = formData.requiredDate || formData.orderDate;
-  formData.addedById = this.authService.getCurrentUserId(); // Add user ID
-  formData.addedByName = formData.addedBy; // Already in the form
-
-        formData.requiredDate = formData.requiredDate; // Add this line
+      formData.requiredDate = formData.requiredDate || formData.orderDate;
+      formData.shippingDate = formData.shippingDate; // Include shipping date
+      formData.addedById = this.authService.getCurrentUserId(); // Add user ID
+      formData.addedByName = formData.addedBy; // Already in the form
 
       // Calculate and add totals
       formData.totalItems = this.totalItems;
@@ -1010,6 +1009,7 @@ validateDates(): void {
     const fieldOrder = [
       'supplier',
       'orderDate',
+      'requiredDate',
       'businessLocation'
     ];
 

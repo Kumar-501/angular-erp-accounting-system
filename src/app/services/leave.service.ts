@@ -286,14 +286,27 @@ async addLeave(leaveData: any): Promise<any> {
 // In your leave.service.ts
 async applyForLeave(application: any): Promise<any> {
   try {
-    // Get the leave type details
+    // 1. Validate leave type exists
     const leaveTypeDoc = await getDoc(doc(this.firestore, 'leave-types', application.leaveTypeId));
-    if (!leaveTypeDoc.exists()) {
-      throw new Error('Leave type not found');
-    }
-    const leaveType = leaveTypeDoc.data() as LeaveType;
+    if (!leaveTypeDoc.exists()) throw new Error('Leave type not found');
     
-    // Get user's leave balance for this type
+    // 2. Calculate requested days
+    const daysRequested = this.calculateLeaveDays(
+      new Date(application.startDate),
+      new Date(application.endDate || application.startDate),
+      application.session
+    );
+    
+    // 3. Check available balance
+    const currentBalance = await this.getRemainingLeave(application.userId, application.leaveTypeId);
+    if (currentBalance < daysRequested) {
+      throw new Error(`Insufficient leave balance. Available: ${currentBalance}, Requested: ${daysRequested}`);
+    }
+    
+    // 4. Create transaction
+    const batch = writeBatch(this.firestore);
+    
+    // Update balance
     const balanceQuery = query(
       collection(this.firestore, 'user-leave-balances'),
       where('userId', '==', application.userId),
@@ -301,68 +314,35 @@ async applyForLeave(application: any): Promise<any> {
     );
     const balanceSnapshot = await getDocs(balanceQuery);
     
-    // Calculate days taken
-    const daysTaken = this.calculateLeaveDays(
-      new Date(application.startDate),
-      new Date(application.endDate),
-      application.session
-    );
-    
-    // Check if user has enough leave balance
-    let currentBalance = 0;
-    let balanceDocRef: any = null;
-    
     if (!balanceSnapshot.empty) {
-      balanceDocRef = balanceSnapshot.docs[0].ref;
-      const balanceData = balanceSnapshot.docs[0].data() as UserLeaveBalance;
-      currentBalance = balanceData.remaining;
-      
-      if (currentBalance < daysTaken) {
-        throw new Error(`Insufficient leave balance. Available: ${currentBalance}, Requested: ${daysTaken}`);
-      }
-    } else {
-      // If no balance record exists, use the leave type's max days
-      currentBalance = leaveType.maxDays;
-      if (currentBalance < daysTaken) {
-        throw new Error(`Insufficient leave balance. Available: ${currentBalance}, Requested: ${daysTaken}`);
-      }
-      
-      // Create new balance record
-      balanceDocRef = doc(collection(this.firestore, 'user-leave-balances'));
+      const balanceRef = balanceSnapshot.docs[0].ref;
+      const currentData = balanceSnapshot.docs[0].data();
+      batch.update(balanceRef, {
+        used: (currentData['used'] || 0) + daysRequested,
+        remaining: currentBalance - daysRequested,
+        updatedAt: new Date()
+      });
     }
     
-    const batch = writeBatch(this.firestore);
-    
-    // Update or create balance record
-    batch.set(balanceDocRef, {
-      userId: application.userId,
-      leaveTypeId: application.leaveTypeId,
-      allocated: leaveType.maxDays,
-      used: (balanceSnapshot.empty ? 0 : balanceSnapshot.docs[0].data()['used']) + daysTaken,
-      remaining: currentBalance - daysTaken,
-      year: new Date().getFullYear(),
-      createdAt: balanceSnapshot.empty ? new Date() : balanceSnapshot.docs[0].data()['createdAt'],
-      updatedAt: new Date()
-    }, { merge: true });
-    
-    // Add leave application
+    // Create leave application
     const leaveRef = doc(collection(this.firestore, 'leaves'));
     batch.set(leaveRef, {
       ...application,
-      daysTaken: daysTaken,
-      remainingLeave: currentBalance - daysTaken,
+      daysTaken: daysRequested,
+      remainingLeave: currentBalance - daysRequested,
       status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date()
     });
     
     await batch.commit();
-    return { success: true };
+    return { success: true, newBalance: currentBalance - daysRequested };
+    
   } catch (error) {
-    console.error('Error applying for leave:', error);
+    console.error('Leave application failed:', error);
     return { 
       success: false, 
-      error: (error instanceof Error ? error.message : String(error)) 
+      error: error instanceof Error ? error.message : 'Unknown error' 
     };
   }
 }
@@ -454,30 +434,58 @@ async approveLeave(leaveId: string, approvedBy: string, note: string = ''): Prom
     
     if (!leaveData) throw new Error('Leave not found');
     
-    // Calculate total taken days before approving
-    const totalTakenDays = await this.getTotalTakenDays(leaveData['employeeId'], leaveData['leaveTypeId']);
+    // Calculate days for this leave only
     const daysForThisLeave = this.calculateLeaveDays(
       new Date(leaveData['startDate']),
       new Date(leaveData['endDate'] || leaveData['startDate']),
       leaveData['session']
     );
     
+    // Get user's current leave balance
+    const balanceQuery = query(
+      collection(this.firestore, 'user-leave-balances'),
+      where('userId', '==', leaveData['employeeId']),
+      where('leaveTypeId', '==', leaveData['leaveTypeId'])
+    );
+    
+    const balanceSnapshot = await getDocs(balanceQuery);
+    
+    if (balanceSnapshot.empty) {
+      throw new Error('User leave balance record not found');
+    }
+
+    const balanceDoc = balanceSnapshot.docs[0].data() as UserLeaveBalance;
+    const newRemaining = balanceDoc.remaining - daysForThisLeave;
+
+    if (newRemaining < 0) {
+      throw new Error('Insufficient remaining leave balance');
+    }
+
+    // Update the user's leave balance first
+    const balanceRef = balanceSnapshot.docs[0].ref;
+    await updateDoc(balanceRef, {
+      used: balanceDoc.used + daysForThisLeave,
+      remaining: newRemaining,
+      updatedAt: new Date()
+    });
+
+    // Then update the leave record
     await updateDoc(leaveRef, {
       status: 'approved',
       approvedBy: approvedBy,
       note: note,
       daysTaken: daysForThisLeave,
-      remainingLeave: leaveData['maxLeaveCount'] - (totalTakenDays + daysForThisLeave),
+      remainingLeave: newRemaining, // Use the updated remaining balance
       approvedAt: new Date(),
       updatedAt: new Date()
     });
 
-    // Add activity log with the actual user who approved
+    // Add activity log
     await this.addLeaveActivity({
       leaveId,
       action: 'status_change',
       status: 'approved',
-      by: approvedBy, // Use the approvedBy parameter instead of 'System'
+      by: approvedBy,
       note: note || 'Leave approved',
       newStatus: 'approved',
       previousStatus: 'pending',
@@ -489,67 +497,61 @@ async approveLeave(leaveId: string, approvedBy: string, note: string = ''): Prom
   }
 }
 
- async rejectLeave(leaveId: string, rejectedBy: string, note: string = ''): Promise<void> {
-  try {
-    // Get leave application details first
-    const leaveApp = await this.getLeaveApplication(leaveId);
-    if (!leaveApp) {
-      throw new Error('Leave application not found');
-    }
-
-    const batch = writeBatch(this.firestore);
-
-    // 1. Update leave status
-    const leaveRef = doc(this.firestore, 'leave-applications', leaveId);
-    batch.update(leaveRef, {
-      status: 'rejected',
-      updatedAt: new Date(),
-      rejectedBy,
-      rejectedAt: new Date(),
-      note
-    });
-
-    // 2. Restore leave balance
-    const balanceCollection = collection(this.firestore, 'user-leave-balances');
+async rejectLeave(leaveId: string, rejectedBy: string, note: string = ''): Promise<void> {
+  const batch = writeBatch(this.firestore);
+  
+  // 1. Get leave details
+  const leaveRef = doc(this.firestore, 'leaves', leaveId);
+  const leaveSnap = await getDoc(leaveRef);
+  if (!leaveSnap.exists()) throw new Error('Leave not found');
+  
+  const leaveData = leaveSnap.data();
+  const daysToRestore = leaveData['daysTaken'] || 0;
+  
+  // 2. Update leave status
+  batch.update(leaveRef, {
+    status: 'rejected',
+    rejectedBy,
+    rejectedAt: new Date(),
+    note,
+    updatedAt: new Date()
+  });
+  
+  // 3. Restore balance if leave was previously approved
+  if (leaveData['status'] === 'approved') {
     const balanceQuery = query(
-      balanceCollection,
-      where('userId', '==', leaveApp.userId),
-      where('leaveTypeId', '==', leaveApp.leaveTypeId)
+      collection(this.firestore, 'user-leave-balances'),
+      where('userId', '==', leaveData['userId']),
+      where('leaveTypeId', '==', leaveData['leaveTypeId'])
     );
     
-    const balanceSnapshot = await getDocs(balanceQuery);
-    if (!balanceSnapshot.empty) {
-      const balanceDoc = balanceSnapshot.docs[0];
-      const currentBalance = balanceDoc.data() as UserLeaveBalance;
-      
-      batch.update(balanceDoc.ref, {
-        remaining: currentBalance.remaining + leaveApp.daysTaken,
-        used: currentBalance.used - leaveApp.daysTaken,
+    const balanceSnap = await getDocs(balanceQuery);
+    if (!balanceSnap.empty) {
+      const balanceRef = balanceSnap.docs[0].ref;
+      const balanceData = balanceSnap.docs[0].data();
+      batch.update(balanceRef, {
+        used: balanceData['used'] - daysToRestore,
+        remaining: balanceData['remaining'] + daysToRestore,
         updatedAt: new Date()
       });
     }
-
-    // 3. Add activity log with user details
-    const activityCollection = collection(this.firestore, 'leave-activities');
-    const activityRef = doc(activityCollection);
-    batch.set(activityRef, {
-      leaveId,
-      action: 'status_change',
-      status: 'rejected',
-      timestamp: new Date(),
-      by: rejectedBy, // This should be the user's name
-      note: note || 'Leave rejected',
-      newStatus: 'rejected',
-      previousStatus: 'pending'
-    });
-
-    await batch.commit();
-  } catch (error) {
-    console.error('Error rejecting leave:', error);
-    throw error;
   }
+  
+  // 4. Add activity log
+  const activityRef = doc(collection(this.firestore, 'leave-activities'));
+  batch.set(activityRef, {
+    leaveId,
+    action: 'status_change',
+    status: 'rejected',
+    previousStatus: leaveData['status'],
+    newStatus: 'rejected',
+    by: rejectedBy,
+    note: note || 'Leave rejected',
+    timestamp: new Date()
+  });
+  
+  await batch.commit();
 }
-
   // Legacy methods for backward compatibility
   getLeaves(): Observable<any[]> {
     const leaveCollection = collection(this.firestore, 'leaves');
@@ -769,24 +771,22 @@ async getTotalTakenDays(userId: string, leaveTypeId: string): Promise<number> {
     }
   }
   
-  calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
-    if (!startDate || !endDate) return 0;
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    // Calculate difference in days
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
-    
-    // Adjust for session
-    if (session === 'First Half' || session === 'Second Half') {
-      days = days - 0.5;
-    }
-    
-    return days;
+calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
+  // Ensure we have valid dates
+  if (!(startDate instanceof Date) || !(endDate instanceof Date)) {
+    throw new Error('Invalid date parameters');
   }
-
+  
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive of both dates
+  
+  // Adjust for half-day sessions
+  if (session === 'First Half' || session === 'Second Half') {
+    days -= 0.5;
+  }
+  
+  return days;
+}
   // Additional utility methods
   async getUserLeaveHistory(userId: string, year?: number): Promise<LeaveApplication[]> {
     try {

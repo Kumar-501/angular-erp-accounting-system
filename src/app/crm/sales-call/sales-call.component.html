@@ -245,20 +245,20 @@
           </td>
           
           <!-- FIXED: Added proper status dropdown for individual calls -->
-          <td *ngIf="isColumnVisible('callStatus')" class="status-cell">
-            <select 
-              [value]="call.callStatus || 'Pending'"
-              (change)="updateIndividualCallStatus(call.customerId, $event)"
-              [disabled]="isUpdatingStatus.has(call.customerId)"
-              class="status-select"
-              [ngClass]="'status-' + (call.callStatus || 'pending').toLowerCase().replace(' ', '-')">
-              <option value="Pending">Pending</option>
-              <option value="Completed">Completed</option>
-              <option value="Follow-up">Follow-up</option>
-              <option value="Not Interested">Not Interested</option>
-            </select>
-            <i *ngIf="isUpdatingStatus.has(call.customerId)" class="fa fa-spinner fa-spin updating-icon"></i>
-          </td>
+<td *ngIf="isColumnVisible('callStatus')" class="status-cell">
+  <select 
+    [(ngModel)]="call.callStatus"
+    (change)="updateIndividualCallStatus(call.customerId, call.callStatus)"
+    [disabled]="isUpdatingStatus.has(call.customerId)"
+    class="status-select"
+    [ngClass]="'status-' + (call.callStatus || 'pending').toLowerCase().replace(' ', '-')">
+    <option value="Pending">Pending</option>
+    <option value="Completed">Completed</option>
+    <option value="Follow-up">Follow-up</option>
+    <option value="Not Interested">Not Interested</option>
+  </select>
+  <i *ngIf="isUpdatingStatus.has(call.customerId)" class="fa fa-spinner fa-spin updating-icon"></i>
+</td>
           
           <td *ngIf="isColumnVisible('notes')" class="notes-cell">
             <textarea [(ngModel)]="call.notes" 

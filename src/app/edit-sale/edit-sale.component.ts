@@ -34,11 +34,13 @@ interface Product {
   sgstAmount?: number;
   igstAmount?: number;
   lastNumber?: string;
+  
   lastNumbers?: string[];
   currentStock?: number;
   defaultSellingPriceExcTax?: number;
   defaultSellingPriceIncTax?: number;
   batchNumber?: string;
+  
   expiryDate?: string;
   batches?: {
     batchNumber: string;
@@ -68,6 +70,7 @@ interface Medicine {
   pills?: string;
   powder?: string;
   time: string;
+  
   frequency?: string;
   [key: string]: any;
   quantity?: string;
@@ -92,6 +95,7 @@ export class EditSaleComponent implements OnInit {
   saleForm!: FormGroup;
   todayDate: string;
   products: Product[] = [];
+  
   isSubmitting = false;
   allProductsSelected: boolean = false;
   lastInteractionTime = 0;
@@ -99,6 +103,9 @@ export class EditSaleComponent implements OnInit {
   productInterestedSearch = '';
   filteredProductsForInterested: any[] = [];
   prescriptions: PrescriptionData[] = [];
+
+// Set a flag to track initial load
+isInitialLoad = true;
   editingPrescriptionIndex: number | null = null;
   currentPrescriptionModal: any;
   currentViewModal: any;
@@ -462,39 +469,52 @@ export class EditSaleComponent implements OnInit {
     return currentUser?.displayName || currentUser?.email || 'Current User';
   }
 
-  ngOnInit(): void {
-    this.initializeForm();
-    this.setupValueChanges();
-    this.loadTaxRates();
-    this.loadPaymentAccounts();
-    this.prefillCurrentUser();
-    this.todayDate = this.datePipe.transform(this.currentDate, 'yyyy-MM-dd') || '';
+ngOnInit(): void {
+  console.log('Initializing EditSaleComponent - products array:', this.products); // Should be empty initially
+  
+  this.initializeForm();
+  this.setupValueChanges();
+  this.loadTaxRates();
+  this.loadPaymentAccounts();
+  this.prefillCurrentUser();
+  this.todayDate = this.datePipe.transform(this.currentDate, 'yyyy-MM-dd') || '';
 
-    this.saleForm.get('totalPayable')?.valueChanges.subscribe(() => {
-      this.calculateRoundOff();
+  console.log('After initialization - products array:', this.products); // Should still be empty
+this.route.params.subscribe(params => {
+    this.saleId = params['id'];
+    if (this.saleId) {
+      this.loadSaleData(this.saleId);
+    }
+  });
+
+  this.saleForm.get('totalPayable')?.valueChanges.subscribe(() => {
+    this.calculateRoundOff();
+  });
+  
+  Promise.all([
+    this.loadCustomers(),
+    this.loadProducts(),
+    this.loadBusinessLocations(),
+    this.loadServiceTypes(),
+    this.loadUsers(),
+    this.loadTaxRates(),
+    this.loadTaxGroups(),
+    this.loadPaymentAccounts()
+  ]).then(() => {
+    console.log('All data loaded - products array:', this.products); // Should still be empty
+    this.route.params.subscribe(params => {
+      this.saleId = params['id'];
+      if (this.saleId) {
+        console.log('Loading sale data for ID:', this.saleId);
+        this.loadSaleData(this.saleId);
+      }
     });
-    
-    Promise.all([
-      this.loadCustomers(),
-      this.loadProducts(),
-      this.loadBusinessLocations(),
-      this.loadServiceTypes(),
-      this.loadUsers(),
-      this.loadTaxRates(),
-      this.loadTaxGroups(),
-      this.loadPaymentAccounts()
-    ]).then(() => {
-      // Get sale ID from route and load sale data
-      this.route.params.subscribe(params => {
-        this.saleId = params['id'];
-        if (this.saleId) {
-          this.loadSaleData(this.saleId);
-        }
-      });
-    });
-  }
+  });
+}
 
 loadSaleData(saleId: string): void {
+    console.log('Loading sale data - products array before:', this.products); // Should be empty
+
   this.saleService.getSaleById(saleId).subscribe({
     next: (sale) => {
       console.log('Loading sale data for editing:', sale);
@@ -570,7 +590,7 @@ loadSaleData(saleId: string): void {
         ppTaxAmount: sale.ppTaxAmount || 0
       });
 
-      // Initialize products array with proper null/undefined checks
+      // Initialize products array only if sale has products
       this.products = sale.products && sale.products.length > 0 
         ? sale.products.map((product: any) => ({
             id: product.id || '',
@@ -625,11 +645,12 @@ loadSaleData(saleId: string): void {
       }
 
       // Set interested products if any
-      if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length > 0) {
-        this.selectedProductsForInterested = this.allProducts.filter(product => 
-          Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.includes(product.id)
-        );
-      }
+if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length > 0) {
+  const interestedIds: string[] = sale.interestedProductIds;
+  this.selectedProductsForInterested = this.allProducts.filter(product => 
+    product.id && interestedIds.includes(product.id)
+  );
+}
 
       // Calculate shipping after tax
       this.calculateAfterTaxShipping();
@@ -2484,52 +2505,42 @@ loadSaleData(saleId: string): void {
     this.calculateTaxes();
   }
 
-  addProduct(): void {
-    if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
-      const productToAdd: Product = {
-        ...this.defaultProduct,
-        taxAmount: this.defaultProduct.taxAmount || 0,
-        cgstAmount: this.defaultProduct.cgstAmount || 0,
-        sgstAmount: this.defaultProduct.sgstAmount || 0,
-        igstAmount: this.defaultProduct.igstAmount || 0,
-        taxType: this.defaultProduct.taxType || ''
-      };
-      this.products.push(productToAdd);
-    }
-
-    this.defaultProduct = {
-      name: '',
-      quantity: 1,
-      unitPrice: 0,
-      discount: 0,
-      discountType: 'Amount',
-      commissionPercent: this.defaultProduct.commissionPercent || 0,
-      commissionAmount: 0,
-      subtotal: 0,
-      priceBeforeTax: 0,
-      taxIncluded: false,
-      batchNumber: '',
-      expiryDate: '',
-      taxRate: 0,
-      taxAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      igstAmount: 0,
-      taxType: ''
+addProduct(): void {
+  // Only add if the default product has data
+  if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
+    const productToAdd: Product = {
+      ...this.defaultProduct,
+      taxAmount: this.defaultProduct.taxAmount || 0,
+      cgstAmount: this.defaultProduct.cgstAmount || 0,
+      sgstAmount: this.defaultProduct.sgstAmount || 0,
+      igstAmount: this.defaultProduct.igstAmount || 0,
+      taxType: this.defaultProduct.taxType || ''
     };
-
-    this.changeDetectorRef.detectChanges();
-    
-    setTimeout(() => {
-      const lastIndex = this.products.length - 1;
-      if (lastIndex >= 0) {
-        const firstField = document.getElementById(`productName_${lastIndex}`);
-        if (firstField) {
-          firstField.focus();
-        }
-      }
-    });
+    this.products.push(productToAdd);
   }
+
+  // Reset the default product
+  this.defaultProduct = {
+    name: '',
+    quantity: 1,
+    unitPrice: 0,
+    discount: 0,
+    discountType: 'Amount',
+    commissionPercent: this.defaultProduct.commissionPercent || 0,
+    commissionAmount: 0,
+    subtotal: 0,
+    priceBeforeTax: 0,
+    taxIncluded: false,
+    batchNumber: '',
+    expiryDate: '',
+    taxRate: 0,
+    taxAmount: 0,
+    cgstAmount: 0,
+    sgstAmount: 0,
+    igstAmount: 0,
+    taxType: ''
+  };
+}
 
   removeProduct(index: number): void {
     this.products.splice(index, 1);

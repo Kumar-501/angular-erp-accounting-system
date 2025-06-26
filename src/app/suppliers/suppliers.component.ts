@@ -81,6 +81,8 @@ payCash: any;
 handleAction(arg0: string,_t151: Supplier) {
 throw new Error('Method not implemented.');
 }
+isSubmitting = false;
+
   isDropdownOpen = false;
   currentActionPopup: string | null = null;
 
@@ -1157,6 +1159,7 @@ async submitPayment(): Promise<void> {
     this.paymentForm.markAllAsTouched();
     return;
   }
+  this.isSubmitting = true; // Disable the button
 
   try {
     const paymentData = {
@@ -1238,7 +1241,11 @@ async submitPayment(): Promise<void> {
 
   }
 
-
+openPaymentForm() {
+  this.showPaymentForm = true;
+  this.isSubmitting = false; // Reset when form is opened
+  // Rest of your existing logic...
+}
   generateContactId(): string {
     const existingIds = this.suppliersList
       .map(s => s.contactId || '')

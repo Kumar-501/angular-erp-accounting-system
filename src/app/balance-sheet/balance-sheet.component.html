@@ -46,21 +46,22 @@
           <h3>Equity</h3>
         </div>
         <div class="section-table">
-          <table>
-            <thead>
+          <table>            <thead>
               <tr>
                 <th class="account-name">Account Name</th>
+                <th class="account-number">Account No.</th>
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
             </thead>            <tbody>
-              <tr *ngFor="let item of balanceSheetData.equity">
-                <td class="account-name">{{ item.name }}</td>
+              <tr *ngFor="let item of balanceSheetData.equity" [class.category-row]="item.isCategory">
+                <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
+                <td class="account-number">{{ item.accountNumber }}</td>
                 <td class="account-head">{{ item.accountHead }}</td>
-                <td class="amount">{{ formatCurrency(item.value) }}</td>
+                <td class="amount" [class.category-amount]="item.isCategory">{{ formatCurrency(item.value) }}</td>
               </tr>
               <tr class="total-row">
-                <td colspan="2">Total Equity</td>
+                <td colspan="3">Total Equity</td>
                 <td class="amount">{{ formatCurrency(balanceSheetData.totals.equity) }}</td>
               </tr>
             </tbody>
@@ -74,19 +75,19 @@
           <h3>Liabilities</h3>
         </div>
         <div class="section-table">
-          <table>
-            <thead>
+          <table>            <thead>
               <tr>
                 <th class="account-name">Account Name</th>
+                <th class="account-number">Account No.</th>
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of balanceSheetData.liabilities">
-                <td class="account-name">{{ item.name }}</td>
-             <td class="account-head">{{ item.accountHead }}</td>
-                <td class="amount">{{ formatCurrency(item.value) }}</td>
+            </thead>            <tbody>
+              <tr *ngFor="let item of balanceSheetData.liabilities" [class.category-row]="item.isCategory">
+                <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
+                <td class="account-number">{{ item.accountNumber }}</td>
+                <td class="account-head">{{ item.accountHead }}</td>
+                <td class="amount" [class.category-amount]="item.isCategory">{{ formatCurrency(item.value) }}</td>
               </tr>
               <tr class="total-row">
                 <td colspan="3">Total Liabilities</td>
@@ -111,13 +112,12 @@
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of balanceSheetData.assets">
-                <td class="account-name">{{ item.name }}</td>
+            </thead>            <tbody>
+              <tr *ngFor="let item of balanceSheetData.assets" [class.category-row]="item.isCategory">
+                <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
                 <td class="account-number">{{ item.accountNumber }}</td>
                 <td class="account-head">{{ item.accountHead }}</td>
-                <td class="amount">{{ formatCurrency(item.value) }}</td>
+                <td class="amount" [class.category-amount]="item.isCategory">{{ formatCurrency(item.value) }}</td>
               </tr>
               <tr class="total-row">
                 <td colspan="3">Total Assets</td>

@@ -1,31 +1,24 @@
 import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, FormGroup, ValidationErrors, Validators } from '@angular/forms';
 import { SaleService } from '../services/sale.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { CustomerService } from '../services/customer.service';
 import { ProductsService } from '../services/products.service';
 import { LocationService } from '../services/location.service';
-// Update the import path below to the correct location of type-of-service.service.ts
-// For example, if the file is in src/app/services/type-of-service.service.ts:
-import { Service, TypeOfServiceService } from '../services/type-of-service.service';
-// If the file does not exist, create it in src/app/services/type-of-service.service.ts and export Service and TypeOfServiceService.
+import { TypeOfServiceService, Service } from '../services/type-of-service.service';
 import { UserService } from '../services/user.service';
 import { CommissionService } from '../services/commission.service';
 import { LeadService } from '../services/leads.service';
 import { TaxService } from '../services/tax.service';
-// Update the import path to the correct location of tax.model.ts
-// Example: If tax.model.ts is in src/app/tax/tax.model.ts, use the following:
-import { TaxGroup, TaxRate } from '../tax/tax.model';
-// If the file does not exist, create it with the required exports.
+import { TaxRate, TaxGroup } from '../tax/tax.model';
 import { AccountService } from '../services/account.service';
 import { switchMap } from 'rxjs/operators';
-
 import { AuthService } from '../auth.service';
 import * as bootstrap from 'bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { getDocs, limit, query, where } from '@angular/fire/firestore';
-import { CodPopupComponent } from '../cod-popup/cod-popup.component';
+import { CodPopupComponent } from "../cod-popup/cod-popup.component";
 import { defaultIfEmpty, lastValueFrom } from 'rxjs';;
 
 
@@ -88,18 +81,17 @@ interface Medicine {
   powder?: string;
   time: string;
   frequency?: string;
-    [key: string]: any;
+  timing?: string; // Add this explicit declaration
   quantity?: string;
-  foodTiming?: string; // Add this for dropdown selection
+  [key: string]: any; // Keep the index signature for other dynamic properties
 }
-
 // Define the PrescriptionData interface
 interface PrescriptionData {
-  patientName: string; // Changed from 'any' to 'string' and made required
+  patientName: any;
   date: string;
   medicines: Medicine[];
-  patientAge?: string;
-  additionalNotes?: string;
+    patientAge?: string; // Add this line
+    additionalNotes?: string;
 }
 
 @Component({
@@ -112,28 +104,28 @@ export class AddSaleComponent implements OnInit {
   saleForm!: FormGroup;
   todayDate: string;
   products: Product[] = [];
-  isSubmitting = false;
-
   lastInteractionTime = 0;
   showProductsInterestedDropdown = false;
   productInterestedSearch = '';
   allProductsSelected: boolean = false;
-
+// Add this at the top of your component class
+isSubmitting = false;
   filteredProductsForInterested: any[] = [];
   prescriptions: PrescriptionData[] = [];
 editingPrescriptionIndex: number | null = null;
   currentPrescriptionModal: any;
-  currentViewModal: any;
-  viewPrescriptionContent: string = '';
   discount: number | undefined;
   discountType: 'Amount' | 'Percentage' | undefined; 
   selectedProductsForInterested: any[] = [];
   selectedPaymentAccount: any = null;
   isFromLead: boolean = false;
   taxAmount: number = 0;
+  selectedMedicineName: string = '';
+
 // Add this in your component class
 availableTaxRates: TaxRate[] = [];
-
+// Add this with your other component properties
+currentCustomerForPrescription: { name: string; age: string | null } = { name: '', age: null };
   shippingDocuments: File[] = [];
 afterTaxShippingControl: FormControl<number | null> = new FormControl<number | null>(null);
 productsCollection: any; // You should replace 'any' with the correct type
@@ -149,25 +141,21 @@ productsCollection: any; // You should replace 'any' with the correct type
   Date = Date; 
   showCustomerEditPopup = false;
 
-// Add food timing options
-foodTimingOptions = [
-  { value: 'before_food', label: 'ഭക്ഷണത്തിനുമുൻപ്' },
-  { value: 'after_food', label: 'ഭക്ഷണത്തിന് ശേഷം' },
-  { value: 'before_after_food', label: 'ഭക്ഷണത്തിനുമുൻപ് / ശേഷം' },
-  { value: 'empty_stomach', label: 'വെറും വയറ്റിൽ' },
-  { value: 'with_food', label: 'ഭക്ഷണത്തോടൊപ്പം' },
-  { value: 'morning_empty', label: 'രാവിലെ വെറും വയറ്റിൽ' },
-  { value: 'night_before_sleep', label: 'രാത്രി ഉറങ്ങുന്നതിനു മുൻപ്' }
-];
-
 // In your component class
 
 prescriptionData: PrescriptionData = {
-  medicines: [],
-  patientName: '', // Fixed: Changed from undefined to empty string
-  date: '',
-  patientAge: '',
-  additionalNotes: ''
+  medicines: [{
+    name: '',
+    dosage: '',
+    instructions: '',
+    ingredients: '',
+    pills: '',
+    powder: '',
+    time: '',
+    type: ''
+  }],
+  patientName: undefined,
+  date: ''
 };
 
 
@@ -235,6 +223,7 @@ defaultProduct: Product = {
 };
   itemsTotal: number = 0;
   filteredCustomers: any[] = [];
+availableMedicines: any;
 
   constructor(
     private fb: FormBuilder,
@@ -253,7 +242,7 @@ defaultProduct: Product = {
     private typeOfServiceService: TypeOfServiceService,
     private commissionService: CommissionService,
     private taxService: TaxService,
-    private authService: AuthService,
+  public authService: AuthService,  // Make it public to use in template
     private changeDetectorRef: ChangeDetectorRef,
         private toastr: ToastrService,
 
@@ -266,12 +255,11 @@ defaultProduct: Product = {
     this.checkForLeadData();
 
   }
-private showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  private showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
   const toastOptions = {
     timeOut: 5000,
     progressBar: true,
-    closeButton: true,
-    positionClass: 'toast-top-center'
+    closeButton: true
   };
 
   switch(type) {
@@ -308,7 +296,20 @@ async getProductByName(productName: string): Promise<Product | null> {
     throw error;
   }
 }
-
+  private getFieldLabel(fieldName: string): string {
+  // Map form control names to user-friendly labels
+  const fieldLabels: {[key: string]: string} = {
+    'customer': 'Customer',
+    'businessLocation': 'Business Location',
+    'saleDate': 'Sale Date',
+    'addedBy': 'Sales Agent',
+    'paymentMethod': 'Payment Method',
+    'paymentAccount': 'Payment Account'
+    // Add more fields as needed
+  };
+  
+  return fieldLabels[fieldName] || fieldName;
+  }
   
   debugCustomerPhones() {
     console.group('Customer Phone Data');
@@ -441,8 +442,7 @@ addMedicineByType(): void {
   const newMedicine: Medicine = {
     name: '',
     type: this.selectedMedicineType,
-    time: 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി',
-    foodTiming: 'before_after_food' // Default food timing
+    time: 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'
   };
 
   // Set default values based on type
@@ -493,20 +493,6 @@ addMedicineByType(): void {
   });
 }
 
-// Add method to get food timing label
-getFoodTimingLabel(value: string): string {
-  const option = this.foodTimingOptions.find(opt => opt.value === value);
-  return option ? option.label : 'ഭക്ഷണത്തിനുമുൻപ് / ശേഷം';
-}
-
-// Add method to handle food timing change
-onFoodTimingChange(medicineIndex: number, event: any): void {
-  const selectedValue = event.target.value;
-  if (this.prescriptionData.medicines[medicineIndex]) {
-    this.prescriptionData.medicines[medicineIndex].foodTiming = selectedValue;
-  }
-}
-
 
 
   addMedicine(): void {
@@ -518,8 +504,7 @@ onFoodTimingChange(medicineIndex: number, event: any): void {
     pills: '',
     powder: '',
     time: '',
-    type: '',
-    foodTiming: 'before_after_food' // Add default food timing
+    type: ''
   });
 
 
@@ -603,294 +588,85 @@ private formatDateForInput(dateString: string): string {
     return '';
   }
 }
-
-// FIX START: The `enforceLTRDirection` function was removed as it was a less effective,
-// one-time style application. The more robust `forceLTRDirection` is now used exclusively.
-
-openPrescriptionModal(event?: Event): void {
-  if (event) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  // Initialize prescription data
+openPrescriptionModal(): void {
+  // Reset if not editing
   if (this.editingPrescriptionIndex === null) {
     this.resetPrescriptionData();
-    this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || '';
-    this.prescriptionData.date = this.todayDate;
+    
+    // Prefill with customer details if available
+    const customerName = this.saleForm.get('customerName')?.value;
+    const customerAge = this.saleForm.get('customerAge')?.value;
+    
+    if (customerName) {
+      this.prescriptionData.patientName = customerName;
+    }
+    if (customerAge) {
+      this.prescriptionData.patientAge = customerAge;
+    }
+    
+    // Set date to today if not set
+    if (!this.prescriptionData.date) {
+      this.prescriptionData.date = this.todayDate;
+    }
   }
 
   const modalElement = document.getElementById('prescriptionModal');
   if (modalElement) {
-    // Create and show modal
-    this.currentPrescriptionModal = new bootstrap.Modal(modalElement, {
-      keyboard: false,
-      backdrop: 'static'
-    });
-    this.currentPrescriptionModal.show();
-
-    // Force LTR direction after modal is shown
-    // FIX: Called the robust `forceLTRDirection` which adds persistent event listeners
-    // to prevent the browser from switching to RTL. This now works for new prescriptions.
-    setTimeout(() => {
-      this.forceLTRDirection();
-    }, 150);
-  }
-}
-
-// Add this method to force LTR direction
-private forceLTRDirection(): void {
-  // Get all editable fields in the prescription modal
-  const editableFields = document.querySelectorAll('.prescription-template [contenteditable="true"], .prescription-template input, .prescription-template textarea, .prescription-template select');
-  
-  editableFields.forEach((field: Element) => {
-    const htmlElement = field as HTMLElement;
-    if (htmlElement) {
-      // Force LTR styles
-      htmlElement.style.direction = 'ltr';
-      htmlElement.style.textAlign = 'left';
-      htmlElement.style.unicodeBidi = 'embed';
-      htmlElement.style.writingMode = 'horizontal-tb';
-      
-      // Add event listeners to maintain LTR on input
-      htmlElement.addEventListener('input', this.maintainLTROnInput.bind(this));
-      htmlElement.addEventListener('focus', this.maintainLTROnFocus.bind(this));
-      htmlElement.addEventListener('keydown', this.maintainLTROnKeydown.bind(this));
-      htmlElement.addEventListener('paste', this.maintainLTROnPaste.bind(this));
-    }
-  });
-  
-  // Also force LTR on the modal content container with proper typing
-  const modalContent = document.querySelector('.prescription-template') as HTMLElement;
-  if (modalContent) {
-    modalContent.style.direction = 'ltr';
-    modalContent.style.textAlign = 'left';
-  }
-}
-// FIX END: The old `enforceLTRDirection` method has been deleted.
-
-// Add this new method for paste events
-private maintainLTROnPaste(event: any): void {
-  const element = event.target;
-  if (element) {
-    // Use setTimeout to allow the paste to complete
-    setTimeout(() => {
-      element.style.direction = 'ltr';
-      element.style.textAlign = 'left';
-      element.style.unicodeBidi = 'embed';
-    }, 10);
-  }
-}
-
-// Add these methods to maintain LTR direction
-private maintainLTROnInput(event: any): void {
-  const element = event.target;
-  if (element) {
-    element.style.direction = 'ltr';
-    element.style.textAlign = 'left';
-    element.style.unicodeBidi = 'embed';
-  }
-}
-
-private maintainLTROnFocus(event: any): void {
-  const element = event.target;
-  if (element) {
-    element.style.direction = 'ltr';
-    element.style.textAlign = 'left';
-    element.style.unicodeBidi = 'embed';
-  }
-}
-
-private maintainLTROnKeydown(event: any): void {
-  const element = event.target;
-  if (element) {
-    // Use setTimeout to apply styles after the character is typed
-    setTimeout(() => {
-      element.style.direction = 'ltr';
-      element.style.textAlign = 'left';
-      element.style.unicodeBidi = 'embed';
-    }, 1);
-  }
-}
-
-// Add method to prevent Enter key submission
-preventEnterSubmission(event: KeyboardEvent): void {
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-}
-
-// Add methods to update prescription fields
-updatePrescriptionField(field: string, event: any): void {
-  const value = event.target.textContent || event.target.innerText || '';
-  
-  // Maintain LTR direction
-  this.maintainLTROnInput(event);
-  
-  switch(field) {
-    case 'patientName':
-      this.prescriptionData.patientName = value;
-      break;
-    case 'patientAge':
-      this.prescriptionData.patientAge = value;
-      break;
-    case 'date':
-      this.prescriptionData.date = value;
-      break;
-  }
-}
-
-updateMedicineField(index: number, field: string, event: any): void {
-  const value = event.target.textContent || event.target.innerText || '';
-  
-  // Maintain LTR direction
-  this.maintainLTROnInput(event);
-  
-  if (this.prescriptionData.medicines[index]) {
-    this.prescriptionData.medicines[index][field] = value;
-  }
-}
-
-// Close modal method
-closePrescriptionModal(): void {
-  if (this.currentPrescriptionModal) {
-    this.currentPrescriptionModal.hide();
-  }
-  this.editingPrescriptionIndex = null;
-  this.resetPrescriptionData();
-}
-
-// Update the savePrescription method
-savePrescription(): void {
-  // Save any unsaved changes from editable fields
-  this.savePrescriptionData();
-  
-  if (this.editingPrescriptionIndex !== null) {
-    // Update existing prescription
-    this.prescriptions[this.editingPrescriptionIndex] = {...this.prescriptionData};
-  } else {
-    // Add new prescription
-    this.prescriptions.push({...this.prescriptionData});
-  }
-  
-  // Close the modal
-  this.closePrescriptionModal();
-  
-  // Show success message
-  this.showToast('Prescription saved successfully!', 'success');
-}
-
-// View prescription method with new modal
-viewPrescription(prescription: PrescriptionData): void {
-  this.viewPrescriptionContent = this.generateViewContent(prescription);
-  
-  const modalElement = document.getElementById('prescriptionViewModal');
-  if (modalElement) {
-    if (this.currentViewModal) {
-      this.currentViewModal.dispose();
+    // Remove any existing modal instances
+    if (this.currentPrescriptionModal) {
+      this.currentPrescriptionModal.dispose();
     }
     
-    this.currentViewModal = new bootstrap.Modal(modalElement);
-    this.currentViewModal.show();
+    // Create new modal
+    this.currentPrescriptionModal = new bootstrap.Modal(modalElement, {
+      focus: true,
+      keyboard: true,
+      backdrop: 'static'
+    });
+    
+    this.currentPrescriptionModal.show();
+    
+    // Update the form fields after modal is shown
+    setTimeout(() => {
+      this.updateFormFieldsFromPrescription();
+    }, 100);
   }
 }
 
-// Generate content for view modal
-private generateViewContent(prescription: PrescriptionData): string {
-  const formattedDate = this.datePipe.transform(prescription.date || this.todayDate, 'MMMM d, yyyy') || this.todayDate;
-  
-  let medicinesHtml = '';
-  prescription.medicines.forEach((medicine, index) => {
-    medicinesHtml += `
-      <div class="medicine-item mb-3 p-3 border rounded">
-        <h6>${index + 1}. ${this.getMedicineTypeName(medicine.type)}</h6>
-        ${this.generateMedicineViewDetails(medicine)}
-      </div>
-    `;
-  });
 
-  return `
-    <div class="prescription-view">
-      <div class="text-center mb-4">
-        <h4>ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h4>
-        <p>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
-        <p>E-mail: contact@herballytouch.com | Ph: 7034110999</p>
-        <p>ഡോ. രാജന പി.ആർ., BAMS</p>
-      </div>
-      
-      <div class="patient-info mb-4">
-        <div class="row">
-          <div class="col-md-4"><strong>പേര്:</strong> ${prescription.patientName || 'Unknown Patient'}</div>
-          <div class="col-md-4"><strong>Age:</strong> ${prescription.patientAge || '___'}</div>
-          <div class="col-md-4"><strong>തീയതി:</strong> ${formattedDate}</div>
-        </div>
-      </div>
-      
-      <div class="medicines">
-        ${medicinesHtml}
-      </div>
-      
-      ${prescription.additionalNotes ? `
-        <div class="additional-notes mt-4 p-3 bg-light rounded">
-          <h6>Additional Notes:</h6>
-          <p>${prescription.additionalNotes}</p>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-// Generate medicine details for view
-private generateMedicineViewDetails(medicine: Medicine): string {
-  let details = '';
+// Add this method to handle content editable changes
+onContentEditableChange(event: any, field: string, index: number): void {
+  const value = event.target.textContent || event.target.innerText || '';
   
-  details += `<p><strong>${medicine.name || '___'}</strong></p>`;
-  
-  const foodTimingLabel = this.getFoodTimingLabel(medicine.foodTiming || 'before_after_food');
-  
-  switch(medicine.type) {
-    case 'kasayam':
-      details += `
-        <p>കഷായം ${medicine.instructions || '___'}ml എടുത്ത് ${medicine.quantity || '___'}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${medicine.powder || '___'} ഗുളിക പൊടിച്ച് ചേർത്ത് ${medicine.pills || '___'} നേരം ${foodTimingLabel} സേവിക്കുക.</p>
-      `;
-      break;
-    case 'buligha':
-      details += `
-        <p>ഗുളിക ${medicine.instructions || '___'} എണ്ണം എടുത്ത് ${medicine.powder || '___'} നേരം ${foodTimingLabel} സേവിക്കുക.</p>
-      `;
-      break;
-    // Add other cases...
-    default:
-      if (medicine.dosage) details += `<p>Dosage: ${medicine.dosage}</p>`;
-      if (medicine.instructions) details += `<p>Instructions: ${medicine.instructions}</p>`;
-      details += `<p>${foodTimingLabel} സേവിക്കുക.</p>`;
-  }
-  
-  return details;
-}
-
-// Close view modal
-closeViewModal(): void {
-  if (this.currentViewModal) {
-    this.currentViewModal.hide();
+  if (this.prescriptionData.medicines[index]) {
+    // Update the medicine object directly
+    switch(field) {
+      case 'name':
+        this.prescriptionData.medicines[index].name = value;
+        break;
+      case 'instructions':
+        this.prescriptionData.medicines[index].instructions = value;
+        break;
+      case 'pills':
+        this.prescriptionData.medicines[index].pills = value;
+        break;
+      case 'powder':
+        this.prescriptionData.medicines[index].powder = value;
+        break;
+      case 'time':
+        this.prescriptionData.medicines[index].time = value;
+        break;
+      case 'dosage':
+        this.prescriptionData.medicines[index].dosage = value;
+        break;
+      case 'quantity':
+        this.prescriptionData.medicines[index].quantity = value;
+        break;
+    }
   }
 }
 
-// Print viewed prescription
-printViewedPrescription(): void {
-  const printContent = this.generatePrintContent(this.prescriptions.find(p => this.viewPrescriptionContent.includes(p.patientName || '')) || this.prescriptions[0]);
-  
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.onload = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
-  }
-}
+
 
 editPrescription(index: number): void {
   this.editingPrescriptionIndex = index;
@@ -906,11 +682,10 @@ editPrescription(index: number): void {
   // Open the modal
   this.openPrescriptionModal();
   
-  // Small delay to ensure modal is fully rendered and force LTR
+  // Small delay to ensure modal is fully rendered
   setTimeout(() => {
     this.updateFormFieldsFromPrescription();
-    this.forceLTRDirection();
-  }, 200);
+  }, 100);
 }
 
 
@@ -919,10 +694,6 @@ private setEditableField(id: string, value: string | undefined): void {
   const element = document.getElementById(id);
   if (element) {
     element.textContent = value || '';
-    // Force LTR direction
-    element.style.direction = 'ltr';
-    element.style.textAlign = 'left';
-    element.style.unicodeBidi = 'embed';
   }
 }
 
@@ -938,14 +709,13 @@ private updateFormFieldsFromPrescription(): void {
   // Update patient name and date
   const patientNameElement = document.getElementById('patientName');
   if (patientNameElement) {
-    patientNameElement.textContent = this.prescriptionData.patientName;
+    patientNameElement.textContent = this.prescriptionData.patientName || '';
   }
 
   const patientAgeElement = document.getElementById('patientAge');
   if (patientAgeElement) {
     patientAgeElement.textContent = this.prescriptionData.patientAge || '';
   }
-
   // Update each medicine field
   this.prescriptionData.medicines.forEach((medicine, index) => {
     // Common fields
@@ -1214,12 +984,10 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
   // Common properties
   details += `<p><strong>${medicineName}</strong></p>`;
   
-  // Get food timing label
-  const foodTimingLabel = this.getFoodTimingLabel(medicine.foodTiming || 'before_after_food');
-  
   // Type-specific details
   switch(medicine.type) {
     case 'kasayam':
+      const kasayamName = this.getEditableFieldContent(`kasayamName_${index}`) || medicine.name || '';
       const kasayamInstructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
       const kasayamQuantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
       const kasayamPowder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
@@ -1227,68 +995,103 @@ private generateMedicineDetails(medicine: Medicine, index: number): string {
       
       
       details += `
-        <p>കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. </p>
-        <p>ഗുളിക ${kasayamPills} പൊടി ചേർത്ത് ${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${kasayamName}കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. 
+        ഗുളിക . പൊടിച്ച്ചേർത്ത് ${kasayamPills} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
       `;
       break;
       
     case 'buligha':
+      const bulighaName = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
       const bulighaInstructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
-      
+      const bulighaPowder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
       details += `
-        <p>ഗുളിക ${bulighaInstructions} എണ്ണം എടുത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${bulighaName}ഗുളിക ${bulighaInstructions} ml. എണ്ണംഎടുത്ത്
+         ${bulighaPowder} നേരംഭക്ഷണത്തിനുമുൻപ് / ശേഷംസേവിക്കുക.</p>
       `;
       break;
       
     case 'bhasmam':
+      const bhasmamName = this.getEditableFieldContent(`bhasmamName_${index}`) || medicine.name || '';
       const bhasmamDosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
       const bhasmamQuantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
+      const bhasmamInstructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
+      const bhasmamPowder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
       
       details += `
-        <p>ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. തേൻ / ചെറുനാരങ്ങാനീർ ചേർത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${bhasmamName} ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. ${bhasmamInstructions} ചേർത്ത് ${bhasmamPowder} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'krudham':
+      const krudhamName = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
+      const krudhamInstructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
       details += `
-        <p>ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${krudhamName} ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത ${krudhamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'suranam':
+      const suranamName = this.getEditableFieldContent(`suranamName_${index}`) || medicine.name || '';
+      const suranamInstructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
+      const suranamPowder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
+      const suranamDosage = this.getEditableFieldContent(`suranamDosage_${index}`) || medicine.dosage || '';
+      
       details += `
-        <p>ചൂർണ്ണം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${suranamName}ചൂർണ്ണം ${suranamInstructions}ml. ടീ - സ്പൂൺ എടുത്ത്  ${suranamPowder} വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് ${suranamDosage} നേരം ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'rasayanam':
+      const rasayanamName = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
+      const rasayanamInstructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
+      
       details += `
-        <p>രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${rasayanamName} രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് ${rasayanamInstructions} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     case 'lagium':
+      const lagiumName = this.getEditableFieldContent(`lagiumName${index}`) || medicine.name || '';
+    
+      const lagiumInstructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
+      const lagiumDosage = this.getEditableFieldContent(`lagiumDosage_${index}`) || medicine.dosage || '';
+
       details += `
-        <p>ലേഹ്യം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>${lagiumName}ലേഹ്യം ${lagiumInstructions} ടീ - സ്പൂൺ എടുത്ത് നേരം ${lagiumDosage} നേരം ഭക്ഷണത്തിനു മുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
       break;
       
     default:
+      const defaultTime = medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
       details += `
         <p>Type: ${medicine.type || '______'}</p>
         ${medicine.dosage ? `<p>Dosage: ${medicine.dosage}</p>` : ''}
         ${medicine.instructions ? `<p>Instructions: ${medicine.instructions}</p>` : ''}
-        <p>${foodTimingLabel} സേവിക്കുക.</p>
+        <p>നേരം: ${defaultTime} ഭക്ഷണത്തിനുമുൻപ് / ശേഷം സേവിക്കുക.</p>
       `;
   }
   
   return details;
+}
+
+viewPrescription(prescription: PrescriptionData): void {
+  // Open in a new window with proper prescription data
+  const printContent = this.generatePrintContent(prescription);
+  
+  const viewWindow = window.open('', '_blank');
+  if (viewWindow) {
+    viewWindow.document.write(printContent);
+    viewWindow.document.close();
+    
+    // Optional: Add print button to the view window
+    viewWindow.document.body.innerHTML += `
+      <div style="text-align: center; margin-top: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          Print Prescription
+        </button>
+      </div>
+    `;
+  }
 }
 
   
@@ -1315,39 +1118,48 @@ private savePrescriptionData(): void {
     // Type-specific fields
     switch(medicine.type) {
       case 'kasayam':
-        medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
+         medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
         medicine.pills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
         medicine.quantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
         medicine.powder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
-        medicine.time = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.time = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || '';
         break;
         
       case 'buligha':
-        medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
         medicine.name = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
-        medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
+      medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
         break;
         
       case 'bhasmam':
-        medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
-        medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
-        medicine.time = this.getEditableFieldContent(`bhasmamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`bhasmamName_${index}`) || medicine.name || '';
+      medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
+      medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
+      medicine.instructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
         break;
         
       case 'krudham':
-        medicine.time = this.getEditableFieldContent(`krudhamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
         break;
         
       case 'suranam':
-        medicine.time = this.getEditableFieldContent(`suranamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`suranamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
+      medicine.powder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
+      medicine.dosage = this.getEditableFieldContent(`suranamDosage_${index}`) || medicine.dosage || '';
         break;
         
       case 'rasayanam':
-        medicine.time = this.getEditableFieldContent(`rasayanamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        medicine.name = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
         break;
         
       case 'lagium':
-        medicine.time = this.getEditableFieldContent(`lagiumTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+         medicine.name = this.getEditableFieldContent(`lagiumName_${index}`) || medicine.name || '';
+      medicine.instructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
+      medicine.dosage = this.getEditableFieldContent(`lagiumDosage_${index}`) || medicine.dosage || '';
         break;
     }
   });
@@ -1421,7 +1233,6 @@ openProductDropdown(): void {
 }
 
 
-
 selectCustomer(customer: any): void {
   // Build the full address string
   const addressParts = [
@@ -1435,8 +1246,8 @@ selectCustomer(customer: any): void {
   
   const fullAddress = addressParts.join(', ');
   
-  // Prioritize mobile over phone number, then alternate contact, then landline
-  const phoneNumber = customer.mobile || customer.phone || customer.alternateContact || customer.landline || '';
+  // For shipping address, use billing address by default
+  const shippingAddress = fullAddress;
 
   // Format the date of birth for the input field
   let formattedDob = '';
@@ -1447,22 +1258,31 @@ selectCustomer(customer: any): void {
       formattedDob = this.datePipe.transform(dobDate, 'yyyy-MM-dd') || '';
     }
   }
-
+  
+  // Update the form with the found customer
   this.saleForm.patchValue({
     customer: customer.id,
-    customerName: customer.displayName,
-    customerPhone: phoneNumber,
+    customerName: customer.displayName || 
+                `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
+                customer.businessName,
+    customerPhone: customer.mobile || customer.phone || '',
+    alternateContact: customer.alternateContact || '',
     customerEmail: customer.email || '',
+    customerAge: customer.age || null,
+    customerDob: formattedDob,
+    customerGender: customer.gender || '',
     billingAddress: fullAddress,
     shippingAddress: fullAddress,
-    alternateContact: customer.alternateContact || '',
-    customerAge: customer.age || null,
-    customerDob: formattedDob, 
-    customerGender: customer.gender || '',
-    customerOccupation: customer.occupation || '',
-    creditLimit: customer.creditLimit || 0,
-    otherData: customer.otherData || customer.notes || '',
+    creditLimit: customer.creditLimit || 0
   });
+  
+  // Store customer details for prescription
+  this.currentCustomerForPrescription = {
+    name: customer.displayName || 
+         `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
+         customer.businessName,
+    age: customer.age || null
+  };
   
   this.customerSearchInput = customer.displayName;
   this.showCustomerDropdown = false;
@@ -1899,7 +1719,6 @@ selectProductForInterested(product: any): void {
 }
 
 
-
 ngOnInit(): void {
     this.initializeForm();
   this.setupValueChanges();
@@ -2058,6 +1877,7 @@ private async prefillCurrentUser(): Promise<void> {
       const loggedInUser = this.users.find(u => u.id === currentUser.uid);
       
       if (loggedInUser) {
+        // Set the form value to the logged-in user
         this.saleForm.patchValue({
           addedBy: loggedInUser.id
         });
@@ -2066,6 +1886,11 @@ private async prefillCurrentUser(): Promise<void> {
         const commissionPercent = await this.getAgentCommission(loggedInUser.id);
         this.defaultProduct.commissionPercent = commissionPercent;
         this.updateDefaultProduct();
+      } else {
+        // If user not found in users list, still set the current user
+        this.saleForm.patchValue({
+          addedBy: currentUser.uid
+        });
       }
     }
   } catch (error) {
@@ -2241,14 +2066,11 @@ private calculateProductTax(product: Product): void {
   }
 }
 
-
 calculateTotalPayable(): void {
   // Get form values
   const discount = this.saleForm.get('discountAmount')?.value || 0;
-   const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
   const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    const shippingTax = shippingBeforeTax * (taxRate / 100);
-
+  const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
   
   // Get packing charge from PP service or COD
   const packingCharge = this.ppServiceData?.packingCharge || this.codData?.packingCharge || 0;
@@ -2477,21 +2299,27 @@ checkPhoneExists() {
     });
   }
 
-  async onUserSelect(userId: string): Promise<void> {
-    if (!userId) return;
-    
-    const commissionPercent = await this.getAgentCommission(userId);
-    
-    // Update all products with this commission percentage
-    this.products.forEach(product => {
-      product.commissionPercent = commissionPercent;
-      this.updateProduct(this.products.indexOf(product));
-    });
-    
-    // Also update the default product
-    this.defaultProduct.commissionPercent = commissionPercent;
-    this.updateDefaultProduct();
+async onUserSelect(userId: string): Promise<void> {
+  if (!userId) return;
+  
+  // Get commission percentage for selected user
+  const commissionPercent = await this.getAgentCommission(userId);
+  
+  // Update all products with this commission percentage
+  this.products.forEach(product => {
+    product.commissionPercent = commissionPercent;
+    this.updateProduct(this.products.indexOf(product));
+  });
+  
+  // Also update the default product
+  this.defaultProduct.commissionPercent = commissionPercent;
+  this.updateDefaultProduct();
+  
+  // If current user is selected, you might want to do something special
+  if (userId === this.authService.currentUserValue?.uid) {
+    console.log('Current user selected as incentive user');
   }
+}
 
 filterCustomers(): void {
   if (!this.customerSearchInput) {
@@ -2840,58 +2668,83 @@ loadCustomers(): Promise<void> {
     );
   }
  
-initializeForm(): void {
-  this.saleForm = this.fb.group({
-    customer: ['', Validators.required],
-    customerName: ['', Validators.required],
-    invoiceNo: ['', Validators.required],
+  initializeForm(): void {
+    this.saleForm = this.fb.group({
+      customer: ['', Validators.required],
+      customerName: [''],
+  invoiceNo: ['', Validators.required],
     orderNo: ['', Validators.required],
-    customerPhone: ['', Validators.required],
-    transactionId: [''],
-    productInterested: [''],
-    status: ['Pending', Validators.required],
-    paymentStatus: ['Due'],
-    alternateContact: [''],
-    customerAge: [null],
+    customerPhone: ['', Validators.required],  // Make sure this exists
+      transactionId: [''],
+      productInterested: [''], // Add this line
+      status: ['Pending', Validators.required], // Set default to 'Pending'
+      paymentStatus: ['Due'],
+    alternateContact: [''], // Add this line
+   customerAge: [null],
     customerDob: [null],
     customerGender: [''],
-    customerEmail: [''],
-    shippingDetails: [''],
-    roundOff: [0],
-    productTaxAmount: [0],
+      customerEmail: [''],
+
+          shippingDetails: [''], // Add this new control
+
+      roundOff: [0], // Add this line
+   productTaxAmount: [0],
     shippingTaxAmount: [0],
     codTaxAmount: [0],
     ppTaxAmount: [0],
-    customerSearch: [''],
-    customerOccupation: [''],
-    creditLimit: [0],
-    otherData: [''],
-    paymentAccount: ['', Validators.required],
-    typeOfService: [''],
-    billingAddress: ['', Validators.required],
-    shippingAddress: ['', Validators.required],
-    saleDate: [this.todayDate, Validators.required],
-    businessLocation: ['', Validators.required],
-    invoiceScheme: [''],
-    document: [null],
-    discountType: ['Percentage'],
-    discountAmount: [0, [Validators.min(0)]],
-    orderTax: [18, [Validators.min(0), Validators.max(100)]],
-    sellNote: [''],
-    shippingStatus: [''],
-    deliveryPerson: [''],
-    shippingDocuments: [null],
-    totalPayable: [0],
-    paymentAmount: [0, [Validators.min(0)]],
-    paidOn: [this.todayDate],
-    paymentMethod: ['', Validators.required],
-    paymentNote: [''],
-    changeReturn: [0],
-    balance: [0],
-      shippingCharges: [0, [Validators.min(0)]], // Before tax
-    shippingChargesAfterTax: [0, [Validators.min(0)]] ,// After tax
-    addedBy: ['', Validators.required]
-  });
+      customerSearch: [''],
+      customerOccupation: [''],
+      creditLimit: [0],
+      otherData: [''],
+      paymentAccount: ['', Validators.required],
+    prescriptions: [[]], // Optional (no Validators.required)
+
+      typeOfService: [''],
+      billingAddress: [''],
+      shippingAddress: [''],
+      saleDate: [this.todayDate, Validators.required],
+      businessLocation: ['', Validators.required],
+      invoiceScheme: [''],
+      document: [null],
+      discountType: ['Percentage'],
+      discountAmount: [0, [Validators.min(0)]],
+    orderTax: [18, [Validators.min(0), Validators.max(100)]], // Set default to 18%
+      sellNote: [''],
+      shippingCharges: [0, [Validators.min(0)]],
+      shippingStatus: [''],
+      deliveryPerson: [''],
+      shippingDocuments: [null],
+      totalPayable: [0],
+      paymentAmount: [0, [Validators.required, Validators.min(0)]],
+      paidOn: [this.todayDate],
+      paymentMethod: ['', Validators.required],
+      paymentNote: [''],
+      changeReturn: [0],
+      balance: [0],
+      addedBy: ['', Validators.required]
+      
+    });
+
+    this.saleForm.get('addedBy')?.valueChanges.subscribe(userId => {
+      this.onUserSelect(userId);
+    });
+    this.saleForm.get('status')?.valueChanges.subscribe(status => {
+      if (status === 'Pending') {
+        this.saleForm.patchValue({ paymentStatus: 'Due' });
+      }
+    });
+  this.afterTaxShippingControl.valueChanges.subscribe(value => {
+    this.onAfterTaxShippingChange(value);
+      this.saleForm.setValidators([this.atLeastOneProductValidator.bind(this)]);
+
+
+});
+  }
+  // Custom validator to ensure at least one product is added
+private atLeastOneProductValidator(): ValidationErrors | null {
+  return (this.products.length > 0 || 
+         (this.defaultProduct.name && this.defaultProduct.quantity > 0)) ? 
+         null : { noProducts: true };
 }
 onAfterTaxShippingChange(afterTaxValue: string | number | null): void {
   if (!afterTaxValue) return;
@@ -3013,22 +2866,20 @@ private populateProductAtIndex(selectedProduct: any, index: number): void {
     this.saleForm.get('orderTax')?.valueChanges.subscribe(() => {
       this.calculateTotalPayable();
     });
-
+this.saleForm.get('customer')?.valueChanges.subscribe(customerId => {
+    if (customerId) {
+      const customer = this.customers.find(c => c.id === customerId);
+      if (customer) {
+        this.prescriptionData.patientName = customer.displayName || 
+                                          `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
+                                          customer.businessName;
+      }
+    }
+  });
     this.saleForm.get('shippingCharges')?.valueChanges.subscribe(() => {
       this.calculateTotalPayable();
     });
-  this.saleForm.get('shippingCharges')?.valueChanges.subscribe(value => {
-    if (this.saleForm.get('shippingCharges')?.dirty) {
-      this.calculateAfterTaxShipping();
-    }
-  });
 
-  // When after-tax shipping changes, calculate before-tax
-  this.saleForm.get('shippingChargesAfterTax')?.valueChanges.subscribe(value => {
-    if (this.saleForm.get('shippingChargesAfterTax')?.dirty) {
-      this.calculateBeforeTaxShipping();
-    }
-  });
     this.saleForm.get('discountType')?.valueChanges.subscribe(() => {
       this.calculateTotalPayable();
     });
@@ -3085,36 +2936,6 @@ updateDefaultProduct(): void {
   this.calculateItemsTotal();
   this.calculateTotalPayable();
   this.calculateTaxes();
-}
-calculateAfterTaxShipping(): void {
-  const beforeTax = this.saleForm.get('shippingCharges')?.value || 0;
-  const taxRate = this.saleForm.get('orderTax')?.value || 0;
-  
-  const afterTax = beforeTax * (1 + (taxRate / 100));
-  
-  // Update after-tax field without triggering its valueChanges
-  this.saleForm.patchValue({
-    shippingChargesAfterTax: parseFloat(afterTax.toFixed(2))
-  }, { emitEvent: false });
-  
-  this.calculateTotalPayable();
-}
-
-calculateBeforeTaxShipping(): void {
-  const afterTax = this.saleForm.get('shippingChargesAfterTax')?.value || 0;
-  const taxRate = this.saleForm.get('orderTax')?.value || 0;
-  
-  let beforeTax = afterTax;
-  if (taxRate > 0) {
-    beforeTax = afterTax / (1 + (taxRate / 100));
-  }
-  
-  // Update before-tax field without triggering its valueChanges
-  this.saleForm.patchValue({
-    shippingCharges: parseFloat(beforeTax.toFixed(2))
-  }, { emitEvent: false });
-  
-  this.calculateTotalPayable();
 }
 
 updateProduct(index: number): void {
@@ -3328,13 +3149,36 @@ calculateShippingWithTax(): number {
     return uploadedUrls;
   }
 
+savePrescription(): void {
+  // First save any changes from editable fields
+  this.savePrescriptionData();
+  
+  if (this.editingPrescriptionIndex !== null) {
+    // Update existing prescription
+    this.prescriptions[this.editingPrescriptionIndex] = {...this.prescriptionData};
+  } else {
+    // Add new prescription
+    this.prescriptions.push({...this.prescriptionData});
+  }
+  
+  // Close the modal
+  if (this.currentPrescriptionModal) {
+    this.currentPrescriptionModal.hide();
+  }
+  
+  this.editingPrescriptionIndex = null;
+  this.resetPrescriptionData();
 
+  
+  // Show success message
+  this.showToast('Prescription saved successfully!', 'success');
+}
 
 resetPrescriptionData(): void {
+  const currentPatientName = this.prescriptionData.patientName;
   this.prescriptionData = {
     medicines: [],
-    patientName: this.saleForm.get('customerName')?.value || '',
-    patientAge: this.saleForm.get('customerAge')?.value?.toString() || '',
+    patientName: currentPatientName || this.saleForm.get('customerName')?.value || '',
     date: this.todayDate,
     additionalNotes: ''
   };
@@ -3361,162 +3205,83 @@ calculateRoundOff(): void {
   this.calculateBalance();
 }
 
-// Helper function to clean undefined values from objects
-private cleanObjectForFirestore(obj: any): any {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
   
-  if (Array.isArray(obj)) {
-    return obj.map(item => this.cleanObjectForFirestore(item)).filter(item => item !== undefined);
-  }
-  
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = this.cleanObjectForFirestore(obj[key]);
-        if (value !== undefined) {
-          cleaned[key] = value;
-        }
-      }
-    }
-    return cleaned;
-  }
-  
-  return obj;
-}
 
-// Helper function to create a clean prescription object
-private createCleanPrescription(): any {
-  if (!this.prescriptions || this.prescriptions.length === 0) {
-    return null;
-  }
+  async saveSale(): Promise<void> {
+    this.isSubmitting = true; // Disable the button
 
-  return this.prescriptions.map(prescription => ({
-    patientName: prescription.patientName || '',
-    patientAge: prescription.patientAge || '',
-    date: prescription.date || this.todayDate,
-    additionalNotes: prescription.additionalNotes || '',
-    medicines: (prescription.medicines || []).map(medicine => ({
-      name: medicine.name || '',
-      type: medicine.type || '',
-      dosage: medicine.dosage || '',
-      instructions: medicine.instructions || '',
-      time: medicine.time || '',
-      quantity: medicine.quantity || '',
-      pills: medicine.pills || '',
-      powder: medicine.powder || '',
-      foodTiming: medicine.foodTiming || 'before_after_food' // Include food timing
-    }))
-  }));
-}
-private getFieldLabel(fieldName: string): string {
-  const fieldLabels: {[key: string]: string} = {
-    'customer': 'Customer',
-    'customerName': 'Customer Name',
-    'invoiceNo': 'Invoice Number',
-    'orderNo': 'Order Number',
-    'customerPhone': 'Customer Phone',
-    'paymentAccount': 'Payment Account',
-    'billingAddress': 'Billing Address',
-    'shippingAddress': 'Shipping Address',
-    'saleDate': 'Sale Date',
-    'businessLocation': 'Business Location',
-    'paymentMethod': 'Payment Method',
-    'addedBy': 'Sales Agent'
-  };
-  
-  return fieldLabels[fieldName] || fieldName;
-}
-async saveSale(): Promise<void> {
-  // Prevent multiple submissions
-  if (this.isSubmitting) {
-    return;
-  }
-  
-  this.isSubmitting = true;
-  
   try {
-    // Mark all fields as touched to show validation errors
+    // Form validation
+ if (!this.saleForm.valid) {
     this.markFormGroupTouched(this.saleForm);
     
-    // Check if form is invalid
-    if (this.saleForm.invalid) {
-      // Find the first invalid control and focus on it
-      const invalidControls = this.findInvalidControls();
-      if (invalidControls.length > 0) {
-        const firstInvalid = invalidControls[0];
-        this.focusOnField(firstInvalid.name);
-        const fieldName = this.getFieldLabel(firstInvalid.name);
-        this.showToast(`Please fill in the required field: ${fieldName}`, 'error');
-      } else {
-        this.showToast('Please fill in all required fields', 'error');
-      }
-            this.isSubmitting = false;
 
-      return;
-    }
-
-    // Check if products exist
-    if (this.products.length === 0 &&
-        !(this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0)) {
+      if (this.products.length === 0 && 
+        !(this.defaultProduct.name || this.defaultProduct.quantity > 0)) {
       this.showToast('Please add at least one product', 'error');
+    }
+
+      Object.keys(this.saleForm.controls).forEach(key => {
+        const control = this.saleForm.get(key);
+        if (control?.invalid) {
+          console.log(`Invalid field: ${key}, Errors:`, control.errors);
+        }
+      });
       return;
     }
 
+    // Generate document numbers
     const invoiceNumber = await this.generateInvoiceNumber();
     const orderNumber = await this.generateOrderNumber();
-
-    // Calculate comprehensive tax amounts
-    const productTax = this.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
-    const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-      ? (this.defaultProduct.taxAmount || 0) 
-      : 0;
-    
-    const shippingTax = (this.saleForm.get('shippingCharges')?.value || 0) *
-      (this.saleForm.get('orderTax')?.value || 0) / 100;
-    const totalTax = productTax + defaultProductTax + shippingTax;
-
-    // Calculate tax breakdown
-    const cgstTotal = this.products.reduce((sum, p) => sum + (p.cgstAmount || 0), 0) + 
-                     (this.defaultProduct.cgstAmount || 0);
-    const sgstTotal = this.products.reduce((sum, p) => sum +  (p.sgstAmount || 0), 0) + 
-                     (this.defaultProduct.sgstAmount || 0);
-    const igstTotal = this.products.reduce((sum, p) => sum + (p.igstAmount || 0), 0) + 
-                     (this.defaultProduct.igstAmount || 0);
-
     this.saleForm.patchValue({
       invoiceNo: invoiceNumber,
       orderNo: orderNumber
     });
 
+    // Delete lead if converting from lead
     if (this.leadIdToDelete) {
       await this.leadService.deleteLead(this.leadIdToDelete);
       console.log('Lead deleted after sale creation');
     }
 
+    // Validate payment account
     const paymentAccountId = this.saleForm.get('paymentAccount')?.value;
-    const selectedPaymentAccount = paymentAccountId ? this.paymentAccounts.find(acc => acc.id === paymentAccountId) : null;
+    if (!paymentAccountId) {
+      alert('Please select a payment account');
+      return;
+    }
+    const selectedPaymentAccount = this.paymentAccounts.find(acc => acc.id === paymentAccountId);
+    if (!selectedPaymentAccount) {
+      alert('Selected payment account not found');
+      return;
+    }
 
+    // Validate customer
     const selectedCustomerId = this.saleForm.get('customer')?.value;
-    const selectedCustomer = selectedCustomerId ? this.customers.find(c => c.id === selectedCustomerId) : null;
-    const customerName = selectedCustomer?.displayName || 'Walk-in Customer';
+    if (!selectedCustomerId) {
+      alert('Please select a customer');
+      return;
+    }
+    const selectedCustomer = this.customers.find(c => c.id === selectedCustomerId);
+    const customerName = selectedCustomer?.displayName || 'Unknown Customer';
 
+    // Get location, service, and user details
     const selectedLocationId = this.saleForm.get('businessLocation')?.value;
-    const selectedLocation = selectedLocationId ? this.businessLocations.find(loc => loc.id === selectedLocationId) : null;
+    const selectedLocation = this.businessLocations.find(loc => loc.id === selectedLocationId);
     const locationName = selectedLocation?.name || '';
 
     const selectedServiceId = this.saleForm.get('typeOfService')?.value;
-    const selectedService = selectedServiceId ? this.serviceTypes.find(s => s.id === selectedServiceId) : null;
+    const selectedService = this.serviceTypes.find(s => s.id === selectedServiceId);
     const serviceName = selectedService?.name || '';
 
     const selectedUserId = this.saleForm.get('addedBy')?.value;
-    const selectedUser = selectedUserId ? this.users.find(u => u.id === selectedUserId) : null;
+    const selectedUser = this.users.find(u => u.id === selectedUserId);
     const userName = selectedUser?.displayName || selectedUser?.name || selectedUser?.email || 'System User';
 
-    const commissionPercent = selectedUserId ? await this.getAgentCommission(selectedUserId) : 0;
+    // Calculate commission
+    const commissionPercent = await this.getAgentCommission(selectedUserId);
 
+    // Prepare products data
     const productsToSave = [...this.products].map(product => ({
       id: product.id || '',
       name: product.name || '',
@@ -3539,6 +3304,7 @@ async saveSale(): Promise<void> {
       priceBeforeTax: product.priceBeforeTax || 0
     }));
 
+    // Add default product if exists
     if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
       productsToSave.push({
         id: '',
@@ -3563,6 +3329,52 @@ async saveSale(): Promise<void> {
       });
     }
 
+    if (productsToSave.length === 0) {
+      alert('Please add at least one product');
+      return;
+    }
+
+    // Calculate tax amounts
+    const productTax = this.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
+    const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
+      ? (this.defaultProduct.taxAmount || 0) 
+      : 0;
+    
+    const shippingTax = (this.saleForm.get('shippingCharges')?.value || 0) *
+      (this.saleForm.get('orderTax')?.value || 0) / 100;
+    const totalTax = productTax + defaultProductTax + shippingTax;
+
+    // Calculate tax breakdown
+    const cgstTotal = this.products.reduce((sum, p) => sum + (p.cgstAmount || 0), 0) + 
+                     (this.defaultProduct.cgstAmount || 0);
+    const sgstTotal = this.products.reduce((sum, p) => sum + (p.sgstAmount || 0), 0) + 
+                     (this.defaultProduct.sgstAmount || 0);
+    const igstTotal = this.products.reduce((sum, p) => sum + (p.igstAmount || 0), 0) + 
+                     (this.defaultProduct.igstAmount || 0);
+
+    // Prepare prescription data with proper fallbacks
+    const prescriptionsToSave = this.prescriptions.length > 0 
+      ? this.prescriptions.map(prescription => ({
+          patientName: prescription.patientName || customerName || 'Unknown Patient',
+          patientAge: prescription.patientAge || '',
+          date: prescription.date || this.todayDate,
+          medicines: prescription.medicines.map(medicine => ({
+            name: medicine.name || '',
+            type: medicine.type || '',
+            dosage: medicine.dosage || '',
+            instructions: medicine.instructions || '',
+            quantity: medicine.quantity || '',
+            powder: medicine.powder || '',
+            pills: medicine.pills || '',
+            time: medicine.time || ''
+          })),
+          additionalNotes: prescription.additionalNotes || '',
+          doctorName: this.currentUser,
+          createdAt: new Date()
+        }))
+      : null;
+
+    // Get lead ID if converting from lead
     let leadId: string | null = null;
     const navigation = this.router.getCurrentNavigation();
     const state = navigation?.extras?.state as { fromLead: boolean, leadData: any };
@@ -3577,21 +3389,21 @@ async saveSale(): Promise<void> {
           leadId = parsedData.leadId;
           localStorage.removeItem('leadForSalesOrder');
         } catch (error) {
+              this.isSubmitting = false; // Re-enable on error
+
           console.error('Error parsing lead data:', error);
         }
       }
     }
 
-    // Create clean prescription data
-    const cleanPrescriptions = this.createCleanPrescription();
-
+    // Prepare sale data with all required fields
     const saleData: any = {
       ...this.saleForm.value,
       invoiceNo: invoiceNumber,
       orderNo: orderNumber,
-      prescriptions: cleanPrescriptions,
-      
-      // Comprehensive tax information
+      prescriptions: prescriptionsToSave,
+
+      // Tax information
       taxAmount: parseFloat(totalTax.toFixed(2)),
       taxDetails: {
         cgst: parseFloat(cgstTotal.toFixed(2)),
@@ -3602,37 +3414,48 @@ async saveSale(): Promise<void> {
       productTaxAmount: parseFloat((productTax + defaultProductTax).toFixed(2)),
       shippingTaxAmount: parseFloat(shippingTax.toFixed(2)),
       
+      // Payment information
       orderTax: this.saleForm.get('orderTax')?.value || 0,
-      paymentAccountId: selectedPaymentAccount?.id || '',
-      paymentAccountName: selectedPaymentAccount?.name || '',
-      paymentAccountType: selectedPaymentAccount?.accountType || '',
+      paymentAccountId: selectedPaymentAccount.id,
+      paymentAccountName: selectedPaymentAccount.name || '',
+      paymentAccountType: selectedPaymentAccount.accountType || '',
+      
+      // Service information
       ppServiceData: this.ppServiceData || null,
       hasPpService: !!this.ppServiceData,
-      prescription: cleanPrescriptions && cleanPrescriptions.length > 0 ? cleanPrescriptions[0] : null,
+      codData: this.codData || null,
+      hasCod: !!this.codData,
+      
+      // Status information
       status: this.saleForm.get('status')?.value || 'Pending',
       paymentStatus: this.saleForm.get('paymentStatus')?.value ||
         (this.saleForm.get('status')?.value === 'Pending' ? 'Due' : 'Paid'),
-      codData: this.codData || null,
-      hasCod: !!this.codData,
-      shippingDocuments: [],
-      customerId: selectedCustomerId || '',
+      
+      // Customer information
+      customerId: selectedCustomerId,
       customer: customerName,
-      businessLocationId: selectedLocationId || '',
+      businessLocationId: selectedLocationId,
       businessLocation: locationName,
       location: locationName,
-      transactionId: this.saleForm.get('transactionId')?.value || '',
-      typeOfService: selectedServiceId || '',
-      typeOfServiceName: serviceName,
+      
+      // Shipping information
+      shippingDocuments: [],
       shippingCharges: this.saleForm.get('shippingCharges')?.value || 0,
       shippingTotal: this.calculateShippingWithTax ? this.calculateShippingWithTax() :
         (this.saleForm.get('shippingCharges')?.value || 0),
+      
+      // Product information
+      products: productsToSave,
+      itemsTotal: this.itemsTotal || 0,
       subtotal: this.itemsTotal || 0,
       totalBeforeTax: (this.itemsTotal || 0) - totalTax,
       totalPayable: this.saleForm.get('totalPayable')?.value || 0,
-      products: productsToSave,
-      itemsTotal: this.itemsTotal || 0,
+      
+      // Commission information
       totalCommission: this.totalCommission || 0,
       commissionPercentage: commissionPercent || 0,
+      
+      // Metadata
       createdAt: new Date(),
       updatedAt: new Date(),
       convertedFromQuotation: this.isFromQuotation || false,
@@ -3640,105 +3463,48 @@ async saveSale(): Promise<void> {
       leadId: leadId || '',
       addedBy: selectedUserId || '',
       addedByDisplayName: userName,
-      interestedProductIds: this.selectedProductsForInterested.map(p => p.id || '') || []
+      interestedProductIds: this.selectedProductsForInterested.map(p => p.id || '') || [],
+      
+      // Additional fields
+      transactionId: this.saleForm.get('transactionId')?.value || '',
+      typeOfService: selectedServiceId || '',
+      typeOfServiceName: serviceName
     };
 
-    // Clean the entire sale data object to remove undefined values
-    const cleanSaleData = this.cleanObjectForFirestore(saleData);
-
-    console.log('Sending sale data with tax details:', cleanSaleData);
-
-    const saleId = await this.saleService.addSale(cleanSaleData);
-
-    // Save prescription separately if it exists
-    if (cleanPrescriptions && cleanPrescriptions.length > 0) {
-      try {
-        await this.saleService.savePrescription({
-          patientName: cleanPrescriptions[0].patientName || 'Unknown Patient',
-          date: this.todayDate,
-          medicines: cleanPrescriptions[0].medicines || [],
-          doctorName: this.currentUser,
-          createdAt: new Date(),
-        });
-      } catch (prescriptionError) {
-        console.error('Error saving prescription:', prescriptionError);
-        // Don't fail the entire sale if prescription save fails
-        this.showToast('Sale saved successfully, but prescription could not be saved', 'info');
+    // Ensure no undefined values in the sale data
+    Object.keys(saleData).forEach(key => {
+      if (saleData[key] === undefined) {
+        saleData[key] = null;
       }
-    }
+    });
 
+    console.log('Sending sale data:', saleData);
+    const saleId = await this.saleService.addSale(saleData);
+
+    // Update lead status if converted from lead
     if (leadId) {
       try {
         await this.leadService.updateLead(leadId, {
           status: 'Converted to Sales Order',
           convertedAt: new Date(),
-          convertedTo: 'sales-order/' + saleId,
           lifeStage: 'Customer',
           dealStatus: 'Won'
         });
       } catch (leadError) {
         console.error('Error updating lead status:', leadError);
-        // Don't fail the entire sale if lead update fails
-        this.showToast('Sale saved successfully, but lead status could not be updated', 'info');
       }
     }
 
-    // Show success message
-    this.showToast(`Sale added successfully!\nInvoice: ${invoiceNumber}\nOrder: ${orderNumber}`, 'success');
-    
-    // Navigate after a small delay to allow user to see the success message
-    setTimeout(() => {
-      this.router.navigate(['/sales-order']);
-    }, 1500);
-
+    alert(`Sale added successfully!\nInvoice: ${invoiceNumber}\nOrder: ${orderNumber}`);
+    this.router.navigate(['/sales-order']);
   } catch (error: any) {
     console.error('Save sale error:', error);
     let errorMessage = 'Error adding sale. ';
     if (error.code) errorMessage += `Error code: ${error.code}. `;
     errorMessage += error.message || 'Please try again.';
-    this.showToast(errorMessage, 'error');
-  } finally {
-    this.isSubmitting = false;
+    alert(errorMessage);
   }
 }
-
-// Helper methods to support the enhanced validation
-private findInvalidControls(): { name: string; control: any }[] {
-  const invalid = [];
-  const controls = this.saleForm.controls;
-  for (const name in controls) {
-    if (controls[name].invalid) {
-      invalid.push({ name, control: controls[name] });
-    }
-  }
-  return invalid;
-  
-}
-
-private markFormGroupTouched(formGroup: FormGroup): void {
-  Object.keys(formGroup.controls).forEach(key => {
-    const control = formGroup.get(key);
-    control?.markAsTouched();
-    
-    if (control instanceof FormGroup) {
-      this.markFormGroupTouched(control);
-    }
-  });
-}
-
-private focusOnField(fieldName: string): void {
-  // Try to find and focus on the field element
-  const element = document.querySelector(`[formControlName="${fieldName}"]`) as HTMLElement;
-  if (element) {
-    element.focus();
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-}
-
-
-
-
-
 private async generateAndSetNumbers(): Promise<void> {
   try {
     // Generate invoice number first
@@ -3802,7 +3568,14 @@ private async generateOrderNumber(): Promise<string> {
     return `ORD-${fallbackNumber}`; // Fallback random number
   }
 }
-
+  private markFormGroupTouched(formGroup: FormGroup): void {
+    Object.values(formGroup.controls).forEach(control => {
+      control.markAsTouched();
+      if (control instanceof FormGroup) {
+        this.markFormGroupTouched(control);
+      }
+    });
+  }
 
 // Fix 2: Update the resetForm() method
 resetForm(): void {
@@ -3843,22 +3616,6 @@ resetForm(): void {
   this.saleForm.markAsPristine();
   this.saleForm.markAsUntouched();
 }
-onContentEditableChange(event: Event, field: string, index?: number): void {
-  const element = event.target as HTMLElement;
-  const value = element.innerText.trim();
-
-  if (index !== undefined) {
-    this.prescriptionData.medicines[index][field as keyof Medicine] = value;
-  } else {
-    // Only assign value if the field is not 'medicines'
-    if (field !== 'medicines') {
-      (this.prescriptionData as any)[field] = value;
-    }
-  }
-
-  this.changeDetectorRef.detectChanges();
-}
-
 }
 
 function then(arg0: () => void) {

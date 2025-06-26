@@ -611,8 +611,8 @@ select:focus {
 .filter-sidebar {
   position: fixed;
   top: 0;
-  right: -320px;
-  width: 320px;
+  right: -380px;
+  width: 360px;
   height: 100vh;
   background-color: #ffffff;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
@@ -760,6 +760,7 @@ select:focus {
   left: 0;
   height: 100%;
   width: 100%;
+  max-width:30%;
   background: rgba(0, 0, 0, 0.3);
   opacity: 0;
   visibility: hidden;
@@ -1572,6 +1573,24 @@ label {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   scrollbar-width: thin; /* For Firefox */
   scrollbar-color: #cbd5e0 #f8f9fa; /* For Firefox */
+}
+/* Container that allows scrolling */
+.table-wrapper {
+  max-height: 600px; /* Adjust height based on your layout */
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #ddd;
+}
+
+/* Make table headers sticky */
+.customer-table thead th {
+  position: sticky;
+  top: 0;
+  background: #ffffff; /* Prevent transparency over rows */
+  z-index: 10;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); /* Optional shadow for effect */
+  padding: 8px;
+  white-space: nowrap; /* Avoid wrapping if you want compact headers */
 }
 
 /* Scrollbar styling for Webkit browsers (Chrome, Safari, newer Edge) */

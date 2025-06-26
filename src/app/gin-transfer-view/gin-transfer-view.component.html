@@ -1,49 +1,76 @@
 <div class="dialog-header">
-  <h2 mat-dialog-title>GIN Transfer Details</h2>
+  <h2 mat-dialog-title>GIN Transfer Details - {{data.transfer.referenceNo}}</h2>
   <button mat-icon-button mat-dialog-close class="close-button">
     <mat-icon>close</mat-icon>
   </button>
 </div>
 
 <mat-dialog-content>
-  <table class="gin-details-table">
-    <tr>
-      <th>Reference No:</th>
-      <td>{{data.transfer.referenceNo}}</td>
-    </tr>
-    <tr>
-      <th>Date:</th>
-      <td>{{data.transfer.date | date:'mediumDate'}}</td>
-    </tr>
-    <tr>
-      <th>From Location:</th>
-      <td>{{data.getLocationName(data.transfer.locationFrom)}}</td>
-    </tr>
-    <tr>
-      <th>To Location:</th>
-      <td>{{data.getLocationName(data.transfer.locationTo)}}</td>
-    </tr>
-    <tr>
-      <th>Status:</th>
-      <td>
-        <span class="status-badge" [ngClass]="data.transfer.status.toLowerCase()">
-          {{data.transfer.status}}
-        </span>
-      </td>
-    </tr>
-    <tr>
-      <th>Shipping Charges:</th>
-      <td>₹ {{data.transfer.shippingCharges.toFixed(2)}}</td>
-    </tr>
-    <tr>
-      <th>Total Amount:</th>
-      <td>₹ {{data.transfer.totalAmount.toFixed(2)}}</td>
-    </tr>
-    <tr *ngIf="data.transfer.additionalNotes">
-      <th>Additional Notes:</th>
-      <td>{{data.transfer.additionalNotes}}</td>
-    </tr>
-  </table>
+  <div class="transfer-details-container">
+    <div class="details-section">
+      <h3>Basic Information</h3>
+      <table class="gin-details-table">
+        <tr>
+          <th>Reference No:</th>
+          <td>{{data.transfer.referenceNo}}</td>
+        </tr>
+       
+        <tr>
+          <th>Status:</th>
+          <td>
+            <span class="status-badge" [ngClass]="data.transfer.status.toLowerCase()">
+              {{data.transfer.status}}
+            </span>
+          </td>
+        </tr>
+       
+        <tr *ngIf="data.transfer.additionalNotes">
+          <th>Additional Notes:</th>
+          <td>{{data.transfer.additionalNotes}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="locations-section">
+      <h3>Locations</h3>
+      <table class="gin-details-table">
+        <tr>
+          <th>From Location:</th>
+          <td>{{data.getLocationName(data.transfer.locationFrom)}}</td>
+        </tr>
+        <tr>
+          <th>To Location:</th>
+          <td>{{data.getLocationName(data.transfer.locationTo)}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="products-section" *ngIf="data.transfer.items && data.transfer.items.length > 0">
+      <h3>Products</h3>
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Product Name</th>
+            <th>SKU</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+          
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of data.transfer.items; let i = index">
+            <td>{{i + 1}}</td>
+            <td>{{item.productName}}</td>
+            <td>{{item.sku || 'N/A'}}</td>
+            <td>{{item.quantity}}</td>
+            <td>{{item.unit || 'pcs'}}</td>
+            
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">

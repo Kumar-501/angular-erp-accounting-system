@@ -18,12 +18,12 @@ interface PurchaseOrder {
   date: string;
   referenceNo: string;
   requiredByDate: string;
-supplierAddress?: string; // Add this line
 
   businessLocation: string;
   businessLocationId: string;
   supplier: string;
-  
+    supplierAddress: string; // Ensure this is included
+
     orderTotal?: number;
   supplierName: string;
    batchNumber?: string;  // Add this
@@ -507,7 +507,7 @@ loadPurchaseOrders(): void {
         businessLocation: order.businessLocation || 'N/A',
         businessLocationId: order.businessLocationId || order.location || 'N/A',
         supplier: order.supplier || 'N/A',
-                supplierAddress: order.supplierAddress || order.supplier?.address || 'N/A', // Add this line
+        supplierAddress: order.supplierAddress || order.supplier?.address || 'N/A', // Map the address
 
         supplierName: order.supplierName || order.supplier || 'Unknown Supplier',
         status: order.status || 'Pending',

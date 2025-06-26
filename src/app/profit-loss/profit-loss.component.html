@@ -52,29 +52,15 @@
               <th colspan="2">Cost of Goods Sold</th>
               <th colspan="2">Total</th>
             </tr>
-          </thead>
-          <tbody>
-     <tr>
-  <td class="font-weight-bold text-nowrap"><i class="fas fa-box-open me-2"></i>Opening Stock</td>
-  <td class="text-end">{{ profitLossData.openingStock | currency:'INR':'symbol':'1.2-2' }}</td>
-  <td rowspan="3" class="font-weight-bold text-center align-middle bg-light">Total COGS</td>
-  <td rowspan="3" class="text-end align-middle bg-light">
-    {{ costOfGoodsSold | currency:'INR':'symbol':'1.2-2' }}
-  </td>
-</tr>
-<tr>
-  <td class="font-weight-bold text-nowrap"><i class="fas fa-shopping-cart me-2"></i>Purchases</td>
-  <td class="text-end">{{ profitLossData.purchases | currency:'INR':'symbol':'1.2-2' }}</td>
-</tr>
-<tr>
-  <td class="font-weight-bold text-nowrap"><i class="fas fa-tools me-2"></i>Direct Expenses</td>
-  <td class="text-end">{{ profitLossData.directExpenses | currency:'INR':'symbol':'1.2-2' }}</td>
-</tr>
-<tr>
-  <td class="font-weight-bold text-nowrap"><i class="fas fa-box me-2"></i>Closing Stock</td>
-  <td class="text-end text-danger">({{ profitLossData.closingStock | currency:'INR':'symbol':'1.2-2' }})</td>
-  <td colspan="2"></td>
-</tr>
+          </thead>          <tbody>
+            <tr>
+              <td class="font-weight-bold text-nowrap"><i class="fas fa-box-open me-2"></i>Opening Stock</td>
+              <td class="text-end">{{ profitLossData.openingStock | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td rowspan="4" class="font-weight-bold text-center align-middle bg-light">Total COGS</td>
+              <td rowspan="4" class="text-end align-middle bg-light">
+                {{ costOfGoodsSold | currency:'INR':'symbol':'1.2-2' }}
+              </td>
+            </tr>
             <tr>
               <td class="font-weight-bold text-nowrap"><i class="fas fa-shopping-cart me-2"></i>Purchases</td>
               <td class="text-end">{{ profitLossData.purchases | currency:'INR':'symbol':'1.2-2' }}</td>
@@ -86,7 +72,6 @@
             <tr>
               <td class="font-weight-bold text-nowrap"><i class="fas fa-box me-2"></i>Closing Stock</td>
               <td class="text-end text-danger">({{ profitLossData.closingStock | currency:'INR':'symbol':'1.2-2' }})</td>
-              <td colspan="2"></td>
             </tr>
           </tbody>
 
@@ -148,30 +133,7 @@
       <i class="fas fa-plus-circle me-2 text-success"></i> Other Income
     </td>
     <td class="text-end text-success">{{ profitLossData.indirectIncome | currency:'INR':'symbol':'1.2-2' }}</td>
-  </tr>
-</tbody>
-          <tbody>
-            <tr *ngFor="let expense of profitLossData.indirectExpenses">
-              <td class="font-weight-bold text-nowrap">
-                <i class="fas fa-minus-circle me-2 text-danger"></i> {{ expense.name }}
-              </td>
-              <td class="text-end">{{ expense.amount | currency:'INR':'symbol':'1.2-2' }}</td>
-              <td *ngIf="expense === profitLossData.indirectExpenses[0]" 
-                  [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
-                  class="font-weight-bold text-center align-middle bg-light">Total Expenses</td>
-              <td *ngIf="expense === profitLossData.indirectExpenses[0]" 
-                  [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
-                  class="text-end align-middle bg-light">
-                {{ totalIndirectExpenses | currency:'INR':'symbol':'1.2-2' }}
-              </td>
-            </tr>
-            <tr *ngIf="profitLossData.indirectIncome > 0">
-              <td class="font-weight-bold text-nowrap text-success">
-                <i class="fas fa-plus-circle me-2 text-success"></i> Indirect Income
-              </td>
-              <td class="text-end text-success">{{ profitLossData.indirectIncome | currency:'INR':'symbol':'1.2-2' }}</td>
-            </tr>
-          </tbody>
+  </tr>          </tbody>
 
           <!-- Net Profit -->
           <tbody>

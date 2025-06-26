@@ -103,6 +103,7 @@ export interface StockReductionParams {
   locationId: string;
   reference: string;
   action: string;
+  userId: string; // Added userId property
 }
 
 export interface StockAdjustmentParams {
@@ -618,7 +619,62 @@ export class StockService {
       return {};
     }
   }
+// In stock.service.ts
 
+async reduceProductStock(params: StockReductionParams): Promise<void> {
+  try {
+    // Get current stock
+    const stockDocId = `${params.productId}_${params.locationId}`;
+    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+    const stockSnap = await getDoc(stockDocRef);
+    
+    let currentStock = 0;
+    if (stockSnap.exists()) {
+      currentStock = stockSnap.data()['quantity'] || 0;
+    }
+    
+    // Calculate new stock
+    const newStock = Math.max(0, currentStock - params.quantity);
+    
+    // Update stock document
+    await setDoc(stockDocRef, {
+      productId: params.productId,
+      locationId: params.locationId,
+      quantity: newStock,
+      lastUpdated: new Date(),
+      updatedBy: params.userId
+    }, { merge: true });
+    
+    // Update daily stock snapshot
+    await this.dailyStockService.updateDailySnapshot(
+      params.productId,
+      params.locationId,
+      new Date(),
+      newStock,
+      'out',
+      params.quantity
+    );
+    
+    // Add stock history entry
+    await this.addStockHistoryEntry({
+      productId: params.productId,
+      locationId: params.locationId,
+      action: params.action as StockHistoryEntry['action'],
+      quantity: params.quantity,
+      oldStock: currentStock,
+      newStock: newStock,
+      referenceNo: params.reference,
+      userId: params.userId,
+      notes: `Stock reduced for ${params.action}`,
+      timestamp: new Date()
+    });
+    
+    this.notifyStockUpdate();
+  } catch (error) {
+    console.error('Error reducing product stock:', error);
+    throw error;
+  }
+}
   async initializeDailyStock(date: Date): Promise<void> {
     await this.dailyStockService.createDailySnapshot(date);
   }

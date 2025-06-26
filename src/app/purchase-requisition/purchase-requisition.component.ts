@@ -514,7 +514,7 @@ getPaginatedRows(): Requisition[] {
 approveRequisition(requisition: Requisition, event?: Event) {
   if (event) event.stopPropagation();
     
- if (!this.isAdmin) { // Use the isAdmin property we set
+  if (!this.isAdmin) {
     alert('Only admin users can approve requisitions');
     return;
   }
@@ -522,10 +522,10 @@ approveRequisition(requisition: Requisition, event?: Event) {
   if (confirm('Are you sure you want to approve this requisition?')) {
     // Get the supplier details including address
     const supplier = this.suppliers.find(s => s.id === requisition.supplier);
-    let supplierAddress = '';
+    let supplierAddress = requisition.supplierAddress || ''; // Use the address from requisition if available
     
-    if (supplier) {
-      // Build the address string from supplier details
+    if (!supplierAddress && supplier) {
+      // Build the address string from supplier details if not in requisition
       const addressParts = [
         supplier.address,
         supplier.addressLine1,
@@ -534,7 +534,7 @@ approveRequisition(requisition: Requisition, event?: Event) {
         supplier.state,
         supplier.postalCode || supplier.zipCode,
         supplier.country
-      ].filter(part => !!part); // Remove empty parts
+      ].filter(part => !!part);
       
       supplierAddress = addressParts.join(', ');
     }
@@ -546,8 +546,8 @@ approveRequisition(requisition: Requisition, event?: Event) {
       businessLocation: requisition.locationName,
       businessLocationId: requisition.location,
       supplier: requisition.supplier || 'To be assigned',
-      supplierName: requisition.supplierName || 'To be assigned',
-      supplierAddress: supplierAddress || requisition.supplierAddress || 'N/A', // Add supplier address
+      supplierName: requisition.supplierName || 'Unknown Supplier',
+      supplierAddress: supplierAddress, // Include the supplier address
       status: 'Pending',
       quantityRemaining: 0,
       shippingStatus: requisition.shippingStatus || 'Not Shipped',
@@ -556,7 +556,6 @@ approveRequisition(requisition: Requisition, event?: Event) {
       createdAt: new Date(),
       requisitionId: requisition.id,
       requiredByDate: requisition.requiredByDate,
-      // Transfer all product items with unit purchase price
       products: requisition.items.map(item => ({
         productId: item.productId,
         productName: item.productName,
@@ -566,26 +565,23 @@ approveRequisition(requisition: Requisition, event?: Event) {
         alertQuantity: item.alertQuantity,
         currentStock: item.currentStock,
         requiredQuantity: item.requiredQuantity,
-        subtotal: item.subtotal // Include subtotal from requisition
+        subtotal: item.subtotal
       })),
-      // Keep original items for reference
       items: requisition.items.map(item => ({
         ...item,
         unitCost: item.unitPurchasePrice || 0,
-        subtotal: item.subtotal // Include subtotal from requisition
+        subtotal: item.subtotal
       })),
       brand: requisition.brand,
       category: requisition.category,
       shippingDate: requisition.shippingDate,
-      orderTotal: this.calculateRequisitionTotal(requisition.items) // Calculate total
+      orderTotal: this.calculateRequisitionTotal(requisition.items)
     };
 
     this.isLoading = true;
     
-    // First update the requisition status
     this.requisitionService.updateRequisitionStatus(requisition.id, 'Approved')
       .then(() => {
-        // Then create the purchase order
         return this.purchaseOrderService.createPurchaseOrderFromRequisition(purchaseOrder);
       })
       .then((createdOrder) => {
@@ -603,7 +599,7 @@ approveRequisition(requisition: Requisition, event?: Event) {
         this.isLoading = false;
       });
   }
-  }
+}
  createPurchaseOrderFromRequisition(order: any): Promise<any> {
   // Include supplierAddress in the data being saved
   const orderData = {

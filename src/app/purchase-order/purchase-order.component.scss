@@ -91,19 +91,20 @@ h1 {
   border: 1px solid #ced4da;
   width: 250px;
 }
-
-/* Table Styles */
 .table-responsive {
-  overflow-x: auto;
-  background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  max-height: 400px;    /* or whatever height you want */
+  overflow-y: auto;
+  position: relative;
 }
 
-.purchase-order-table {
-  width: 100%;
-  border-collapse: collapse;
+.purchase-order-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #fff;
+  z-index: 100;
+  box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
 }
+
 
 .purchase-order-table th, 
 .purchase-order-table td {

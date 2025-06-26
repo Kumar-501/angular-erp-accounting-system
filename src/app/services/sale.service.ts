@@ -21,7 +21,7 @@ import {
   orderBy,
   limit
 } from '@angular/fire/firestore';
-
+import { StockService } from './stock.service';
 import { Observable, from } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ProductsService } from './products.service';
@@ -179,6 +179,7 @@ interface SalesOrder {
   roundOff: number;
   paymentAccount: string;
   paymentAccountName?: string;
+  
   transactionId: string;
     paidOn?: Date;  // Changed from required to optional
 
@@ -319,6 +320,7 @@ export class SaleService {
   constructor(
     private firestore: Firestore,
     private productsService: ProductsService,
+    private stockService: StockService,
     private papa: Papa,
         private returnService: ReturnService, // Add this injection
 
@@ -1056,167 +1058,123 @@ getReturnLogsBySale(saleId: string): Observable<any[]> {
     }
   }
 
-  async updateSaleWithStockHandling(saleId: string, saleData: Partial<SalesOrder>): Promise<void> {
-      try {
-        if (!saleId) {
-          throw new Error('Sale ID is required for update');
-        }
-  
-        const saleDoc = doc(this.firestore, 'sales', saleId);
-        const currentSaleSnapshot = await getDoc(saleDoc);
-  
-        if (!currentSaleSnapshot.exists()) {
-          throw new Error(`Sale with ID ${saleId} not found`);
-        }
-  
-        const currentSaleData = currentSaleSnapshot.data() as SalesOrder;
-        const oldStatus = currentSaleData.status;
-        const newStatus = saleData.status;
-  
-        if (oldStatus !== newStatus) {
-          if (newStatus === 'Completed') {
-            await this.reduceProductStockForSale({
-              ...currentSaleData,
-              ...saleData,
-              id: saleId
-            });
-          } else if (oldStatus === 'Completed') {
-            await this.restoreProductStockForSale({
-              ...currentSaleData,
-              id: saleId
-            });
-          }
-        }
-  
-        await updateDoc(saleDoc, {
-          ...saleData,
-          updatedAt: new Date()
-        });
-  
-      } catch (error) {
-        console.error('Error updating sale:', error);
-        throw error;
+ async updateSaleWithStockHandling(saleId: string, saleData: Partial<SalesOrder>): Promise<void> {
+    try {
+      if (!saleId) {
+        throw new Error('Sale ID is required for update');
       }
-    }
 
+      const saleDoc = doc(this.firestore, 'sales', saleId);
+      const currentSaleSnapshot = await getDoc(saleDoc);
+
+      if (!currentSaleSnapshot.exists()) {
+        throw new Error(`Sale with ID ${saleId} not found`);
+      }
+
+      const currentSaleData = currentSaleSnapshot.data() as SalesOrder;
+      const oldStatus = currentSaleData.status;
+      const newStatus = saleData.status;
+
+      // <-- LOGIC FOR STOCK ADJUSTMENT BASED ON STATUS CHANGE -->
+      // Check if status is changing TO 'Completed'
+      if (newStatus === 'Completed' && oldStatus !== 'Completed') {
+        const fullSaleForStock = { ...currentSaleData, ...saleData, id: saleId };
+        await this.reduceProductStockForSale(fullSaleForStock);
+      }
+      // Check if status is changing FROM 'Completed' to something else (e.g., 'Cancelled')
+      else if (oldStatus === 'Completed' && newStatus !== 'Completed') {
+        await this.restoreProductStockForSale({ ...currentSaleData, id: saleId });
+      }
+
+      await updateDoc(saleDoc, {
+        ...saleData,
+        updatedAt: new Date()
+      });
+
+    } catch (error) {
+      console.error('Error updating sale with stock handling:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Reduces product stock for a completed sale by delegating to the central StockService.
+   */
   private async reduceProductStockForSale(sale: SalesOrder): Promise<void> {
     try {
-      if (!sale.id) {
-        throw new Error('Sale ID is required for stock reduction');
-      }
-      
+      if (!sale.id) throw new Error('Sale ID is required for stock reduction');
       if (!sale.products || sale.products.length === 0) {
         console.warn('No products in sale, skipping stock reduction');
         return;
       }
 
-      const batch = writeBatch(this.firestore);
-
-      for (const saleProduct of sale.products) {
-        if (!saleProduct.quantity || saleProduct.quantity <= 0) {
-          console.warn(`Invalid quantity for product: ${saleProduct.name || saleProduct.id}`);
-          continue;
-        }
-
-        let product;
-        try {
-          if (saleProduct.id) {
-            product = await this.productsService.getProductById(saleProduct.id);
-          }
-          if (!product && saleProduct.name) {
-            product = await this.productsService.getProductByName(saleProduct.name);
-          }
-        } catch (error) {
-          console.error(`Error fetching product ${saleProduct.id || saleProduct.name}:`, error);
-          continue;
-        }
-
-        if (!product || !product.id) {
-          console.error(`Product not found: ${saleProduct.id || saleProduct.name}`);
-          continue;
-        }
-
-        const currentStock = product.currentStock || 0;
-        if (currentStock < saleProduct.quantity) {
-          throw new Error(
-            `Insufficient stock for product ${product.productName}. 
-            Available: ${currentStock}, Requested: ${saleProduct.quantity}`
-          );
-        }
-
-        const newStock = currentStock - saleProduct.quantity;
-
-        const productDoc = doc(this.firestore, `products/${product.id}`);
-        batch.update(productDoc, {
-          currentStock: newStock,
-          updatedAt: new Date()
-        });
-
-        const stockHistoryRef = collection(this.firestore, 'stock_movements');
-        batch.set(doc(stockHistoryRef), {
-          productId: product.id,
-          saleId: sale.id,
-          action: 'sale',
-          quantity: -saleProduct.quantity,
-          locationId: sale.businessLocation || 'default',
-          oldStock: currentStock,
-          newStock: newStock,
-          reference: sale.invoiceNo || `sale-${sale.id}`,
-          timestamp: new Date(),
-          notes: `Sold in sale ${sale.invoiceNo || sale.id}`
-        });
+      const locationId = sale.businessLocation;
+      if (!locationId) {
+        throw new Error(`Sale must have a businessLocation to reduce stock. Sale Invoice: ${sale.invoiceNo}`);
       }
 
-      await batch.commit();
-      this.stockUpdatedSource.next();
+      const userId = sale.addedBy || 'system';
+
+      for (const saleProduct of sale.products) {
+        const productId = saleProduct.id || saleProduct.productId;
+        if (!productId) {
+          console.error('Product ID is missing for an item in the sale.', saleProduct);
+          continue;
+        }
+
+        if (!saleProduct.quantity || saleProduct.quantity <= 0) {
+          console.warn(`Invalid quantity for product: ${saleProduct.name || productId}`);
+          continue;
+        }
+
+        // <-- DELEGATE TO STOCK SERVICE FOR STOCK REDUCTION -->
+        await this.stockService.adjustProductStock(
+          productId,
+          saleProduct.quantity,
+          'subtract', // Action
+          locationId,
+          `Sale: ${sale.invoiceNo || sale.id}`, // Reference
+          userId,
+          { saleId: sale.id, invoiceNo: sale.invoiceNo } // Context for history
+        );
+      }
+      console.log(`Stock reduction for sale ${sale.invoiceNo || sale.id} processed via StockService.`);
     } catch (error) {
-      console.error('Error in reduceProductStockForSale:', error);
+      console.error('Error reducing stock for sale:', error);
       throw error;
     }
   }
 
+  /**
+   * Restores product stock if a sale is cancelled or returned by delegating to the StockService.
+   */
   private async restoreProductStockForSale(sale: SalesOrder): Promise<void> {
     try {
       if (!sale.products || sale.products.length === 0) return;
 
-      const batch = writeBatch(this.firestore);
-
-      for (const saleProduct of sale.products) {
-        let product;
-        if (saleProduct.id) {
-          product = await this.productsService.getProductById(saleProduct.id);
-        }
-        if (!product) {
-          product = await this.productsService.getProductByName(saleProduct.name);
-        }
-        
-        if (product && product.id) {
-          const newStock = (product.currentStock || 0) + saleProduct.quantity;
-          
-          const productDoc = doc(this.firestore, `products/${product.id}`);
-          batch.update(productDoc, {
-            currentStock: newStock,
-            updatedAt: new Date()
-          });
-
-          const stockHistoryRef = collection(this.firestore, 'stock_movements');
-          batch.set(doc(stockHistoryRef), {
-            productId: product.id,
-            saleId: sale.id,
-            action: 'return',
-            quantity: saleProduct.quantity,
-            locationId: sale.businessLocation || 'default',
-            oldStock: product.currentStock || 0,
-            newStock: newStock,
-            reference: sale.invoiceNo || `sale-${sale.id}`,
-            timestamp: new Date(),
-            notes: `Stock returned from sale ${sale.invoiceNo || sale.id}`
-          });
-        }
+      const locationId = sale.businessLocation;
+      if (!locationId) {
+        throw new Error(`Sale location is not defined for sale ${sale.invoiceNo}. Cannot restore stock.`);
       }
 
-      await batch.commit();
-      this.stockUpdatedSource.next();
+      const userId = 'system'; // Or get current user ID
+
+      for (const saleProduct of sale.products) {
+        const productId = saleProduct.id || saleProduct.productId;
+        if (!productId) continue;
+
+        // <-- DELEGATE TO STOCK SERVICE FOR STOCK RESTORATION -->
+        await this.stockService.adjustProductStock(
+          productId,
+          saleProduct.quantity,
+          'add', // Action
+          locationId,
+          `Reversal/Cancellation for Sale: ${sale.invoiceNo || sale.id}`, // Reference
+          userId,
+          { saleId: sale.id, invoiceNo: sale.invoiceNo, action: 'return' } // Context
+        );
+      }
+      console.log(`Stock restoration for sale ${sale.invoiceNo || sale.id} processed via StockService.`);
     } catch (error) {
       console.error('Error restoring product stock:', error);
       throw error;
@@ -1368,7 +1326,6 @@ getReturnLogsBySale(saleId: string): Observable<any[]> {
     }
   }
 
-// In your SaleService, update the processReturn method to use the correct interface
 async processReturn(returnData: any): Promise<any> {
   try {
     console.log('Processing return with data:', returnData);
@@ -1388,15 +1345,13 @@ async processReturn(returnData: any): Promise<any> {
     if (!returnData.returnedItems || !Array.isArray(returnData.returnedItems) || returnData.returnedItems.length === 0) {
       throw new Error('No items selected for return');
     }
- const paymentAccountId = returnData.paymentAccountId || 
-                           returnData.paymentAccount || 
-                           await this.getPaymentAccountFromSale(returnData.originalSaleId);
-    // Process items with proper typing
-    const validatedItems: SalesReturnLogItem[] = returnData.returnedItems.map((item: any) => {
+
+    // First validate all items and convert them properly
+    const validatedItems = await Promise.all(returnData.returnedItems.map(async (item: any) => {
       const productId = item.productId || item.id || item.itemId || item.product_id;
       const productName = item.name || item.productName || item.itemName || item.product_name;
       const unitPrice = parseFloat(item.unitPrice || item.price || item.unit_price || item.selling_price || 0);
-      const quantity = parseInt(item.quantity || 0);
+      const quantity = parseInt(item.quantity || item.returnQuantity || 0);
       const originalQuantity = parseInt(item.originalQuantity || 0);
 
       if (!productId) {
@@ -1423,6 +1378,25 @@ async processReturn(returnData: any): Promise<any> {
         throw new Error(`Invalid unit price (${item.unitPrice || item.price}). Must be a positive number.`);
       }
 
+      // Update stock in product-stock collection
+      const productStockRef = doc(this.firestore, "product-stock", `${productId}_s3LF1LDGeUtPMAwtOS3G`);
+      const productStockCollection = collection(this.firestore, "product-stock");
+      const snapshot = await getDoc(productStockRef);
+      
+      if (snapshot.exists()) {
+        let temp = snapshot.data();
+        temp["quantity"] = (temp["quantity"] || 0) + quantity; // Add returned quantity back to stock
+        await updateDoc(productStockRef, temp);
+      } else {
+        await addDoc(productStockCollection, {
+          lastUpdated: new Date(),
+          locationId: "s3LF1LDGeUtPMAwtOS3G",
+          productId: productId,
+          quantity: quantity, // Initial stock for returned items
+          updatedBy: "admin"
+        });
+      }
+
       return {
         productId,
         productName: productName.trim(),
@@ -1432,7 +1406,7 @@ async processReturn(returnData: any): Promise<any> {
         subtotal: unitPrice * quantity,
         reason: item.reason || returnData.returnReason || 'Return processed'
       };
-    });
+    }));
 
     const returnReason = (returnData.returnReason || returnData.reason || '').trim();
     if (!returnReason) {
@@ -1443,7 +1417,7 @@ async processReturn(returnData: any): Promise<any> {
     const isFullReturn = validatedItems.every(item => item.returnQuantity === item.quantity);
     const returnStatus = isFullReturn ? 'Returned' : 'Partial Return';
 
-    // Prepare the return document with proper typing
+    // Prepare the return document
     const returnDoc = {
       originalSaleId: returnData.originalSaleId,
       invoiceNo: returnData.invoiceNo,
@@ -1462,12 +1436,16 @@ async processReturn(returnData: any): Promise<any> {
     const returnDocRef = await addDoc(returnsCollection, returnDoc);
     const returnId = returnDocRef.id;
 
-    // 2. Then log the return transaction with proper typing
+    // 2. Then log the return transaction
+    const paymentAccountId = returnData.paymentAccountId || 
+                           returnData.paymentAccount || 
+                           await this.getPaymentAccountFromSale(returnData.originalSaleId);
+    
     const returnLog: SalesReturnLog = {
       saleId: returnData.originalSaleId,
       returnDate: new Date(),
-      paymentAccountId: paymentAccountId, // Make sure this is properly set
-      items: validatedItems // validatedItems is already SalesReturnLogItem[]
+      paymentAccountId: paymentAccountId,
+      items: validatedItems
     };
 
     await this.returnService.logReturn(returnLog);
@@ -1482,23 +1460,9 @@ async processReturn(returnData: any): Promise<any> {
 
     await this.updateSale(returnData.originalSaleId, saleUpdateData);
 
-    // 4. Restore product stock
-    // Map validatedItems (SalesReturnLogItem[]) to ReturnItem[]
-    const returnItems: ReturnItem[] = validatedItems.map(item => ({
-      productId: item.productId,
-      name: item.productName, // Map productName to name
-      quantity: item.returnQuantity,
-      originalQuantity: item.quantity,
-      unitPrice: item.unitPrice,
-      reason: item.reason,
-      subtotal: item.subtotal
-    }));
-
-    await this.restoreProductStockForReturn({
-      ...returnDoc,
-      id: returnId,
-      returnedItems: returnItems
-    });
+    // 4. Update the stock report by refreshing it
+    // This will ensure the returned items appear in the stock report
+    this.stockUpdatedSource.next();
 
     return {
       success: true,
@@ -1513,7 +1477,7 @@ async processReturn(returnData: any): Promise<any> {
     console.error('Error processing return:', error);
     throw new Error(`Return processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  }
+}
   private async getPaymentAccountFromSale(saleId: string): Promise<string> {
   try {
     const saleDoc = await getDoc(doc(this.firestore, 'sales', saleId));

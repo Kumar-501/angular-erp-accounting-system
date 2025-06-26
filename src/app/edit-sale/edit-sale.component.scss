@@ -550,4 +550,20 @@ select.form-control {
     padding: 10px;
     font-size: 0.9rem;
   }
+}/* Hide the Action column header and cells */
+th:last-child,
+td:last-child {
+  display: none !important;
+}
+
+/* Alternative approach - hide only when it contains the trash button */
+th:has(+ td button.btn-danger),
+td:has(button.btn-danger) {
+  display: none !important;
+}
+
+/* If the above doesn't work in all browsers, use this more specific approach */
+.table th:nth-last-child(1),
+.table td:nth-last-child(1) {
+  display: none !important;
 }

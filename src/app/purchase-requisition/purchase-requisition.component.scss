@@ -457,9 +457,20 @@ select.form-control {
     }
   }
   
-  .table-responsive {
-    overflow-x: auto;
-  }
+ .table-responsive {
+  max-height: 500px;       /* or whatever height you want */
+  overflow-y: auto;        /* enable vertical scrolling */
+  position: relative;      /* for sticky positioning context */
+}
+
+.requisition-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f0eded;  /* match your header background */
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); /* optional shadow for clarity */
+}
+
   
   .requisition-table {
     width: 100%;

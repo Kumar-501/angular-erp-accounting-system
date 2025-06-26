@@ -48,7 +48,11 @@
   </div>         
 </div>
 <!-- Add this at the bottom of the file -->
-
+<app-customer-edit-popup *ngIf="showCustomerEditPopup" 
+  [customerData]="selectedCustomerForEdit"
+  (save)="onCustomerSave($event)"
+  (close)="onCustomerEditClose()">
+</app-customer-edit-popup>
         <!-- Separate div for Customer Details -->
         <div class="card">
           <div class="card-header bg-light">
@@ -192,9 +196,9 @@
             <!-- Edit Button -->
             <div class="row mb-3">
               <div class="col-12">
-             <button type="button" class="btn btn-primary" (click)="openCustomerEditPopup()">
-  <i class="fas fa-edit"></i> Edit Customer Details
-</button>
+                <button type="button" class="btn btn-primary" (click)="openCustomerEditPopup()">
+                  <i class="fas fa-edit"></i> Edit Customer Details
+                </button>
               </div>
             </div>
           </div>
@@ -202,10 +206,11 @@
       </div>
 
       <!-- Right Container (60%) - Payment Details (MODIFIED) -->
-      <app-pp-service-popup *ngIf="showPpServicePopup" 
-      (formSubmit)="onPpServiceFormSubmit($event)"
-      (close)="onPpServiceClose()">
+<app-pp-service-popup *ngIf="showPpServicePopup" 
+  (formSubmit)="onPpServiceFormSubmit($event)"
+  (close)="onPpServiceClose()">
 </app-pp-service-popup>
+
 <app-cod-popup *ngIf="showCodPopup" 
   (formSubmit)="onCodFormSubmit($event)"
   (close)="onCodClose()">
@@ -227,20 +232,28 @@
               </div>
             </div>
           </div>
-          <div class="col-md-6">
-            <div class="form-group mb-3">
-              <label for="addedBy" class="form-label">Incentive User:</label>
-              <select id="addedBy" formControlName="addedBy" class="form-control" required>
-                <option value="">-- Select User --</option>
-                <option *ngFor="let user of users" [value]="user.id" [selected]="user.id === saleForm.get('addedBy')?.value">
-                  {{ user.displayName || user.name || user.email || 'Unknown User' }}
-                </option>
-              </select>
-              <div *ngIf="saleForm.get('addedBy')?.invalid && saleForm.get('addedBy')?.touched" class="text-danger">
-                Sales agent is required
-              </div>
-            </div>
-          </div>
+    <div class="col-md-6">
+  <div class="form-group mb-3">
+    <label for="addedBy" class="form-label">Incentive User:</label>
+    <select id="addedBy" formControlName="addedBy" class="form-control" required>
+      <!-- Show current user as first option -->
+      <option *ngIf="authService.currentUserValue" 
+              [value]="authService.currentUserValue.uid" 
+              [selected]="true">
+        {{ authService.currentUserValue.displayName || authService.currentUserValue.email }}
+      </option>
+      <!-- Other users -->
+      <option *ngFor="let user of users" 
+              [value]="user.id" 
+              [disabled]="user.id === authService.currentUserValue?.uid">
+        {{ user.displayName || user.name || user.email || 'Unknown User' }}
+      </option>
+    </select>
+    <div *ngIf="saleForm.get('addedBy')?.invalid && saleForm.get('addedBy')?.touched" class="text-danger">
+      Sales agent is required
+    </div>
+  </div>
+</div>
         </div>
 
 
@@ -278,7 +291,6 @@
               <select id="typeOfService" formControlName="typeOfService" class="form-control" (change)="onServiceTypeChange($event)">
                 <option value="">Select Service Type</option>
                 <option *ngFor="let service of serviceTypes" [value]="service.id">{{ service.name }}</option>
-                <option value="COD">COD</option>
               </select>
             </div>
           </div>
@@ -571,13 +583,14 @@
             
             </div>
 <div class="prescription-button-container">
-<button type="button" class="btn btn-info me-2" (click)="openPrescriptionModal($event)">
-  <i class="fas fa-file-prescription"></i> Add Prescription
-</button>
-   <button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="openPrescriptionModal($event)">
+  <button type="button" class="btn btn-info me-2" (click)="openPrescriptionModal()">
+    <i class="fas fa-file-prescription"></i> Add Prescription
+  </button>
+  <button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="openPrescriptionModal()">
     <i class="fas fa-plus"></i> Add Another Prescription
   </button>
 </div>
+
 <div class="prescription-list mt-3" *ngIf="prescriptions.length > 0">
   <h6>Prescriptions ({{prescriptions.length}})</h6>
   <div class="list-group">
@@ -592,13 +605,11 @@
           </div>
         </div>
         <div>
-          <button type="button" class="btn btn-sm btn-outline-info me-1" (click)="viewPrescription(prescription)">
-            <i class="fas fa-eye"></i>
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary me-1" (click)="editPrescription(i)">
-            <i class="fas fa-edit"></i>
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger" (click)="deletePrescription(i)">
+  <button class="btn btn-sm btn-outline-secondary me-1" 
+        (click)="editPrescription(i); $event.preventDefault()">
+  <i class="fas fa-edit"></i>
+</button>
+          <button class="btn btn-sm btn-outline-danger" (click)="deletePrescription(i)">
             <i class="fas fa-trash"></i>
           </button>
         </div>
@@ -614,10 +625,7 @@
         </div>
       </div>
     </div>
-
-
-<div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+<div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="prescriptionModalLabel">Prescription</h5>
@@ -632,39 +640,43 @@
             <p>ഡോ. രാജന പി.ആർ., BAMS</p>
           </div>
           
-       <div class="d-flex justify-content-between mb-4">
-  <div>
-    <p>പേര്: <span class="editable-field" contenteditable="true" id="patientName"></span></p>
-    <p>Age: <span class="editable-field" contenteditable="true" id="patientAge"></span></p> <!-- Changed to English -->
-  </div>
-  <p>തീയതി: <span class="editable-field" contenteditable="true" id="prescriptionDate">{{todayDate}}</span></p>
-</div>
+          <div class="d-flex justify-content-between mb-4">
+            <div>
+              <p>പേര്: <span class="editable-field" contenteditable="true" id="patientName"></span></p>
+              <p>Age: <span class="editable-field" contenteditable="true" id="patientAge"></span></p>
+            </div>
+            <p>തീയതി: <span class="editable-field" contenteditable="true" id="prescriptionDate">{{todayDate}}</span></p>
+          </div>
           
-       <!-- Update the medicine type selector section in your template -->
-<div class="row mb-3">
- <!-- Replace the medicine type selector with this pill navigation -->
-<div class="col-md-12">
-  <label class="form-label">Select Medicine Type:</label>
-  <div class="d-flex flex-wrap gap-2 mb-3">
-    <button *ngFor="let type of medicineTypes" 
-    button type="button"
-            class="btn btn-pill" 
-            [ngClass]="{'btn-primary': selectedMedicineType === type.value, 'btn-outline-primary': selectedMedicineType !== type.value}"
-            (click)="selectMedicineType(type.value)">
-      {{type.label}}
-    </button>
-  </div>
-  
-  <div class="input-group" *ngIf="selectedMedicineType">
-    <button class="btn btn-primary" type="button" (click)="addMedicineByType()">
-      <i class="fas fa-plus"></i> Add New
-    </button>
-    <button class="btn btn-secondary ms-2" type="button" (click)="addSameMedicineType()">
-      <i class="fas fa-copy"></i> Add Another
-    </button>
-  </div>
-</div>
-</div>
+          <!-- Medicine type selector -->
+          <div class="row mb-3">
+            <div class="col-md-12">
+              <label class="form-label">Select Medicine Type:</label>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                <button *ngFor="let type of medicineTypes" 
+                        type="button"
+                        class="btn btn-pill" 
+                        [ngClass]="{'btn-primary': selectedMedicineType === type.value, 'btn-outline-primary': selectedMedicineType !== type.value}"
+                        (click)="selectMedicineType(type.value)">
+                  {{type.label}}
+                </button>
+              </div>
+              
+              <div class="input-group" *ngIf="selectedMedicineType">
+                <select class="form-select" [(ngModel)]="selectedMedicineName" [ngModelOptions]="{standalone: true}">
+                  <option value="">Select Medicine</option>
+                  <option *ngFor="let med of availableMedicines[selectedMedicineType]" [value]="med">{{med}}</option>
+                </select>
+                <button class="btn btn-primary" type="button" (click)="addMedicineByType()">
+                  <i class="fas fa-plus"></i> Add
+                </button>
+                <button class="btn btn-secondary ms-2" type="button" (click)="addSameMedicineType()">
+                  <i class="fas fa-copy"></i> Add Another
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Medicine Items Container -->
           <div class="prescription-items" id="medicineItems">
             <div *ngFor="let medicine of prescriptionData.medicines; let i = index" class="prescription-item mb-4 p-3 border rounded">
@@ -674,133 +686,113 @@
                   <i class="fas fa-trash"></i>
                 </button>
               </div>
-              
-              <!-- Kasayam Template -->
-              <div *ngIf="medicine.type === 'kasayam'" class="kasayam-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
-                  കഷായം <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>ml  എടുത്ത് തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
-                  <span class="editable-field" contenteditable="true" [id]="'kasayamInstructions_'+i">{{medicine.instructions || ''}}</span>
-                </p>
-                <p>
-                  ഗുളിക <span class="editable-field" contenteditable="true" [id]="'kasayamPills_'+i">{{medicine.pills || ''}}</span>
-                  പൊടി ചേർത്ത് <span class="editable-field" contenteditable="true" [id]="'kasayamPowder_'+i">{{medicine.powder || ''}}</span>
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'kasayamTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Buligha Template -->
-              <div *ngIf="medicine.type === 'buligha'" class="buligha-template">
-                <p>
-                    <span [id]="'kasayamName_'+i" 
-          [(ngModel)]="medicine.name" 
-          [ngModelOptions]="{standalone: true}">
-      {{medicine.name || ''}}
-    </span>
-                                  <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
-  ഗുളിക <span [id]="'kasayamInstructions_'+i" 
-          [(ngModel)]="medicine.instructions" 
-          [ngModelOptions]="{standalone: true}">
-      {{medicine.instructions || ''}}
-    </span>                  <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
 
-                   തിളപ്പിച്     ചാറ്റിയവെള്ളം                       <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
-ചേർത്ത്
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'bulighaTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Bhasmam Template -->
-              <div *ngIf="medicine.type === 'bhasmam'" class="bhasmam-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'bhasmamName_'+i">{{medicine.name || ''}}</span>
-                  ഭസ്മം <span class="editable-field" contenteditable="true" [id]="'bhasmamDosage_'+i">{{medicine.dosage ||''}}</span>
-                  നുള്ള് എടുത്ത് <span class="editable-field" contenteditable="true" [id]="'bhasmamQuantity_'+i">{{medicine.quantity || ''}}</span>
-                  ml. തേൻ / ചെറുനാരങ്ങാനീർ ചേർത്ത്
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'bhasmamTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Krudham Template -->
-              <div *ngIf="medicine.type === 'krudham'" class="krudham-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
-                  ഘൃതം ഒരു                   <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
-ടീ - സ്പൂൺ എടുത്ത്
-                </p>
-                <p>                  <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
+              <!-- Dynamic Medicine Templates -->
+              <div [ngSwitch]="medicine.type">
+                <!-- Kasayam Template -->
+                <div *ngSwitchCase="'kasayam'" class="kasayam-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
+                    കഷായം <span class="editable-field underlined" contenteditable="true" [id]="'kasayamInstructions_'+i">{{medicine.instructions||''}}</span>ml എടുത്ത് 
+                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamQuantity_'+i">{{medicine.quantity || ''}}</span> ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
+                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamPowder_'+i">{{medicine.powder || ''}}</span> ഗുളിക . പൊടിച്ച്ചേർത്ത് 
+                    <span class="editable-field underlined" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>നേരം
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
+                      <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
 
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'krudhamTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Suranam Template -->
-              <div *ngIf="medicine.type === 'suranam'" class="suranam-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'suranamName_'+i">{{medicine.name || ''}}</span>
-                  ചൂർണ്ണം ഒരു                   <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
-ടീ - സ്പൂൺ എടുത്ത്
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'suranamTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Rasayanam Template -->
-              <div *ngIf="medicine.type === 'rasayanam'" class="rasayanam-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'rasayanamName_'+i">{{medicine.name || ''}}</span>
-                  രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത്
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'rasayanamTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
-              </div>
-              
-              <!-- Lagium Template -->
-              <div *ngIf="medicine.type === 'lagium'" class="lagium-template">
-                <p>
-                  <span class="editable-field" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>
-                  ലേഹ്യം ഒരു                  <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
- ടീ - സ്പൂൺ എടുത്ത്
-                </p>
-                <p>
-                  നേരം <span class="editable-field" contenteditable="true" [id]="'lagiumTime_'+i">{{medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'}}</span>
-                  <select class="form-select d-inline-block" style="width: auto;" [(ngModel)]="medicine.foodTiming" [ngModelOptions]="{standalone: true}">
-                    <option *ngFor="let option of foodTimingOptions" [value]="option.value">{{option.label}}</option>
-                  </select>
-                  <span> സേവിക്കുക.</span>
-                </p>
+                <!-- Buligha Template -->
+                <div *ngSwitchCase="'buligha'" class="buligha-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'bulighaName_'+i">{{medicine.name || ''}}</span>
+                    ഗുളിക <span class="editable-field underlined" contenteditable="true" [id]="'bulighaInstructions_'+i">{{medicine.instructions || ''}}</span>
+                    എണ്ണം എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'bulighaPowder_'+i">{{medicine.powder || ''}}</span>
+                    നേരം
+
+
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
+                     <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
+
+                <!-- Bhasmam Template -->
+                <div *ngSwitchCase="'bhasmam'" class="bhasmam-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamName_'+i">{{medicine.name || ''}}</span>
+                    ഭസ്മം <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamDosage_'+i">{{medicine.dosage ||''}}</span>
+                    നുള്ള് എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamQuantity_'+i">{{medicine.quantity || ''}}</span>
+                    ml. <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamInstructions_'+i">{{medicine.instructions || ''}}</span> ചേർത്ത് 
+ <span class="editable-field underlined" contenteditable="true" [id]="'bulighaPowder_'+i">{{medicine.powder || ''}}</span>
+                    നേരം
+
+
+
+
+
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
+      <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
+
+                <!-- Krudham Template -->
+                <div *ngSwitchCase="'krudham'" class="krudham-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
+                    ഘൃതം  <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span> ടീ - സ്പൂൺ എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span> നേരം
+
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">നേരം
+                        <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
+
+                <!-- Suranam Template -->
+                <div *ngSwitchCase="'suranam'" class="suranam-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'suranamName_'+i">{{medicine.name || ''}}</span>
+                    ചൂർണ്ണം <span class="editable-field underlined" contenteditable="true" [id]="'suranamInstructions_'+i">{{medicine.instructions || ''}}</span> ടീ - സ്പൂൺ എടുത്ത്.
+                    <span class="editable-field underlined" contenteditable="true" [id]="'suranamPowder_'+i">{{medicine.powder || ''}}</span> വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് <span class="editable-field underlined" contenteditable="true" [id]="'suranamPowder_'+i">{{medicine.powder || ''}}</span>നേരം
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
+                   <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
+
+                <!-- Rasayanam Template -->
+                <div *ngSwitchCase="'rasayanam'" class="rasayanam-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'rasayanamName_'+i">{{medicine.name || ''}}</span>
+                    രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'rasayanamInstructions_'+i">{{medicine.instructions || ''}}</span>നേരം
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">നേരം
+                <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
+
+                <!-- Lagium Template -->
+                <div *ngSwitchCase="'lagium'" class="lagium-template">
+                  <p>
+                    <span class="editable-field underlined" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>
+                    ലേഹ്യം <span class="editable-field underlined" contenteditable="true" [id]="'lagiumInstructions_'+i">{{medicine.instructions || ''}}</span> ടീ - സ്പൂൺ എടുത്ത്
+<span class="editable-field underlined" contenteditable="true" [id]="'lagiumInstructions_'+i">{{medicine.instructions || ''}}</span>നേരം
+
+
+                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
+     <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
+                      <option value="after">(ശേഷംസേവിക്കുക)</option>
+                    </select>
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -816,36 +808,11 @@
           </div>
         </div>
       </div>
-<div class="modal-footer">
- 
-
- <div class="modal-footer">
-  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-
-  <button type="button" class="btn btn-success" (click)="savePrescription()">
-    {{editingPrescriptionIndex !== null ? 'Update' : 'Save'}} Prescription
-  </button>
-</div>
-</div>
-    </div>
-  </div>
-</div>
-<!-- Prescription View Modal -->
-<div class="modal fade" id="prescriptionViewModal" tabindex="-1" aria-labelledby="prescriptionViewModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="prescriptionViewModalLabel">
-          View Prescription
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" (click)="closeViewModal()"></button>
-      </div>
-      <div class="modal-body" [innerHTML]="viewPrescriptionContent">
-        <!-- Content will be dynamically generated -->
-      </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="closeViewModal()">Close</button>
-   
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-success" (click)="savePrescription()">
+          {{editingPrescriptionIndex !== null ? 'Update' : 'Save'}} Prescription
+        </button>
       </div>
     </div>
   </div>
@@ -917,13 +884,16 @@
 <!-- Shipping With Tax -->
 <!-- Shipping With Tax -->
 <div class="col-md-6">
- <label for="shippingChargesAfterTax" class="form-label">Shipping Charges (After Tax):</label>
-    <input type="number" id="shippingChargesAfterTax" formControlName="shippingChargesAfterTax" 
-           class="form-control" min="0" step="0.01">
-    <small class="text-muted">
-      Total including {{ saleForm.get('orderTax')?.value || 0 }}% tax
-    </small>
-  </div>
+  <label class="form-label">Shipping Charges (After Tax):</label>
+  <input type="number" class="form-control" 
+         [formControl]="afterTaxShippingControl"
+         (change)="calculateTotalPayable()" />
+<small class="text-muted">
+  Base: {{ saleForm.get('shippingCharges')?.value | currency:'INR' }} +
+  Tax: {{ (saleForm.get('shippingCharges')?.value * (saleForm.get('orderTax')?.value / 100)) | currency:'INR' }}
+</small>
+
+</div>
 
               <!-- Shipping Status -->
               <div class="col-md-6">
@@ -1152,10 +1122,10 @@
           </div>
         </div>
             <div class="col-12 text-center">
-<button type="submit" class="btn btn-primary btn-lg me-2">
+<button type="submit" class="btn btn-primary btn-lg me-2" 
+        [disabled]="isSubmitting || !saleForm.valid || products.length === 0">
   <i class="fas fa-save"></i> 
-  <span *ngIf="isSubmitting">Saving...</span>
-  <span *ngIf="!isSubmitting">Save Sale</span>
+  {{ isSubmitting ? 'Saving...' : 'Save Sale' }}
 </button>
         <button type="button" class="btn btn-secondary btn-lg" (click)="resetForm()">
           <i class="fas fa-undo"></i> Reset
@@ -1181,14 +1151,13 @@
   </div>
 
   <!-- Shipping Charge (before tax) -->
-<div class="col-md-6">
-    <label for="shippingCharges" class="form-label">Shipping Charges (Before Tax):</label>
-    <input type="number" id="shippingCharges" formControlName="shippingCharges" 
-           class="form-control" min="0" step="0.01">
-    <small class="text-muted">
-      Base amount before tax
-    </small>
+  <div class="summary-item">
+    <span class="summary-label">Shipping Charge:</span>
+    <span class="summary-value">
+      {{ saleForm.get('shippingCharges')?.value | currency:'INR' }}
+    </span>
   </div>
+
   <!-- Shipping Tax -->
   <div class="summary-item" *ngIf="saleForm.get('orderTax')?.value > 0">
     <span class="summary-label">

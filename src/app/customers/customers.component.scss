@@ -46,7 +46,27 @@ $transition: all 0.2s ease-in-out;
       outline: none;
     }
   }
-  
+  /* Make the table responsive and scrollable vertically */
+.table-responsive {
+  max-height: 500px; /* You can adjust this height as needed */
+  overflow-y: auto;
+}
+
+/* Style the customer table */
+.customers-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* Sticky header */
+.customers-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #fff; /* Important to ensure the header doesn't blend with content */
+  z-index: 2;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); /* Optional: adds subtle shadow below header */
+}
+
   input, select {
     font-family: inherit;
     padding: 0.75rem 1rem;

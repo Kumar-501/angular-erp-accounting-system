@@ -270,10 +270,27 @@
             background: #f8f9fa;
         }
         
-        .table-responsive {
-            overflow-x: auto;
-        }
         
+
+.table-responsive {
+  max-height: 500px;         /* Set desired max height for the scroll */
+  overflow-y: auto;          /* Enable vertical scrolling */
+  position: relative;        /* Needed for sticky positioning */
+}
+
+.table-responsive thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa; /* Light grey header bg, adjust as needed */
+  z-index: 10;
+  box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1); /* subtle shadow for separation */
+}
+
+
+
+
+
+
         @media (max-width: 768px) {
             .controls-row {
                 flex-direction: column;

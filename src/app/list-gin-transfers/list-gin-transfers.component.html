@@ -70,6 +70,8 @@
               <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
             </span>
           </th>
+              <th>Products</th> <!-- New column for products -->
+
           <th (click)="sortData('status')">
             Status
             <span class="sort-icon" *ngIf="currentSortColumn === 'status'">
@@ -83,7 +85,6 @@
               <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
             </span>
           </th> -->
-          <th>Additional Notes</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -93,13 +94,19 @@
           <td>{{ transfer.referenceNo }}</td>
           <td>{{ getLocationName(transfer.locationFrom) }}</td>
           <td>{{ getLocationName(transfer.locationTo) }}</td>
+           <td>
+      <div class="product-list">
+        <div *ngFor="let item of transfer.items" class="product-item">
+          {{ item.productName }} ({{ item.quantity }} {{ item.unit }})
+        </div>
+      </div>
+    </td>
           <td>
             <span class="status-badge" [ngClass]="transfer.status.toLowerCase()" (click)="openStatusModal(transfer)">
               {{ transfer.status }}
             </span>
           </td>
           <!-- <td>₹ {{ transfer.totalAmount.toFixed(2) }}</td> -->
-          <td>{{ transfer.additionalNotes || '-' }}</td>
           <td>
             <div class="action-buttons">
              <button class="view-btn" (click)="viewGinTransfer(transfer)" title="View">

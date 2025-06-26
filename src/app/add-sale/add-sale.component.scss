@@ -714,11 +714,19 @@ select.form-control {
   padding: 0.25rem 0.5rem;
   font-size: 0.875rem;
   margin-left: 0.5rem;
-}.is-invalid {
-  border-color: #dc3545 !important;
+}.required-field::after {
+  content: " *";
+  color: red;
+}
+
+.is-invalid {
+  border-color: #dc3545;
 }
 
 .invalid-feedback {
-  color: #dc3545;
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
   font-size: 0.875em;
+  color: #dc3545;
 }

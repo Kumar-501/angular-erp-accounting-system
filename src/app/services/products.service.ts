@@ -208,7 +208,8 @@ async searchProducts(searchQuery: string): Promise<Product[]> {  // Changed para
     console.error('Error searching products:', error);
     throw error;
   }
-}
+  }
+  
 // In products.service.ts
 
 // In products.service.ts

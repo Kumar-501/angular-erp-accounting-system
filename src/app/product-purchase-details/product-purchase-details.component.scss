@@ -60,3 +60,78 @@
   background-color: #f8f9fa;
   z-index: 10;
 }
+
+/* Sales History Styles */
+.sales-history-table {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.sales-history-table table {
+  margin-bottom: 0;
+}
+
+.sales-history-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa;
+  z-index: 10;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  
+  &.status-completed {
+    background-color: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #a3cfbb;
+  }
+  
+  &.status-paid {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+  }
+}
+
+.card-header {
+  .fas {
+    color: #007bff;
+  }
+}
+
+.text-muted {
+  h6 {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+}
+
+hr.mt-1 {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.75rem;
+}.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: capitalize;
+  
+  &.completed {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  
+  &.pending {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+  
+  &.cancelled {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+}

@@ -10,6 +10,8 @@ interface PurchaseOrderReference {
 }
 
 export interface PurchaseOrder {
+  orderDate: string;
+  shippingDate(shippingDate: any): any;
   id?: string;
   date: string;
   referenceNo: string;

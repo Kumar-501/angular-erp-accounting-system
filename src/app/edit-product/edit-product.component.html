@@ -37,20 +37,22 @@
    
       <!-- Add this after the Barcode Type field -->
       <div class="form-row">
-        <div class="form-group">
-          <label>Business Location:</label>
+         <div class="form-group">
+          <label>HSN Code:</label>
+          <input type="text" placeholder="HSN Code" 
+                 [(ngModel)]="product.hsnCode" name="hsnCode">
+        </div>
+  <div class="form-group">
+          <!-- <label>Business Location:</label>
           <select [(ngModel)]="product.location" name="location">
             <option value="">Please Select</option>
             <option *ngFor="let location of locations" [value]="location.id">
               {{ location.name }}
             </option>
-          </select>
+          </select> -->
         </div>
-        <div class="form-group">
-          <label>HSN Code:</label>
-          <input type="text" placeholder="HSN Code" 
-                 [(ngModel)]="product.hsnCode" name="hsnCode">
-        </div>
+        <div class="form-group"></div>
+       
       </div>
 
       <div class="form-row">
@@ -208,40 +210,41 @@
 
     <!-- Product Type Section -->
     <div class="container">
+<div class="form-group required-field">
+  <label class="required">Applicable Tax:</label>
+  <select
+    [(ngModel)]="product.applicableTax"
+    name="applicableTax"
+    required
+    (change)="onTaxChange()"
+    [class.invalid-field]="productFormSubmitted && !product.applicableTax"
+  >
+    <option value="" disabled selected *ngIf="!product.applicableTax">Select Tax</option>
+    <option [ngValue]="'None'">None</option>
+    <option *ngFor="let tax of taxRates" [ngValue]="tax">
+      {{ tax.name }} ({{ tax.rate || tax.percentage }}%)
+    </option>
+  </select>
+  <div class="tax-info-box" *ngIf="product.taxPercentage > 0">
+    Current tax rate: {{ product.taxPercentage }}%
+  </div>
+  <div *ngIf="productFormSubmitted && !product.applicableTax" class="error-message">
+    Applicable Tax is required
+  </div>
+</div>
       <div class="form-row">
-        <div class="form-group">
-          <label class="required">Applicable Tax:</label>
-          <select [(ngModel)]="product.applicableTax" name="applicableTax" (change)="onTaxChange()">
-            <option [ngValue]="'None'">None</option>
-            <option *ngFor="let tax of taxRates" [ngValue]="tax">
-              {{ tax.name }} ({{ tax.percentage }}%)
-            </option>
-          </select>
-          <div *ngIf="product.taxPercentage > 0" class="tax-info">
-            Current tax rate: {{ product.taxPercentage }}%
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="required">Selling Price Tax Type:</label>
-          <select [(ngModel)]="product.sellingPriceTaxType" name="sellingPriceTaxType" required (change)="calculateTax()">
-            <option>Exclusive</option>
-            <option>Inclusive</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
+        <!-- <div class="form-group">
           <label class="required">Define Product:</label>
           <select [(ngModel)]="product.defineProduct" name="defineProduct" required>
             <option value="Regular">Regular Product</option>
             <option value="Asset">Asset</option>
             <option value="Expense">Expense</option>
           </select>
-        </div>
+        </div> -->
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="required">Product Type:</label>
+          <label class="">Product Type:</label>
           <select [(ngModel)]="product.productType" name="productType" required (change)="onProductTypeChange()">
             <option>Single</option>
             <option>Variant</option>

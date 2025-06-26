@@ -188,7 +188,6 @@ export class AddProductComponent implements OnInit, OnDestroy {
       taxPercentage: 0,
       sellingPriceTaxType: 'Inclusive',
       productType: 'Single',
-      marginPercentage: 0,
       defaultPurchasePriceExcTax: null,
       defaultPurchasePriceIncTax: null,
       defaultSellingPriceExcTax: null,
@@ -468,30 +467,64 @@ export class AddProductComponent implements OnInit, OnDestroy {
     });
   }
 
-  calculateFromMRP() {
-    const taxPercentage = this.getTaxPercentage();
-    if (this.product.defaultSellingPriceIncTax !== null && this.product.defaultSellingPriceIncTax !== undefined) {
-      this.product.defaultSellingPriceExcTax =
-        this.product.defaultSellingPriceIncTax / (1 + taxPercentage / 100);
-
-      if (this.product.defaultPurchasePriceExcTax) {
-        const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
-        const sellingPrice = parseFloat(this.product.defaultSellingPriceExcTax);
-        this.product.marginPercentage = this.roundToTwoDecimals(((sellingPrice - cost) / cost) * 100);
-      }
-
-      this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(this.product.defaultSellingPriceExcTax);
-      this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(this.product.defaultSellingPriceIncTax);
-    }
-  }
 
   calculateSellingPriceIncTax() {
     const taxPercentage = this.getTaxPercentage();
     if (this.product.defaultSellingPriceExcTax !== null && this.product.defaultSellingPriceExcTax !== undefined) {
       const calculatedPrice = parseFloat(this.product.defaultSellingPriceExcTax) * (1 + taxPercentage / 100);
       this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(calculatedPrice);
+      
+   
     }
   }
+
+  // New method to handle margin changes
+onMarginChange() {
+  // Validate margin percentage input
+  if (this.product.marginPercentage < 0) {
+    this.product.marginPercentage = 0;
+    return;
+  }
+
+  // Allow margins over 100% - no upper limit validation
+  this.calculateSellingPriceFromMargin();
+}
+  // New method to calculate selling price from margin
+  private calculateSellingPriceFromMargin() {
+    if (this.product.defaultPurchasePriceExcTax && 
+        this.product.marginPercentage !== null && 
+        this.product.marginPercentage !== undefined) {
+      
+      const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
+      const margin = parseFloat(this.product.marginPercentage);
+      
+      if (cost > 0) {
+        // Calculate selling price based on margin
+        const sellingPriceExcTax = cost * (1 + margin / 100);
+        this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(sellingPriceExcTax);
+        
+        // Calculate selling price including tax
+        const taxPercentage = this.getTaxPercentage();
+        this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(
+          sellingPriceExcTax * (1 + taxPercentage / 100)
+        );
+      }
+    }
+  }
+
+private updateMarginFromPrices() {
+  if (this.product.defaultPurchasePriceExcTax && 
+      this.product.defaultSellingPriceExcTax &&
+      this.product.defaultPurchasePriceExcTax > 0) {
+    
+    const cost = parseFloat(this.product.defaultPurchasePriceExcTax);
+    const sellingPrice = parseFloat(this.product.defaultSellingPriceExcTax);
+    
+    // Calculate margin without restrictions
+    const calculatedMargin = ((sellingPrice - cost) / cost) * 100;
+    this.product.marginPercentage = this.roundToTwoDecimals(calculatedMargin);
+  }
+}
 
   calculateTaxAmount(): number {
     const taxPercentage = this.getTaxPercentage();
@@ -847,33 +880,33 @@ export class AddProductComponent implements OnInit, OnDestroy {
     const price = cost * (1 + (this.product.marginPercentage / 100));
     return Math.round(price);
   }
-
-  calculateCombinationPrices(): number {
-    if (!this.product.components || this.product.components.length === 0) {
-      this.product.defaultPurchasePriceExcTax = 0;
-      this.product.defaultPurchasePriceIncTax = 0;
-      return 0;
-    }
-
-    let totalCost = 0;
-
-    this.product.components.forEach((component: any) => {
-      const product = this.getComponentProduct(this.product.components.indexOf(component));
-      if (product && product.defaultPurchasePriceExcTax) {
-        const componentCost = product.defaultPurchasePriceExcTax * (component.quantity || 1);
-        totalCost += componentCost;
-      }
-    });
-
-    this.product.defaultPurchasePriceExcTax = this.roundToTwoDecimals(totalCost);
-
-    const taxPercentage = this.getTaxPercentage();
-    this.product.defaultPurchasePriceIncTax = this.roundToTwoDecimals(
-      totalCost * (1 + taxPercentage / 100)
-    );
-
-    return this.roundToTwoDecimals(totalCost);
+// Update the calculateCombinationPrices() method:
+calculateCombinationPrices(): number {
+  if (!this.product.components || this.product.components.length === 0) {
+    this.product.defaultPurchasePriceExcTax = 0;
+    this.product.defaultPurchasePriceIncTax = 0;
+    return 0;
   }
+
+  let totalCost = 0;
+
+  this.product.components.forEach((component: any) => {
+    const product = this.getComponentProduct(this.product.components.indexOf(component));
+    if (product && product.defaultPurchasePriceExcTax) {
+      const componentCost = product.defaultPurchasePriceExcTax * (component.quantity || 1);
+      totalCost += componentCost;
+    }
+  });
+
+  this.product.defaultPurchasePriceExcTax = this.roundToTwoDecimals(totalCost);
+
+  const taxPercentage = this.getTaxPercentage();
+  this.product.defaultPurchasePriceIncTax = this.roundToTwoDecimals(
+    totalCost * (1 + taxPercentage / 100)
+  );
+
+  return this.roundToTwoDecimals(totalCost);
+}
 
   isVariationSelected(variationId: string): boolean {
     return this.selectedVariations.some(v => v.id === variationId);
@@ -1012,7 +1045,7 @@ export class AddProductComponent implements OnInit, OnDestroy {
     if (this.product.defaultPurchasePriceIncTax !== null) {
       this.product.defaultPurchasePriceExcTax =
         this.product.defaultPurchasePriceIncTax / (1 + taxPercentage / 100);
-      this.calculateSellingPrice();
+      this.updateMarginFromPrices();
     }
   }
 
@@ -1024,27 +1057,25 @@ export class AddProductComponent implements OnInit, OnDestroy {
     }
   }
 
-  calculateAllPrices() {
-    const taxPercentage = this.getTaxPercentage();
+private calculateAllPrices() {
+  const taxPercentage = this.getTaxPercentage();
 
-    if (this.product.productType === 'Combination') {
-      const cost = this.calculateCombinationPrices();
+  if (this.product.productType === 'Combination') {
+    const cost = this.calculateCombinationPrices();
 
-      if (!this.product.defaultSellingPriceIncTax) {
-        const priceBeforeTax = cost * (1 + this.product.marginPercentage / 100);
-        this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(priceBeforeTax);
-        this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(
-          priceBeforeTax * (1 + taxPercentage / 100)
-        );
-      } else {
-        this.calculateFromMRP();
-      }
+    if (!this.product.defaultSellingPriceIncTax) {
+      const priceBeforeTax = cost;
+      this.product.defaultSellingPriceExcTax = this.roundToTwoDecimals(priceBeforeTax);
+      this.product.defaultSellingPriceIncTax = this.roundToTwoDecimals(
+        priceBeforeTax * (1 + taxPercentage / 100)
+      );
     } else {
-      if (this.product.defaultSellingPriceIncTax) {
-        this.calculateFromMRP();
-      }
+    }
+  } else {
+    if (this.product.defaultSellingPriceIncTax) {
     }
   }
+}
 
   async addProduct() {
     this.productFormSubmitted = true;
@@ -1145,62 +1176,67 @@ export class AddProductComponent implements OnInit, OnDestroy {
     this.isLoading = false;
   }
 
-  validateForm(): boolean {
-    let isValid = true;
-
-    const requiredFields = [
-      { field: 'productName', message: 'Product name is required' },
-      { field: 'unit', message: 'Unit is required' },
-      { field: 'barcodeType', message: 'Barcode type is required' },
-      { field: 'productType', message: 'Product type is required' }
-    ];
-
-    if (!this.product.notForSelling) {
-      requiredFields.push(
-        { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' }
-      );
+ validateForm(): boolean {
+  this.productFormSubmitted = true;
+  
+  // Check if form is valid
+  if (this.productForm && this.productForm.invalid) {
+    // Scroll to first invalid field
+    const firstInvalidElement = document.querySelector('.ng-invalid');
+    if (firstInvalidElement) {
+      firstInvalidElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    for (const { field, message } of requiredFields) {
-      if (!this.product[field]) {
-        alert(message);
-        isValid = false;
-      }
-    }
-
-    if (this.product.applicableTax === null || this.product.applicableTax === undefined) {
-      alert('Applicable Tax is required');
-      isValid = false;
-    }
-
-    if (!this.product.notForSelling) {
-      if (!this.product.defaultSellingPriceExcTax && !this.product.defaultSellingPriceIncTax) {
-        alert('Either selling price (exc. tax) or MRP (inc. tax) is required');
-        isValid = false;
-      }
-    }
-
-    switch (this.product.productType) {
-      case 'Variant':
-        if (!this.variantCombinations || this.variantCombinations.length === 0) {
-          alert('Please select at least one variation');
-          isValid = false;
-        }
-        break;
-
-      case 'Combination':
-        if (!this.product.components || this.product.components.length === 0) {
-          alert('Please add at least one component');
-          isValid = false;
-        }
-        break;
-
-      case 'Single':
-        break;
-    }
-
-    return isValid;
+    return false;
   }
+
+  // Additional custom validations
+  let isValid = true;
+  const requiredFields = [
+    { field: 'productName', message: 'Product name is required' },
+    { field: 'unit', message: 'Unit is required' },
+    { field: 'barcodeType', message: 'Barcode type is required' },
+    { field: 'productType', message: 'Product type is required' },
+    { field: 'applicableTax', message: 'Applicable Tax is required' }
+  ];
+
+  if (!this.product.notForSelling) {
+    requiredFields.push(
+      { field: 'sellingPriceTaxType', message: 'Selling price tax type is required' }
+    );
+  }
+
+  for (const { field, message } of requiredFields) {
+    if (!this.product[field]) {
+      isValid = false;
+      // Don't break so we can highlight all missing fields
+    }
+  }
+
+  // Product type specific validations
+  switch (this.product.productType) {
+    case 'Variant':
+      if (!this.variantCombinations || this.variantCombinations.length === 0) {
+        isValid = false;
+      }
+      break;
+
+    case 'Combination':
+      if (!this.product.components || this.product.components.length === 0) {
+        isValid = false;
+      }
+      break;
+  }
+
+  if (!isValid) {
+    // Scroll to first error
+    const firstErrorElement = document.querySelector('.invalid');
+    if (firstErrorElement) {
+      firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  return isValid;
+}
 
   onNotForSellingChange() {
     if (this.product.notForSelling) {

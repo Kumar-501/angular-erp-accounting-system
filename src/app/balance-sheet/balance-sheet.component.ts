@@ -6,6 +6,7 @@ import { ExpenseService } from '../services/expense.service';
 import { SaleService } from '../services/sale.service';
 import { PurchaseService } from '../services/purchase.service';
 import { StockService } from '../services/stock.service';
+import { DailyStockService } from '../services/daily-stock.service';
 import { Firestore, collection, getDocs, query, where, orderBy } from '@angular/fire/firestore';
 import { Subscription, interval } from 'rxjs';
 import * as XLSX from 'xlsx';
@@ -18,6 +19,15 @@ interface BalanceSheetItem {
   value: number;
   accountHead: string;
   isRealtimeData?: boolean;
+  isCategory?: boolean;
+  accounts?: BalanceSheetAccount[];
+}
+
+interface BalanceSheetAccount {
+  name: string;
+  accountNumber: string;
+  value: number;
+  accountHead: string;
 }
 
 interface BalanceSheetData {
@@ -57,14 +67,14 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
   refreshInterval = 5; // minutes
   
   private refreshSubscription?: Subscription;
-  private readonly COMPANY_NAME = 'HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED';
-  constructor(
+  private readonly COMPANY_NAME = 'HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED';  constructor(
     private accountService: AccountService,
     private profitLossService: ProfitLossService,
     private expenseService: ExpenseService,
     private saleService: SaleService,
     private purchaseService: PurchaseService,
     private stockService: StockService,
+    private dailyStockService: DailyStockService,
     private firestore: Firestore
   ) {}
 
@@ -150,9 +160,8 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
         this.getAllAccounts(),
         this.loadRealtimeProfitLossData(forceRefresh)
       ]);
-      
-      // Categorize accounts into balance sheet sections
-      this.categorizeAccounts(accounts);      // Add real-time profit/loss to equity
+        // Categorize accounts into balance sheet sections
+      await this.categorizeAccounts(accounts);// Add real-time profit/loss to equity
       if (profitLossData && profitLossData.netProfit !== undefined) {
         this.addProfitLossToEquity(profitLossData);
         this.balanceSheetData.profitLossLastUpdated = profitLossData.lastUpdated;
@@ -298,33 +307,77 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
       profitLossData.closingStock = 0;
     }
   }
-
   private async getStockValueForPL(date: Date, type: 'opening'|'closing'): Promise<number> {
     try {
-      const productStockCollection = collection(this.firestore, 'product-stock');
-      const querySnapshot = await getDocs(productStockCollection);
+      const businessDate = this.formatDateForSnapshot(date);
+      console.log(`Balance Sheet - Getting ${type} stock value for date: ${businessDate}`);
       
-      let totalStockValue = 0;
+      // Get daily snapshots for the date
+      const snapshotsCollection = collection(this.firestore, 'dailyStockSnapshots');
+      const q = query(
+        snapshotsCollection,
+        where('date', '==', businessDate)
+      );
       
-      for (const doc of querySnapshot.docs) {
-        const stockData = doc.data();
-        const quantity = stockData['quantity'] || 0;
-        let unitCost = stockData['unitCost'] || 0;
-        
-        // Apply realistic validation - if unit cost seems too high, cap it
-        if (unitCost > 10000) {
-          unitCost = Math.min(unitCost, 1000); // Cap at ₹1000 per unit for P&L accuracy
-        }
-        
-        const stockValue = quantity * unitCost;
-        totalStockValue += stockValue;
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        console.log(`Balance Sheet - No dailyStockSnapshots found for ${businessDate}`);
+        return 0;
       }
+
+      // Get all products for cost price reference (excluding tax)
+      const productsCollection = collection(this.firestore, 'products');
+      const productsSnapshot = await getDocs(productsCollection);
+      const productsMap = new Map();
       
+      productsSnapshot.docs.forEach(doc => {
+        const product = doc.data();
+        // Use defaultPurchasePriceExcTax to exclude tax from cost calculations
+        const costPrice = product['defaultPurchasePriceExcTax'] || 0;
+        productsMap.set(doc.id, {
+          ...product,
+          costPrice: costPrice
+        });
+      });
+
+      // Calculate total stock value
+      let totalStockValue = 0;
+      let processedSnapshots = 0;
+
+      querySnapshot.docs.forEach(doc => {
+        const snapshot = doc.data();
+        const productId = snapshot['productId'];
+        const stockQuantity = type === 'opening' ? 
+          (snapshot['openingStock'] || 0) : 
+          (snapshot['closingStock'] || 0);
+        
+        const product = productsMap.get(productId);
+        if (product && stockQuantity > 0) {
+          const stockValue = stockQuantity * product.costPrice;
+          totalStockValue += stockValue;
+          processedSnapshots++;
+          
+          console.log(`Balance Sheet - Product ${productId}: Quantity=${stockQuantity}, Cost=${product.costPrice}, Value=${stockValue}`);
+        } else if (!product) {
+          console.warn(`Balance Sheet - Product not found for productId: ${productId}`);
+        }
+      });
+
+      console.log(`Balance Sheet - Processed ${processedSnapshots} snapshots, Total ${type} stock value: ${totalStockValue}`);
       return totalStockValue;
+      
     } catch (error) {
-      console.error(`Error getting ${type} stock value:`, error);
+      console.error(`Balance Sheet - Error getting ${type} stock value:`, error);
       return 0;
     }
+  }
+
+  /**
+   * Format date for dailyStockSnapshot collection (YYYY-MM-DD format)
+   */
+  private formatDateForSnapshot(date: Date): string {
+    return date.toISOString().split('T')[0];
   }
 
   private async loadTransactionDataForPL(startDate: Date, endDate: Date, profitLossData: any): Promise<void> {
@@ -354,7 +407,6 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
       console.error('Error loading transaction data for P&L:', error);
     }
   }
-
   private async getSalesForPL(startDate: Date, endDate: Date): Promise<number> {
     try {
       const salesCollection = collection(this.firestore, 'sales');
@@ -370,17 +422,42 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
       
       querySnapshot.docs.forEach(doc => {
         const saleData = doc.data();
-        const saleAmount = saleData['paymentAmount'] || saleData['itemsTotal'] || saleData['totalAmount'] || saleData['total'] || 0;
-        totalSales += Number(saleAmount) || 0;
+        let saleAmount = 0;
+        
+        // Calculate from products array if available (more accurate, excluding tax)
+        if (saleData['products'] && Array.isArray(saleData['products'])) {
+          saleAmount = saleData['products'].reduce((sum: number, product: any) => {
+            const quantity = product['quantity'] || 1;
+            // Use selling price excluding tax
+            const unitPrice = product['sellingPriceExcTax'] || product['unitPriceExcTax'] || product['unitPrice'] || 0;
+            const discount = product['discount'] || 0;
+            return sum + ((unitPrice * quantity) - discount);
+          }, 0);
+        }
+        
+        // If no products or amount is 0, try other fields but subtract tax
+        if (saleAmount === 0) {
+          const totalAmount = saleData['paymentAmount'] || saleData['itemsTotal'] || saleData['totalAmount'] || saleData['total'] || 0;
+          const totalTax = saleData['totalTax'] || 
+                          (saleData['cgst'] || 0) + 
+                          (saleData['sgst'] || 0) + 
+                          (saleData['igst'] || 0);
+          
+          saleAmount = totalAmount - totalTax;
+        }
+        
+        // Ensure amount is positive
+        saleAmount = Math.max(0, saleAmount || 0);
+        totalSales += saleAmount;
       });
       
+      console.log('Balance Sheet - Total sales (excluding tax):', totalSales);
       return totalSales;
     } catch (error) {
       console.error('Error getting sales for P&L:', error);
       return 0;
     }
-  }
-  private async getPurchasesForPL(startDate: Date, endDate: Date): Promise<number> {
+  }private async getPurchasesForPL(startDate: Date, endDate: Date): Promise<number> {
     try {
       const purchasesCollection = collection(this.firestore, 'purchases');
       const q = query(
@@ -396,24 +473,43 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
       querySnapshot.docs.forEach(doc => {
         const purchaseData = doc.data();
         
-        // Use productsSubtotal first (value without GST), then fall back to other amount fields
-        let purchaseAmount = purchaseData['productsSubtotal'] || purchaseData['purchaseTotal'] || purchaseData['grandTotal'] || purchaseData['totalAmount'] || purchaseData['total'] || 0;
+        // Use productsSubtotal (excludes tax) as first preference
+        let purchaseAmount = purchaseData['productsSubtotal'];
         
-        // If using purchaseTotal or grandTotal, try to subtract tax to get the actual purchase value
-        if (!purchaseData['productsSubtotal'] && (purchaseData['purchaseTotal'] || purchaseData['grandTotal'])) {
-          const totalTax = purchaseData['totalTax'] || 
-                          (purchaseData['cgst'] || 0) + (purchaseData['sgst'] || 0) + (purchaseData['igst'] || 0);
-          if (totalTax > 0) {
-            purchaseAmount = (purchaseData['purchaseTotal'] || purchaseData['grandTotal']) - totalTax;
-            console.log(`Balance Sheet - Adjusted purchase amount by removing tax: Original: ${purchaseData['purchaseTotal'] || purchaseData['grandTotal']}, Tax: ${totalTax}, Net: ${purchaseAmount}`);
-          }
+        // If productsSubtotal not available, calculate from products array
+        if (!purchaseAmount && purchaseData['products'] && Array.isArray(purchaseData['products'])) {
+          purchaseAmount = purchaseData['products'].reduce((sum: number, product: any) => {
+            // Use netCost or unitCost (which should be excluding tax)
+            const costExcTax = product['netCost'] || product['unitCost'] || 0;
+            const quantity = product['quantity'] || 1;
+            return sum + (costExcTax * quantity);
+          }, 0);
         }
         
-        totalPurchases += Number(purchaseAmount) || 0;
-        console.log('Balance Sheet - Purchase amount (excluding GST):', purchaseAmount, 'Reference:', purchaseData['referenceNo'] || purchaseData['invoiceNo']);
+        // If still no amount, try other fields but subtract tax
+        if (!purchaseAmount) {
+          const totalAmount = purchaseData['purchaseTotal'] || purchaseData['grandTotal'] || 0;
+          const totalTax = purchaseData['totalTax'] || 
+                          (purchaseData['cgst'] || 0) + 
+                          (purchaseData['sgst'] || 0) + 
+                          (purchaseData['igst'] || 0);
+          
+          purchaseAmount = totalAmount - totalTax;
+        }
+        
+        // Ensure amount is positive
+        purchaseAmount = Math.max(0, purchaseAmount || 0);
+        totalPurchases += purchaseAmount;
+        
+        console.log('Balance Sheet - Purchase (excl. tax):', {
+          reference: purchaseData['referenceNo'] || purchaseData['invoiceNo'],
+          amount: purchaseAmount,
+          originalTotal: purchaseData['grandTotal'],
+          tax: purchaseData['totalTax']
+        });
       });
       
-      console.log('Balance Sheet - Total purchases (excluding GST):', totalPurchases);
+      console.log('Balance Sheet - Total purchases (excluding tax):', totalPurchases);
       return totalPurchases;
     } catch (error) {
       console.error('Error getting purchases for P&L:', error);
@@ -658,62 +754,331 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
    */
   private formatDateForInput(date: Date): string {
     return date.toISOString().split('T')[0];
-  }
-  /**
-   * Categorize accounts into balance sheet sections
+  }  /**
+   * Get all possible account head types
    */
-  private categorizeAccounts(accounts: any[]): void {
-    accounts.forEach(account => {
-      if (account.accountHead?.group) {
-        const group = account.accountHead.group.toLowerCase();
-        const value = account.openingBalance || 0;
-        
-        // Skip profit/loss related accounts as they will be handled separately
-        const accountName = account.name.toLowerCase();
-        if (accountName.includes('profit') || 
-            accountName.includes('loss') || 
-            accountName.includes('retained earnings') || 
-            accountName.includes('accumulated')) {
-          console.log(`Skipping profit/loss account from categorization: ${account.name}`);
-          return;
-        }
-        
-        const balanceSheetItem: BalanceSheetItem = {
-          name: account.name,
-          accountNumber: account.accountNumber || '',
-          value: value,
-          accountHead: account.accountHead.value || account.accountHead.group
-        };
-        
-        console.log(`Categorizing account: ${account.name} -> ${group}`);
-        
-        switch (group) {
-          case 'equity':
-            this.addAccountToSection('equity', balanceSheetItem);
-            break;
-          case 'liabilities':
-            this.addAccountToSection('liabilities', balanceSheetItem);
-            break;
-          case 'asset':
-          case 'assets':
-            this.addAccountToSection('assets', balanceSheetItem);
-            break;
-          default:
-            console.warn(`Unknown account group: ${group} for account: ${account.name}`);
-        }
-      } else {
-        console.warn(`Account missing accountHead.group: ${account.name}`);
-      }
-    });
+  private getAllAccountHeadTypes() {
+    return {
+      'Asset': [
+        'Asset|fixed_assets',
+        'Asset|deposits_assets',
+        'Asset|investments',
+        'Asset|loans_advances',
+        'Asset|sundry_debtors',
+        'Asset|suspense_account',
+        'Asset|income_receivables',
+        'Asset|input_tax_credits',
+        'Asset|prepaid_advances',
+        'Asset|bank_accounts',
+        'Asset|current_assets'
+      ],
+      'Equity': [
+        'Equity|capital_account'
+      ],
+      'Liabilities': [
+        'Liabilities|current_liabilities',
+        'Liabilities|duties_taxes',
+        'Liabilities|loans_liabilities',
+        'Liabilities|secured_loans',
+        'Liabilities|sundry_creditors',
+        'Liabilities|expenses_payable',
+        'Liabilities|advance_earned',
+        'Liabilities|tax_payable',
+        'Liabilities|tds_payable'
+      ]
+    };
   }
 
+  /**
+   * Get account head display name
+   */
+  private getAccountHeadDisplayName(accountHeadValue: string): string {
+    const accountHeadMap: { [key: string]: string } = {
+      'Asset|fixed_assets': 'Fixed Assets',
+      'Asset|deposits_assets': 'Deposits (Assets)',
+      'Asset|investments': 'Investments',
+      'Asset|loans_advances': 'Loans and Advances',
+      'Asset|sundry_debtors': 'Sundry Debtors',
+      'Asset|suspense_account': 'Suspense A/C',
+      'Asset|income_receivables': 'Income Receivables',
+      'Asset|input_tax_credits': 'Input Tax Credits',
+      'Asset|prepaid_advances': 'Prepaid Advances',
+      'Asset|bank_accounts': 'Banks',
+      'Asset|current_assets': 'Current Assets',
+      'Equity|capital_account': 'Capital Account',
+      'Liabilities|current_liabilities': 'Current Liabilities',
+      'Liabilities|duties_taxes': 'Duties and Taxes',
+      'Liabilities|loans_liabilities': 'Loans (Liabilities)',
+      'Liabilities|secured_loans': 'Secured Loans',
+      'Liabilities|sundry_creditors': 'Sundry Creditors',
+      'Liabilities|expenses_payable': 'Expense Payable',
+      'Liabilities|advance_earned': 'Advance Earned',
+      'Liabilities|tax_payable': 'Tax Payable',
+      'Liabilities|tds_payable': 'TDS Payable'
+    };
+    
+    return accountHeadMap[accountHeadValue] || accountHeadValue;
+  }  /**
+   * Calculate current balance for an account using the exact same logic as list-accounts component
+   */
+  private async calculateAccountCurrentBalance(accountId: string, openingBalance: number): Promise<number> {
+    try {
+      // Get all transactions and sales data
+      const [transactions, salesData] = await Promise.all([
+        this.getTransactionsForAccount(accountId),
+        this.getSalesForAccount(accountId)
+      ]);
+      
+      let currentBalance = openingBalance;
+      
+      // Process all transactions chronologically (same as list-accounts)
+      transactions.sort((a: any, b: any) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      ).forEach((transaction: any) => {
+        const amount = Number(transaction.amount || 0);
+        
+        // Calculate debit/credit based on transaction type and amount (same logic as list-accounts)
+        let balanceChange = 0;
+        
+        // If transaction already has debit/credit fields, use them
+        if (transaction.debit !== undefined && transaction.credit !== undefined) {
+          const debit = Number(transaction.debit || 0);
+          const credit = Number(transaction.credit || 0);
+          balanceChange = credit - debit;
+        } else {
+          // Calculate debit/credit from amount and type (exact same logic as list-accounts)
+          switch (transaction.type) {
+            case 'expense':
+            case 'transfer_out':
+            case 'purchase_payment':
+              balanceChange = -amount; // Debit decreases balance
+              break;
+            case 'income':
+            case 'transfer_in':
+            case 'deposit':
+            case 'sale':
+            case 'purchase_return':
+              balanceChange = amount; // Credit increases balance
+              break;
+            default:
+              // For unknown types, assume expense types decrease balance
+              if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
+                balanceChange = -amount;
+              } else {
+                balanceChange = amount;
+              }
+          }
+        }
+        
+        currentBalance += balanceChange;
+      });
+      
+      // Also process sales data for balance calculation (same as list-accounts)
+      salesData.forEach((sale: any) => {
+        const paymentAmount = Number(sale.paymentAmount) || 0;
+        if (paymentAmount > 0) {
+          currentBalance += paymentAmount;
+        }
+      });
+      
+      console.log(`Balance Sheet - Account ${accountId}: Opening: ${openingBalance}, Final: ${currentBalance}`);
+      
+      return currentBalance;
+    } catch (error) {
+      console.error(`Error calculating current balance for account ${accountId}:`, error);
+      return openingBalance; // Fallback to opening balance
+    }
+  }
+
+  /**
+   * Get all transactions for a specific account
+   */
+  private async getTransactionsForAccount(accountId: string): Promise<any[]> {
+    try {
+      const transactionsRef = collection(this.firestore, 'transactions');
+      const accountTransactionsQuery = query(
+        transactionsRef,
+        where('accountId', '==', accountId)
+      );
+      
+      const snapshot = await getDocs(accountTransactionsQuery);
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+    } catch (error) {
+      console.error(`Error getting transactions for account ${accountId}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get sales data for a specific account (same logic as list-accounts)
+   */
+  private async getSalesForAccount(accountId: string): Promise<any[]> {
+    try {
+      const salesRef = collection(this.firestore, 'sales');
+      
+      // Query both paymentAccountId and paymentAccount fields (same as list-accounts)
+      const salesQuery1 = query(
+        salesRef,
+        where('paymentAccountId', '==', accountId)
+      );
+      
+      const salesQuery2 = query(
+        salesRef,
+        where('paymentAccount', '==', accountId)
+      );
+      
+      const [snapshot1, snapshot2] = await Promise.all([
+        getDocs(salesQuery1),
+        getDocs(salesQuery2)
+      ]);
+      
+      const sales: any[] = [];
+      
+      // Add sales from paymentAccountId
+      snapshot1.docs.forEach(doc => {
+        sales.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // Add sales from paymentAccount (avoiding duplicates)
+      snapshot2.docs.forEach(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        if (!sales.find(sale => sale.id === data.id)) {
+          sales.push(data);
+        }
+      });
+      
+      return sales;
+    } catch (error) {
+      console.error(`Error getting sales for account ${accountId}:`, error);
+      return [];
+    }
+  }
+  /**
+   * Categorize accounts into balance sheet sections and show all account types
+   */
+  private async categorizeAccounts(accounts: any[]): Promise<void> {
+    const allAccountHeadTypes = this.getAllAccountHeadTypes();
+    const accountsByType: { [key: string]: any[] } = {};
+    
+    // Group accounts by their account head value
+    accounts.forEach(account => {
+      if (account.accountHead?.value) {
+        const accountHeadValue = account.accountHead.value;
+        if (!accountsByType[accountHeadValue]) {
+          accountsByType[accountHeadValue] = [];
+        }
+        accountsByType[accountHeadValue].push(account);
+      }
+    });    // Process each account group
+    for (const [group, accountHeadTypes] of Object.entries(allAccountHeadTypes)) {
+      for (const accountHeadValue of accountHeadTypes) {
+        const accountsForType = accountsByType[accountHeadValue] || [];
+        const accountHeadDisplayName = this.getAccountHeadDisplayName(accountHeadValue);
+        let categoryTotal = 0;
+        
+        if (accountsForType.length > 0) {
+          // Add category header first
+          const categoryHeaderItem: BalanceSheetItem = {
+            name: accountHeadDisplayName,
+            accountNumber: group === 'Asset' ? `${accountsForType.length} accounts` : '',
+            value: 0, // Will be updated after processing individual accounts
+            accountHead: accountHeadDisplayName,
+            isCategory: true
+          };
+          
+          // Add individual accounts for this category
+          const individualAccounts: BalanceSheetItem[] = [];
+          for (const account of accountsForType) {
+            // Skip profit/loss related accounts as they will be handled separately
+            const accountName = account.name.toLowerCase();
+            if (accountName.includes('profit') || 
+                accountName.includes('loss') || 
+                accountName.includes('retained earnings') || 
+                accountName.includes('accumulated')) {
+              console.log(`Skipping profit/loss account from categorization: ${account.name}`);
+              continue;
+            }
+            
+            const openingBalance = Number(account.openingBalance || 0);
+            const currentBalance = await this.calculateAccountCurrentBalance(account.id, openingBalance);
+            categoryTotal += currentBalance;
+            
+            const balanceSheetItem: BalanceSheetItem = {
+              name: `  ${account.name}`, // Indent individual accounts
+              accountNumber: group === 'Asset' ? (account.accountNumber || '') : '',
+              value: currentBalance,
+              accountHead: accountHeadDisplayName,
+              isCategory: false
+            };
+            
+            individualAccounts.push(balanceSheetItem);
+            console.log(`Adding individual ${group} account: ${balanceSheetItem.name} = ${currentBalance}`);
+          }
+          
+          // Update category total
+          categoryHeaderItem.value = categoryTotal;
+          
+          // Add category header first, then individual accounts
+          switch (group.toLowerCase()) {
+            case 'equity':
+              this.addAccountToSection('equity', categoryHeaderItem);
+              individualAccounts.forEach(item => this.addAccountToSection('equity', item));
+              break;
+            case 'liabilities':
+              this.addAccountToSection('liabilities', categoryHeaderItem);
+              individualAccounts.forEach(item => this.addAccountToSection('liabilities', item));
+              break;
+            case 'asset':
+              this.addAccountToSection('assets', categoryHeaderItem);
+              individualAccounts.forEach(item => this.addAccountToSection('assets', item));
+              break;
+            default:
+              console.warn(`Unknown account group: ${group}`);
+          }
+        } else {
+          // Add empty category to show structure
+          const balanceSheetItem: BalanceSheetItem = {
+            name: accountHeadDisplayName,
+            accountNumber: group === 'Asset' ? 'No accounts' : '',
+            value: 0,
+            accountHead: accountHeadDisplayName,
+            isCategory: true
+          };
+          
+          console.log(`Adding empty ${group} category: ${balanceSheetItem.name} = 0`);
+          
+          // Add to appropriate section
+          switch (group.toLowerCase()) {
+            case 'equity':
+              this.addAccountToSection('equity', balanceSheetItem);
+              break;
+            case 'liabilities':
+              this.addAccountToSection('liabilities', balanceSheetItem);
+              break;
+            case 'asset':
+              this.addAccountToSection('assets', balanceSheetItem);
+              break;
+            default:
+              console.warn(`Unknown account group: ${group}`);
+          }
+        }
+      }
+    }
+  }
   /**
    * Add account to specific section
    */
   private addAccountToSection(section: keyof Pick<BalanceSheetData, 'equity' | 'liabilities' | 'assets'>, item: BalanceSheetItem): void {
     this.balanceSheetData[section].push(item);
-    this.balanceSheetData.totals[section] += item.value;
-  }  /**
+    // Only add to totals if it's not a category header (to avoid double counting)
+    if (!item.isCategory) {
+      this.balanceSheetData.totals[section] += item.value;
+    }
+  }/**
    * Add real-time profit/loss to equity section
    */
   private addProfitLossToEquity(profitLossData: any): void {

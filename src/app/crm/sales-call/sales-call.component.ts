@@ -90,87 +90,95 @@ export class SalesCallComponent implements OnInit, OnDestroy {
     }
   }
 
-  // FIXED: Simplified and more reliable status update method
-  async updateIndividualCallStatus(customerId: string, event: any): Promise<void> {
-    const newStatus = event.target.value;
-    
-    if (!customerId || !newStatus) {
-      console.warn('Invalid customerId or status');
-      return;
-    }
-
-    // Prevent multiple simultaneous updates for the same customer
-    if (this.isUpdatingStatus.has(customerId)) {
-      console.log('Update already in progress for customer:', customerId);
-      return;
-    }
-
-    console.log('Updating status for customer:', customerId, 'to:', newStatus);
-    
-    // Mark as updating
-    this.isUpdatingStatus.add(customerId);
-    
-    try {
-      // Update the status using the service
-      await this.salesCallService.updateSalesCall(customerId, {
-        callStatus: newStatus,
-        statusUpdatedAt: new Date()
-      });
-      
-      // Update local state immediately for better UX
-      this.updateLocalCallStatus(customerId, newStatus);
-      
-      // Create a call log entry for this status change
-      const currentUserId = await this.getCurrentUserId();
-      await this.callLogService.addCallLog(customerId, {
-        subject: `Status changed to ${newStatus}`,
-        description: `Status manually changed to ${newStatus}`,
-        callOutcome: this.mapStatusToCallOutcome(newStatus),
-        createdAt: Timestamp.now(),
-        createdBy: currentUserId,
-        isStatusUpdate: true
-      });
-
-      console.log('Status updated successfully for customer:', customerId);
-      
-    } catch (error) {
-      console.error('Error updating status for customer:', customerId, error);
-      
-      // Revert the UI change on error
-      const originalCall = this.salesCalls.find(call => call.customerId === customerId);
-      if (originalCall) {
-        event.target.value = originalCall.callStatus || 'Pending';
-      }
-      
-      alert('Failed to update status. Please try again.');
-    } finally {
-      // Remove from updating set
-      this.isUpdatingStatus.delete(customerId);
-    }
+async updateIndividualCallStatus(customerId: string, newStatus: string): Promise<void> {
+  if (!customerId || !newStatus) {
+    console.warn('Invalid customerId or status');
+    return;
   }
 
-  // Helper method to update local state
-  private updateLocalCallStatus(customerId: string, newStatus: string): void {
-    // Update in salesCalls array
-    const salesCallIndex = this.salesCalls.findIndex(call => call.customerId === customerId);
-    if (salesCallIndex >= 0) {
-      this.salesCalls[salesCallIndex] = {
-        ...this.salesCalls[salesCallIndex],
-        callStatus: newStatus,
-        statusUpdatedAt: new Date()
-      };
+  // Prevent multiple simultaneous updates for the same customer
+  if (this.isUpdatingStatus.has(customerId)) {
+    console.log('Update already in progress for customer:', customerId);
+    return;
+  }
+
+  console.log('Updating status for customer:', customerId, 'to:', newStatus);
+  
+  // Mark as updating
+  this.isUpdatingStatus.add(customerId);
+  
+  try {
+    // Find the call in our arrays to get the current data
+    const callIndex = this.salesCalls.findIndex(c => c.customerId === customerId);
+    if (callIndex === -1) return;
+
+    const callData = this.salesCalls[callIndex];
+    
+    // Update the status using the service
+    await this.salesCallService.updateSalesCall(customerId, {
+      callStatus: newStatus,
+      statusUpdatedAt: new Date()
+    });
+    
+    // Update local state immediately for better UX
+    this.updateLocalCallStatus(customerId, newStatus);
+    
+    // Create a call log entry for this status change
+    const currentUserId = await this.getCurrentUserId();
+    await this.callLogService.addCallLog(customerId, {
+      subject: `Status changed to ${newStatus}`,
+      description: `Status manually changed to ${newStatus}`,
+      callOutcome: this.mapStatusToCallOutcome(newStatus),
+      createdAt: Timestamp.now(),
+      createdBy: currentUserId,
+      isStatusUpdate: true
+    });
+
+    console.log('Status updated successfully for customer:', customerId);
+    
+  } catch (error) {
+    console.error('Error updating status for customer:', customerId, error);
+    
+    // Revert the UI change on error
+    const originalCall = this.salesCalls.find(call => call.customerId === customerId);
+    if (originalCall) {
+      originalCall.callStatus = originalCall.callStatus || 'Pending';
     }
     
-    // Update in filteredCalls array
-    const filteredCallIndex = this.filteredCalls.findIndex(call => call.customerId === customerId);
-    if (filteredCallIndex >= 0) {
-      this.filteredCalls[filteredCallIndex] = {
-        ...this.filteredCalls[filteredCallIndex],
-        callStatus: newStatus,
-        statusUpdatedAt: new Date()
-      };
-    }
+    alert('Failed to update status. Please try again.');
+  } finally {
+    // Remove from updating set
+    this.isUpdatingStatus.delete(customerId);
   }
+}
+
+private updateLocalCallStatus(customerId: string, newStatus: string): void {
+  // Update in salesCalls array
+  const salesCallIndex = this.salesCalls.findIndex(call => call.customerId === customerId);
+  if (salesCallIndex >= 0) {
+    this.salesCalls[salesCallIndex].callStatus = newStatus;
+    this.salesCalls[salesCallIndex].statusUpdatedAt = new Date();
+  }
+  
+  // Update in filteredCalls array
+  const filteredCallIndex = this.filteredCalls.findIndex(call => call.customerId === customerId);
+  if (filteredCallIndex >= 0) {
+    this.filteredCalls[filteredCallIndex].callStatus = newStatus;
+    this.filteredCalls[filteredCallIndex].statusUpdatedAt = new Date();
+  }
+}
+
+private mapStatusToCallOutcome(status: string): string {
+  switch(status) {
+    case 'Completed': return 'Successful';
+    case 'Pending': return 'No Answer';
+    case 'Follow-up': return 'Left Message';
+    case 'Not Interested': return 'Wrong Number';
+    default: return status;
+  }
+}
+
+
 
   // Track by function for better performance
   trackByFn(index: number, item: any): any {
@@ -224,15 +232,7 @@ export class SalesCallComponent implements OnInit, OnDestroy {
     }
   }
 
-  private mapStatusToCallOutcome(status: string): string {
-    switch(status) {
-      case 'Completed': return 'Successful';
-      case 'Pending': return 'No Answer';
-      case 'Follow-up': return 'Left Message';
-      case 'Not Interested': return 'Wrong Number';
-      default: return status;
-    }
-  }
+
   // Enhanced bulk update method with call logs
   async bulkUpdateStatus(newStatus: string): Promise<void> {
     if (!newStatus || this.selectedCalls.length === 0) {

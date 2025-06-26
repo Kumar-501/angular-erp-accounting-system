@@ -381,17 +381,17 @@ body {
 .suppliers-table td {
   padding: 12px 15px;
   text-align: left;
+  text-wrap: nowrap;
   border-bottom: 1px solid #eee;
 }
 
 .suppliers-table th {
-  background-color: #f9f9f9;
-  font-weight: 600;
-  color: #333;
-  cursor: pointer;
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  text-wrap: nowrap;
+     position: sticky;
+  top: 0; /* or top: 10px; etc., as you need */
+  background-color: white; /* optional */
+  z-index: 1000; 
+  
 }
 
 .suppliers-table th:hover {
@@ -877,6 +877,24 @@ textarea:focus {
 /* Status section */
 .status-section {
   padding: 6px 16px;
+}
+.suppliers-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.suppliers-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #fff; /* or any background so text is readable */
+  z-index: 2;
+  box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); /* optional for effect */
+}
+
+/* Make table scrollable */
+.table-responsive {
+  max-height: 500px; /* or whatever height you want */
+  overflow-y: auto;
 }
 
 
@@ -1454,6 +1472,13 @@ margin-top: -5%;
 .spinner-border {
   margin-right: 5px;
   vertical-align: middle;
+}
+
+.btn-save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}.spinner-border-sm {
+  margin-right: 5px;
 }
 
 .btn-save:disabled {

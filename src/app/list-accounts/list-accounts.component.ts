@@ -122,17 +122,16 @@ ngOnInit(): void {
   ];
 }
 
-  // Initialize deposit form
-  initDepositForm(): void {
-    this.depositForm = this.fb.group({
-      depositTo: ['', Validators.required],
-      amount: [0, [Validators.required, Validators.min(1)]],
-      depositFrom: ['', Validators.required],
-      date: [new Date().toISOString().split('T')[0], Validators.required],
-      note: [''],
-      attachmentUrl: ['']
-    });
-  }
+initDepositForm(): void {
+  this.depositForm = this.fb.group({
+    depositTo: ['', Validators.required],
+    amount: [0, [Validators.required, Validators.min(1)]],
+    depositFrom: [''], // Removed Validators.required
+    date: [new Date().toISOString().split('T')[0], Validators.required],
+    note: [''],
+    attachmentUrl: ['']
+  });
+}
   loadUsers(): void {
     this.userService.getUsers().subscribe(users => {
       this.users = users;
@@ -205,24 +204,28 @@ processAccountTransactions(): void {
       if (transaction.debit !== undefined && transaction.credit !== undefined) {
         debit = Number(transaction.debit || 0);
         credit = Number(transaction.credit || 0);
-      } else {
-        // Calculate debit/credit from amount and type
+      } else {        // Calculate debit/credit from amount and type
         switch (transaction.type) {
           case 'expense':
           case 'transfer_out':
+          case 'fund_transfer_out':
+          case 'deposit_out':
           case 'purchase_payment':
             debit = amount;
             break;
           case 'income':
           case 'transfer_in':
+          case 'fund_transfer_in':
+          case 'deposit_in':
+          case 'deposit':
           case 'sale':
           case 'purchase_return':
-          case 'deposit':
             credit = amount;
             break;
           default:
             // For unknown types, assume expense types are debits, others are credits
-            if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
+            if (transaction.type?.includes('expense') || transaction.type?.includes('payment') || 
+                transaction.type?.includes('out')) {
               debit = amount;
             } else {
               credit = amount;
@@ -236,24 +239,39 @@ processAccountTransactions(): void {
         credit: credit
       });
     });
-    
-    // Include sales payments as credit transactions
+      // Include sales payments as credit transactions
     this.sales.forEach(sale => {
       const accountId = sale.paymentAccountId || sale.paymentAccount;
       if (accountId) {
         if (!this.accountTransactions[accountId]) {
           this.accountTransactions[accountId] = [];
         }
-        // Push a sale transaction with credit amount
-        const paymentAmount = Number(sale.paymentAmount) || 0;
-        this.accountTransactions[accountId].push({ 
-          debit: 0, 
-          credit: paymentAmount,
-          type: 'sale',
-          description: `Sale: ${sale.invoiceNo || 'No invoice'}`,
-          date: sale.saleDate || sale.createdAt,
-          amount: paymentAmount
-        });
+        
+        // Calculate the proper payment amount using enhanced logic
+        const paymentAmount = this.calculateSalesPaymentAmount(sale);
+        
+        // Only include sales with actual payment amounts > 0
+        if (paymentAmount > 0) {
+          console.log('Processing sale for list-accounts:', {
+            invoiceNo: sale.invoiceNo,
+            accountId: accountId,
+            paymentAmount: paymentAmount,
+            balance: sale.balance,
+            itemsTotal: sale.itemsTotal
+          });
+          
+          this.accountTransactions[accountId].push({ 
+            debit: 0, 
+            credit: paymentAmount,
+            type: 'sale',
+            description: `Sale: ${sale.invoiceNo || sale.orderNo || 'No invoice'} - ${sale.customerName || sale.customer || 'Unknown Customer'}`,
+            date: this.convertToDate(sale.paidOn || sale.saleDate || sale.createdAt),
+            amount: paymentAmount,
+            invoiceNo: sale.invoiceNo,
+            customer: sale.customerName || sale.customer,
+            source: 'sale'
+          });
+        }
       }
     });
     
@@ -305,10 +323,7 @@ clearSearch(): void {
   this.searchTerm = '';
   this.applySearchFilter();
 }
-getAccBalance(accountId: string): number {
-  // Return calculated balance if available, otherwise use opening balance
-  return this.accounts.find(acc => acc.id === accountId)?.calculatedBalance
-}
+
 loadAccountsRealtime(): void {
   this.accountService.getAccounts((accounts: any[]) => {
     // First get all accounts
@@ -352,17 +367,20 @@ loadAccountsRealtime(): void {
             debit = Number(transaction.debit || 0);
             credit = Number(transaction.credit || 0);
             balanceChange = credit - debit;
-          } else {
-            // Calculate debit/credit from amount and type
+          } else {            // Calculate debit/credit from amount and type
             switch (transaction.type) {
               case 'expense':
               case 'transfer_out':
+              case 'fund_transfer_out':
+              case 'deposit_out':
               case 'purchase_payment':
                 debit = amount;
                 balanceChange = -amount; // Debit decreases balance
                 break;
               case 'income':
               case 'transfer_in':
+              case 'fund_transfer_in':
+              case 'deposit_in':
               case 'deposit':
               case 'sale':
               case 'purchase_return':
@@ -371,7 +389,8 @@ loadAccountsRealtime(): void {
                 break;
               default:
                 // For unknown types, assume expense types decrease balance
-                if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
+                if (transaction.type?.includes('expense') || transaction.type?.includes('payment') || 
+                    transaction.type?.includes('out')) {
                   debit = amount;
                   balanceChange = -amount;
                 } else {
@@ -394,13 +413,12 @@ loadAccountsRealtime(): void {
           // Update debit/credit totals
           this.debitCreditTotals[accountId].debit += debit;
           this.debitCreditTotals[accountId].credit += credit;
-        }
-      });
+        }      });
 
       // Also process sales data for balance calculation
       this.sales.forEach(sale => {
         const accountId = sale.paymentAccountId || sale.paymentAccount;
-        const paymentAmount = Number(sale.paymentAmount) || 0;
+        const paymentAmount = this.calculateSalesPaymentAmount(sale);
         
         if (accountId && paymentAmount > 0 && accountBalances.has(accountId)) {
           const currentBalance = accountBalances.get(accountId) || 0;
@@ -414,9 +432,12 @@ loadAccountsRealtime(): void {
             debit: 0, 
             credit: paymentAmount,
             type: 'sale',
-            description: `Sale: ${sale.invoiceNo || 'No invoice'}`,
-            date: sale.saleDate || sale.createdAt,
-            amount: paymentAmount
+            description: `Sale: ${sale.invoiceNo || sale.orderNo || 'No invoice'} - ${sale.customerName || sale.customer || 'Unknown Customer'}`,
+            date: this.convertToDate(sale.paidOn || sale.saleDate || sale.createdAt),
+            amount: paymentAmount,
+            invoiceNo: sale.invoiceNo,
+            customer: sale.customerName || sale.customer,
+            source: 'sale'
           });
           
           // Update credit total
@@ -425,11 +446,11 @@ loadAccountsRealtime(): void {
           }
           this.debitCreditTotals[accountId].credit += paymentAmount;
         }
-      });      // Update accounts with calculated balances
+      });
+      
+      // Update accounts with calculated balances
       this.accounts = accounts.map(account => {
         const calculatedBalance = accountBalances.get(account.id) || account.openingBalance || 0;
-        console.log("Fanisus: b: ", this.getAccBalance(account.id))
-        console.log("Fanisus: ", calculatedBalance)
         return {
           ...account,
           calculatedBalance: calculatedBalance
@@ -1027,11 +1048,13 @@ exportPDF(): void {
 
 // Enhanced fund transfer method
 fundTransfer(account: any): void {
+  console.log('Opening fund transfer modal for account:', account);
   this.selectedFromAccount = account;
   this.fundTransferForm.patchValue({
     fromAccount: account.id,
     date: new Date().toISOString().split('T')[0]
   });
+  console.log('Fund transfer form after patch:', this.fundTransferForm.value);
   this.showFundTransferModal = true;
 }
 deposit(account: any): void {
@@ -1074,118 +1097,81 @@ deposit(account: any): void {
     this.initDepositForm();
     this.showDepositModal = false;
     this.selectedAccount = null;
-  }
-
-  submitDeposit(): void {
-  if (this.depositForm.valid) {
-    const formValue = this.depositForm.value;
-    
-    // Get the accounts involved
-    const toAccount = this.accounts.find(acc => acc.id === formValue.depositTo);
-    const fromAccount = this.accounts.find(acc => acc.id === formValue.depositFrom);
-    
-    if (!toAccount || !fromAccount) {
-      alert('One or both accounts not found');
-      return;
-    }
-    
-    // Validate sufficient balance in from account
-    const depositAmount = parseFloat(formValue.amount);
-    if ((fromAccount.openingBalance || 0) < depositAmount) {
-      alert('Insufficient balance in the source account');
-      return;
-    }
-    
-    const depositDate = new Date(formValue.date);
-    
-    // Create deposit record
-    const depositData = {
-      accountId: formValue.depositTo,
-      accountName: toAccount.name,
-      depositFrom: formValue.depositFrom,
-      depositFromName: fromAccount.name,
-      amount: depositAmount,
-      date: depositDate,
-      note: formValue.note || '',
-      attachmentUrl: formValue.attachmentUrl || '',
-      type: 'deposit',
-      description: `Deposit from ${fromAccount.name}`,
-      addedBy: 'User', // Replace with actual user
-      hasDocument: !!formValue.attachmentUrl,
-      createdAt: new Date()
-    };
-    
-    // Create transaction records for both accounts
-    const toTransaction = {
-      accountId: formValue.depositTo,
-      date: depositDate,
-      description: `Deposit from ${fromAccount.name}`,
-      paymentMethod: 'Deposit',
-      paymentDetails: '',
-      note: formValue.note || '',
-      addedBy: 'User',
-      debit: 0,
-      credit: depositAmount,
-      type: 'deposit',
-      hasDocument: !!formValue.attachmentUrl,
-      attachmentUrl: formValue.attachmentUrl || '',
-      fromAccountId: formValue.depositFrom,
-      toAccountId: formValue.depositTo
-    };
-    
-    const fromTransaction = {
-      accountId: formValue.depositFrom,
-      date: depositDate,
-      description: `Deposit to ${toAccount.name}`,
-      paymentMethod: 'Deposit',
-      paymentDetails: '',
-      note: formValue.note || '',
-      addedBy: 'User',
-      debit: depositAmount,
-      credit: 0,
-      type: 'deposit_out',
-      hasDocument: !!formValue.attachmentUrl,
-      attachmentUrl: formValue.attachmentUrl || '',
-      fromAccountId: formValue.depositFrom,
-      toAccountId: formValue.depositTo
-    };
-    
-    // Use a batch write to ensure all operations succeed or fail together
-    const batch = writeBatch(this.firestore);
-    
-    // Add deposit record
-    const depositsRef = collection(this.firestore, 'deposits');
-    const depositRef = doc(depositsRef);
-    batch.set(depositRef, depositData);
-    
-    // Add transaction records
-    const transactionsRef = collection(this.firestore, 'transactions');
-    const toTransactionRef = doc(transactionsRef);
-    batch.set(toTransactionRef, toTransaction);
-    
-    const fromTransactionRef = doc(transactionsRef);
-    batch.set(fromTransactionRef, fromTransaction);
-    
- 
-    
-  
-    
-    // Commit the batch operation
-    batch.commit()
-      .then(() => {
-        alert('Deposit completed successfully!');
+  }  submitDeposit(): void {
+    if (this.depositForm.valid) {
+      const formValue = this.depositForm.value;
+      
+      // Get the target account
+      const toAccount = this.accounts.find(acc => acc.id === formValue.depositTo);
+      
+      if (!toAccount) {
+        alert('Target account not found');
+        return;
+      }
+      
+      const depositAmount = parseFloat(formValue.amount);
+      const depositDate = new Date(formValue.date);
+      
+      // Check if depositFrom is provided
+      const hasFromAccount = formValue.depositFrom && formValue.depositFrom.trim() !== '';
+      let fromAccount = null;
+      
+      if (hasFromAccount) {
+        fromAccount = this.accounts.find(acc => acc.id === formValue.depositFrom);
+        
+        if (!fromAccount) {
+          alert('Source account not found');
+          return;
+        }
+        
+        // Validate sufficient balance in from account
+        const currentBalance = this.calculateAccountCurrentBalance(fromAccount);
+        if (currentBalance < depositAmount) {
+          alert('Insufficient balance in the source account');
+          return;
+        }
+      }
+      
+      // Prepare deposit data
+      const depositData = {
+        accountId: formValue.depositTo,
+        accountName: toAccount.name,
+        depositFrom: hasFromAccount ? formValue.depositFrom : null,
+        depositFromName: hasFromAccount ? fromAccount?.name : null,
+        amount: depositAmount,
+        date: depositDate,
+        note: formValue.note || '',
+        attachmentUrl: formValue.attachmentUrl || '',
+        description: hasFromAccount ? `Deposit from ${fromAccount?.name}` : 'Direct deposit',
+        addedBy: 'User',
+        hasDocument: !!formValue.attachmentUrl
+      };
+      
+      // Use the account service to process the deposit
+      this.accountService.addDeposit(depositData).then(() => {
+        alert('Deposit processed successfully!');
         this.closeDepositForm();
-      })
-      .catch((err) => {
-        console.error('Error during deposit:', err);
-        alert('Error during deposit: ' + err.message);
-      });
-  } else {
-    alert('Please fill all required fields');
+      }).catch((error) => {
+        console.error('Error processing deposit:', error);
+        alert('Error processing deposit. Please try again.');
+      });    } else {
+      alert('Please fill all required fields');
+    }
   }
-}
-
   submitFundTransfer(): void {
+    console.log('Fund transfer form submitted');
+    
+    // Safety check for form initialization
+    if (!this.fundTransferForm) {
+      console.error('Fund transfer form is not initialized');
+      alert('Form is not properly initialized. Please close and reopen the form.');
+      return;
+    }
+    
+    console.log('Form valid:', this.fundTransferForm.valid);
+    console.log('Form value:', this.fundTransferForm.value);
+    console.log('Form errors:', this.fundTransferForm.errors);
+    
     if (this.fundTransferForm.valid) {
       const formValue = this.fundTransferForm.value;
       
@@ -1204,98 +1190,70 @@ deposit(account: any): void {
         return;
       }
       
-      // Validate sufficient balance // Fanisus 
-      if ((fromAccount.openingBalance || 0) < formValue.amount) {
-        alert('Insufficient balance in the source account');
+      // Calculate current balance including all transactions
+      const fromAccountCurrentBalance = this.calculateAccountCurrentBalance(fromAccount);
+      const transferAmount = parseFloat(formValue.amount);
+      
+      console.log(`Transfer amount: ₹${transferAmount}`);
+      console.log(`From account (${fromAccount.name}) current balance: ₹${fromAccountCurrentBalance}`);
+      
+      // Validate sufficient balance
+      if (fromAccountCurrentBalance < transferAmount) {
+        const message = `Insufficient balance in ${fromAccount.name}. Available balance: ₹${fromAccountCurrentBalance.toFixed(2)}, Required: ₹${transferAmount.toFixed(2)}`;
+        console.log(message);
+        alert(message);
         return;
       }
       
-      // Create transaction records for both accounts
-      const transferAmount = parseFloat(formValue.amount);
-      const transferDate = new Date(formValue.date);
-      
-      const fromTransaction = {
+      // Prepare transfer data
+      const transferData = {
         fromAccountId: formValue.fromAccount,
-        toAccountId: formValue.toAccount,
         fromAccountName: fromAccount.name,
+        toAccountId: formValue.toAccount,
         toAccountName: toAccount.name,
         amount: transferAmount,
-        date: transferDate,
+        date: new Date(formValue.date),
         note: formValue.note || '',
         attachmentUrl: formValue.attachmentUrl || '',
-        type: 'transfer',
-        description: `Transfer to ${toAccount.name}`,
-        paymentMethod: 'Transfer',
-        debit: transferAmount,
-        credit: 0,
-        addedBy: 'User', // Replace with actual user
-        hasDocument: !!formValue.attachmentUrl,
-        createdAt: new Date()
+        addedBy: 'User',
+        hasDocument: !!formValue.attachmentUrl
       };
       
-      const toTransaction = {
-        fromAccountId: formValue.fromAccount,
-        toAccountId: formValue.toAccount,
-        fromAccountName: fromAccount.name,
-        toAccountName: toAccount.name,
-        amount: transferAmount,
-        date: transferDate,
-        note: formValue.note || '',
-        attachmentUrl: formValue.attachmentUrl || '',
-        type: 'transfer',
-        description: `Transfer from ${fromAccount.name}`,
-        paymentMethod: 'Transfer',
-        debit: 0,
-        credit: transferAmount,
-        addedBy: 'User', // Replace with actual user
-        hasDocument: !!formValue.attachmentUrl,
-        createdAt: new Date()
-      };
-  
-      // Use a batch write to ensure both transactions are created
-      const transactionsRef = collection(this.firestore, 'transactions');
-      const batch = writeBatch(this.firestore);
-      
-      const fromRef = doc(transactionsRef);
-      batch.set(fromRef, fromTransaction);
-      
-      const toRef = doc(transactionsRef);
-      batch.set(toRef, toTransaction);
-  
-      // Also create an entry in the fundTransfers collection for reference
-      const fundTransferData = {
-        fromAccountId: formValue.fromAccount,
-        toAccountId: formValue.toAccount,
-        fromAccountName: fromAccount.name,
-        toAccountName: toAccount.name,
-        amount: transferAmount,
-        date: transferDate,
-        note: formValue.note || '',
-        attachmentUrl: formValue.attachmentUrl || '',
-        addedBy: 'User', // Replace with actual user
-        createdAt: new Date()
-      };
-      
-      const transfersRef = collection(this.firestore, 'fundTransfers');
-      const transferDoc = doc(transfersRef);
-      batch.set(transferDoc, fundTransferData);
-  
-
-      
-
-  
-      // Commit the batch operation
-      batch.commit()
-        .then(() => {
-          alert('Fund transfer completed successfully!');
-          this.closeFundTransferForm();
-        })
-        .catch((err) => {
-          console.error('Error during fund transfer:', err);
-          alert('Error during fund transfer: ' + err.message);
-        });
+      // Use the account service to process the transfer
+      this.accountService.addFundTransfer(transferData).then(() => {
+        console.log('Fund transfer completed successfully');
+        alert('Fund transfer completed successfully!');
+        this.closeFundTransferForm();
+      }).catch((error) => {
+        console.error('Error during fund transfer:', error);
+        alert('Error during fund transfer: ' + error.message);
+      });
     } else {
-      alert('Please fill all required fields');
+      console.log('Fund transfer form is invalid:', this.fundTransferForm.errors);
+      // Display which fields are invalid for debugging
+      Object.keys(this.fundTransferForm.controls).forEach(key => {
+        const control = this.fundTransferForm.get(key);
+        if (control && control.invalid) {
+          console.log(`Invalid field: ${key}`, control.errors);
+        }
+      });
+      
+      // Show specific error messages
+      let errorMessage = 'Please correct the following errors:\n';
+      if (this.fundTransferForm.get('fromAccount')?.invalid) {
+        errorMessage += '- Select a source account\n';
+      }
+      if (this.fundTransferForm.get('toAccount')?.invalid) {
+        errorMessage += '- Select a destination account\n';
+      }
+      if (this.fundTransferForm.get('amount')?.invalid) {
+        errorMessage += '- Enter a valid amount (minimum ₹0.01)\n';
+      }
+      if (this.fundTransferForm.get('date')?.invalid) {
+        errorMessage += '- Select a valid date\n';
+      }
+      
+      alert(errorMessage);
     }
   }
   
@@ -1363,12 +1321,28 @@ deposit(account: any): void {
     if (this.currentPage * this.entriesPerPage < this.totalEntries) {
       this.currentPage++;
     }
-  }
-  loadSalesRealtime(): void {
+  }  loadSalesRealtime(): void {
     this.saleService.getSalesWithAccountInfo().subscribe(
       (sales: any[]) => {
+        console.log('Raw sales data loaded in list-accounts:', sales); // Debug log
         this.sales = sales;
-        // No need to reprocess here since loadAccountsRealtime handles sales integration
+        
+        // Log sales with their calculated payment amounts for debugging
+        sales.forEach(sale => {
+          const paymentAmount = this.calculateSalesPaymentAmount(sale);
+          if (paymentAmount > 0) {
+            console.log('Sale with payment:', {
+              invoiceNo: sale.invoiceNo,
+              paymentAmount: paymentAmount,
+              paymentAccountId: sale.paymentAccountId,
+              balance: sale.balance,
+              itemsTotal: sale.itemsTotal
+            });
+          }
+        });
+        
+        // Reprocess account transactions to include updated sales data
+        this.processAccountTransactions();
       },
       (error: any) => {
         console.error('Error loading sales:', error);
@@ -1376,4 +1350,108 @@ deposit(account: any): void {
       }
     );
   }
+
+  private convertToDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (dateValue?.toDate && typeof dateValue.toDate === 'function') return dateValue.toDate(); // Handle Firestore Timestamp
+    if (typeof dateValue === 'string') {
+      // Handle various string date formats
+      const date = new Date(dateValue);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+      // If standard parsing fails, try to extract date components for formats like "June 23, 2025 at 3:49:55 AM UTC+5:30"
+      try {
+        const cleanedDate = dateValue.replace(/\s+at\s+.*$/, ''); // Remove time zone part
+        return new Date(cleanedDate);
+      } catch {
+        return new Date();
+      }
+    }
+    if (typeof dateValue === 'number') return new Date(dateValue);
+    return new Date();
+  }
+
+  // Helper method to calculate sales payment amount
+  private calculateSalesPaymentAmount(sale: any): number {
+    let paymentAmount = 0;
+    
+    // First try to get the actual payment amount
+    if (sale.paymentAmount && Number(sale.paymentAmount) > 0) {
+      paymentAmount = Number(sale.paymentAmount);
+    }
+    // If no payment amount, check if this is a paid sale and use itemsTotal or balance
+    else if (sale.balance && Number(sale.balance) > 0) {
+      paymentAmount = Number(sale.balance);
+    }
+    // Check for items total + any additional charges
+    else if (sale.itemsTotal) {
+      let total = Number(sale.itemsTotal);
+      
+      // Add packaging charges if present
+      if (sale.codData && sale.codData.packingCharge) {
+        total += Number(sale.codData.packingCharge);
+      }
+      
+      // Add tax if present
+      if (sale.orderTax && Number(sale.orderTax) > 0) {
+        const taxAmount = (total * Number(sale.orderTax)) / 100;
+        total += taxAmount;
+      }
+      
+      paymentAmount = total;
+    }
+    // Fallback to totalAmount or total
+    else {
+      paymentAmount = Number(sale.totalAmount || sale.total || 0);
+    }
+    
+    return paymentAmount;
+  }
+  // Helper method to calculate current account balance including all transactions
+  calculateAccountCurrentBalance(account: any): number {
+    if (!account || !account.id) return 0;
+    
+    // Use calculatedBalance if available, otherwise calculate manually
+    if (account.calculatedBalance !== undefined) {
+      return Number(account.calculatedBalance);
+    }
+    
+    const openingBalance = Number(account.openingBalance || 0);
+    const accountTotals = this.debitCreditTotals[account.id];
+    
+    if (!accountTotals) {
+      return openingBalance;
+    }
+    
+    // Current balance = Opening balance + Credits - Debits
+    const currentBalance = openingBalance + accountTotals.credit - accountTotals.debit;
+    return currentBalance;
+  }
+
+  // Helper method to check fund transfer form state for debugging
+  debugFundTransferForm(): void {
+    console.log('=== Fund Transfer Form Debug Info ===');
+    console.log('Form valid:', this.fundTransferForm?.valid);
+    console.log('Form value:', this.fundTransferForm?.value);
+    console.log('Accounts loaded:', this.accounts?.length || 0);
+    console.log('Selected from account:', this.selectedFromAccount);
+    console.log('Modal visible:', this.showFundTransferModal);
+    
+    if (this.fundTransferForm) {
+      Object.keys(this.fundTransferForm.controls).forEach(key => {
+        const control = this.fundTransferForm.get(key);
+        console.log(`${key}:`, {
+          value: control?.value,
+          valid: control?.valid,
+          errors: control?.errors,
+          touched: control?.touched,
+          dirty: control?.dirty
+        });
+      });
+    }
+    console.log('=== End Debug Info ===');
+  }
+
 }

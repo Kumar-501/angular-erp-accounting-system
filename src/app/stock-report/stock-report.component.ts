@@ -353,9 +353,15 @@ export class StockReportComponent implements OnInit, OnDestroy {
               locationId, 
               this.closingStockEndTime
             );
+            console.log("Fanisus: sasdasd Closing S", closingStock)
             
+            const totalStockSold = await this.dailyStockService.getTotalStockSold( // TODO
+              productId,
+              locationId,
+              this.closingStockEndTime
+            )
             // Calculate total sold for the period
-            const totalSold = Math.max(0, openingStock + 0 - closingStock); // Simplified calculation
+            // const totalSold = Math.max(0, openingStock + 0 - closingStock); // Simplified calculation
             
             stockMap[productId][locationId] = {
               locationId: locationId,
@@ -363,7 +369,7 @@ export class StockReportComponent implements OnInit, OnDestroy {
               currentStock: currentStock,
               openingStock: openingStock,
               closingStock: closingStock,
-              totalSold: totalSold
+              totalSold: totalStockSold
             };
           }
         }
@@ -386,6 +392,8 @@ export class StockReportComponent implements OnInit, OnDestroy {
           overallOpeningStock += stock.openingStock || 0;
           overallClosingStock += stock.closingStock || 0;
         });
+        // TODO
+        console.log("Fanisus: Opening Stock: ", overallOpeningStock, "Closing Stock:", overallClosingStock);
         
         const totalCurrentStock = Object.values(productStocks).reduce((total, stock) => total + (stock.currentStock || 0), 0);
         

@@ -67,49 +67,39 @@ export class PaymentService {
    * @param paymentData Payment data to be added
    * @returns Promise with the new payment ID
    */
-   async addPayment(paymentData: any): Promise<void> {
-    const paymentsCollection = collection(this.firestore, 'payments');
-    
-    // Add the payment record
-    await addDoc(paymentsCollection, paymentData);
-
-    // If this is a supplier payment (not tied to a specific purchase)
-    if (paymentData.type === 'supplier' && paymentData.supplierId) {
-      // Apply payment to oldest purchases first (FIFO)
-      let remainingAmount = paymentData.amount;
-      
-      // Get all purchases for this supplier that have payment due
-      const purchasesQuery = query(
-        collection(this.firestore, 'purchases'),
-        where('supplierId', '==', paymentData.supplierId),
-        where('paymentDue', '>', 0),
-        orderBy('purchaseDate', 'asc')
-      );
-      
-      const querySnapshot = await getDocs(purchasesQuery);
-      
-      for (const doc of querySnapshot.docs) {
-        if (remainingAmount <= 0) break;
-        
-        const purchase = doc.data() as any;
-        const paymentDue = purchase.paymentDue || 0;
-        
-        if (paymentDue > 0) {
-          const paymentAmount = Math.min(remainingAmount, paymentDue);
-          
-          // Update the purchase record
-          await updateDoc(doc.ref, {
-            paymentAmount: (purchase.paymentAmount || 0) + paymentAmount,
-            paymentDue: paymentDue - paymentAmount,
-            paymentStatus: (paymentDue - paymentAmount) <= 0 ? 'Paid' : 'Partial',
-            updatedAt: new Date()
-          });
-          
-          remainingAmount -= paymentAmount;
-        }
-      }
-    }
+async addPayment(paymentData: any): Promise<string> {
+  const paymentRef = await addDoc(collection(this.firestore, 'payments'), {
+    ...paymentData,
+    isImmutable: true, // Mark as immutable
+    createdAt: new Date()
+  });
+  
+  // Only update purchase status, don't delete anything
+  if (paymentData.purchaseId) {
+    await this.updatePurchaseStatus(paymentData.purchaseId, paymentData.amount);
   }
+  
+  return paymentRef.id;
+}
+
+private async updatePurchaseStatus(purchaseId: string, paymentAmount: number): Promise<void> {
+  const purchaseRef = doc(this.firestore, 'purchases', purchaseId);
+  const purchaseDoc = await getDoc(purchaseRef);
+  
+  if (purchaseDoc.exists()) {
+    const purchaseData = purchaseDoc.data();
+    const newPaymentAmount = (purchaseData['paymentAmount'] || 0) + paymentAmount;
+    const newPaymentDue = (purchaseData['grandTotal'] || 0) - newPaymentAmount;
+    const newStatus = newPaymentDue <= 0 ? 'Paid' : 'Partial';
+    
+    await updateDoc(purchaseRef, {
+      paymentAmount: newPaymentAmount,
+      paymentDue: newPaymentDue,
+      paymentStatus: newStatus,
+      updatedAt: new Date()
+    });
+  }
+}
 
 
   /**
@@ -488,22 +478,34 @@ getSupplierPaymentsRealtime(supplierId: string, callback: (payments: PaymentData
    * @param paymentData Payment data
    * @returns Observable of the complete process
    */
-processPayment(paymentData: PaymentData): Observable<string> {
-  if (!paymentData.purchaseId || !paymentData.amount) {
-    return throwError(() => new Error('Purchase ID and amount are required'));
+async processPayment(paymentData: PaymentData): Promise<void> {
+  try {
+    // Add the payment record
+    const paymentRef = await addDoc(collection(this.firestore, 'payments'), paymentData);
+    
+    // Update the purchase status if this is a purchase payment
+    if (paymentData.purchaseId) {
+      const purchaseRef = doc(this.firestore, 'purchases', paymentData.purchaseId);
+      const purchaseDoc = await getDoc(purchaseRef);
+      
+      if (purchaseDoc.exists()) {
+        const purchaseData = purchaseDoc.data();
+        const newPaymentAmount = (purchaseData['paymentAmount'] || 0) + paymentData.amount;
+        const newPaymentDue = (purchaseData['grandTotal'] || 0) - newPaymentAmount;
+        const newStatus = newPaymentDue <= 0 ? 'Paid' : 'Partial';
+        
+        await updateDoc(purchaseRef, {
+          paymentAmount: newPaymentAmount,
+          paymentDue: newPaymentDue,
+          paymentStatus: newStatus,
+          updatedAt: new Date()
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    throw error;
   }
-
-  return from(this.addPayment(paymentData)).pipe(
-    switchMap(paymentId => 
-      from(this.updatePurchasePayment(paymentData.purchaseId!, paymentData.amount)).pipe(
-        map(() => paymentId as unknown as string) // Type assertion to ensure correct output type
-      )
-    ),
-    catchError(error => {
-      console.error('Error processing payment:', error);
-      return throwError(() => new Error(`Payment processing failed: ${error instanceof Error ? error.message : String(error)}`));
-    })
-  );
 }
 
 

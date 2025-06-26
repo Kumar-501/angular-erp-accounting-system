@@ -27,6 +27,8 @@ export class EditProductComponent implements OnInit, OnDestroy {
   variantCombinations: any[] = [];
   locations: any[] = [];
   productId: string = '';
+    productFormSubmitted = false; // Add this line
+
 
   categories: any[] = [];
   brands: any[] = [];

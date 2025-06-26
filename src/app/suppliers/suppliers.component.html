@@ -634,7 +634,7 @@
         </form>
       </div>
     </div>
-  </div>
+  </div>
 </div>
 
 <div class="modal" [class.show]="showPaymentForm">
@@ -727,11 +727,11 @@
         <div class="form-actions">
           <button type="button" class="btn btn-cancel" (click)="closePaymentForm()">Cancel</button>
           <button type="button" class="btn btn-primary" (click)="submitPayment()" 
-                  [disabled]="paymentForm.invalid || paymentAccountsLoading">
-            <span *ngIf="paymentAccountsLoading" class="spinner-border spinner-border-sm" 
-                  role="status" aria-hidden="true"></span>
-            Save Payment
-          </button>
+        [disabled]="paymentForm.invalid || paymentAccountsLoading || isSubmitting">
+  <span *ngIf="paymentAccountsLoading || isSubmitting" class="spinner-border spinner-border-sm" 
+        role="status" aria-hidden="true"></span>
+  {{ isSubmitting ? 'Processing...' : 'Save Payment' }}
+</button>
         </div>
       </form>
     </div>

@@ -114,37 +114,40 @@ export class EditPurchaseOrderComponent implements OnInit {
 
     this.filteredSuppliers = [...this.suppliers];
   }
+initForm(): void {
+  this.purchaseOrderForm = this.fb.group({
+  
+    referenceNo: [{ value: '', disabled: true }],
+    orderDate: [''],
+    requiredDate: [''],
+    shippingDate: [''],
+    addedBy: [''],
+       supplier: [''],
+    address: ['N/A'], 
+    businessLocation: [''],
+    status: ['Pending'],
+    products: this.fb.array([]),
+    shippingDetails: this.fb.group({
+      shippingDetails: [''],
+      shippingAddress: [''],
+      shippingChargesBeforeTax: [0, [Validators.min(0)]],
+      shippingTaxPercent: [18, [Validators.min(0), Validators.max(100)]],
+      shippingTaxAmount: [0],
+      shippingChargesAfterTax: [0],
+      shippingStatus: [''],
+      deliveredTo: [''],
+      shippingDocuments: [null]
+    }),
+    attachDocument: [null],
+    additionalNotes: ['']
+  });
 
-  initForm(): void {
-    this.purchaseOrderForm = this.fb.group({
-      supplier: ['', Validators.required],
-      address: [''],
-      referenceNo: [{ value: '', disabled: true }, Validators.required],
-      orderDate: ['', Validators.required],
-    requiredDate: ['', Validators.required], // Make sure this exists
-
-      addedBy: ['', Validators.required],
-      businessLocation: ['', Validators.required],
-      status: ['Pending'],
-      products: this.fb.array([]),
-      shippingDetails: this.fb.group({
-        shippingDetails: [''],
-        shippingAddress: [''],
-        shippingChargesBeforeTax: [0, [Validators.min(0)]],
-        shippingTaxPercent: [18, [Validators.min(0), Validators.max(100)]],
-        shippingTaxAmount: [0],
-        shippingChargesAfterTax: [0],
-        shippingStatus: [''],
-        deliveredTo: [''],
-        shippingDocuments: [null]
-      }),
-      attachDocument: [null],
-      additionalNotes: ['']
-    });
-
-    this.calculateShippingTax();
-  }
-
+  this.calculateShippingTax();
+}
+getDisplayAddress(): string {
+  const address = this.purchaseOrderForm.get('address')?.value;
+  return address && address.trim() !== '' ? address : 'N/A';
+}
   loadProducts(): void {
     this.productsService.getProductsRealTime().subscribe({
       next: (products: any[]) => {
@@ -342,26 +345,26 @@ export class EditPurchaseOrderComponent implements OnInit {
     return this.purchaseOrderForm.get('products') as FormArray;
   }
 
-  addEmptyProduct() {
-    this.productsFormArray.push(
-      this.fb.group({
-        productId: ['', Validators.required],
-        quantity: [1, [Validators.required, Validators.min(1)]],
-        unitCost: [0, [Validators.required, Validators.min(0)]],
-        discountType: ['percent'],
-        discountPercent: [0, [Validators.min(0), Validators.max(100)]],
-        discountAmount: [0, [Validators.min(0)]],
-        unitCostBeforeTax: [0],
-        subtotalBeforeTax: [0],
-        taxPercent: [0, [Validators.min(0), Validators.max(100)]],
-        taxAmount: [0],
-        netCost: [0],
-        lineTotal: [0],
-        currentStock: [0],
-        selected: [false]
-      })
-    );
-  }
+addEmptyProduct() {
+  this.productsFormArray.push(
+    this.fb.group({
+      productId: [''],
+      quantity: [1, [Validators.min(1)]],
+      unitCost: [0, [Validators.min(0)]],
+      discountType: ['percent'],
+      discountPercent: [0, [Validators.min(0), Validators.max(100)]],
+      discountAmount: [0, [Validators.min(0)]],
+      unitCostBeforeTax: [0],
+      subtotalBeforeTax: [0],
+      taxPercent: [0, [Validators.min(0), Validators.max(100)]],
+      taxAmount: [0],
+      netCost: [0],
+      lineTotal: [0],
+      currentStock: [0],
+      selected: [false]
+    })
+  );
+}
 
   removeProduct(index: number) {
     this.discountTypes.splice(index, 1);
@@ -699,14 +702,15 @@ async loadOrderDetails(orderId: string): Promise<void> {
         }
       }
       
-      // Populate the form with order data
+      // Populate the form with order data including required date and shipping date
       this.purchaseOrderForm.patchValue({
         supplier: orderData.supplier,
-        address: orderData.address,
-        referenceNo: orderData.referenceNo,
-        orderDate: this.formatDateForInput(orderData.date),
+            address: orderData.address || 'N/A', // Fallback to 'N/A'
 
-        addedBy: orderData.addedBy || this.users[0]?.username,
+        referenceNo: orderData.referenceNo,
+        orderDate: this.formatDateForInput(orderData.date || orderData.orderDate),
+        requiredDate: this.formatDateForInput(orderData.requiredDate || orderData.requiredByDate), // This ensures required date is properly set
+        shippingDate: this.formatDateForInput(orderData.shippingDate),
         businessLocation: orderData.businessLocation,
         status: orderData.status || 'Pending',
         additionalNotes: orderData.additionalNotes || '',
@@ -719,8 +723,6 @@ async loadOrderDetails(orderId: string): Promise<void> {
           shippingChargesAfterTax: orderData.shippingDetails?.shippingChargesAfterTax || orderData.shippingCharges || 0,
           shippingStatus: orderData.shippingDetails?.shippingStatus || '',
           deliveredTo: orderData.shippingDetails?.deliveredTo || '',
-        requiredDate: this.formatDateForInput(orderData.requiredDate || orderData.requiredByDate), // Add this line
-
         }
       });
 
@@ -785,13 +787,6 @@ async loadOrderDetails(orderId: string): Promise<void> {
       } else {
         this.addEmptyProduct();
       }
-      
-      // Handle document references if they exist
-      // (Removed check for orderData.attachDocument as it does not exist on PurchaseOrder)
-      
-      if (orderData.shippingDetails?.shippingDocuments) {
-        // Display existing shipping document info
-      }
     }
   } catch (error) {
     console.error('Error loading order details:', error);
@@ -799,15 +794,19 @@ async loadOrderDetails(orderId: string): Promise<void> {
     this.isLoading = false;
   }
 }
-  formatDateForInput(dateString: string | Date | undefined | null): string {
-    if (!dateString) return '';
+ formatDateForInput(dateInput: string | Date | null | undefined | Function): string {
+    // Handle function case explicitly
+    if (typeof dateInput === 'function') return '';
     
-    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    if (!dateInput) return '';
     
-    if (isNaN(date.getTime())) return '';
-    
-    return date.toISOString().split('T')[0];
-  }
+    try {
+        const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+        return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
+    } catch {
+        return '';
+    }
+}
 
   private initializeProductTaxes() {
     this.productsFormArray.controls.forEach((control, index) => {
@@ -916,12 +915,15 @@ async loadOrderDetails(orderId: string): Promise<void> {
       } else {
         delete formData.shippingDetails.shippingDocuments;
       }
-
+  if (!formData.address) {
+    formData.address = 'N/A'; // or empty string ''
+  }
       formData.updatedAt = new Date().toISOString();
       formData.date = formData.orderDate;
       formData.supplierName = this.getSupplierDisplayName(this.selectedSupplierDetails);
       formData.locationName = formData.businessLocation;
-    formData.requiredDate = formData.requiredDate || formData.orderDate;
+      formData.requiredDate = formData.requiredDate || formData.orderDate;
+      formData.shippingDate = formData.shippingDate; // Include shipping date
 
       formData.totalItems = this.totalItems;
       formData.subTotal = this.productsFormArray.controls.reduce((total, control) => {

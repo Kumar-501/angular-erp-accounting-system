@@ -1416,32 +1416,19 @@ resetFilters() {
 // Replace your existing applyDateFilter method with this:
 
 calculateLeaveDetails(leave: any): any {
-  // Get all APPROVED leaves of this type for THIS USER ONLY
-  const userApprovedLeaves = this.leaves.filter(l => 
-    l.employeeId === leave.employeeId && 
-    l.leaveTypeId === leave.leaveTypeId && 
-    l.status === 'approved' &&
-    l.id !== leave.id // Exclude current leave if it's not approved yet
-  );
-
-  // Calculate total days already taken from approved leaves
-  const totalDaysTaken = userApprovedLeaves.reduce((sum, l) => sum + l.daysTaken, 0);
+  // Calculate days for this specific leave
+  const daysForThisLeave = this.calculateDaysForLeave(leave);
   
-  // Current leave days (only count if approved)
-  const currentLeaveDays = leave.status === 'approved' ? this.calculateDaysForLeave(leave) : 0;
-  
-  // Calculate remaining leave
+  // Calculate remaining leave based on maxLeaveCount and this leave's days
   const maxLeaveCount = leave.maxLeaveCount || 0;
-  const remainingLeave = maxLeaveCount - (totalDaysTaken + currentLeaveDays);
+  const remainingLeave = maxLeaveCount - (leave.status === 'approved' ? daysForThisLeave : 0);
   
   return {
     ...leave,
-    daysTaken: totalDaysTaken, // Shows total approved days taken before this leave
-    daysTakenForThisLeave: this.calculateDaysForLeave(leave), // Days for this specific leave
+    daysTakenForThisLeave: daysForThisLeave,
     remainingLeave: Math.max(remainingLeave, 0) // Don't show negative values
   };
 }
-
 private calculateDaysForLeave(leave: any): number {
   const startDate = new Date(leave.startDate);
   const endDate = new Date(leave.endDate || leave.startDate);

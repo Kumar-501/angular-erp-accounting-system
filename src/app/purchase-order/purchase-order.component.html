@@ -186,9 +186,10 @@
         <th *ngIf="columns[9].visible" (click)="sortTable('supplierName')">
           Supplier <i class="fa" [ngClass]="getSortIcon('supplierName')"></i>
         </th>
-        <!-- <th *ngIf="columns[2].visible" (click)="sortTable('supplierAddress')">
+<!-- <th *ngIf="columns[2].visible" (click)="sortTable('supplierAddress')">
   Supplier Address <i class="fa" [ngClass]="getSortIcon('supplierAddress')"></i>
 </th> -->
+
         <th *ngIf="columns[14].visible" (click)="sortTable('unitPurchasePrice')">
           Unit Purchase Price <i class="fa" [ngClass]="getSortIcon('unitPurchasePrice')"></i>
         </th>
@@ -273,7 +274,7 @@
         </td>
      
         <td *ngIf="columns[9].visible">{{ order.supplierName || 'N/A' }}</td>
-        <!-- <td *ngIf="columns[2].visible">{{ order.supplierAddress || 'N/A' }}</td> -->
+<!-- <td *ngIf="columns[2].visible">{{ order.supplierAddress || 'N/A' }}</td> -->
         
         <td *ngIf="columns[14].visible">
           <div *ngIf="order.items && order.items.length > 0">
@@ -433,5 +434,5 @@
         </div>
       </div>
     </div>
-  </div>
+</div>
 </div>

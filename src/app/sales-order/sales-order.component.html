@@ -56,7 +56,7 @@
         <span>Last 7 Days</span>
       </div>
       <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
-        <span>Last 30 Days</span>
+        <span>Last 30 Days</span>z
       </div>
       <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
         <span>Last Month</span>
@@ -458,34 +458,42 @@
           <td class="text-start" [hidden]="!isColumnVisible('customer')">{{ sale.customer }}</td>
           <td class="text-start" [hidden]="!isColumnVisible('customerPhone')">{{ sale.customerPhone }}</td>
           <td class="text-start" [hidden]="!isColumnVisible('location')">{{ sale.location }}</td>
-          <td class="text-center" [hidden]="!isColumnVisible('status')">
-            <span class="badge"
-                  [ngClass]="{
-                    'bg-success text-white': sale.status === 'Completed' || sale.status === 'active', 
-                    'bg-warning text-dark': sale.status === 'Pending' || sale.status === 'pending', 
-                    'bg-danger text-white': sale.status === 'Cancelled' || sale.status === 'inactive'
-                  }">
-              {{ (sale.status === 'active') ? 'Completed' : (sale.status || 'Pending') }}
-            </span>
-          </td>
+         <td class="text-center" [hidden]="!isColumnVisible('status')">
+    <span class="badge"
+          [ngClass]="{
+            'bg-success text-white': sale.status === 'Completed' || sale.status === 'active', 
+            'bg-warning text-dark': sale.status === 'Pending' || sale.status === 'pending', 
+            'bg-danger text-white': sale.status === 'Cancelled' || sale.status === 'inactive',
+            'bg-secondary text-white': sale.status === 'Partial Return' || sale.status === 'partial return'
+          }">
+      {{ (sale.status === 'active') ? 'Completed' : 
+         (sale.status === 'partial return') ? 'Partial Return' : 
+         (sale.status || 'Pending') }}
+    </span>
+</td>
           <td class="text-start" [hidden]="!isColumnVisible('typeOfService')">{{ sale.typeOfServiceName || sale.typeOfService || 'N/A' }}</td>
           <td class="text-start" [hidden]="!isColumnVisible('alternateContact')">
   {{ sale.alternateContact || 'N/A' }}
 </td>
-          <td class="text-center" [hidden]="!isColumnVisible('shippingStatus')">
-            <span class="badge"
-                  [ngClass]="{
-                    'bg-success text-white': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered', 
-                    'bg-warning text-dark': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending', 
-                    'bg-info text-white': sale.shippingStatus === 'Shipped' || sale.shippingStatus === 'shipped',
-                    'bg-secondary text-white': sale.shippingStatus === 'Returned' || sale.shippingStatus === 'returned',
-                    'bg-primary text-white': sale.shippingStatus === 'Ordered' || sale.shippingStatus === 'Onhold' || 
-                                            sale.shippingStatus === 'Print' || sale.shippingStatus === 'Reached hub' ||
-                                            sale.shippingStatus === 'Out for delivery'
-                  }">
-              {{ sale.shippingStatus || 'Pending' }}
-            </span>
-          </td>
+       <td class="text-center" [hidden]="!isColumnVisible('shippingStatus')">
+    <span class="badge"
+          [ngClass]="{
+            'bg-success text-white': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered', 
+            'bg-warning text-dark': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending' || 
+                                   sale.shippingStatus === 'Processing' || sale.shippingStatus === 'processing',
+            'bg-info text-white': sale.shippingStatus === 'Shipped' || sale.shippingStatus === 'shipped' || 
+                                sale.shippingStatus === 'Packed' || sale.shippingStatus === 'packed',
+            'bg-secondary text-white': sale.shippingStatus === 'Returned' || sale.shippingStatus === 'returned' || 
+                                     sale.shippingStatus === 'Cancelled' || sale.shippingStatus === 'cancelled',
+            'bg-primary text-white': sale.shippingStatus === 'Ordered' || sale.shippingStatus === 'Onhold' || 
+                                    sale.shippingStatus === 'Print' || sale.shippingStatus === 'Reached hub' ||
+                                    sale.shippingStatus === 'Out for delivery' || sale.shippingStatus === 'ordered' ||
+                                    sale.shippingStatus === 'onhold' || sale.shippingStatus === 'print' ||
+                                    sale.shippingStatus === 'reached hub' || sale.shippingStatus === 'out for delivery'
+          }">
+      {{ sale.shippingStatus || 'Pending' }}
+    </span>
+</td>
           <td class="text-start" [hidden]="!isColumnVisible('addedBy')">{{ sale.addedByDisplayName }}</td>
           <td class="text-start" [hidden]="!isColumnVisible('product')">{{ getProductsDisplayText(sale.products) }}</td>
           <td class="text-start" [hidden]="!isColumnVisible('shippingDetails')">{{ sale.shippingDetails || 'N/A' }}</td>
