@@ -33,8 +33,8 @@
                 </p>
               </div>
               <div class="col-md-6">
-                <p><strong>Type of Service:</strong> {{ sale.typeOfServiceName }}</p>
-                <p><strong>Shipping Status:</strong> 
+                <!-- <p><strong>Type of Service:</strong> {{ sale.typeOfServiceName }}</p> -->
+                <!-- <p><strong>Shipping Status:</strong> 
                   <span class="badge" [ngClass]="{
                     'bg-success': sale.shippingStatus === 'Delivered' || sale.shippingStatus === 'delivered',
                     'bg-warning': sale.shippingStatus === 'Pending' || sale.shippingStatus === 'pending',
@@ -43,10 +43,10 @@
                   }">
                     {{ sale.shippingStatus }}
                   </span>
-                </p>
+                </p> -->
                 <p><strong>Transaction ID:</strong> {{ sale.transactionId || 'N/A' }}</p>
-                <p><strong>Location:</strong> {{ sale.location || sale.businessLocation }}</p>
-                <p><strong>Added By:</strong> {{ sale.addedByDisplayName }}</p>
+                <!-- <p><strong>Location:</strong> {{ sale.location || sale.businessLocation }}</p>
+                <p><strong>Added By:</strong> {{ sale.addedByDisplayName }}</p> -->
               </div>
             </div>
           </div>
@@ -85,8 +85,7 @@
             <p><strong>Payment Amount:</strong> {{ sale.paymentAmount | currency:'INR' }}</p>
             <p><strong>Balance:</strong> {{ sale.balance |currency:'INR' }}</p>
             <p><strong>Change Return:</strong> {{ sale.changeReturn | currency:'INR' }}</p>
-            <p><strong>Paid On:</strong> {{ sale.paidOn | date: 'medium' }}</p>
-            <p><strong>Payment Note:</strong> {{ sale.paymentNote || 'N/A' }}</p>
+<p><strong>Paid On:</strong> {{ sale.paidOn | date: 'mediumDate' }}</p>
           </div>
         </div>
 

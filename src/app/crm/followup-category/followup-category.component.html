@@ -1,4 +1,3 @@
-<!-- HTML Template -->
 <div class="followup-category-container">
   <div class="header">
     <h2>Followup Category</h2>
@@ -17,9 +16,15 @@
       </div>
 
       <div class="button-group">
-        <button class="btn btn-outline-secondary" (click)="exportToCSV()"><i class="fa fa-file-csv"></i> Export CSV</button>
-        <button class="btn btn-outline-secondary" (click)="print()"><i class="fa fa-print"></i> Print</button>
-        <button class="btn btn-outline-secondary" (click)="toggleColumnVisibility()"><i class="fa fa-columns"></i> Column visibility</button>
+        <button class="btn btn-outline-secondary" (click)="exportToCSV()">
+          📊 Export CSV
+        </button>
+        <button class="btn btn-outline-secondary" (click)="print()">
+          🖨️ Print
+        </button>
+        <button class="btn btn-outline-secondary" (click)="toggleColumnVisibility()">
+          📋 Column visibility
+        </button>
       </div>
 
       <div class="search-box">
@@ -27,7 +32,12 @@
       </div>
 
       <button class="btn btn-primary add-button" (click)="toggleForm()">
-        <i class="fa fa-plus"></i> Add
+        ➕ Add
+      </button>
+      
+      <!-- Optional: Add clear all button for testing -->
+      <button class="btn btn-danger" (click)="clearAllData()" style="margin-left: 10px;">
+        🗑️ Clear All
       </button>
     </div>
 
@@ -35,21 +45,33 @@
       <table class="table">
         <thead>
           <tr>
-            <th *ngIf="visibleColumns.name">Followup Category <i class="fa fa-sort" (click)="sort('name')"></i></th>
-            <th *ngIf="visibleColumns.description">Description <i class="fa fa-sort" (click)="sort('description')"></i></th>
+            <th *ngIf="visibleColumns.name">
+              Followup Category 
+              <span class="sort-icon" (click)="sort('name')">
+                {{ sortField === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕️' }}
+              </span>
+            </th>
+            <th *ngIf="visibleColumns.description">
+              Description 
+              <span class="sort-icon" (click)="sort('description')">
+                {{ sortField === 'description' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕️' }}
+              </span>
+            </th>
             <th *ngIf="visibleColumns.action">Action</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngIf="filteredCategories.length === 0">
-            <td [attr.colspan]="getVisibleColumnCount()" class="text-center">No data available in table</td>
+            <td [attr.colspan]="getVisibleColumnCount()" class="text-center">
+              {{ isLoading ? 'Loading...' : 'No data available in table' }}
+            </td>
           </tr>
           <tr *ngFor="let category of getPaginatedData()">
             <td *ngIf="visibleColumns.name">{{ category.name }}</td>
             <td *ngIf="visibleColumns.description">{{ category.description }}</td>
             <td *ngIf="visibleColumns.action">
-              <button class="btn btn-sm btn-primary" (click)="editCategory(category)">Edit</button>
-              <button class="btn btn-sm btn-danger" (click)="deleteCategory(category)">Delete</button>
+              <button class="btn btn-sm btn-primary" (click)="editCategory(category)" [disabled]="isLoading">Edit</button>
+              <button class="btn btn-sm btn-danger" (click)="deleteCategory(category)" [disabled]="isLoading">Delete</button>
             </td>
           </tr>
         </tbody>
@@ -87,7 +109,9 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" (click)="toggleForm()">Close</button>
-          <button type="button" class="btn btn-primary" (click)="onSave()">Save</button>
+          <button type="button" class="btn btn-primary" (click)="onSave()" [disabled]="isLoading">
+            {{ isLoading ? 'Saving...' : 'Save' }}
+          </button>
         </div>
       </div>
     </div>

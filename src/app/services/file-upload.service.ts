@@ -13,12 +13,18 @@ export class FileUploadService {
   async convertFileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = () => {
         const result = reader.result as string;
         resolve(result);
       };
-      reader.onerror = error => reject(error);
+      reader.onerror = error => {
+        console.error('FileReader error:', error);
+        reject(new Error('Failed to read file'));
+      };
+      reader.onabort = () => {
+        reject(new Error('File reading was aborted'));
+      };
+      reader.readAsDataURL(file);
     });
   }
 
@@ -96,6 +102,7 @@ export class FileUploadService {
       reader.onload = (e) => {
         img.src = e.target?.result as string;
       };
+      reader.onerror = () => reject(new Error('Failed to read image file'));
       reader.readAsDataURL(file);
     });
   }
@@ -111,5 +118,73 @@ export class FileUploadService {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Validate image dimensions
+   */
+  async validateImageDimensions(file: File, maxWidth?: number, maxHeight?: number): Promise<{valid: boolean, width: number, height: number}> {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('File is not an image'));
+        return;
+      }
+
+      const img = new Image();
+      img.onload = () => {
+        const isValid = (!maxWidth || img.width <= maxWidth) && (!maxHeight || img.height <= maxHeight);
+        resolve({
+          valid: isValid,
+          width: img.width,
+          height: img.height
+        });
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read image file'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Check if file is an image
+   */
+  isImageFile(file: File): boolean {
+    return file.type.startsWith('image/');
+  }
+
+  /**
+   * Check if file is a document
+   */
+  isDocumentFile(file: File): boolean {
+    const documentTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/csv',
+      'application/zip'
+    ];
+    return documentTypes.includes(file.type);
+  }
+
+  /**
+   * Get appropriate icon class for file type
+   */
+  getFileIconClass(file: File | any): string {
+    if (!file) return 'fas fa-file';
+    
+    const fileType = typeof file === 'string' ? '' : file.type || '';
+    
+    if (fileType.startsWith('image/')) return 'fas fa-image';
+    if (fileType === 'application/pdf') return 'fas fa-file-pdf';
+    if (fileType.includes('word')) return 'fas fa-file-word';
+    if (fileType === 'text/csv') return 'fas fa-file-csv';
+    if (fileType === 'application/zip') return 'fas fa-file-archive';
+    
+    return 'fas fa-file';
   }
 }

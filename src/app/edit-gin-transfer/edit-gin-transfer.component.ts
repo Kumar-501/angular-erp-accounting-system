@@ -85,10 +85,9 @@ export class EditGinTransferComponent implements OnInit {
           shippingCharges: transfer.shippingCharges,
           additionalNotes: transfer.additionalNotes
         });
-        
-        this.selectedProducts = transfer.items.map(item => ({
-          ...item
-        }));
+    this.selectedProducts = transfer.items?.map(item => ({
+  ...item
+})) || [];
       }
     });
   }
@@ -187,6 +186,8 @@ onCancel() {
         date: formData.date,
         referenceNo: formData.referenceNo,
         locationFrom: formData.locationFrom,
+          transfers: [], // or whatever default value makes sense
+
         locationTo: formData.locationTo,
         createdAt: new Date(formData.date), // Add this line
         locationTo2: formData.locationTo2 || null,
@@ -249,7 +250,7 @@ onCancel() {
     const destinationLocation = this.locations.find(l => l.id === ginTransfer.locationTo);
     const secondaryLocation = ginTransfer.locationTo2 ? this.locations.find(l => l.id === ginTransfer.locationTo2) : null;
     
-    for (const item of ginTransfer.items) {
+for (const item of ginTransfer.items || []) {
       const totalQuantityFromSource = item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0);
       
       console.log(`Processing transfer for ${item.productName} (${item.sku})`);
@@ -276,7 +277,7 @@ onCancel() {
           item.productId, 
           item.productName,
           item.sku,
-          ginTransfer.locationTo, 
+ginTransfer.locationTo || '',
           destinationLocation?.name || 'Unknown Location',
           item.quantity,
           'increase'

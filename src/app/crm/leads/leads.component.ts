@@ -5,7 +5,7 @@ import { SourceService } from '../../services/source.service';
 import { LifeStageService } from '../../services/life-stage.service';
 import { UserService } from '../../services/user.service';
 import { Router } from '@angular/router';
-import { FollowupCategoryService } from '../../services/followup-category.service';
+import { FollowupCategory, FollowupCategoryService } from '../../services/followup-category.service';
 import { CustomerService } from '../../services/customer.service';
 import { LeadStatusService } from '../../services/lead-status.service';
 import { FileSizePipe } from './file-size.pipe';
@@ -56,6 +56,7 @@ interface LeadFilters {
   styleUrls: ['./leads.component.scss']
 })
 export class LeadsComponent implements OnInit {
+  
  @Input() products: any[] = [];
   @Input() size: 'small' | 'medium' | 'large' = 'medium';
   @Output() selectionChange = new EventEmitter<any[]>();
@@ -63,12 +64,15 @@ export class LeadsComponent implements OnInit {
   @ViewChild('searchInput') searchInput!: ElementRef;
    shown = false;
   searchKeyword = '';
+  
   selectedProducts: any[] = [];
   filteredUsers: any[] = [];
 departments = ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'];
   filteredProducts: any[] = [];
   pageSizeOptions = [10, 25, 50, 100];  // Add this line
   readonly PC_DEPARTMENTS = ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'];
+   showActionPopup = false;
+  selectedLeadForAction: any = null;
   // ... other fields
   leadCategory?: string; // if you also track one main category
   categories?: string[]; // ✅ add this line
@@ -92,6 +96,8 @@ selectedDateRange: string = '';
   private searchSubject = new Subject<string>();
   private searchSubscription!: Subscription;
   searchQuery = '';
+  leaveForm: any;
+  leaveService: any;
 getLeadNameById(_t896: string) {
 throw new Error('Method not implemented.');
 }
@@ -141,7 +147,20 @@ addedBy?: {
   onSearchInput(): void {
     this.searchSubject.next(this.searchQuery);
   }
-  
+    openActionPopup(lead: any): void {
+    this.selectedLeadForAction = lead;
+    this.showActionPopup = true;
+  }  closeActionPopup(): void {
+    this.showActionPopup = false;
+    this.selectedLeadForAction = null;
+  }handleConversion(lead: any): void {
+    if (lead.mobileExists) {
+      this.prepareForSalesOrder(lead);
+    } else {
+      this.convertToCustomer(lead);
+    }
+    this.closeActionPopup();
+  }
   getPriorityClass(arg0: any): string|string[]|Set<string>|{ [klass: string]: any; }|null|undefined {
     throw new Error('Method not implemented.');
   }
@@ -435,8 +454,10 @@ updatePagination(): void {
   this.totalPages = Math.ceil(this.totalItems / this.pageSize);
   
   // Ensure current page is within valid range
-  if (this.currentPage > this.totalPages) {
-    this.currentPage = this.totalPages > 0 ? this.totalPages : 1;
+  if (this.currentPage > this.totalPages && this.totalPages > 0) {
+    this.currentPage = this.totalPages;
+  } else if (this.totalPages === 0) {
+    this.currentPage = 1;
   }
 
   this.startIndex = (this.currentPage - 1) * this.pageSize;
@@ -466,7 +487,8 @@ updatePagination(): void {
   selectedLeadForFollowUp: any = null;
   dateRangeStart: Date | null = null;
   dateRangeEnd: Date | null = null;
-  
+  private leadsSubscription: Subscription | null = null;
+
 
 availableUsers: any[] = [];
 selectedUserId: string = '';
@@ -488,7 +510,8 @@ selectedUserId: string = '';
     private lifeStageService: LifeStageService,
     private userService: UserService,
     public authService: AuthService,
-      private productsService: ProductsService, // Add this line
+    private productsService: ProductsService, // Add this line
+      
  // Add this line
 
     private router: Router,
@@ -594,7 +617,28 @@ selectedUserId: string = '';
     }
     return false;
   });
+  }
+async updateLeaveBalance() {
+  const userId = this.leaveForm.get('employeeId')?.value;
+  const leaveTypeId = this.leaveForm.get('leaveTypeId')?.value;
+  
+  if (userId && leaveTypeId) {
+    try {
+      const balance = await this.leaveService.getUserLeaveBalance(userId, leaveTypeId);
+      
+      // Update the form with the remaining balance
+      this.leaveForm.patchValue({
+        maxLeaveCount: balance.remaining // Show remaining instead of total
+      });
+      
+      // You can also display this information to the user
+      console.log(`Leave Balance - Total: ${balance.total}, Used: ${balance.used}, Remaining: ${balance.remaining}`);
+    } catch (error) {
+      console.error('Error calculating leave balance:', error);
+    }
+  }
 }
+
 
 // In leads.component.ts
 getUserDepartment(assignedTo: string): string {
@@ -769,15 +813,14 @@ async saveDepartment(): Promise<void> {
   }
 }
 
-  goToFirstPage(): void {
-    this.currentPage = 1;
-    this.updatePagination();
-  }
-  
-  goToLastPage(): void {
-    this.currentPage = this.totalPages;
-    this.updatePagination();
-  }
+goToFirstPage(): void {
+  this.goToPage(1);
+}
+
+goToLastPage(): void {
+  this.goToPage(this.totalPages);
+}
+
  toggleProductSelection(product: any) {
     const index = this.selectedProducts.findIndex(p => p === product || p.id === product.id);
     
@@ -964,7 +1007,7 @@ addCustomProduct() {
   }
 }
 getVisiblePages(): number[] {
-  const totalPages = Math.ceil(this.totalItems / this.pageSize);
+  const totalPages = this.totalPages;
   const visiblePages = 5; // Number of page buttons to show
   const pages: number[] = [];
   
@@ -985,6 +1028,8 @@ getVisiblePages(): number[] {
 
   return pages;
 }
+
+goT: any
 // Method to handle product selection and addition
 onProductSelectAndAdd(productName: string) {
   if (productName) {
@@ -1052,121 +1097,89 @@ async assignSelectedLeads() {
   }
 
   try {
-    // Get all selected leads
     const leadsToUpdate = this.allLeads.filter(lead => this.selectedLeads.has(lead.id));
-    
+
     if (this.randomAssignMode) {
-      // Random assignment logic
       const availableUsers = [...this.availableUsers];
-      const assignments: {[userId: string]: number} = {}; // Track assignments per user
-      
-      // Initialize assignment counts
-      availableUsers.forEach(user => {
-        assignments[user.id] = 0;
-      });
+      if (availableUsers.length === 0) {
+        alert('There are no available users for random assignment.');
+        return;
+      }
 
-      // Assign leads randomly but evenly
-      const shuffledLeads = [...leadsToUpdate].sort(() => 0.5 - Math.random());
-      
-      for (const lead of shuffledLeads) {
-        // Find user with least assignments who hasn't been assigned this lead before
-        let selectedUser = null;
-        let minAssignments = Infinity;
-        
-        // Shuffle users to randomize selection among those with same min assignments
-        const shuffledUsers = [...availableUsers].sort(() => 0.5 - Math.random());
-        
-        for (const user of shuffledUsers) {
-          // Check if this user has the least assignments and hasn't been assigned this lead before
-          if (assignments[user.id] < minAssignments) {
-            selectedUser = user;
-            minAssignments = assignments[user.id];
-          }
-        }
-        
-        if (selectedUser) {
-          // Prepare update data
-          const updateData = {
-            assignedTo: selectedUser.name,
-            assignedToId: selectedUser.id,
-            department: selectedUser.department,
-            updatedAt: new Date()
-          };
+      // Shuffle leads for good measure, though not strictly necessary with the new logic
+      const shuffledLeads = [...leadsToUpdate].sort(() => 0.5 - Math.random()); [1]
 
-          // Update the lead
-          await this.leadService.updateLead(lead.id, updateData);
-          
-          // Update local data
-          Object.assign(lead, updateData);
-          
-          // Increment assignment count
-          assignments[selectedUser.id]++;
-        }
+      for (let i = 0; i < shuffledLeads.length; i++) {
+        // *** FIX: Select a truly random user for each lead ***
+        const randomIndex = Math.floor(Math.random() * availableUsers.length);
+        const selectedUser = availableUsers[randomIndex];
+
+        const updateData = {
+          ...shuffledLeads[i],
+          assignedTo: selectedUser.name,
+          assignedToId: selectedUser.id,
+          department: selectedUser.department,
+          updatedAt: new Date(),
+          alternateContact: shuffledLeads[i].alternateContact || '',
+          occupation: shuffledLeads[i].occupation || ''
+        };
+
+        await this.leadService.updateLead(shuffledLeads[i].id, updateData);
+        Object.assign(shuffledLeads[i], updateData);
       }
     } else {
-      // Manual assignment to a single user
+      // This is the logic for manual assignment (no changes needed here)
       if (!this.selectedUserId) {
         alert('Please select a user to assign leads to');
         return;
       }
-      
+
       const selectedUser = this.availableUsers.find(u => u.id === this.selectedUserId);
       if (!selectedUser) {
         alert('Selected user not found');
         return;
       }
 
-      // Prepare update data for all selected leads
-      const updateData: {
-        assignedTo: any;
-        assignedToId: any;
-        department: any;
-        updatedAt: Date;
-        lifeStage?: string;
-      } = {
+      const updateData = {
         assignedTo: selectedUser.name,
         assignedToId: selectedUser.id,
         department: selectedUser.department,
         updatedAt: new Date()
       };
 
-      // Include life stage if selected
-      if (this.selectedLifeStage) {
-        updateData.lifeStage = this.selectedLifeStage;
-      }
+      const updatePromises = leadsToUpdate.map(lead => {
+        const fullUpdateData = {
+          ...lead,
+          ...updateData,
+          alternateContact: lead.alternateContact || '',
+          occupation: lead.occupation || ''
+        };
+        return this.leadService.updateLead(lead.id, fullUpdateData);
+      });
 
-      // Update all selected leads
-      const updatePromises = leadsToUpdate.map(lead => 
-        this.leadService.updateLead(lead.id, updateData)
-      );
-      
       await Promise.all(updatePromises);
-      
-      // Update local data
+
       leadsToUpdate.forEach(lead => {
-        Object.assign(lead, updateData);
+        Object.assign(lead, {
+          ...updateData,
+          alternateContact: lead.alternateContact || '',
+          occupation: lead.occupation || ''
+        });
       });
     }
 
-    // Show success message
     this.validationMessage = {
       text: 'Leads assigned successfully',
       type: 'success'
     };
-    
-    // Close modal and clear selections
     this.closeAssignModal();
     this.selectedLeads.clear();
     this.allSelected = false;
-    
-    // Refresh the filtered data
     this.applyFilters();
-    
-    // Hide success message after 3 seconds
     setTimeout(() => {
       this.validationMessage = null;
     }, 3000);
-    
+
   } catch (error) {
     console.error('Error assigning leads:', error);
     this.validationMessage = {
@@ -1526,33 +1539,45 @@ private getCommonDepartment(leads: any[]): string | null {
   return null;
   }
   
+// In leads.component.ts
 async openAssignModal(randomMode: boolean): Promise<void> {
   this.randomAssignMode = randomMode;
   const currentUserRole = this.authService.currentUserValue?.role || '';
   const currentUserDepartment = this.authService.currentUserValue?.department || '';
 
   try {
-    // For random assignment, only show users from PC1-PC8 departments
-    this.availableUsers = this.usersList.filter(user => 
-      user.role === 'Executive' && 
-      user.department && 
-      user.department.match(/^PC[1-8]$/i) // Matches PC1 through PC8
-    );
-
-    // If current user is supervisor, filter to their department only
-    if (currentUserRole === 'Supervisor' && currentUserDepartment) {
-      this.availableUsers = this.availableUsers.filter(user => 
-        user.department === currentUserDepartment
+    if (randomMode) {
+      // For random assignment, get all PC department users
+      this.availableUsers = this.usersList.filter(user => 
+        user.role === 'Executive' && 
+        user.department && 
+        user.department.match(/^PC[1-8]$/i)
       );
-    }
-
-    // For random assignment, shuffle the users and select 3
-    if (randomMode && this.availableUsers.length > 0) {
-      const shuffledUsers = [...this.availableUsers]
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 3);
-      this.availableUsers = shuffledUsers;
-      this.selectedUserId = shuffledUsers[0]?.id || '';
+      
+      // If current user is supervisor, filter to their department only
+      if (currentUserRole === 'Supervisor' && currentUserDepartment) {
+        this.availableUsers = this.availableUsers.filter(user => 
+          user.department === currentUserDepartment
+        );
+      }
+      
+      // No need to pre-select a user for random assignment
+      this.selectedUserId = '';
+    } else {
+      // For manual assignment, filter users based on role
+      if (currentUserRole === 'Supervisor') {
+        this.availableUsers = this.usersList.filter(user => 
+          user.department === currentUserDepartment && 
+          user.role === 'Executive'
+        );
+      } else {
+        this.availableUsers = this.usersList.filter(user => 
+          user.role === 'Executive'
+        );
+      }
+      
+      // Try to pre-select the first user
+      this.selectedUserId = this.availableUsers.length > 0 ? this.availableUsers[0].id : '';
     }
   } catch (error) {
     console.error('Error getting users:', error);
@@ -1588,7 +1613,14 @@ async openAssignModal(randomMode: boolean): Promise<void> {
     categories: [selectedCategories || [], Validators.required]
   });
 }
-  
+  getFirstEntryIndex(): number {
+  return (this.currentPage - 1) * this.pageSize + 1;
+}
+
+getLastEntryIndex(): number {
+  return Math.min(this.currentPage * this.pageSize, this.totalItems);
+}
+
   isCategorySelected(category: string): boolean {
     const categories = this.categoryForm?.get('categories')?.value || [];
     return categories.includes(category);
@@ -1599,10 +1631,18 @@ async loadLeads() {
   const currentUserDepartment = this.authService.currentUserValue?.department || '';
 
   this.leadService.getLeads().subscribe(async leads => {
-    // Process each lead to check for duplicates and reorders
+    // 1. Batch fetch existing customers
+    const mobileNumbers = leads.map(lead => lead.mobile).filter(mobile => !!mobile) as string[];
+    
+    // This assumes your customerService has a method to get customers by an array of mobile numbers.
+    // If not, you will need to implement it. See the note below.
+    const existingCustomers = await this.customerService.getCustomersByMobileNumbers(mobileNumbers);
+    const existingCustomersMap = new Map(existingCustomers.map(c => [c.mobile, c]));
+
+    // 2. Process leads with the fetched data
     for (const lead of leads) {
       if (lead.mobile) {
-        lead.mobileExists = await this.customerService.checkMobileNumberExists(lead.mobile);
+        lead.mobileExists = existingCustomersMap.has(lead.mobile);
         lead.isReordered = lead.mobileExists;
         
         const duplicateLeads = leads.filter(l => 
@@ -1621,20 +1661,18 @@ async loadLeads() {
         lead.isDuplicate = false;
       }
     }
-      let filtered = leads;
+
+    let filtered = leads;
     if (currentUserRole === 'Executive') {
-      // Executives see only leads assigned to them
       filtered = leads.filter(lead => 
         lead.assignedTo === this.authService.getCurrentUserName() || 
         lead.assignedToId === this.authService.getCurrentUserId()
       );
     } else if (currentUserRole === 'Supervisor') {
-      // Supervisors see leads from their department only
       filtered = leads.filter(lead => 
         lead.department === currentUserDepartment
       );
     }
-    // Admin and other roles see all leads
     
     this.allLeads = filtered.map(lead => ({
       ...lead,
@@ -1647,6 +1685,7 @@ async loadLeads() {
     this.applyFilters();
   });
 }
+
 
   loadLeadStatuses() {
     console.log('Loading lead statuses...');
@@ -1923,15 +1962,17 @@ onUserSelectionChange(event: Event): void {
     this.selectedUserDepartment = selectedUser.department;
   }
 }
-  loadFollowupCategories(): void {
-    this.followupCategoryService.getFollowupCategories()
-      .then((categories) => {
+loadFollowupCategories(): void {
+  this.followupCategoryService.getFollowupCategories()
+    .subscribe({
+      next: (categories: FollowupCategory[]) => {
         this.followupCategories = categories;
-      })
-      .catch((error) => {
+      },
+      error: (error: any) => {
         console.error('Error loading followup categories:', error);
-      });
-  }
+      }
+    });
+}
   
 
 
@@ -1966,6 +2007,8 @@ onUserSelectionChange(event: Event): void {
 
   get f() { return this.leadForm.controls; }
   get followUpControls() { return this.followUpForm.controls; }
+// In leads.component.ts
+
 async convertToCustomer(lead: any) {
   // Check if mobile exists in customers
   const mobileExists = await this.customerService.checkMobileNumberExists(lead.mobile);
@@ -1978,17 +2021,20 @@ async convertToCustomer(lead: any) {
     }
 
     try {
-      // 1. Convert lead to customer (including all demographic data)
+      // 1. Convert lead to customer, ensuring all fields are passed explicitly
       const customerData = await this.leadService.convertLeadToCustomer({
-        ...lead,
+        ...lead, // Pass all existing lead data
+        // Explicitly include fields for clarity and to ensure they are not missed
+        dateOfBirth: lead.dateOfBirth,
+        city: lead.city, // This field holds the district value
+        leadStatus: lead.leadStatus,
+        lifeStage: lead.lifeStage,
+        gender: lead.gender,
+        age: lead.age,
+        prefix: lead.prefix,
+        middleName: lead.middleName,
         assignedTo: lead.assignedTo,
         assignedToId: lead.assignedToId,
-        // Ensure all demographic fields are included
-        age: lead.age,
-        dob: lead.dateOfBirth,
-        gender: lead.gender,
-        prefix: lead.prefix,
-        middleName: lead.middleName
       });
       
       // 2. Delete the lead after successful conversion
@@ -1999,12 +2045,6 @@ async convertToCustomer(lead: any) {
         customerData: {
           ...customerData,
           displayName: lead.businessName || `${lead.firstName} ${lead.lastName}`.trim(),
-          assignedTo: lead.assignedTo,
-          assignedToId: lead.assignedToId,
-          // Include all demographic fields
-          age: lead.age,
-          dob: lead.dateOfBirth,
-          gender: lead.gender
         },
         isExistingCustomer: false,
         leadId: lead.id
@@ -2025,31 +2065,39 @@ async convertToCustomer(lead: any) {
 }
 
 // Update the prepareForSalesOrder method
+// In leads.component.ts
+
+// ... inside the LeadsComponent class
+
+// --- REPLACE this method with the updated version ---
 async prepareForSalesOrder(lead: any) {
   try {
     // 1. Delete the lead first
     await this.leadService.deleteLead(lead.id);
     
-    // 2. Get customer data (since mobile exists)
+    // 2. Get existing customer data
     const customerData = await this.customerService.getCustomerByMobile(lead.mobile);
     
-    // 3. Prepare complete data for sales order
+    // 3. Prepare complete data for sales order, merging lead data
     const saleData = {
       customerData: {
-        ...customerData,
+        ...customerData, // Start with existing customer data
         displayName: lead.businessName || `${lead.firstName} ${lead.lastName}`.trim(),
-        // Include all demographic fields
+        
+        // --- THIS IS THE FIX: OVERWRITE WITH LEAD'S LATEST INFO ---
         age: customerData.age || lead.age,
-        dob: customerData.dob || lead.dateOfBirth,
-        gender: customerData.gender || lead.gender,
+        dob: customerData.dob || lead.dateOfBirth, // <-- FIX
+        gender: customerData.gender || lead.gender, // <-- FIX
+        occupation: customerData.occupation || lead.occupation, // <-- FIX
         assignedTo: lead.assignedTo,
         assignedToId: lead.assignedToId
+        // ... include any other fields from the lead you want to ensure are passed ...
       },
       isExistingCustomer: true,
       leadId: lead.id
     };
 
-    // 4. Navigate with state and query params
+    // 4. Navigate to the add-sale page with the complete data
     this.router.navigate(['/add-sale'], {
       state: { 
         fromLead: true,
@@ -2215,7 +2263,6 @@ editLead(lead: any) {
     estimatedValue: lead.estimatedValue || '',
     source: lead.source || '',
     lifeStage: lead.lifeStage || '',
-    // Use assignedToId if available, otherwise fall back to assignedTo
     assignedTo: lead.assignedToId || lead.assignedTo || '',
     notes: lead.notes || '',
     addressLine1: lead.addressLine1 || '',
@@ -2223,7 +2270,8 @@ editLead(lead: any) {
     city: lead.city || '',
     state: lead.state || '',
     country: lead.country || 'India',
-    zipCode: lead.zipCode || ''
+    zipCode: lead.zipCode || '',
+    occupation: lead.occupation || '' // Add this line
   };
 
   if (lead.productInterested) {
@@ -2233,6 +2281,7 @@ editLead(lead: any) {
   // Navigate to the lead-add component with all parameters
   this.router.navigate(['/crm/lead-add'], { queryParams });
 }
+
 async validateMobileNumber() {
   const mobileControl = this.leadForm.get('mobile');
   const mobile = mobileControl?.value;
@@ -2685,10 +2734,12 @@ applyFilters(): void {
 
 
 
-  goToPage(page: number) {
+goToPage(page: number): void {
+  if (page >= 1 && page <= this.totalPages) {
     this.currentPage = page;
     this.updatePagination();
   }
+}
 
 async mergeDuplicate(leadId: string, keepOriginal: boolean) {
   if (confirm(`Are you sure you want to merge this lead? All information will be ${keepOriginal ? 'merged into the original lead' : 'kept in this lead and the original will be deleted'}`)) {

@@ -1,0 +1,88 @@
+<div class="account-summary-container">
+  <!-- Header Section -->
+  <!-- <div class="summary-header">
+    <div class="date-range-section">
+      <h6 class="text-muted mb-1">Date Range:</h6>
+      <div class="date-range-badge">
+        {{ accountData.dateRange.from }} - {{ accountData.dateRange.to }}
+      </div>
+    </div>
+    
+    <div class="company-details">
+      <h5 class="company-name">{{ accountData.companyDetails.name }}</h5>
+      <p class="company-address text-muted">{{ accountData.companyDetails.address }}</p>
+    </div>
+  </div> -->
+
+  <!-- Main Content Section -->
+  <div class="summary-content">
+    <!-- Supplier Details Section -->
+    <div class="supplier-section">
+      <div class="section-header">
+        <h6 class="section-title">To:</h6>
+      </div>
+      
+      <div class="supplier-details">
+        <h6 class="supplier-name">{{ getSupplierDisplayName() }}</h6>
+        <div class="supplier-info">
+          <p class="mb-1" *ngIf="getSupplierAddress()">{{ getSupplierAddress() }}</p>
+          <p class="mb-1" *ngIf="accountData.supplierDetails.mobile">
+            <i class="fas fa-phone me-2"></i>Mobile: {{ accountData.supplierDetails.mobile }}
+          </p>
+          <p class="mb-0" *ngIf="accountData.supplierDetails.taxNumber">
+            <i class="fas fa-id-card me-2"></i>Tax number: {{ accountData.supplierDetails.taxNumber }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Account Summary Section -->
+    <div class="account-summary-section">
+      <div class="summary-header-card">
+        <h5 class="summary-title">Account Summary</h5>
+        <p class="summary-date-range">{{ accountData.dateRange.from }} to {{ accountData.dateRange.to }}</p>
+      </div>
+      
+      <div class="summary-items">
+        <div class="summary-item">
+          <span class="item-label">Opening Balance</span>
+          <span class="item-value">₹ {{ accountData.openingBalance | number:'1.2-2' }}</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="item-label">Total Purchase</span>
+          <span class="item-value total-purchase">₹ {{ accountData.totalPurchase | number:'1.2-2' }}</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="item-label">Total Expense</span>
+          <span class="item-value">₹ {{ accountData.totalExpense | number:'1.2-2' }}</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="item-label">Total paid</span>
+          <span class="item-value total-paid">₹ {{ accountData.totalPaid | number:'1.2-2' }}</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="item-label">Advance Balance</span>
+          <span class="item-value">₹ {{ accountData.advanceBalance | number:'1.2-2' }}</span>
+        </div>
+        
+        <div class="summary-item balance-due">
+          <span class="item-label">Balance due</span>
+          <span class="item-value" [ngClass]="{'text-danger': accountData.balanceDue > 0, 'text-success': accountData.balanceDue <= 0}">
+            ₹ {{ accountData.balanceDue | number:'1.2-2' }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Footer -->
+  <!-- <div class="summary-footer">
+    <p class="footer-text">
+      Showing all invoices and payments between {{ accountData.dateRange.from }} and {{ accountData.dateRange.to }}
+    </p>
+  </div> -->
+</div>

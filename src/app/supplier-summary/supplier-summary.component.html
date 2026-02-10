@@ -1,46 +1,209 @@
 <div class="supplier-summary-container">
+  <!-- Header Section -->
   <div class="header-section">
-    <h2>Supplier Summary</h2>
-    <div class="summary-actions">
-      <div class="supplier-count">
-        <strong>Total Suppliers: {{ suppliers.length }}</strong>
-      </div>
-      <button class="export-btn" (click)="exportToExcel()" [disabled]="suppliers.length === 0">
-        <i class="fa fa-download"></i> Export to Excel
+    <h2><i class="fas fa-users me-2"></i>Supplier Summary</h2>
+    <div class="header-actions">
+      <button class="btn btn-primary me-2" (click)="exportToExcel()" [disabled]="filteredSuppliers.length === 0">
+        <i class="fas fa-file-excel me-1"></i> Export Excel
+      </button>
+      <button class="btn btn-success" (click)="exportToCSV()" [disabled]="filteredSuppliers.length === 0">
+        <i class="fas fa-file-csv me-1"></i> Export CSV
       </button>
     </div>
   </div>
 
-  <div class="table-responsive">
-    <table class="supplier-summary-table">
+  <!-- Statistics Cards omitted for brevity - keep your existing ones -->
+  <!-- ... (Stats cards here) ... -->
+
+  <!-- Filters Section -->
+  <div class="filters-card mb-4">
+    <div class="card">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filters & Search</h5>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Search</label>
+            <input type="text" class="form-control" [(ngModel)]="searchTerm" 
+                   (ngModelChange)="applyFilters()" 
+                   placeholder="Search ID, Name, Mobile...">
+          </div>
+
+          <!-- Date Range Filter -->
+          <div class="col-md-3">
+            <label class="form-label">Date Range (Created)</label>
+            <div class="d-flex flex-column gap-2">
+              <div class="date-input-wrapper">
+                <span class="label-hint">From</span>
+                <input type="text" 
+                       class="form-control form-control-sm date-input" 
+                       [value]="getFormattedDateForInput(filterOptions.startDate)"
+                       (blur)="onManualDateInput($event, 'start')"
+                       placeholder="DD-MM-YYYY">
+                <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+                  <i class="fas fa-calendar-alt"></i>
+                </button>
+                <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="filterOptions.startDate" (change)="applyFilters()">
+              </div>
+              <div class="date-input-wrapper">
+                <span class="label-hint">To</span>
+                <input type="text" 
+                       class="form-control form-control-sm date-input" 
+                       [value]="getFormattedDateForInput(filterOptions.endDate)"
+                       (blur)="onManualDateInput($event, 'end')"
+                       placeholder="DD-MM-YYYY">
+                <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+                  <i class="fas fa-calendar-alt"></i>
+                </button>
+                <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="filterOptions.endDate" (change)="applyFilters()">
+              </div>
+            </div>
+          </div>
+
+          <div class="col-md-2">
+            <label class="form-label">Status</label>
+            <select class="form-select" [(ngModel)]="filterOptions.status" (change)="applyFilters()">
+              <option value="">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">State</label>
+            <select class="form-select" [(ngModel)]="filterOptions.state" (change)="applyFilters()">
+              <option value="">All States</option>
+              <option *ngFor="let state of statesList" [value]="state">{{ state }}</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Type</label>
+            <select class="form-select" [(ngModel)]="filterOptions.contactType" (change)="applyFilters()">
+              <option value="">All Types</option>
+              <option *ngFor="let type of contactTypesList" [value]="type">{{ type }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-md-12 d-flex justify-content-between align-items-center">
+            <div class="d-flex gap-3">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="filterOptions.hasPaymentDue" (change)="applyFilters()" id="paymentDue">
+                <label class="form-check-label" for="paymentDue">Has Due</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="filterOptions.hasOpeningBalance" (change)="applyFilters()" id="openingBalance">
+                <label class="form-check-label" for="openingBalance">Has Balance</label>
+              </div>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" (click)="clearFilters()">
+              <i class="fas fa-times me-1"></i> Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table Section -->
+  <div class="table-controls mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="entries-control">
+        Show 
+        <select [(ngModel)]="entriesPerPage" (change)="applyFilters()" class="form-select d-inline-block w-auto">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select> 
+        entries
+      </div>
+      <button class="btn btn-outline-primary btn-sm" (click)="toggleColumnSelector()">
+        <i class="fas fa-columns me-1"></i> Columns
+      </button>
+      
+      <!-- Column Selector -->
+      <div class="column-selector-dropdown shadow" [class.show]="showColumnSelector">
+        <div class="column-selector-header">
+          <h6>Select Columns</h6>
+          <button class="btn-close" (click)="toggleColumnSelector()"></button>
+        </div>
+        <div class="column-selector-body">
+          <div *ngFor="let column of columnVisibility" class="column-option">
+            <label class="form-check-label">
+              <input type="checkbox" class="form-check-input" [checked]="column.visible" (change)="toggleColumnVisibility(column.name)">
+              {{ column.label }}
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="spinner-border text-primary"></div>
+    <p class="mt-3">Loading suppliers data...</p>
+  </div>
+
+  <div *ngIf="!isLoading" class="table-responsive">
+    <table class="suppliers-summary-table">
       <thead>
         <tr>
-          <th>Contact ID</th>
-          <th>Name</th>
-          <th>Business Name</th>
-          <th>Status</th>
-          <!-- Add more columns as needed -->
+          <th>Actions</th>
+          <th *ngIf="isColumnVisible('contactId')" (click)="sortBy('contactId')" class="sortable">Contact ID <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('createdAt')" (click)="sortBy('createdAt')" class="sortable">Created Date <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('firstName')" (click)="sortBy('firstName')" class="sortable">Name <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('businessName')" (click)="sortBy('businessName')" class="sortable">Business <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('mobile')" (click)="sortBy('mobile')" class="sortable">Mobile <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('state')" (click)="sortBy('state')" class="sortable">State <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('status')" (click)="sortBy('status')" class="sortable">Status <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('paymentDue')" (click)="sortBy('paymentDue')" class="sortable text-end">Due <i class="fas fa-sort"></i></th>
+          <th *ngIf="isColumnVisible('totalPurchases')" (click)="sortBy('totalPurchases')" class="sortable text-end">Total Purchases <i class="fas fa-sort"></i></th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let supplier of suppliers">
-          <td>{{ supplier.contactId || 'N/A' }}</td>
+        <tr *ngFor="let supplier of paginatedSuppliers">
           <td>
-            <div *ngIf="supplier.isIndividual">
-              {{ supplier.prefix || '' }} {{ supplier.firstName || '' }} {{ supplier.middleName || '' }} {{ supplier.lastName || '' }}
+            <div class="action-buttons">
+              <button class="btn btn-sm btn-outline-primary" (click)="viewSupplier(supplier)"><i class="fas fa-eye"></i></button>
+              <button class="btn btn-sm btn-outline-secondary ms-1" (click)="editSupplier(supplier)"><i class="fas fa-edit"></i></button>
             </div>
           </td>
-          <td>{{ !supplier.isIndividual ? (supplier.businessName || 'N/A') : 'N/A' }}</td>
-          <td>
-            <span class="status-badge" [class.active]="supplier.status === 'Active'">
-              {{ supplier.status || 'Inactive' }}
-            </span>
+          <td *ngIf="isColumnVisible('contactId')">{{ supplier.contactId }}</td>
+          <td *ngIf="isColumnVisible('createdAt')">{{ supplier.createdAt | date:'dd-MM-yyyy' }}</td>
+          <td *ngIf="isColumnVisible('firstName')">{{ getFullName(supplier) }}</td>
+          <td *ngIf="isColumnVisible('businessName')">{{ supplier.businessName || 'Individual' }}</td>
+          <td *ngIf="isColumnVisible('mobile')">{{ supplier.mobile }}</td>
+          <td *ngIf="isColumnVisible('state')">{{ supplier.state }}</td>
+          <td *ngIf="isColumnVisible('status')">
+            <span class="status-badge" [class.active]="supplier.status === 'Active'">{{ supplier.status }}</span>
           </td>
+          <td *ngIf="isColumnVisible('paymentDue')" class="text-end fw-bold" [class.text-danger]="(supplier.paymentDue || 0) > 0">
+            ₹{{ supplier.paymentDue || 0 | number:'1.2-2' }}
+          </td>
+          <td *ngIf="isColumnVisible('totalPurchases')" class="text-end">₹{{ supplier.totalPurchases || 0 | number:'1.2-2' }}</td>
         </tr>
-        <tr *ngIf="suppliers.length === 0">
-          <td colspan="4" class="no-data">No suppliers found</td>
+        <tr *ngIf="filteredSuppliers.length === 0">
+          <td [attr.colspan]="getVisibleColumnsCount()" class="text-center py-5">No suppliers found.</td>
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-controls mt-4" *ngIf="!isLoading && filteredSuppliers.length > 0">
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="small text-muted">Showing {{ getFirstItemNumber() }} to {{ getLastItemNumber() }} of {{ filteredSuppliers.length }}</span>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" [class.disabled]="currentPage === 1"><button class="page-link" (click)="prevPage()">Previous</button></li>
+          <li *ngFor="let page of getPageNumbers()" class="page-item" [class.active]="page === currentPage">
+            <button class="page-link" (click)="goToPage(page)">{{ page }}</button>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage === totalPages"><button class="page-link" (click)="nextPage()">Next</button></li>
+        </ul>
+      </nav>
+    </div>
   </div>
 </div>

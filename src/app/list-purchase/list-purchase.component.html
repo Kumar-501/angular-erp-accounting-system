@@ -25,9 +25,10 @@
         <div class="d-flex align-items-center">
           <label class="me-2">Show</label>
           <select class="form-select form-select-sm me-2" style="width: 70px;">
-            <option>25</option>
-            <option>50</option>
-            <option>100</option>
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
           </select>
           <label>entries</label>
         </div>
@@ -43,11 +44,29 @@
           <button class="btn btn-sm btn-outline-primary" (click)="toggleFilterSidebar()">
             <i class="fas fa-filter me-1"></i> Filter
           </button>
+           <div class="column-visibility-container">
+            <button class="btn btn-sm btn-outline-info" (click)="showColumnVisibilityDropdown = !showColumnVisibilityDropdown">
+              <i class="fas fa-columns me-1"></i> Column Visibility
+            </button>
+            <div class="column-visibility-dropdown" *ngIf="showColumnVisibilityDropdown">
+              <div *ngFor="let col of columns" class="column-option">
+                <label>
+                  <input type="checkbox" [(ngModel)]="col.visible" [disabled]="col.field === 'actions'">
+                  {{ col.label }}
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <div class="form-group mb-0">
-          <input type="text" class="form-control form-control-sm" placeholder="Search ..." [(ngModel)]="searchText" (input)="applyFilter()">
-        </div>
+<!-- In your template -->
+<div class="form-group mb-0">
+  <input type="text" 
+         class="form-control form-control-sm" 
+         placeholder="Search by reference, invoice, supplier, location, status, etc..." 
+         [(ngModel)]="searchText" 
+         (input)="applyFilter()">
+</div>
       </div>
       
 
@@ -110,10 +129,10 @@
   <label class="form-label">Supplier</label>
   
   <!-- Search input for suppliers -->
-  <input type="text" class="form-control form-control-sm mb-2" 
+  <!-- <input type="text" class="form-control form-control-sm mb-2" 
          [(ngModel)]="supplierSearchText" 
          (input)="filterSuppliers()"
-         placeholder="Search suppliers...">
+         placeholder="Search suppliers..."> -->
   
   <!-- Dropdown for filtered suppliers -->
   <select class="form-select form-select-sm" 
@@ -148,326 +167,391 @@
 <!-- Add overlay when sidebar is open -->
 <div class="sidebar-overlay" [class.show]="showFilterSidebar" (click)="toggleFilterSidebar()"></div>
       <!-- Main Table -->
+         <!-- Main Table -->
       <div class="table-responsive">
         <table class="table table-hover no-vertical-lines" id="purchaseTable">
-      <!-- Update the table header section to include click events for sorting -->
-<thead class="table-light">
-  <tr>
-    <th>Action <i class="fas fa-sort"></i></th>
-    <th (click)="sortTable('date')">
-      Date <i class="fas" [ngClass]="getSortIcon('date')"></i>
-    </th>
-    <th (click)="sortTable('referenceNo')">
-      Reference No <i class="fas" [ngClass]="getSortIcon('referenceNo')"></i>
-    </th>
-    <th (click)="sortTable('invoiceNo')">
-      Invoice No <i class="fas" [ngClass]="getSortIcon('invoiceNo')"></i>
-    </th>
-
-    <th (click)="sortTable('businessLocation')">
-      To Location <i class="fas" [ngClass]="getSortIcon('businessLocation')"></i>
-    </th>
- <th (click)="sortTable('supplier')">
-      Supplier <i class="fas" [ngClass]="getSortIcon('supplier')"></i>
-    </th>
- <th (click)="sortTable('supplierAddress')">
- From Address <i class="fas" [ngClass]="getSortIcon('supplierAddress')"></i>
-</th>
-    <th (click)="sortTable('purchaseStatus')">
-      Purchase Status <i class="fas" [ngClass]="getSortIcon('purchaseStatus')"></i>
-    </th>
-    
-    <th (click)="sortTable('paymentStatus')">
-      Payment Status <i class="fas" [ngClass]="getSortIcon('paymentStatus')"></i>
-    </th>
-    <!-- In your table header section -->
-
-    <!-- In your table header section -->
-<!-- Add these columns to your table -->
-<th (click)="sortTable('totalTax')">Tax (₹)</th>
-<th (click)="sortTable('cgst')">CGST (₹)</th>
-<th (click)="sortTable('sgst')">SGST (₹)</th>
-<th (click)="sortTable('igst')">IGST (₹)</th>
-<th (click)="sortTable('taxRate')">Tax Rate (%)</th>
-    <th (click)="sortTable('grandTotal')">
-      Grand Total <i class="fas" [ngClass]="getSortIcon('grandTotal')"></i>
-    </th>
-    <th (click)="sortTable('paymentAccount')">
-  Payment Account <i class="fas" [ngClass]="getSortIcon('paymentAccount')"></i>
-</th>
-    <th (click)="sortTable('paymentDue')">
-      Payment due <i class="fas fa-question-circle text-info"></i> 
-      <i class="fas" [ngClass]="getSortIcon('paymentDue')"></i>
-    </th>
- 
-    <th (click)="sortTable('addedBy')">
-      Added By <i class="fas" [ngClass]="getSortIcon('addedBy')"></i>
-    </th>
-  </tr>
-</thead>
+          <thead class="table-light">
+            <tr>
+              <!-- Action Column (Not Sortable) -->
+              <th scope="col" *ngIf="isColumnVisible('actions')">Action</th>
+              
+              <!-- Sortable Columns with Alignment and Icons -->
+              <th scope="col" *ngIf="isColumnVisible('date')" (click)="sortTable('date')" style="cursor: pointer;">
+                Date <i class="fas" [ngClass]="getSortIcon('date')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('receivedDate')">Received Date</th>
+              <th scope="col" *ngIf="isColumnVisible('referenceNo')" (click)="sortTable('referenceNo')" style="cursor: pointer;">
+                Reference No <i class="fas" [ngClass]="getSortIcon('referenceNo')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('invoiceNo')" (click)="sortTable('invoiceNo')" style="cursor: pointer;">
+                Invoice No <i class="fas" [ngClass]="getSortIcon('invoiceNo')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('businessLocation')" (click)="sortTable('businessLocation')" style="cursor: pointer;">
+                To Location <i class="fas" [ngClass]="getSortIcon('businessLocation')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('supplier')" (click)="sortTable('supplier')" style="cursor: pointer;">
+                Supplier <i class="fas" [ngClass]="getSortIcon('supplier')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('supplierAddress')" (click)="sortTable('supplierAddress')" style="cursor: pointer;">
+                From Address <i class="fas" [ngClass]="getSortIcon('supplierAddress')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('purchaseStatus')" (click)="sortTable('purchaseStatus')" style="cursor: pointer;">
+                Purchase Status <i class="fas" [ngClass]="getSortIcon('purchaseStatus')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('paymentStatus')" (click)="sortTable('paymentStatus')" style="cursor: pointer;">
+                Payment Status <i class="fas" [ngClass]="getSortIcon('paymentStatus')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('totalTax')" class="text-end" (click)="sortTable('totalTax')" style="cursor: pointer;">
+                Tax (₹) <i class="fas" [ngClass]="getSortIcon('totalTax')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('cgst')" class="text-end" (click)="sortTable('cgst')" style="cursor: pointer;">
+                CGST (₹) <i class="fas" [ngClass]="getSortIcon('cgst')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('sgst')" class="text-end" (click)="sortTable('sgst')" style="cursor: pointer;">
+                SGST (₹) <i class="fas" [ngClass]="getSortIcon('sgst')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('igst')" class="text-end" (click)="sortTable('igst')" style="cursor: pointer;">
+                IGST (₹) <i class="fas" [ngClass]="getSortIcon('igst')"></i>
+              </th>
+               <th scope="col" *ngIf="isColumnVisible('taxRate')" class="text-end" (click)="sortTable('taxRate')" style="cursor: pointer;">
+                Tax Rate (%) <i class="fas" [ngClass]="getSortIcon('taxRate')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('grandTotal')" class="text-end" (click)="sortTable('grandTotal')" style="cursor: pointer;">
+                Grand Total <i class="fas" [ngClass]="getSortIcon('grandTotal')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('paymentAccount')" (click)="sortTable('paymentAccount')" style="cursor: pointer;">
+                Payment Account <i class="fas" [ngClass]="getSortIcon('paymentAccount')"></i>
+              </th>
+              <th scope="col" *ngIf="isColumnVisible('paymentDue')" class="text-end" (click)="sortTable('paymentDue')" style="cursor: pointer;">
+                Payment Due <i class="fas" [ngClass]="getSortIcon('paymentDue')"></i>
+              </th>
+              <!-- <th scope="col" *ngIf="isColumnVisible('addedBy')" (click)="sortTable('addedBy')" style="cursor: pointer;">
+                Added By <i class="fas" [ngClass]="getSortIcon('addedBy')"></i>
+              </th> -->
+            </tr>
+          </thead>
           <tbody>
             <tr *ngIf="isLoading">
-              <td colspan="12" class="text-center">
-                <div class="spinner-border" role="status">
+              <td [attr.colspan]="visibleColumnsCount" class="text-center p-4">
+                <div class="spinner-border text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
+                <p class="mt-2">Loading Purchases...</p>
               </td>
             </tr>
             
             <tr *ngFor="let purchase of filteredPurchases">
-            <td>
-  <!-- Action Button -->
-  <button class="action-button" (click)="openActionPopup(purchase, $event)">Actions</button>
-
-  <!-- Action Popup -->
-  <div class="action-popup-overlay" *ngIf="currentActionPopup === purchase.id" (click)="closeActionPopup()">
-    <div class="action-popup" (click)="$event.stopPropagation()">
-      <div class="popup-header">
-        <h4>Purchase #{{purchase.referenceNo}}</h4>
-        <button class="close-btn" (click)="closeActionPopup()">&times;</button>
-      </div>
-      
-      <div class="popup-body">
-        <div class="action-item" (click)="viewPurchase(purchase); closeActionPopup()">
-          <i class="fas fa-eye text-info"></i>
-          <span>View</span>
-        </div>
-        
-        <div class="action-item" (click)="editPurchase(purchase); closeActionPopup()">
-          <i class="fas fa-edit text-primary"></i>
-          <span>Edit</span>
-        </div>
-        
-        <div class="action-item" (click)="addPayment(purchase); closeActionPopup()">
-          <i class="fas fa-money-bill-wave text-success"></i>
-          <span>Add Payment</span>
-        </div>
-        
-        <div class="action-item" (click)="updateStatus(purchase); closeActionPopup()">
-          <i class="fas fa-sync-alt text-info"></i>
-          <span>Update Status</span>
-        </div>
-        
-        <div class="action-item" (click)="openReturnModal(purchase); closeActionPopup()">
-          <i class="fas fa-undo text-warning"></i>
-          <span>Purchase Return</span>
-        </div>
-        
-        <div class="action-item" (click)="printPurchase(purchase); closeActionPopup()">
-          <i class="fas fa-print text-secondary"></i>
-          <span>Print</span>
-        </div>
-        
-        <div class="action-item" (click)="viewPayments(purchase); closeActionPopup()">
-          <i class="fas fa-history text-secondary"></i>
-          <span>View Payments</span>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="action-item text-danger" (click)="confirmDelete(purchase); closeActionPopup()">
-          <i class="fas fa-trash-alt"></i>
-          <span>Delete</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</td>
-              <td>{{ purchase.purchaseDate || 'N/A' }}</td>
-              <td>{{ purchase.referenceNo || 'N/A' }}</td>
-              <td>{{ purchase.invoiceNo || 'N/A' }}</td>
-    <!-- Remove this column: <td>{{ getProductsDisplay(purchase.products) }}</td> -->
-    <td>{{ purchase.businessLocation || 'N/A' }}</td>
-              <td>{{ purchase.supplier|| 'N/A' }}</td>
-              <td>{{ purchase.supplierAddress || 'N/A' }}</td>
-
-              <td>
-                <span [class]="getStatusClass(purchase.purchaseStatus)">
-                  {{ purchase.purchaseStatus || 'Unknown' }}
-                </span>
+              <!-- Action Cell -->
+              <td *ngIf="isColumnVisible('actions')">
+                <button class="action-button" (click)="openActionPopup(purchase, $event)">Actions</button>
+                <div class="action-popup-overlay" *ngIf="currentActionPopup === purchase.id" (click)="closeActionPopup()">
+                  <div class="action-popup" (click)="$event.stopPropagation()">
+                    <div class="popup-header"><h4>Purchase #{{purchase.referenceNo}}</h4><button class="close-btn" (click)="closeActionPopup()">&times;</button></div>
+                    <div class="popup-body">
+                      <div class="action-item" (click)="viewPurchase(purchase); closeActionPopup()"><i class="fas fa-eye text-info"></i><span>View</span></div>
+                      <div class="action-item" (click)="editPurchase(purchase); closeActionPopup()"><i class="fas fa-edit text-primary"></i><span>Edit</span></div>
+                      <div class="action-item" (click)="addPayment(purchase); closeActionPopup()"><i class="fas fa-money-bill-wave text-success"></i><span>Add Payment</span></div>
+                      <div class="action-item" (click)="updateStatus(purchase); closeActionPopup()"><i class="fas fa-sync-alt text-info"></i><span>Update Status</span></div>
+                      <div class="action-item" (click)="openReturnModal(purchase); closeActionPopup()"><i class="fas fa-undo text-warning"></i><span>Purchase Return</span></div>
+                      <div class="action-item" (click)="printPurchase(purchase); closeActionPopup()"><i class="fas fa-print text-secondary"></i><span>Print</span></div>
+                      <div class="divider"></div>
+                      <div class="action-item text-danger" (click)="confirmDelete(purchase); closeActionPopup()"><i class="fas fa-trash-alt"></i><span>Delete</span></div>
+                    </div>
+                  </div>
+                </div>
               </td>
-              <td>{{ purchase.paymentStatus || 'Unknown' }}</td>
-              <!-- In your table body section -->
-              <!-- In your table body section -->
-<td>₹ {{ purchase.totalTax?.toFixed(2) || '0.00' }}</td>
-<td>₹ {{ purchase.cgst?.toFixed(2) || '0.00' }}</td>
-<td>₹ {{ purchase.sgst?.toFixed(2) || '0.00' }}</td>
-<td>₹ {{ purchase.igst?.toFixed(2) || '0.00' }}</td>
-<td>{{ purchase.taxRate || '0' }}%</td>
-<td class="text-end">
-  ₹{{ purchase.grandTotal | number:'1.2-2' }}
-</td><td>
-  <div *ngIf="purchase.paymentAccount">
-    {{ purchase.paymentAccount.name }}
-    <small *ngIf="purchase.paymentAccount.accountNumber" class="text-muted d-block">
-      {{ purchase.paymentAccount.accountNumber }}
-    </small>
-    <small *ngIf="purchase.paymentAccount.accountType" class="text-muted d-block">
-      {{ purchase.paymentAccount.accountType }}
-    </small>
-  </div>
-  <div *ngIf="!purchase.paymentAccount && purchase.paymentMethod">
-    {{ purchase.paymentMethod }}
-  </div>
-  <div *ngIf="!purchase.paymentAccount && !purchase.paymentMethod">
-    N/A
-  </div>
-</td>
-    <td>₹ {{ purchase.paymentDue || '0.00' }}</td>
 
-              <td>{{ purchase.addedBy || 'System' }}</td>
+              <!-- Data Cells with consistent visibility and formatting -->
+              <td *ngIf="isColumnVisible('date')">{{ purchase.purchaseDate || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('receivedDate')">{{ purchase.receivedDate || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('referenceNo')">{{ purchase.referenceNo || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('invoiceNo')">{{ purchase.invoiceNo || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('businessLocation')">{{ purchase.businessLocation || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('supplier')">{{ purchase.supplier || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('supplierAddress')">{{ purchase.supplierAddress || 'N/A' }}</td>
+              <td *ngIf="isColumnVisible('purchaseStatus')"><span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">{{ purchase.purchaseStatus || 'Unknown' }}</span></td>
+              <td *ngIf="isColumnVisible('paymentStatus')"><span class="badge" [ngClass]="getStatusClass(purchase.paymentStatus)">{{ purchase.paymentStatus || 'Unknown' }}</span></td>
+              <td *ngIf="isColumnVisible('totalTax')" class="text-end">₹ {{ purchase.totalTax | number:'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('cgst')" class="text-end">₹ {{ purchase.cgst | number:'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('sgst')" class="text-end">₹ {{ purchase.sgst | number:'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('igst')" class="text-end">₹ {{ purchase.igst | number:'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('taxRate')" class="text-end">{{ purchase.taxRate || '0' }}%</td>
+              <td *ngIf="isColumnVisible('grandTotal')" class="text-end">₹{{ purchase.grandTotal | number:'1.2-2' }}</td>
+              <td *ngIf="isColumnVisible('paymentAccount')">
+                <div *ngIf="purchase.paymentAccount">{{ purchase.paymentAccount.name }}<small *ngIf="purchase.paymentAccount.accountNumber" class="text-muted d-block">{{ purchase.paymentAccount.accountNumber }}</small><small *ngIf="purchase.paymentAccount.accountType" class="text-muted d-block">{{ purchase.paymentAccount.accountType }}</small></div>
+                <div *ngIf="!purchase.paymentAccount && purchase.paymentMethod">{{ purchase.paymentMethod }}</div>
+                <div *ngIf="!purchase.paymentAccount && !purchase.paymentMethod">N/A</div>
+              </td>
+              <td *ngIf="isColumnVisible('paymentDue')" class="text-end">₹ {{ purchase.paymentDue | number:'1.2-2' }}</td>
+              <!-- <td *ngIf="isColumnVisible('addedBy')">{{ purchase.addedBy || 'System' }}</td> -->
             </tr>
             
             <tr *ngIf="!isLoading && filteredPurchases.length === 0">
-              <td colspan="12" class="text-center">No data available in table</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Totals Row -->
-      <div class="table-responsive" *ngIf="!isLoading">
-        <table class="table table-bordered">
-          <tbody>
-            <tr>
-              <td class="fw-bold text-end" style="width: 20%">Total:</td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%"></td>
-              <td style="width: 10%">₹ {{ calculateTotal('grandTotal') }}</td>
-                <td style="width: 10%">₹ {{ calculateTotal('totalTax') }}</td> <!-- New column -->
-
-              <td style="width: 20%">
-                <div>Purchase Due - ₹ {{ calculateTotal('paymentDue') }}</div>
-                <div>Purchase Return - ₹ {{ calculateTotalReturns() }}</div>
+              <td [attr.colspan]="visibleColumnsCount" class="text-center p-4">
+                <i class="fas fa-box-open fa-2x text-muted"></i>
+                <p class="mt-2">No data available in table</p>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
+      <!-- Updated Totals Row Section with Purchase Returns without Tax -->
+<!-- ✅ FIXED: Totals Row Section -->
+<!-- Update the totals section in list-purchase.component.html -->
+
+<!-- Enhanced Totals Row Section with Purchase Returns and Shipping Tax -->
+<div class="table-responsive" *ngIf="!isLoading">
+  <table class="table table-bordered">
+    <tbody>
+      <tr>
+        <td class="fw-bold text-end" style="width: 15%">Total:</td>
+        <td style="width: 8%"></td>
+        <td style="width: 8%"></td>
+        <td style="width: 8%"></td>
+        <td style="width: 8%"></td>
+        <td class="text-end fw-bold" style="width: 8%">₹ {{ totalGrandTotal | number:'1.2-2' }}</td>
+        <td class="text-end fw-bold" style="width: 8%">₹ {{ totalTax | number:'1.2-2' }}</td>
+        <td style="width: 21%">
+          <div class="total-summary">
+            
+            <div class="summary-line">
+              <span class="summary-label">Purchase Due:</span>
+              <span class="summary-value">₹ {{ totalPaymentDue | number:'1.2-2' }}</span>
+            </div>
+
+            <!-- Shipping Totals -->
+            <div class="summary-line shipping-summary">
+              <span class="summary-label">Shipping (w/o Tax):</span>
+              <span class="summary-value">₹ {{ totalShippingChargesBeforeTax | number:'1.2-2' }}</span>
+            </div>
+            <div class="summary-line shipping-summary">
+              <span class="summary-label">Shipping Tax (Gross):</span>
+              <span class="summary-value">₹ {{ totalShippingTaxAmount | number:'1.2-2' }}</span>
+            </div>
+
+            <!-- Return Totals -->
+            <div class="summary-line return-summary">
+              <span class="summary-label">Purchase Return (w/o Tax):</span>
+              <span class="summary-value text-danger">- ₹ {{ totalReturnsAmountWithoutTax | number:'1.2-2' }}</span>
+            </div>
+            <div class="summary-line return-summary">
+              <span class="summary-label">Return Product Tax:</span>
+              <span class="summary-value text-danger">- ₹ {{ totalReturnsTaxAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="summary-line return-summary" *ngIf="totalPurchaseReturnsWithShipping > 0">
+              <span class="summary-label">Return Shipping Charges:</span>
+              <span class="summary-value text-danger">- ₹ {{ totalPurchaseReturnsWithShipping | number:'1.2-2' }}</span>
+            </div>
+            <!-- ✅ NEW: Display refunded shipping tax -->
+            <div class="summary-line return-summary" *ngIf="totalShippingTaxRefunded > 0">
+              <span class="summary-label">Return Shipping Tax:</span>
+              <span class="summary-value text-danger">- ₹ {{ totalShippingTaxRefunded | number:'1.2-2' }}</span>
+            </div>
+
+            <!-- Net Calculations -->
+            <hr class="summary-divider">
+            <div class="summary-line net-summary">
+              <span class="summary-label">Net Shipping Tax (ITC):</span>
+              <span class="summary-value text-primary">₹ {{ (totalShippingTaxAmount - totalShippingTaxRefunded) | number:'1.2-2' }}</span>
+            </div>
+
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
       <!-- Pagination and Summary -->
-      <div class="row mt-3">
-        <div class="col-md-6">
-          <p>Showing {{ filteredPurchases.length > 0 ? '1' : '0' }} to {{ filteredPurchases.length }} of {{ purchases.length }} entries</p>
-        </div>
-        <div class="col-md-6">
-          <nav aria-label="Page navigation" class="float-end">
-            <ul class="pagination pagination-sm">
-              <li class="page-item disabled">
-                <a class="page-link" href="#" tabindex="-1">Previous</a>
-              </li>
-              <li class="page-item active"><a class="page-link" href="#">1</a></li>
-              <li class="page-item disabled">
-                <a class="page-link" href="#">Next</a>
-              </li>
-            </ul>
-          </nav>
-        </div>
-      </div>
+ <div class="row mt-3">
+  <div class="col-md-6">
+    <p>Showing {{ getPaginatedItems().length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} 
+    to {{ Math.min(currentPage * itemsPerPage, totalItems) }} of {{ totalItems }} entries</p>
+  </div>
+  <div class="col-md-6">
+    <nav aria-label="Page navigation" class="float-end">
+      <ul class="pagination pagination-sm">
+        <li class="page-item" [class.disabled]="currentPage === 1">
+          <a class="page-link" href="javascript:void(0)" (click)="goToPage(currentPage - 1)">Previous</a>
+        </li>
+        
+        <li *ngFor="let page of getPageNumbers()" class="page-item" [class.active]="page === currentPage">
+          <a class="page-link" href="javascript:void(0)" (click)="goToPage(page)">{{ page }}</a>
+        </li>
+        
+        <li class="page-item" [class.disabled]="currentPage * itemsPerPage >= totalItems">
+          <a class="page-link" href="javascript:void(0)" (click)="goToPage(currentPage + 1)">Next</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</div>
     </div>
   </div>
 </div>
 
-<!-- Return Modal -->
+<!-- Updated Return Modal with Better Unit Cost Display -->
 <div class="modal fade" id="returnModal" tabindex="-1" aria-labelledby="returnModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+  <div class="modal-dialog modal-xl">
     <div class="modal-content return-modal-custom">
-      <!-- Screen overlay when disabled -->
       <div class="screen-overlay" *ngIf="isDisabled">
-        <div class="spinner-border text-primary overlay-spinner" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
+        <div class="spinner-border text-primary overlay-spinner" role="status"></div>
         <div class="overlay-message" *ngIf="disabledMessage">{{disabledMessage}}</div>
       </div>
       
       <div class="modal-header return-modal-header">
-        <h5 class="modal-title" id="returnModalLabel">
-          <i class="fas fa-undo-alt me-2"></i>Return Purchase
-        </h5>
+        <h5 class="modal-title" id="returnModalLabel"><i class="fas fa-undo-alt me-2"></i>Return Purchase</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" [disabled]="isDisabled"></button>
       </div>
       
       <div class="modal-body return-modal-body" [class.disabled-content]="isDisabled">
         <div *ngIf="selectedPurchase" class="return-form-container">
-          <!-- Header Section -->
           <div class="row mb-4 header-section">
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label return-label">Purchase Reference:</label>
               <div class="return-reference-value">{{selectedPurchase.referenceNo}}</div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
+              <label class="form-label return-label">Supplier:</label>
+              <div class="return-supplier-value">{{selectedPurchase.supplier}}</div>
+            </div>
+            <div class="col-md-4">
               <label class="form-label return-label">Return Date:</label>
-              <input type="date" class="form-control return-date-input" 
-                     [(ngModel)]="returnData.returnDate" [disabled]="isDisabled">
+              <input type="date" class="form-control return-date-input" [(ngModel)]="returnData.returnDate" [disabled]="isDisabled">
             </div>
           </div>
 
-          <!-- Products Table -->
           <div class="table-responsive mb-4 return-products-table">
-            <table class="table">
-              <thead>
+            <table class="table table-bordered">
+              <thead class="table-light">
                 <tr>
-                  <th class="product-col">Product</th>
-                  <th class="qty-col">Purchased Qty</th>
-                  <th class="return-col">Return Qty</th>
-                  <th class="price-col">Unit Price</th>
-                  <th class="subtotal-col">Subtotal</th>
+                  <th class="product-col">Product Name</th>
+                  <th class="qty-col text-center">Purchased Qty</th>
+                  <th class="return-col text-center">Return Qty</th>
+                  <th class="price-col text-center">Unit Cost (Before Tax)</th>
+                  <th class="price-col text-center">Unit Cost (With Tax)</th>
+                  <th class="tax-col text-center">Tax Rate (%)</th>
+                  <th class="total-col text-center">Subtotal (Before Tax)</th>
+                  <th class="total-col text-center">Tax Amount</th>
+                  <th class="total-col text-center">Total (With Tax)</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let product of selectedPurchase.products; let i = index">
-                  <td class="product-name">{{ product.name || product.productName }}</td>
-                  <td class="purchased-qty">{{ product.quantity }}</td>
-                  <td class="return-qty-input">
-                    <input type="number" class="form-control" 
-                           [(ngModel)]="returnData.products[i].returnQuantity" 
-                           (change)="calculateReturnSubtotal(i)"
-                           min="0" [max]="product.quantity || 0" [disabled]="isDisabled">
+                <tr *ngFor="let product of returnData.products; let i = index">
+                  <td class="product-name">
+                    <div class="product-details">
+                      <strong>{{ product.name || product.productName }}</strong>
+                      <small class="text-muted d-block" *ngIf="product.sku">SKU: {{ product.sku }}</small>
+                      <small class="text-muted d-block" *ngIf="product.batchNumber">Batch: {{ product.batchNumber }}</small>
+                    </div>
                   </td>
-                  <td class="unit-price">₹ {{ product.price | number:'1.2-2' }}</td>
-                  <td class="subtotal">₹ {{ returnData.products[i].subtotal | number:'1.2-2' }}</td>
+                  <td class="purchased-qty text-center">
+                    <span class="badge bg-info">{{ product.quantity }}</span>
+                  </td>
+                  <td class="return-qty-input text-center">
+                    <input type="number" 
+                           class="form-control text-center" 
+                           [(ngModel)]="product.returnQuantity" 
+                           (input)="onReturnQuantityChange(i)"
+                           (blur)="onReturnQuantityBlur(i)"
+                           min="0" 
+                           [max]="product.quantity ?? 0" 
+                           [disabled]="isDisabled || !product.quantity"
+                           placeholder="0">
+                  </td>
+                  <td class="unit-price-before-tax text-center">
+                    <strong class="text-primary">₹ {{ getUnitCostBeforeTax(product) | number:'1.2-2' }}</strong>
+                  </td>
+                  <td class="unit-price text-center">
+                    ₹ {{ (product.price || product.unitCost || 0) | number:'1.2-2' }}
+                  </td>
+                  <td class="tax-rate text-center">
+                    <span class="badge bg-warning">{{ product.taxRate || 0 }}%</span>
+                  </td>
+                  <td class="subtotal-before-tax text-center">
+                    <strong class="text-success">₹ {{ (product.returnSubtotal || 0) | number:'1.2-2' }}</strong>
+                  </td>
+                  <td class="tax-amount text-center">
+                    ₹ {{ calculateReturnTaxAmount(product) | number:'1.2-2' }}
+                  </td>
+                  <td class="total-amount text-center">
+                    <strong class="text-info">₹ {{ calculateReturnTotalWithTax(product) | number:'1.2-2' }}</strong>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Return Reason -->
           <div class="mb-4 return-reason-section">
             <label class="form-label return-label">Return Reason:</label>
-            <textarea class="form-control return-reason-textarea" 
-                      rows="3" 
-                      placeholder="Please specify the reason for return..."
-                      [(ngModel)]="returnData.reason" [disabled]="isDisabled"></textarea>
+            <textarea class="form-control return-reason-textarea" rows="3" placeholder="Please specify the reason for return..." [(ngModel)]="returnData.reason" [disabled]="isDisabled"></textarea>
           </div>
 
-          <!-- Status Section -->
           <div class="row mb-4 status-section">
             <div class="col-md-6 status-select">
               <label class="form-label return-label">Return Status:</label>
               <select class="form-select" [(ngModel)]="returnData.returnStatus" [disabled]="isDisabled">
                 <option value="pending">Pending</option>
                 <option value="completed">Completed</option>
-                <option value="rejected">Rejected</option>
               </select>
             </div>
             <div class="col-md-6 status-select">
               <label class="form-label return-label">Payment Status:</label>
               <select class="form-select" [(ngModel)]="returnData.paymentStatus" [disabled]="isDisabled">
                 <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="partial">Partial</option>
+                <option value="completed">Completed</option>
               </select>
             </div>
           </div>
-
-          <!-- Total Amount -->
+          
           <div class="total-amount-section">
-            <div class="total-amount-label">Total Return Amount:</div>
-            <div class="total-amount-value">₹ {{ calculateTotalReturnAmount() | number:'1.2-2' }}</div>
+            <div class="row justify-content-end">
+                <div class="col-md-8">
+                <div class="total-breakdown border rounded p-3">
+  <div class="breakdown-row d-flex justify-content-between">
+    <span class="breakdown-label">Subtotal (Before Tax):</span>
+    <span class="breakdown-value">₹ {{ calculateTotalReturnAmountWithoutTax() | number:'1.2-2' }}</span>
+  </div>
+  <div class="breakdown-row d-flex justify-content-between">
+    <span class="breakdown-label">Total Tax Amount:</span>
+    <span class="breakdown-value">₹ {{ calculateTotalReturnTaxAmount() | number:'1.2-2' }}</span>
+  </div>
+  
+  <!-- ✅ MODIFIED: Conditional shipping display -->
+  <div class="breakdown-row shipping-row d-flex justify-content-between" 
+       *ngIf="isFullReturn() && selectedPurchase && (selectedPurchase.shippingChargesBeforeTax || selectedPurchase.shippingTaxAmount)">
+    <span class="breakdown-label">+ Shipping Charges Refund:</span>
+    <span class="breakdown-value text-warning">
+      ₹ {{ (selectedPurchase.shippingChargesBeforeTax || 0) | number:'1.2-2' }}
+    </span>
+  </div>
+  
+  <div class="breakdown-row shipping-row d-flex justify-content-between" 
+       *ngIf="isFullReturn() && selectedPurchase && selectedPurchase.shippingTaxAmount">
+    <span class="breakdown-label">+ Shipping Tax Refund:</span>
+    <span class="breakdown-value text-warning">
+      ₹ {{ selectedPurchase.shippingTaxAmount | number:'1.2-2' }}
+    </span>
+  </div>
+  
+  <!-- ✅ ADDED: Message for partial returns -->
+  <div class="breakdown-row partial-return-note" 
+       *ngIf="!isFullReturn() && hasReturnItems()">
+    <small class="text-muted">
+      <i class="fas fa-info-circle"></i> 
+      Shipping charges are not refunded for partial returns
+    </small>
+  </div>
+  
+  <hr class="total-divider">
+  <div class="breakdown-row grand-total d-flex justify-content-between">
+    <span class="total-amount-label"><strong>Net Return Amount:</strong></span>
+    <span class="total-amount-value"><strong>₹ {{ calculateTotalReturnAmount() | number:'1.2-2' }}</strong></span>
+  </div>
+</div>
+                </div>
+            </div>
           </div>
         </div>
       </div>
@@ -476,7 +560,7 @@
         <button type="button" class="btn btn-cancel" data-bs-dismiss="modal" [disabled]="isDisabled">
           <i class="fas fa-times me-2"></i>Cancel
         </button>
-        <button type="button" class="btn btn-submit" (click)="submitReturn()" [disabled]="isDisabled">
+        <button type="button" class="btn btn-submit" (click)="submitReturn()" [disabled]="isDisabled || !hasReturnItems()">
           <i class="fas fa-check me-2"></i>Submit Return
         </button>
       </div>
@@ -484,6 +568,8 @@
   </div>
 </div>
 
+
+<!-- Payment Modal -->
 <div class="modal" [class.show]="showPaymentForm">
   <div class="modal-content payment-modal">
     <div class="modal-header">
@@ -505,20 +591,26 @@
           </div>
         </div>
         
-<div class="form-group">
-  <label>Payment Account:*</label>
-  <select class="form-control" formControlName="paymentAccount" required>
-    <option value="">Select Payment Account</option>
-    <option *ngFor="let account of paymentAccounts" [ngValue]="account"
-            [disabled]="account.openingBalance <= 0">
-      {{account.name}} ({{account.accountNumber}}) - ₹{{account.openingBalance | number:'1.2-2'}}
-    </option>
-  </select>
-  <div *ngIf="paymentForm.get('paymentAccount')?.invalid && paymentForm.get('paymentAccount')?.touched" 
-       class="error-message">
-    Please select a payment account
-  </div>
-</div>
+          <div class="form-group">
+          <label>Payment Account:*</label>
+          <select class="form-control" formControlName="paymentAccount" required>
+            <option [ngValue]="null" disabled>Select Payment Account</option>
+            
+            <option *ngFor="let account of paymentAccounts" [ngValue]="account">
+              {{ account.name }}
+              <span *ngIf="account.accountNumber"> ({{ account.accountNumber }})</span>
+              - Balance: {{ (account.calculatedBalance !== undefined ? account.calculatedBalance : account.openingBalance) | currency:'INR' }}
+            </option>
+
+          </select>
+          <div *ngIf="paymentAccountsLoading" class="text-muted small mt-1">
+            Loading accounts...
+          </div>
+          <div *ngIf="paymentForm.get('paymentAccount')?.invalid && (paymentForm.get('paymentAccount')?.touched || paymentForm.get('paymentAccount')?.dirty)" 
+               class="error-message">
+            Please select a payment account.
+          </div>
+        </div>
         
         <div class="form-group">
           <label>Payment Method:*</label>
@@ -541,15 +633,15 @@
         <div class="amount-summary">
           <div class="summary-row">
             <span>Grand Total:</span>
-            <span>₹ {{ currentPaymentPurchase?.grandTotal || '0.00' }}</span>
+            <span>₹ {{ currentPaymentPurchase?.grandTotal | number:'1.2-2' }}</span>
           </div>
           <div class="summary-row">
             <span>Paid Amount:</span>
-            <span>₹ {{ currentPaymentPurchase?.paymentAmount || '0.00' }}</span>
+            <span>₹ {{ currentPaymentPurchase?.paymentAmount | number:'1.2-2' }}</span>
           </div>
           <div class="summary-row highlight">
             <span>Balance Due:</span>
-            <span>₹ {{ currentPaymentPurchase?.paymentDue || '0.00' }}</span>
+            <span>₹ {{ currentPaymentPurchase?.paymentDue | number:'1.2-2' }}</span>
           </div>
         </div>
         
@@ -594,10 +686,10 @@
         
         <div class="form-actions">
           <button type="button" class="btn btn-secondary" (click)="closePaymentForm()">Cancel</button>
-     <button type="button" class="btn btn-primary" (click)="submitPayment()" 
-        [disabled]="paymentForm.invalid || paymentAccountsLoading || paymentProcessing">
-  <span *ngIf="paymentProcessing" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-  {{ paymentProcessing ? 'Processing...' : 'Save Payment' }}
+      <button type="button" class="btn btn-primary" (click)="submitPayment()" 
+        [disabled]="paymentForm.invalid || paymentAccountsLoading || isSaving">
+  <span *ngIf="paymentAccountsLoading || isSaving" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+  {{ isSaving ? 'Saving...' : 'Save Payment' }}
 </button>
         </div>
       </form>
@@ -610,128 +702,7 @@
       <div class="modal-header">
         <h5 class="modal-title" id="statusModalLabel">
           <i class="fas fa-sync-alt me-2"></i>Update Purchase Status
-        </h5><!-- Payment Modal -->
-<div class="modal" [class.show]="showPaymentForm">
-  <div class="modal-content payment-modal">
-    <div class="modal-header">
-      <h2>Add Payment</h2>
-      <span class="close" (click)="closePaymentForm()">&times;</span>
-    </div>
-    
-    <div class="modal-body">
-      <form [formGroup]="paymentForm">
-        <div class="form-row">
-          <div class="form-group">
-            <label>Reference No:</label>
-            <input type="text" class="form-control" formControlName="referenceNo" readonly>
-          </div>
-          
-          <div class="form-group">
-            <label>Supplier:</label>
-            <input type="text" class="form-control" formControlName="supplierName" readonly>
-          </div>
-        </div>
-        
-       <div class="form-group">
-          <label>Payment Account:*</label>
-          <select class="form-control" formControlName="paymentAccount" required>
-            <option value="">Select Payment Account</option>
-            <option *ngFor="let account of paymentAccounts" [ngValue]="account"
-                    [disabled]="account.openingBalance <= 0">
-              {{account.name}} ({{account.accountNumber}}) - ₹{{account.openingBalance | number:'1.2-2'}}
-            </option>
-          </select>
-          <div *ngIf="paymentForm.get('paymentAccount')?.invalid && paymentForm.get('paymentAccount')?.touched" 
-               class="error-message">
-            Please select a payment account
-          </div>
-        </div>
-
-        
-        <div class="form-group">
-          <label>Payment Method:*</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" formControlName="paymentMethod" value="Cash" checked> Cash
-            </label>
-            <label class="radio-label">
-              <input type="radio" formControlName="paymentMethod" value="Bank Transfer"> Bank Transfer
-            </label>
-            <label class="radio-label">
-              <input type="radio" formControlName="paymentMethod" value="Cheque"> Cheque
-            </label>
-            <label class="radio-label">
-              <input type="radio" formControlName="paymentMethod" value="Other"> Other
-            </label>
-          </div>
-        </div>
-        
-        <div class="amount-summary">
-          <div class="summary-row">
-            <span>Grand Total:</span>
-            <span>₹ {{ currentPaymentPurchase?.grandTotal || '0.00' }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Paid Amount:</span>
-            <span>₹ {{ currentPaymentPurchase?.paymentAmount || '0.00' }}</span>
-          </div>
-          <div class="summary-row highlight">
-            <span>Balance Due:</span>
-            <span>₹ {{ currentPaymentPurchase?.paymentDue || '0.00' }}</span>
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>Amount:*</label>
-            <input 
-              type="number" 
-              class="form-control"
-              formControlName="amount" 
-              step="0.01" 
-              min="0.01" 
-              [max]="currentPaymentPurchase?.paymentDue || 0"
-              required>
-            <div *ngIf="paymentForm.get('amount')?.invalid && paymentForm.get('amount')?.touched" 
-                 class="error-message">
-              Please enter a valid amount
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label>Paid on:*</label>
-            <input 
-              type="datetime-local" 
-              class="form-control"
-              formControlName="paidDate" 
-              required>
-            <div *ngIf="paymentForm.get('paidDate')?.invalid && paymentForm.get('paidDate')?.touched" 
-                 class="error-message">
-              Please select a date
-            </div>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label>Payment Note:</label>
-          <textarea 
-            class="form-control"
-            formControlName="paymentNote" 
-            rows="3"></textarea>
-        </div>
-        
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" (click)="closePaymentForm()">Cancel</button>
-          <button type="button" class="btn btn-primary" (click)="submitPayment()" 
-                  [disabled]="paymentForm.invalid || paymentAccountsLoading">
-            <span *ngIf="paymentAccountsLoading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            Save Payment
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -785,5 +756,5 @@
   </button>
 </div>
     </div>
-  </div>
+  </div>
 </div>

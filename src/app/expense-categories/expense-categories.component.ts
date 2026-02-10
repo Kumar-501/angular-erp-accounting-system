@@ -102,8 +102,7 @@ onSubCategoryChange: any;
           { value: 'Indirect Expense', label: 'Indirect Expense' },
           { value: 'Direct Expense', label: 'Direct Expense' },
           { value: 'Cost of Goods Sold', label: 'Cost of Goods Sold' },
-          { value: 'GST Deposit', label: 'GST Deposit' },
-          { value: 'TDS Deposit', label: 'TDS Deposit' },
+          { value: 'Operational Expenses', label: 'Operational Expenses' },
 
         ]}
       ];

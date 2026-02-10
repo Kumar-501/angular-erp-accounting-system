@@ -25,7 +25,7 @@
     <div class="detail-row">
       <div class="detail-item">
         <label>Location:</label>
-        <span>{{ requisition.locationName }}</span>
+        <span>{{ requisition.locationName || requisition.location }}</span>
       </div>
       <div class="detail-item">
         <label>Status:</label>
@@ -75,19 +75,18 @@
             <td>{{ item.alertQuantity || 0 }}</td>
             <td>{{ item.unitPurchasePrice | currency:'INR'}}</td>
             <td>{{ item.purchasePriceIncTax | currency:'INR' }}</td>
-            <td>{{ (item.requiredQuantity * item.unitPurchasePrice) | currency:'INR' }}</td>
+            <td>{{ getItemTotal(item) | currency:'INR' }}</td>
           </tr>
           <tr class="total-row">
-            <td colspan="5"></td>
-            <td colspan="2"><strong>Grand Total:</strong></td>
-            <td><strong>{{ getGrandTotal() |currency:'INR' }}</strong></td>
+            <td colspan="6"></td>
+            <td><strong>Grand Total: {{ getGrandTotal() | currency:'INR' }}</strong></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="actions">
-    
+      <!-- Add any action buttons here if needed -->
     </div>
   </div>
 </div>

@@ -1,0 +1,445 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f8f9fa;
+    color: #333;
+    line-height: 1.6;
+}
+/* Custom Date Input Wrapper */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding-left: 10px;
+    background-color: #fff !important;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      color: #0d6efd;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+.error-text {
+  color: #dc3545;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header Styles */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.page-header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background-color: #27ae60;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #229954;
+}
+
+.btn-secondary {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+/* Table Styles */
+.table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    margin-bottom: 30px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 15px 20px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+tr:hover {
+    background-color: #f8f9fa;
+}
+
+.amount {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    margin-right: 10px;
+    font-size: 16px;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+.btn-icon:hover {
+    opacity: 1;
+}
+
+/* Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    padding: 20px;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    margin-left: 10%;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #7f8c8d;
+}
+
+/* Form Styles */
+form {
+    padding: 20px;
+}
+
+fieldset {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+legend {
+    padding: 0 10px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.form-group input, .form-group select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.description-group {
+    grid-column: 1 / -1;
+}
+
+/* File Input Styling */
+.file-name {
+    display: block;
+    margin-top: 8px;
+    font-size: 14px;
+    color: #9b59b6;
+    font-weight: 500;
+}
+
+// #################################################################
+// ### NEW STYLES FOR THE CUSTOM CHECKBOX                          ###
+// #################################################################
+.form-group-checkbox {
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    grid-column: 1 / -1; // Ensure it takes full width in the grid row
+
+    label {
+        margin-left: 10px;
+        font-weight: 500;
+        color: #2c3e50;
+        cursor: pointer;
+        user-select: none; // Prevent text selection on click
+    }
+
+    input[type="checkbox"] {
+        // Hide the default browser checkbox
+        -webkit-appearance: none;
+        appearance: none;
+        background-color: #fff;
+        margin: 0;
+
+        // Custom checkbox styles
+        font: inherit;
+        color: currentColor;
+        width: 1.2em;
+        height: 1.2em;
+        border: 0.15em solid #bdc3c7;
+        border-radius: 0.25em;
+        transform: translateY(-0.075em);
+        
+        display: grid;
+        place-content: center;
+        cursor: pointer;
+        transition: 120ms all ease-in-out;
+
+        &::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em #27ae60; // Checkmark color
+            
+            // Create checkmark shape using clip-path
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        &:checked {
+            border-color: #27ae60; // Border color when checked
+            background-color: #f0fff8;
+        }
+
+        &:checked::before {
+            transform: scale(1);
+        }
+
+        &:focus-visible {
+            outline: max(2px, 0.15em) solid #3498db;
+            outline-offset: max(2px, 0.1em);
+        }
+    }
+}
+
+
+/* Journal Entries Table */
+.journal-items-table {
+    overflow-x: auto;
+    margin-bottom: 15px;
+}
+
+.journal-items-table table {
+    min-width: 700px;
+}
+
+.journal-items-table th, 
+.journal-items-table td {
+    padding: 12px;
+}
+
+.journal-items-table input, 
+.journal-items-table select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.btn-add-entry {
+    background-color: #3498db;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    margin-top: 10px;
+}
+
+.btn-add-entry:hover {
+    background-color: #2980b9;
+}
+
+/* Totals Section */
+.totals-section {
+    display: flex;
+    justify-content: flex-end;
+    gap: 20px;
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+}
+
+.totals-section div {
+    font-weight: 500;
+}
+
+.totals-section span {
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.difference.unbalanced {
+    color: #e74c3c;
+}
+
+/* Modal Footer */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 20px;
+    border-top: 1px solid #e0e0e0;
+}
+
+/* View Details Modal */
+.view-details-body {
+    padding: 20px;
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.text-right {
+    text-align: right;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .btn-primary {
+        margin-top: 15px;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .totals-section {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    th, td {
+        padding: 10px 15px;
+    }
+}

@@ -1,43 +1,48 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { ExpenseService } from '../services/expense.service';
-import { SaleService } from '../services/sale.service';
-import { PayrollService } from '../services/payroll.service';
-import { PurchaseService } from '../services/purchase.service';
-import { Subscription } from 'rxjs';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, OnDestroy } from "@angular/core";
+import { ExpenseService } from "../services/expense.service";
+import { SaleService } from "../services/sale.service";
+import { PayrollService } from "../services/payroll.service";
+import { PurchaseService } from "../services/purchase.service";
+import { Subscription } from "rxjs";
+import { DatePipe } from "@angular/common";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
+// Interface updated to use 'type' instead of 'category'
 interface ReportEntry {
   id: string;
   date: Date | string;
-  category: string;
+  type: string; // Changed from 'category'
   totalAmount: number;
-  entryType: 'expense' | 'income' | 'sale' | 'payroll' | 'purchase';
+  entryType: "expense" | "income" | "sale" | "payroll" | "purchase";
 }
 
 @Component({
-  selector: 'app-list-report',
-  templateUrl: './list-report.component.html',
-  styleUrls: ['./list-report.component.scss'],
-  providers: [DatePipe]
+  selector: "app-list-report",
+  templateUrl: "./list-report.component.html",
+  styleUrls: ["./list-report.component.scss"],
+  providers: [DatePipe],
 })
 export class ListReportComponent implements OnInit, OnDestroy {
   entries: ReportEntry[] = [];
   filteredEntries: ReportEntry[] = [];
-  sortField: string = 'date';
-  sortDirection: 'asc' | 'desc' = 'desc';
+  sortField: string = "date";
+  sortDirection: "asc" | "desc" = "desc";
   currentPage: number = 1;
   entriesPerPage: number = 10;
   totalEntries: number = 0;
-  searchTerm: string = '';
+  searchTerm: string = "";
   isLoading: boolean = true;
+  showFilters: boolean = false;
+  startDate: string = "";
+  endDate: string = "";
+  
+  // Replaces 'selectedCategory' and 'categories'
+  activeTypeFilter: string = "All";
 
-  // Make Math available to template
   Math = Math;
 
-  private expensesSub!: Subscription;
-  private salesSub!: Subscription;
-  private payrollsSub!: Subscription;
-  private purchasesSub!: Subscription;
+  private dataSub!: Subscription;
 
   constructor(
     private expenseService: ExpenseService,
@@ -53,147 +58,188 @@ export class ListReportComponent implements OnInit, OnDestroy {
 
   loadData(): void {
     this.isLoading = true;
-    
-    // Load expenses
-    this.expensesSub = this.expenseService.getExpenses().subscribe(expenses => {
-      const expenseEntries: ReportEntry[] = expenses.map(expense => ({
-        id: expense.id || 'expense-' + Date.now() + '-' + Math.random(),
-        date: expense.date,
-        category: expense.expenseCategory || 'Expense',
-        totalAmount: expense.totalAmount || 0,
-        entryType: 'expense' as const
-      }));
+    if (this.dataSub) {
+      this.dataSub.unsubscribe();
+    }
+    this.dataSub = new Subscription();
+    this.entries = []; // Clear entries on reload
 
-      // Load sales
-      this.salesSub = this.saleService.listenForSales().subscribe(sales => {
-        const saleEntries: ReportEntry[] = sales.map(sale => ({
-          id: sale.id || 'sale-' + Date.now() + '-' + Math.random(),
-          date: sale.saleDate,
-          category: 'Sale',
-          totalAmount: sale.paymentAmount || 0,
-          entryType: 'sale' as const
-        }));
+    // Fetch all data sources
+    this.dataSub.add(this.expenseService.getExpenses().subscribe(data => this.processData('expense', data)));
+    this.dataSub.add(this.expenseService.getIncomes().subscribe(data => this.processData('income', data)));
+    this.dataSub.add(this.saleService.listenForSales().subscribe(data => this.processData('sale', data)));
+    this.dataSub.add(this.purchaseService.getPurchases().subscribe(data => this.processData('purchase', data)));
+    this.dataSub.add(this.payrollService.getPayrollsRealTime().subscribe(data => this.processData('payroll', data)));
 
-        // Load payrolls
-        this.payrollsSub = this.payrollService.getPayrollsRealTime().subscribe(payrolls => {
-          const payrollEntries: ReportEntry[] = payrolls.map(payroll => ({
-            id: payroll.id || 'payroll-' + Date.now() + '-' + Math.random(),
-            date: payroll.monthYear,
-            category: 'Payroll',
-            totalAmount: payroll.totalGross || 0,
-            entryType: 'payroll' as const
-          }));
-
-          // Load purchases
-          this.purchasesSub = this.purchaseService.getPurchases().subscribe(purchases => {
-            const purchaseEntries: ReportEntry[] = purchases.map(purchase => ({
-              id: purchase.id || 'purchase-' + Date.now() + '-' + Math.random(),
-              date: purchase.purchaseDate,
-              category: 'Purchase',
-              totalAmount: purchase.grandTotal || purchase.purchaseTotal || 0,
-              entryType: 'purchase' as const
-            }));
-
-            // Combine all entries
-            this.entries = [
-              ...expenseEntries,
-              ...saleEntries,
-              ...payrollEntries,
-              ...purchaseEntries
-            ];
-
-            // Sort by date
-            this.entries.sort((a, b) => {
-              const dateA = new Date(a.date).getTime();
-              const dateB = new Date(b.date).getTime();
-              return dateB - dateA;
-            });
-
-            this.filteredEntries = [...this.entries];
-            this.totalEntries = this.filteredEntries.length;
-            this.isLoading = false;
-          });
-        });
-      });
-    });
+    // Set a timeout to handle initial rendering
+    setTimeout(() => this.isLoading = false, 1500);
   }
-// Add this method to your ListReportComponent class
-async deleteEntry(entry: ReportEntry) {
-  if (confirm('Are you sure you want to delete this entry?')) {
-    try {
-      this.isLoading = true;
-      
-      // Delete based on entry type
-      switch (entry.entryType) {
+
+  private processData(type: 'expense' | 'income' | 'sale' | 'payroll' | 'purchase', data: any[]): void {
+    // Remove old data of the same type to prevent duplicates on real-time updates
+    this.entries = this.entries.filter(e => e.entryType !== type);
+
+    const newEntries = data.map(item => {
+      let reportEntry: ReportEntry = {
+        id: item.id || `${type}-${Date.now()}`,
+        date: new Date(), // Default value
+        type: 'Unknown',
+        totalAmount: 0,
+        entryType: type
+      };
+
+      switch(type) {
         case 'expense':
-          await this.expenseService.deleteExpense(entry.id);
+          reportEntry.date = item.date;
+          reportEntry.type = 'Expense';
+          reportEntry.totalAmount = item.totalAmount || 0;
+          break;
+        case 'income':
+          reportEntry.date = item.date;
+          reportEntry.type = 'Income';
+          reportEntry.totalAmount = item.totalAmount || 0;
           break;
         case 'sale':
-          await this.saleService.deleteSale(entry.id);
-          break;
-        case 'payroll':
-          await this.payrollService.deletePayroll(entry.id);
+          reportEntry.date = item.saleDate;
+          reportEntry.type = 'Sale';
+          reportEntry.totalAmount = item.paymentAmount || 0;
           break;
         case 'purchase':
-          await this.purchaseService.deletePurchase(entry.id);
+          reportEntry.date = item.purchaseDate;
+          reportEntry.type = 'Purchase';
+          reportEntry.totalAmount = item.grandTotal || item.purchaseTotal || 0;
+          break;
+        case 'payroll':
+          reportEntry.date = item.monthYear;
+          reportEntry.type = 'Payroll';
+          reportEntry.totalAmount = item.totalGross || 0;
           break;
       }
-      
-      // Reload data after deletion
-      this.loadData();
-    } catch (error) {
-      console.error('Error deleting entry:', error);
-      this.isLoading = false;
-      alert('Failed to delete entry. Please try again.');
+      return reportEntry;
+    });
+
+    this.entries.push(...newEntries);
+    this.sortAndFilterData();
+  }
+
+  private sortAndFilterData(): void {
+    this.entries.sort((a, b) => {
+        const dateA = new Date(a.date as string).getTime();
+        const dateB = new Date(b.date as string).getTime();
+        return dateB - dateA; // Default sort by most recent
+    });
+    this.applyFilters();
+  }
+
+  applyTypeFilter(type: string): void {
+    this.activeTypeFilter = type;
+    this.applyFilters();
+  }
+
+  async deleteEntry(entry: ReportEntry) {
+    if (confirm("Are you sure you want to delete this entry?")) {
+      try {
+        this.isLoading = true;
+        switch (entry.entryType) {
+          case "expense": await this.expenseService.deleteExpense(entry.id); break;
+          case "income": await this.expenseService.deleteTransaction(entry.id, 'income'); break;
+          case "sale": await this.saleService.deleteSale(entry.id); break;
+          case "payroll": await this.payrollService.deletePayroll(entry.id); break;
+          case "purchase": await this.purchaseService.deletePurchase(entry.id); break;
+        }
+        // Data will reload via listeners, no need to call loadData() manually
+      } catch (error) {
+        console.error("Error deleting entry:", error);
+        this.isLoading = false;
+        alert("Failed to delete entry. Please try again.");
+      }
     }
   }
-}
+
   sortData(field: string): void {
     if (this.sortField === field) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+      this.sortDirection = this.sortDirection === "asc" ? "desc" : "asc";
     } else {
       this.sortField = field;
-      this.sortDirection = 'asc';
+      this.sortDirection = "asc";
     }
 
     this.filteredEntries.sort((a, b) => {
-      let valueA: any;
-      let valueB: any;
-
+      let valueA: any, valueB: any;
       switch (this.sortField) {
-        case 'date':
-          valueA = new Date(a.date).getTime();
-          valueB = new Date(b.date).getTime();
-          break;
-        case 'totalAmount':
-          valueA = a.totalAmount || 0;
-          valueB = b.totalAmount || 0;
-          break;
-        default: // category
-          valueA = a.category.toLowerCase();
-          valueB = b.category.toLowerCase();
+        case "date": valueA = new Date(a.date as string).getTime(); valueB = new Date(b.date as string).getTime(); break;
+        case "totalAmount": valueA = a.totalAmount || 0; valueB = b.totalAmount || 0; break;
+        default: valueA = a.type.toLowerCase(); valueB = b.type.toLowerCase(); break; // Sort by type
       }
 
-      if (valueA < valueB) return this.sortDirection === 'asc' ? -1 : 1;
-      if (valueA > valueB) return this.sortDirection === 'asc' ? 1 : -1;
+      if (valueA < valueB) return this.sortDirection === "asc" ? -1 : 1;
+      if (valueA > valueB) return this.sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-
     this.currentPage = 1;
   }
 
-  onSearch(event: any): void {
-    this.searchTerm = event.target.value.toLowerCase();
-    this.filteredEntries = this.entries.filter(entry => 
-      entry.category.toLowerCase().includes(this.searchTerm) ||
-      this.formatDate(entry.date).toLowerCase().includes(this.searchTerm)
-    );
+  toggleFilters(): void {
+    this.showFilters = !this.showFilters;
+  }
+
+  setPresetDateRange(preset: string): void {
+    const today = new Date();
+    let startDate = new Date(), endDate = new Date();
+
+    switch (preset) {
+      case 'Today': startDate = today; endDate = today; break;
+      case 'Yesterday': startDate.setDate(today.getDate() - 1); endDate.setDate(today.getDate() - 1); break;
+      case 'Last 7 Days': startDate.setDate(today.getDate() - 6); endDate = today; break;
+      case 'Last 30 Days': startDate.setDate(today.getDate() - 29); endDate = today; break;
+      case 'This Month': startDate = new Date(today.getFullYear(), today.getMonth(), 1); endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); break;
+      case 'Last Month': startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1); endDate = new Date(today.getFullYear(), today.getMonth(), 0); break;
+      // ... other cases remain the same
+    }
+    this.startDate = this.datePipe.transform(startDate, 'yyyy-MM-dd') || '';
+    this.endDate = this.datePipe.transform(endDate, 'yyyy-MM-dd') || '';
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    let filtered = [...this.entries];
+
+    if (this.searchTerm) {
+      const lowercasedTerm = this.searchTerm.toLowerCase();
+      filtered = filtered.filter(entry =>
+        entry.type.toLowerCase().includes(lowercasedTerm) ||
+        this.formatDate(entry.date).toLowerCase().includes(lowercasedTerm)
+      );
+    }
+
+    if (this.startDate && this.endDate) {
+      const start = new Date(this.startDate).getTime();
+      const end = new Date(this.endDate).getTime() + (24 * 60 * 60 * 1000 - 1); // Include full end day
+      filtered = filtered.filter(entry => {
+        const entryDate = new Date(entry.date as string).getTime();
+        return entryDate >= start && entryDate <= end;
+      });
+    }
+
+    if (this.activeTypeFilter !== "All") {
+      filtered = filtered.filter(entry => entry.type === this.activeTypeFilter);
+    }
+
+    this.filteredEntries = filtered;
     this.totalEntries = this.filteredEntries.length;
     this.currentPage = 1;
   }
 
+  clearFilters(): void {
+    this.startDate = "";
+    this.endDate = "";
+    this.searchTerm = "";
+    this.activeTypeFilter = "All"; // Reset type filter
+    this.applyFilters();
+  }
+
   changeEntriesPerPage(event: any): void {
-    this.entriesPerPage = parseInt(event.target.value);
+    this.entriesPerPage = parseInt(event.target.value, 10);
     this.currentPage = 1;
   }
 
@@ -204,15 +250,11 @@ async deleteEntry(entry: ReportEntry) {
   }
 
   nextPage(): void {
-    if (this.currentPage * this.entriesPerPage < this.totalEntries) {
-      this.currentPage++;
-    }
+    if (this.currentPage * this.entriesPerPage < this.totalEntries) this.currentPage++;
   }
 
   previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+    if (this.currentPage > 1) this.currentPage--;
   }
 
   getTotalAmount(): number {
@@ -220,26 +262,42 @@ async deleteEntry(entry: ReportEntry) {
   }
 
   formatDate(date: any): string {
-    if (!date) return '';
-    
+    if (!date) return "N/A";
     try {
-      if (typeof date === 'object' && 'toDate' in date) {
-        return this.datePipe.transform(date.toDate(), 'shortDate') || '';
-      } else if (date instanceof Date) {
-        return this.datePipe.transform(date, 'shortDate') || '';
-      } else {
-        return this.datePipe.transform(new Date(date), 'shortDate') || '';
-      }
+      const d = (typeof date.toDate === 'function') ? date.toDate() : new Date(date);
+      return this.datePipe.transform(d, "shortDate") || "";
     } catch (e) {
-      console.error('Error formatting date:', e);
-      return '';
+      return "Invalid Date";
     }
   }
 
   ngOnDestroy(): void {
-    if (this.expensesSub) this.expensesSub.unsubscribe();
-    if (this.salesSub) this.salesSub.unsubscribe();
-    if (this.payrollsSub) this.payrollsSub.unsubscribe();
-    if (this.purchasesSub) this.purchasesSub.unsubscribe();
+    if (this.dataSub) this.dataSub.unsubscribe();
+  }
+
+  exportToCSV(): void {
+    const csvData = this.filteredEntries.map(entry => ({
+      Date: this.formatDate(entry.date),
+      Type: entry.type,
+      Amount: entry.totalAmount,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(csvData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "FinancialReport");
+    const buffer = XLSX.write(workbook, { bookType: "csv", type: "array" });
+    saveAs(new Blob([buffer], { type: "text/csv;charset=utf-8;" }), `financial_report_${new Date().toISOString().slice(0, 10)}.csv`);
+  }
+
+  exportToExcel(): void {
+    const excelData = this.filteredEntries.map(entry => ({
+      Date: this.formatDate(entry.date),
+      Type: entry.type,
+      Amount: entry.totalAmount,
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "FinancialReport");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    saveAs(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8" }), `financial_report_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 }

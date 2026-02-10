@@ -1,203 +1,212 @@
-<div class="cash-flow-container">
-    <div class="page-header">
-      <div class="title">
-        <h2>Cash Flow Statement</h2>
-        <p>Consolidated view of all account transactions</p>
-      </div>
-      
-      <div class="action-buttons">
-        <button class="btn btn-success" (click)="downloadCashFlowData()">
-          <i class="fa fa-download"></i> Download
-        </button>
-        <!-- Other action buttons as needed -->
-      </div>
+<div class="cash-flow-page">
+  <!-- Page Header -->
+  <div class="page-header mb-4">
+    <div>
+      <h2 class="page-title">Cash Flow Statement</h2>
+      <p class="page-subtitle text-muted">Consolidated view of all account transactions</p>
     </div>
-    
-    <div class="filters-section">
-      <form [formGroup]="filterForm">
-        <div class="form-row">
-          <div class="date-filter">
-            <label>From:</label>
-            <input type="date" formControlName="fromDate" class="form-control">
-            
-            <label>To:</label>
-            <input type="date" formControlName="toDate" class="form-control">
+    <div class="header-actions">
+      <button class="btn btn-success" (click)="downloadCashFlowData()">
+        <i class="fa fa-file-excel"></i> Download as Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters and Controls Card -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form [formGroup]="filterForm" class="filter-form">
+        <div class="row g-3 align-items-center">
+   <!-- Date Filters -->
+<div class="col-md-4">
+  <div class="date-filters-flex d-flex gap-2">
+    <!-- From Date -->
+    <div class="date-input-wrapper flex-grow-1">
+      <span class="label-hint">From:</span>
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('fromDate')?.value)"
+             (blur)="onManualDateInput($event, 'fromDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('from')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #fromDatePicker type="date" formControlName="fromDate" class="hidden-date-picker">
+    </div>
+
+    <!-- To Date -->
+    <div class="date-input-wrapper flex-grow-1">
+      <span class="label-hint">To:</span>
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('toDate')?.value)"
+             (blur)="onManualDateInput($event, 'toDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('to')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #toDatePicker type="date" formControlName="toDate" class="hidden-date-picker">
+    </div>
+  </div>
+</div>
+
+          <!-- Account & Type Filters -->
+          <div class="col-md-5">
+            <div class="input-group">
+              <select formControlName="accountId" class="form-select">
+                <option value="All">All Accounts</option>
+                <option *ngFor="let account of allAccounts" [value]="account.id">{{account.name}}</option>
+              </select>
+              <select formControlName="transactionType" class="form-select">
+                <option value="All">All Types</option>
+                <option value="Debit">Debit</option>
+                <option value="Credit">Credit</option>
+              </select>
+            </div>
           </div>
           
-          <div class="account-filter">
-            <label>Account:</label>
-            <select formControlName="accountId" class="form-control">
-              <option value="All">All Accounts</option>
-              <option *ngFor="let account of allAccounts" [value]="account.id">
-                {{account.name}}
-              </option>
-            </select>
-          </div>
-          
-          <div class="transaction-type-filter">
-            <label>Type:</label>
-            <select formControlName="transactionType" class="form-control">
-              <option value="All">All</option>
-              <option value="Debit">Debit</option>
-              <option value="Credit">Credit</option>
-              <option value="Transfer">Transfer</option>
-            </select>
-          </div>
-          
-          <div class="search-filter">
-            <input type="text" formControlName="searchQuery" class="form-control" placeholder="Search...">
+          <!-- Search Filter -->
+          <div class="col-md-3">
+            <div class="input-group">
+                <span class="input-group-text"><i class="fa fa-search"></i></span>
+                <input type="text" formControlName="searchQuery" class="form-control" placeholder="Search...">
+            </div>
           </div>
         </div>
       </form>
       
-      <div class="view-toggle">
-        <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">
-          <i class="fa fa-table"></i> Table
-        </button>
-        <button [class.active]="viewMode === 'card'" (click)="viewMode = 'card'">
-          <i class="fa fa-th-large"></i> Card
-        </button>
-      </div>
-    </div>
-    
-    <div class="entries-per-page">
-      <label>Show</label>
-      <select [(ngModel)]="entriesPerPage" (change)="updatePagedTransactions()">
-        <option value="10">10</option>
-        <option value="25">25</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-      <label>entries</label>
-    </div>
-    
-    <div class="loading-spinner" *ngIf="loading">
-      <div class="spinner"></div>
-      <p>Loading transactions...</p>
-    </div>
-    
-    <div class="no-data-message" *ngIf="!loading && isEmpty">
-      <p>No transactions found for the selected criteria.</p>
-    </div>
-    
-    <!-- Table View -->
-    <div class="cash-flow-table" *ngIf="viewMode === 'table' && !loading && !isEmpty">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Account</th>
-            <th>Description</th>
-            <th>Payment Method</th>
-            <th>Payment Details</th>
-            <th>Note</th>
-            <th>Added By</th>
-            <th>Debit</th>
-            <th>Credit</th>
-            <th>Account Balance</th>
-            <th>Total Balance</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let transaction of pagedTransactions">
-            <td>{{transaction.date | date:'MM/dd/yyyy HH:mm'}}</td>
-            <td>{{transaction.account}}</td>
-            <td>{{transaction.description}}</td>
-            <td>{{transaction.paymentMethod}}</td>
-            <td>{{transaction.paymentDetails}}</td>
-            <td>{{transaction.note}}</td>
-            <td>{{transaction.addedBy}}</td>
-            <td *ngIf="transaction.debit > 0">₹{{transaction.debit | number:'1.2-2'}}</td>
-            <td *ngIf="transaction.debit === 0"></td>
-            <td *ngIf="transaction.credit > 0">₹{{transaction.credit | number:'1.2-2'}}</td>
-            <td *ngIf="transaction.credit === 0"></td>
-            <td [ngClass]="{'negative-balance': transaction.accountBalance < 0}">
-              ₹{{transaction.accountBalance | number:'1.2-2'}}
-            </td>
-            <td [ngClass]="{'negative-balance': transaction.totalBalance < 0}">
-              ₹{{transaction.totalBalance | number:'1.2-2'}}
-            </td>
-            <td>
-              <button class="btn btn-sm btn-success" (click)="downloadDocument(transaction)" 
-                      *ngIf="transaction.hasDocument">
-                Download
-              </button>
-            </td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="7" class="text-right"><strong>Total:</strong></td>
-            <td><strong>₹{{totalDebit | number:'1.2-2'}}</strong></td>
-            <td><strong>₹{{totalCredit | number:'1.2-2'}}</strong></td>
-            <td colspan="3"></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    
-    <!-- Card View -->
-    <div class="cash-flow-cards" *ngIf="viewMode === 'card' && !loading && !isEmpty">
-      <div class="card" *ngFor="let transaction of pagedTransactions">
-        <div class="card-header">
-          <div class="transaction-date">{{transaction.date | date:'MM/dd/yyyy HH:mm'}}</div>
-          <div class="transaction-account">{{transaction.account}}</div>
-          <div class="transaction-type" 
-               [ngClass]="{'debit': transaction.debit > 0, 'credit': transaction.credit > 0}">
-            {{transaction.debit > 0 ? 'Debit' : 'Credit'}}
-          </div>
-        </div>
-        <div class="card-body">
-          <h4 class="card-title">{{transaction.description}}</h4>
-          <div class="card-details">
-            <p><strong>Payment Method:</strong> {{transaction.paymentMethod}}</p>
-            <p *ngIf="transaction.paymentDetails"><strong>Payment Details:</strong> {{transaction.paymentDetails}}</p>
-            <p *ngIf="transaction.note"><strong>Note:</strong> {{transaction.note}}</p>
-            <p><strong>Added By:</strong> {{transaction.addedBy}}</p>
-            <p class="card-amount debit" *ngIf="transaction.debit > 0">
-              <strong>Debit:</strong> ₹{{transaction.debit | number:'1.2-2'}}
-            </p>
-            <p class="card-amount credit" *ngIf="transaction.credit > 0">
-              <strong>Credit:</strong> ₹{{transaction.credit | number:'1.2-2'}}
-            </p>
-            <p class="card-balance">
-              <strong>Account Balance:</strong> ₹{{transaction.accountBalance | number:'1.2-2'}}
-            </p>
-            <p class="card-total-balance">
-              <strong>Total Balance:</strong> ₹{{transaction.totalBalance | number:'1.2-2'}}
-            </p>
-          </div>
-        </div>
-        <div class="card-footer">
-          <button class="btn btn-sm btn-success" *ngIf="transaction.hasDocument"
-                  (click)="downloadDocument(transaction)">
-            Download
-          </button>
-        </div>
-      </div>
-      
-      <div class="totals-card">
-        <div class="totals-header">Totals</div>
-        <div class="totals-body">
-          <p><strong>Total Debit:</strong> ₹{{totalDebit | number:'1.2-2'}}</p>
-          <p><strong>Total Credit:</strong> ₹{{totalCredit | number:'1.2-2'}}</p>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Pagination Controls -->
-    <div class="pagination-controls" *ngIf="!loading && !isEmpty">
-      <div class="showing-entries">
-        Showing {{(currentPage - 1) * entriesPerPage + 1}} to 
-        {{getMinValue(currentPage * entriesPerPage, filteredTransactions.length)}} of 
-        {{filteredTransactions.length}} entries
-      </div>
-      <div class="pagination-buttons">
-        <button [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
-        <span class="page-number">{{currentPage}}</span>
-        <button [disabled]="currentPage * entriesPerPage >= filteredTransactions.length" 
-                (click)="nextPage()">Next</button>
+      <hr>
+
+      <div class="d-flex justify-content-between align-items-center">
+        <!-- Entries Per Page -->
+   <!-- Entries Per Page -->
+  <div class="entries-per-page" [formGroup]="filterForm">
+    <label>Show</label>
+    <!-- This now uses formControlName to link with the reactive form -->
+    <select formControlName="entriesPerPage" class="form-control">
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+    </select>
+    <label>entries</label>
+  </div>
+        
       </div>
     </div>
   </div>
+
+  <!-- Data Display Card -->
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <!-- Loading Spinner -->
+      <div *ngIf="loading" class="text-center p-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 text-muted">Loading transactions...</p>
+      </div>
+
+      <!-- No Data Message -->
+      <div *ngIf="!loading && isEmpty" class="text-center p-5">
+        <i class="fa fa-info-circle fa-3x text-muted mb-3"></i>
+        <h4>No Transactions Found</h4>
+        <p class="text-muted">There are no transactions matching your criteria.</p>
+      </div>
+
+      <!-- Table View -->
+      <div *ngIf="viewMode === 'table' && !loading && !isEmpty" class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Account</th>
+              <th class="text-end">Debit</th>
+              <th class="text-end">Credit</th>
+              <!-- <th class="text-end">Account Balance</th> -->
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let transaction of pagedTransactions">
+              <td>{{transaction.date | date:'MMM d, y,'}}</td>
+              <td>
+                <div>{{transaction.description}}</div>
+                <small class="text-muted">{{transaction.paymentMethod}}</small>
+              </td>
+              <td>{{transaction.account}}</td>
+              <td class="text-end text-danger">{{transaction.debit > 0 ? (transaction.debit | currency:'₹') : ''}}</td>
+              <td class="text-end text-success">{{transaction.credit > 0 ? (transaction.credit | currency:'₹') : ''}}</td>
+              <!-- <td class="text-end" [class.text-danger]="transaction.accountBalance < 0">{{transaction.accountBalance | currency:'₹'}}</td> -->
+              <td class="text-center">
+                <button class="btn btn-sm btn-outline-secondary" *ngIf="transaction.hasDocument">
+                  <i class="fa fa-download"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="table-light">
+                <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                <td class="text-end text-danger"><strong>{{totalDebit | currency:'₹'}}</strong></td>
+                <td class="text-end text-success"><strong>{{totalCredit | currency:'₹'}}</strong></td>
+                <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Card View -->
+      <div *ngIf="viewMode === 'card' && !loading && !isEmpty">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-4" *ngFor="let transaction of pagedTransactions">
+            <div class="card h-100 transaction-card">
+              <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <h5 class="card-title">{{transaction.description}}</h5>
+                    <span class="badge" [ngClass]="transaction.debit > 0 ? 'bg-danger-soft' : 'bg-success-soft'">
+                        {{transaction.debit > 0 ? 'Debit' : 'Credit'}}
+                    </span>
+                </div>
+                <h6 class="card-subtitle mb-2 text-muted">{{transaction.account}}</h6>
+                <div class="d-flex justify-content-between align-items-end">
+                    <div>
+                        <p class="card-text mb-1">
+                            <strong [class.text-danger]="transaction.debit > 0" [class.text-success]="transaction.credit > 0">
+                                {{ (transaction.debit > 0 ? transaction.debit : transaction.credit) | currency:'₹' }}
+                            </strong>
+                        </p>
+                        <small class="text-muted">{{transaction.date | date:'MMM d, y, h:mm a'}}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" *ngIf="transaction.hasDocument">
+                        <i class="fa fa-download"></i>
+                    </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <!-- Card Footer for Pagination -->
+    <div class="card-footer bg-light" *ngIf="!loading && !isEmpty">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="text-muted">
+                Showing <strong>{{(currentPage - 1) * entriesPerPage + 1}}</strong> to <strong>{{getMinValue(currentPage * entriesPerPage, filteredTransactions.length)}}</strong> of <strong>{{filteredTransactions.length}}</strong> entries
+            </div>
+            <nav>
+                <ul class="pagination mb-0">
+                    <li class="page-item" [class.disabled]="currentPage === 1">
+                        <a class="page-link" href="#" (click)="previousPage()">Previous</a>
+                    </li>
+                    <li class="page-item" [class.disabled]="currentPage * entriesPerPage >= filteredTransactions.length">
+                        <a class="page-link" href="#" (click)="nextPage()">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+  </div>
+</div>

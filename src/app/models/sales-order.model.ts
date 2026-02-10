@@ -1,4 +1,11 @@
 export interface SalesOrder {
+  businessLocationId: any;
+  businessLocation: any;
+  orderNo: string | undefined;
+  paidOn: any;
+  paymentMethod: any;
+    orderStatus: string; // <-- FIX: Add this property
+
   id: string;
   customerId: string;
   saleDate: Date | any;
@@ -6,6 +13,7 @@ export interface SalesOrder {
   typeOfService?: string;
   typeOfServiceName?: string;
   products?: Array<{
+    productId: string | undefined;
     id?: string;
     name?: string;
     quantity?: number;

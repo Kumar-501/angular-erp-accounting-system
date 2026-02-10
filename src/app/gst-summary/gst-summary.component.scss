@@ -1,0 +1,241 @@
+/* Global styles for the GST Summary page */
+.gst-summary-page {
+  padding: 2rem;
+  background-color: #f9f9f9;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+  }
+  p {
+    color: #6c757d;
+  }
+}
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+
+  .form-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    
+    label {
+      font-weight: 600;
+      white-space: nowrap;
+      margin-bottom: 0;
+    }
+  }
+}
+
+/* Custom Date Input Styling */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 160px;
+
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    height: 35px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding-left: 10px;
+    background-color: #fff !important;
+    font-size: 0.9rem;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      color: #0d6efd;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+/* Filter bar styling */
+.filter-bar {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  background-color: #ffffff;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  margin-bottom: 2rem;
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  label {
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #495057;
+  }
+
+  .date-input {
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  }
+
+  .submit-btn {
+    padding: 0.6rem 1.5rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: #0056b3;
+    }
+
+    &:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+  }
+}
+
+/* Summary cards styling */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+
+  .card {
+    display: flex;
+    align-items: center;
+    padding: 1.5rem;
+    border-radius: 8px;
+    color: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+
+    .card-icon {
+      font-size: 2rem;
+      margin-right: 1.5rem;
+      opacity: 0.8;
+    }
+
+    .card-content {
+      display: flex;
+      flex-direction: column;
+      span {
+        font-size: 0.9rem;
+      }
+      strong {
+        font-size: 1.75rem;
+        font-weight: 700;
+      }
+    }
+
+    &.payable { background: linear-gradient(135deg, #e53935, #b71c1c); }
+    &.receivable { background: linear-gradient(135deg, #43a047, #1b5e20); }
+    &.net-gst.positive-net { background: linear-gradient(135deg, #fb8c00, #e65100); }
+    &.net-gst.negative-net { background: linear-gradient(135deg, #1e88e5, #0d47a1); }
+  }
+}
+
+/* Details tables styling */
+.details-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.details-table {
+  background-color: #ffffff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+
+  h3 {
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 0.75rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+
+    thead th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      text-align: left;
+    }
+
+    tbody tr:hover {
+      background-color: #f1f3f5;
+    }
+
+    tfoot {
+      font-weight: bold;
+      color: #333;
+    }
+  }
+}
+
+.text-right {
+  text-align: right;
+}
+
+.text-center {
+  text-align: center;
+  color: #888;
+  padding: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 992px) {
+  .details-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

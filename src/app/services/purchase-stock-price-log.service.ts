@@ -80,31 +80,23 @@ export class PurchaseStockPriceLogService {
   
   
   
-  getLogsByProductId(productId: string): Observable<PurchaseStockPriceLog[]> {
-    return new Observable(observer => {
-      const collectionRef = collection(this.firestore, this.collectionName);
-      const productQuery = query(collectionRef, where('productId', '==', productId));
-      
-      getDocs(productQuery).then(querySnapshot => {
-        const logs = querySnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            // Convert Firestore Timestamp to Date
-            grnCreatedDate: data['grnCreatedDate']?.toDate(),
-            createdAt: data['createdAt']?.toDate(),
-            updatedAt: data['updatedAt']?.toDate()
-          } as PurchaseStockPriceLog;
-        });
-        observer.next(logs);
-        observer.complete();
-      }).catch(error => {
-        observer.error(error);
-      });
-    });
-  }
+// In purchase-stock-price-log.service.ts
+async getLogsByProductId(productId: string): Promise<PurchaseStockPriceLog[]> {
+  const collectionRef = collection(this.firestore, this.collectionName);
+  const productQuery = query(collectionRef, where('productId', '==', productId));
   
+  const querySnapshot = await getDocs(productQuery);
+  return querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      grnCreatedDate: data['grnCreatedDate']?.toDate(),
+      createdAt: data['createdAt']?.toDate(),
+      updatedAt: data['updatedAt']?.toDate()
+    } as PurchaseStockPriceLog;
+  });
+}
 logPriceChange(logData: Omit<PurchaseStockPriceLog, 'id' | 'createdAt' | 'updatedAt'>): Observable<string> {
   // Create a new object with all fields, explicitly handling undefined values
   const completeData: any = {

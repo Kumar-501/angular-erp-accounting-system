@@ -10,8 +10,9 @@
   <div *ngIf="!loading">
     <!-- Main Summary Card -->
     <div class="card mb-4">
-      <div class="card-header bg-dark text-white">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
         <h3>VAT Summary Table</h3>
+        <button class="btn btn-light" (click)="exportToExcel()">Export to Excel</button>
       </div>
       <div class="card-body">
         <!-- Net VAT Summary -->
@@ -107,8 +108,8 @@
                 <td>{{calculateTaxByRate(vatSummary.details.sales, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
                 <td>{{calculatePurchaseTaxByRate(vatSummary.details.purchases, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
                 <td>{{calculateExpenseTaxByRate(vatSummary.details.expenses, rate) | currency:'INR':'symbol':'1.2-2'}}</td>
-                <td>{{(calculateTaxByRate(vatSummary.details.sales, rate) || 0) - 
-                    (calculatePurchaseTaxByRate(vatSummary.details.purchases, rate) || 0) - 
+                <td>{{(calculateTaxByRate(vatSummary.details.sales, rate) || 0) -
+                    (calculatePurchaseTaxByRate(vatSummary.details.purchases, rate) || 0) -
                     (calculateExpenseTaxByRate(vatSummary.details.expenses, rate) || 0) | currency:'INR':'symbol':'1.2-2'}}</td>
               </tr>
             </tbody>

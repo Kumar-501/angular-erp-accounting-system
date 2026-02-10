@@ -5,18 +5,20 @@
 <!-- Add this section right below your table-controls div -->
 <div class="filter-section">
   <div class="filter-header">
+      <!-- Add this to your table-controls div, near your other buttons -->
+<div class="bulk-actions" *ngIf="selectedCustomers.length > 0">
+  <button class="btn-delete" (click)="deleteSelectedCustomers()">
+    <i class="fa fa-trash"></i> Delete Selected ({{selectedCustomers.length}})
+  </button>
+</div>
+    <div class="filter-header">
     <button class="btn-add" (click)="toggleForm()">
       <i class="fa fa-plus"></i> Add
     </button>
     <button class="btn-filter" (click)="toggleFilterSidebar()">
       <i class="fa fa-filter"></i> Filter
     </button>
-  <!-- Add this to your table-controls div, near your other buttons -->
-<div class="bulk-actions" *ngIf="selectedCustomers.length > 0">
-  <button class="btn-delete" (click)="deleteSelectedCustomers()">
-    <i class="fa fa-trash"></i> Delete Selected ({{selectedCustomers.length}})
-  </button>
-</div>
+  </div>
   </div>
   
  <!-- Filter Sidebar -->
@@ -29,6 +31,63 @@
   </div>
   
   <div class="filter-options">
+    <!-- Date Range Filter -->
+    <div class="filter-group">
+      <label>Date Range:</label>
+      <div class="date-range-section">
+        <select [(ngModel)]="filterOptions.dateRange" (change)="onDateRangeChange()" class="date-range-select">
+          <option value="">All Dates</option>
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="last7days">Last 7 Days</option>
+          <option value="last30days">Last 30 Days</option>
+          <option value="lastMonth">Last Month</option>
+          <option value="thisMonth">This Month</option>
+          <option value="thisFinancialYear">This Financial Year</option>
+          <option value="lastFinancialYear">Last Financial Year</option>
+          <option value="custom">Custom Range</option>
+        </select>
+        
+<!-- Replace the existing custom-date-inputs section -->
+<div class="custom-date-inputs" *ngIf="filterOptions.dateRange === 'custom'">
+  <div class="date-input-group">
+    <label>From:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="date-input" 
+             [value]="getFormattedDateForInput(filterOptions.customStartDate)"
+             (blur)="onManualDateInput($event, 'start')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="filterOptions.customStartDate" (change)="applyFilters()">
+    </div>
+  </div>
+
+  <div class="date-input-group">
+    <label>To:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="date-input" 
+             [value]="getFormattedDateForInput(filterOptions.customEndDate)"
+             (blur)="onManualDateInput($event, 'end')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="filterOptions.customEndDate" (change)="applyFilters()">
+    </div>
+  </div>
+</div>
+        
+        <!-- Display Selected Date Range -->
+        <div class="selected-range-display" *ngIf="getSelectedDateRangeText()">
+          <small class="text-muted">{{ getSelectedDateRangeText() }}</small>
+        </div>
+      </div>
+    </div>
+
     <!-- Status Filter -->
     <div class="filter-group">
       <label>Status:</label>
@@ -70,15 +129,19 @@
   </select>
 </div>
     
-    <div class="filter-group">
-      <label>Life Stage:</label>
-      <select [(ngModel)]="filterOptions.lifestage" (change)="applyFilters()">
-        <option value="">None</option>
-        <option *ngFor="let stage of lifeStages" [value]="stage.name">
-          {{ stage.name }}
-        </option>
-      </select>
-    </div>
+<!-- In the Filter Sidebar section -->
+<div class="filter-group">
+  <label>Life Stage:</label>
+  <!-- ======================= THE FIX ======================= -->
+  <!-- Change filterOptions.lifestage to filterOptions.lifeStage -->
+  <select [(ngModel)]="filterOptions.lifeStage" (change)="applyFilters()">
+  <!-- ===================== END OF THE FIX ==================== -->
+    <option value="">All Life Stages</option>
+    <option *ngFor="let stage of lifeStages" [value]="stage.name">
+      {{ stage.name }}
+    </option>
+  </select>
+</div>
     <div class="filter-actions">
       <button class="btn-apply" (click)="applyFilters()">
         Apply Filters
@@ -147,8 +210,9 @@
     </div>
     
 <!-- Main Content Section -->
-<div class="table-responsive">
-  <table class="customers-table">
+<div class="table-container">
+  <div class="table-responsive">
+    <table class="customers-table">
     <thead>
       <tr>
         <th [class.hidden]="!isColumnVisible('Select')" class="select-column">
@@ -165,24 +229,32 @@
         <th [class.hidden]="!isColumnVisible('Email')" (click)="sortBy('email')">Email</th>
         <th [class.hidden]="!isColumnVisible('Mobile')" (click)="sortBy('mobile')">Mobile</th>
         <th [class.hidden]="!isColumnVisible('Landline')" (click)="sortBy('landline')">Landline</th>
+        <th [class.hidden]="!isColumnVisible('Occupation')" (click)="sortBy('occupation')">Occupation</th>
         <th [class.hidden]="!isColumnVisible('Alternate Contact')" (click)="sortBy('alternateContact')">Alternate Contact</th>
         <th [class.hidden]="!isColumnVisible('Date of Birth')" (click)="sortBy('dob')">Date of Birth</th>
         <th [class.hidden]="!isColumnVisible('Address Line 1')" (click)="sortBy('addressLine1')">Address Line 1</th>
         <th [class.hidden]="!isColumnVisible('Address Line 2')" (click)="sortBy('addressLine2')">Address Line 2</th>
-        <th [class.hidden]="!isColumnVisible('City')" (click)="sortBy('city')">City</th>
         <th [class.hidden]="!isColumnVisible('District')" (click)="sortBy('district')">District</th>
         <th [class.hidden]="!isColumnVisible('State')" (click)="sortBy('state')">State</th>
         <th [class.hidden]="!isColumnVisible('Country')" (click)="sortBy('country')">Country</th>
         <th [class.hidden]="!isColumnVisible('Zip Code')" (click)="sortBy('zipCode')">Zip Code</th>
         <th [class.hidden]="!isColumnVisible('Tax Number')" (click)="sortBy('taxNumber')">Tax Number</th>
-        <th [class.hidden]="!isColumnVisible('Pay Term')" (click)="sortBy('payTerm')">Pay Term</th>
+        <th [class.hidden]="!isColumnVisible('Billing Type')" (click)="sortBy('billingType')">Billing Type</th>
+        <th [class.hidden]="!isColumnVisible('Credit Limit')" (click)="sortBy('creditLimit')">Credit Limit</th>
+        <th [class.hidden]="!isColumnVisible('Account Holder Name')" (click)="sortBy('accountHolderName')">Account Holder</th>
+        <th [class.hidden]="!isColumnVisible('Bank Account Number')" (click)="sortBy('bankAccountNumber')">Bank Account No.</th>
+        <th [class.hidden]="!isColumnVisible('Bank Name')" (click)="sortBy('bankName')">Bank Name</th>
+        <th [class.hidden]="!isColumnVisible('Bank Identifier Code')" (click)="sortBy('bankIdentifierCode')">Bank ID Code</th>
+        <th [class.hidden]="!isColumnVisible('Branch')" (click)="sortBy('branch')">Branch</th>
+        <th [class.hidden]="!isColumnVisible('Swift Code')" (click)="sortBy('swiftCode')">Swift Code</th>
         <th [class.hidden]="!isColumnVisible('Opening Balance')" (click)="sortBy('openingBalance')">Opening Balance</th>
         <th [class.hidden]="!isColumnVisible('Assigned To')" (click)="sortBy('assignedTo')">Assigned To</th>
         <th [class.hidden]="!isColumnVisible('Gender')" (click)="sortBy('gender')">Gender</th>
         <th [class.hidden]="!isColumnVisible('Age')" (click)="sortBy('age')">Age</th>
-        <th [class.hidden]="!isColumnVisible('Life Stage')" (click)="sortBy('lifestage')">Life Stage</th>
+         <th [class.hidden]="!isColumnVisible('Life Stage')" (click)="sortBy('lifestage')">Life Stage</th>
         <th [class.hidden]="!isColumnVisible('Ad Code')" (click)="sortBy('adcode')">Ad Code</th>
         <th [class.hidden]="!isColumnVisible('Contact Type')" (click)="sortBy('contactType')">Contact Type</th>
+        <th [class.hidden]="!isColumnVisible('Created Date')" (click)="sortBy('createdAt')">Created Date</th>      
       </tr>
     </thead>
     <tbody>
@@ -197,44 +269,54 @@
             <button class="btn-dropdown" (click)="openActionPopup(customer)">Actions</button>
           </div>
 
-          <div class="action-popup-overlay" *ngIf="currentActionPopup === customer.id" (click)="closeActionPopup()">
-            <div class="action-popup" (click)="$event.stopPropagation()">
-              <div class="popup-header">
-                <h4>{{customer.businessName || (customer.firstName + ' ' + (customer.lastName || ''))}}</h4>
-                <button class="close-btn" (click)="closeActionPopup()">&times;</button>
-              </div>
-              
-              <div class="popup-body">
-                <div class="action-item" (click)="editCustomer(customer); closeActionPopup()">
-                  <i class="fa fa-edit"></i> 
-                  <span>Edit</span>
-                </div>
-                
-                <div class="action-item text-danger" (click)="deleteCustomer(customer.id); closeActionPopup()">
-                  <i class="fa fa-trash"></i> 
-                  <span>Delete</span>
-                </div>
-                
-                <div class="divider"></div>
-                
-                <div class="status-section">
-                  <h5>Status</h5>
-                  <div class="status-option">
-                    <input type="radio" id="activeCheckbox{{customer.id}}" 
-                          [checked]="customer.status === 'Active'"
-                          (change)="updateCustomerStatus(customer, 'Active'); closeActionPopup()">
-                    <label for="activeCheckbox{{customer.id}}">Active</label>
-                  </div>
-                  <div class="status-option">
-                    <input type="radio" id="inactiveCheckbox{{customer.id}}" 
-                          [checked]="customer.status !== 'Active'"
-                          (change)="updateCustomerStatus(customer, 'Inactive'); closeActionPopup()">
-                    <label for="inactiveCheckbox{{customer.id}}">Inactive</label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+         <div class="action-popup-overlay" *ngIf="currentActionPopup === customer.id" (click)="closeActionPopup()">
+  <div class="action-popup" (click)="$event.stopPropagation()">
+    <div class="popup-header">
+      <h4>{{customer.businessName || (customer.firstName + ' ' + (customer.lastName || ''))}}</h4>
+      <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+    </div>
+    
+    <div class="popup-body">
+      <div class="action-item" (click)="viewCustomer(customer)">
+        <i class="fa fa-eye"></i> 
+        <span>View</span>
+      </div>
+      
+      <div class="action-item" (click)="editCustomer(customer); closeActionPopup()">
+        <i class="fa fa-edit"></i> 
+        <span>Edit</span>
+      </div>
+         <div class="action-item" (click)="viewContactPage(customer)">
+          <i class="fa fa-user"></i> 
+          <span>View Contact</span>
+        </div>
+      <div class="action-item text-danger" (click)="deleteCustomer(customer.id); closeActionPopup()">
+        <i class="fa fa-trash"></i> 
+        <span>Delete</span>
+      </div>
+      
+      <div class="divider"></div>
+      
+      <div class="status-section">
+        <h5>Status</h5>
+        <div class="status-option">
+          <input type="radio" 
+                 id="activeCheckbox{{customer.id}}" 
+                 [checked]="customer.status === 'Active'"
+                 (change)="updateCustomerStatus(customer, 'Active'); closeActionPopup()">
+          <label for="activeCheckbox{{customer.id}}">Active</label>
+        </div>
+        <div class="status-option">
+          <input type="radio" 
+                 id="inactiveCheckbox{{customer.id}}" 
+                 [checked]="customer.status !== 'Active'"
+                 (change)="updateCustomerStatus(customer, 'Inactive'); closeActionPopup()">
+          <label for="inactiveCheckbox{{customer.id}}">Inactive</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
         </td>
         <td [class.hidden]="!isColumnVisible('Contact ID')">{{ customer.contactId }}</td>
         <td [class.hidden]="!isColumnVisible('Prefix')">{{ customer.prefix }}</td>
@@ -246,28 +328,39 @@
         <td [class.hidden]="!isColumnVisible('Email')">{{ customer.email }}</td>
         <td [class.hidden]="!isColumnVisible('Mobile')">{{ customer.mobile }}</td>
         <td [class.hidden]="!isColumnVisible('Landline')">{{ customer.landline }}</td>
+        <td [class.hidden]="!isColumnVisible('Occupation')">{{ customer.occupation }}</td>
         <td [class.hidden]="!isColumnVisible('Alternate Contact')">{{ customer.alternateContact }}</td>
-        <td [class.hidden]="!isColumnVisible('Date of Birth')">{{ customer.dob | date }}</td>
+        <td [class.hidden]="!isColumnVisible('Date of Birth')">{{ customer.dob | date:'dd/MM/yyyy' }}</td>
         <td [class.hidden]="!isColumnVisible('Address Line 1')">{{ customer.addressLine1 }}</td>
         <td [class.hidden]="!isColumnVisible('Address Line 2')">{{ customer.addressLine2 }}</td>
-        <td [class.hidden]="!isColumnVisible('City')">{{ customer.city }}</td>
         <td [class.hidden]="!isColumnVisible('District')">{{ customer.district }}</td>
         <td [class.hidden]="!isColumnVisible('State')">{{ customer.state }}</td>
         <td [class.hidden]="!isColumnVisible('Country')">{{ customer.country }}</td>
         <td [class.hidden]="!isColumnVisible('Zip Code')">{{ customer.zipCode }}</td>
         <td [class.hidden]="!isColumnVisible('Tax Number')">{{ customer.taxNumber }}</td>
-        <td [class.hidden]="!isColumnVisible('Pay Term')">{{ customer.payTerm }} {{ customer.payTerm ? 'Days' : '' }}</td>
+        <td [class.hidden]="!isColumnVisible('Billing Type')">{{ customer.billingType }}</td>
+        <td [class.hidden]="!isColumnVisible('Credit Limit')">₹ {{ customer.creditLimit | number:'1.2-2' }}</td>
+        <td [class.hidden]="!isColumnVisible('Account Holder Name')">{{ customer.accountHolderName }}</td>
+        <td [class.hidden]="!isColumnVisible('Bank Account Number')">{{ customer.bankAccountNumber }}</td>
+        <td [class.hidden]="!isColumnVisible('Bank Name')">{{ customer.bankName }}</td>
+        <td [class.hidden]="!isColumnVisible('Bank Identifier Code')">{{ customer.bankIdentifierCode }}</td>
+        <td [class.hidden]="!isColumnVisible('Branch')">{{ customer.branch }}</td>
+        <td [class.hidden]="!isColumnVisible('Swift Code')">{{ customer.swiftCode }}</td>
         <td [class.hidden]="!isColumnVisible('Opening Balance')">₹ {{ customer.openingBalance || '0.00' }}</td>
         <td [class.hidden]="!isColumnVisible('Assigned To')">{{ customer.assignedTo }}</td>
         <td [class.hidden]="!isColumnVisible('Gender')">{{ customer.gender }}</td>
         <td [class.hidden]="!isColumnVisible('Age')">{{ customer.age }}</td>
-        <td [class.hidden]="!isColumnVisible('Life Stage')">{{ customer.lifestage }}</td>
-<td [class.hidden]="!isColumnVisible('Ad Code')">
-  {{ getLeadStatusText(customer.adcode || '') }}
-</td>       <td [class.hidden]="!isColumnVisible('Contact Type')">{{ customer.contactType }}</td>
+     <!-- Use lowercase 'lifestage' and 'adcode' to display the data -->
+       <td [class.hidden]="!isColumnVisible('Life Stage')">{{ customer.lifeStage }}</td>
+        <td [class.hidden]="!isColumnVisible('Ad Code')">
+          {{ customer.leadStatus || 'N/A' }}
+        </td>    <td [class.hidden]="!isColumnVisible('Contact Type')">{{ customer.contactType }}</td>
+        <td [class.hidden]="!isColumnVisible('Created Date')">
+          {{ customer.createdAt | date:'dd/MM/yyyy' }}
+        </td>    
       </tr>
       <tr *ngIf="filteredCustomers.length === 0">
-        <td [attr.colspan]="visibleColumns.length + 1" class="no-data">No customers found</td>
+        <td [attr.colspan]="getVisibleColumnCount()" class="no-data">No customers found</td>
       </tr>
     </tbody>
   </table>
@@ -322,6 +415,214 @@
     <span>{{ (currentPage - 1) * entriesPerPage + 1 }} - {{ Math.min(currentPage * entriesPerPage, filteredCustomers.length) }} of {{ filteredCustomers.length }} items</span>
   </div>
 </div>
+
+  <!-- View Customer Modal -->
+  <div class="modal view-modal" [class.show]="showViewModal" *ngIf="viewingCustomer">
+    <div class="modal-content view-modal-content">
+      <div class="modal-header">
+        <h2>Customer Details</h2>
+        <span class="close" (click)="closeViewModal()">&times;</span>
+      </div>
+      
+      <div class="modal-body view-modal-body">
+        <div class="customer-details">
+          <!-- Basic Information -->
+          <div class="detail-section">
+            <h3>Basic Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>Contact ID:</label>
+                <span>{{ viewingCustomer.contactId || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <label>Contact Type:</label>
+                <span>{{ viewingCustomer.contactType || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <label>Name:</label>
+                <span>{{ getCustomerDisplayName(viewingCustomer) }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.department">
+                <label>Department:</label>
+                <span>{{ viewingCustomer.department }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.gender">
+                <label>Gender:</label>
+                <span>{{ viewingCustomer.gender }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.age">
+                <label>Age:</label>
+                <span>{{ viewingCustomer.age }} years</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.dob">
+                <label>Date of Birth:</label>
+                <span>{{ viewingCustomer.dob | date:'mediumDate' }}</span>
+              </div>
+              <div class="detail-item">
+                <label>Status:</label>
+                <span class="status-badge" [class.active]="viewingCustomer.status === 'Active'" [class.inactive]="viewingCustomer.status !== 'Active'">
+                  {{ viewingCustomer.status || 'N/A' }}
+                </span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer?.occupation">
+                <label>Occupation:</label>
+                <span>{{ viewingCustomer.occupation }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contact Information -->
+          <div class="detail-section">
+            <h3>Contact Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <label>Email:</label>
+                <span>{{ viewingCustomer.email || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <label>Mobile:</label>
+                <span>{{ viewingCustomer.mobile || 'N/A' }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.landline">
+                <label>Landline:</label>
+                <span>{{ viewingCustomer.landline }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.alternateContact">
+                <label>Alternate Contact:</label>
+                <span>{{ viewingCustomer.alternateContact }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Address Information -->
+          <div class="detail-section" *ngIf="viewingCustomer.addressLine1 || viewingCustomer.city || viewingCustomer.state">
+            <h3>Address Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item full-width">
+                <label>Address:</label>
+                <span>{{ getFullAddress(viewingCustomer) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Business Information -->
+          <div class="detail-section">
+            <h3>Business Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item" *ngIf="viewingCustomer.assignedTo">
+                <label>Assigned To:</label>
+                <span>{{ viewingCustomer.assignedTo }}</span>
+              </div>
+            <!-- In the Add/Edit Customer Form Modal -->
+<div class="form-group">
+    <label for="lifeStage">Life Stage:</label>
+    <!-- ======================= THE FIX ======================= -->
+    <!-- Change customerData.lifestage to customerData.lifeStage -->
+    <select [(ngModel)]="customerData.lifeStage" name="lifeStage" id="lifeStage" class="form-control">
+    <!-- ===================== END OF THE FIX ==================== -->
+        <option value="">Select Life Stage</option>
+        <option *ngFor="let stage of lifeStages" [value]="stage.name">
+            {{ stage.name }}
+        </option>
+    </select>
+</div>
+              <div class="detail-item" *ngIf="viewingCustomer.adcode">
+                <label>Ad Code:</label>
+                <span>{{ getLeadStatusText(viewingCustomer.adcode) }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.taxNumber">
+                <label>Tax Number:</label>
+                <span>{{ viewingCustomer.taxNumber }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.payTerm">
+                <label>Pay Term:</label>
+                <span>{{ viewingCustomer.payTerm }} Days</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial Information -->
+          <div class="detail-section">
+            <h3>Financial Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item" *ngIf="viewingCustomer.openingBalance">
+                <label>Opening Balance:</label>
+                <span>₹ {{ viewingCustomer.openingBalance | number:'1.2-2' }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.saleDue">
+                <label>Sale Due:</label>
+                <span>₹ {{ viewingCustomer.saleDue | number:'1.2-2' }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.saleReturn">
+                <label>Sale Return:</label>
+                <span>₹ {{ viewingCustomer.saleReturn | number:'1.2-2' }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.advanceBalance">
+                <label>Advance Balance:</label>
+                <span>₹ {{ viewingCustomer.advanceBalance | number:'1.2-2' }}</span>
+              </div>
+               <div class="detail-item" *ngIf="viewingCustomer.billingType">
+                <label>Billing Type:</label>
+                <span>{{ viewingCustomer.billingType }}</span>
+              </div>
+               <div class="detail-item" *ngIf="viewingCustomer.creditLimit">
+                <label>Credit Limit:</label>
+                <span>₹ {{ viewingCustomer.creditLimit | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Banking Information -->
+          <div class="detail-section">
+            <h3>Banking Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item" *ngIf="viewingCustomer.accountHolderName">
+                <label>Account Holder:</label>
+                <span>{{ viewingCustomer.accountHolderName }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.bankAccountNumber">
+                <label>Account Number:</label>
+                <span>{{ viewingCustomer.bankAccountNumber }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.bankName">
+                <label>Bank Name:</label>
+                <span>{{ viewingCustomer.bankName }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.branch">
+                <label>Branch:</label>
+                <span>{{ viewingCustomer.branch }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.bankIdentifierCode">
+                <label>Bank ID Code (IFSC):</label>
+                <span>{{ viewingCustomer.bankIdentifierCode }}</span>
+              </div>
+              <div class="detail-item" *ngIf="viewingCustomer.swiftCode">
+                <label>Swift Code:</label>
+                <span>{{ viewingCustomer.swiftCode }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timestamps -->
+          <div class="detail-section" *ngIf="viewingCustomer.createdAt || viewingCustomer.updatedAt">
+            <h3>Record Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item" *ngIf="viewingCustomer.createdAt">
+                <label>Created At:</label>
+                <span>{{ formatCreatedDate(viewingCustomer.createdAt) }}</span>
+              </div>
+           
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" (click)="closeViewModal()">Close</button>
+        <button type="button" class="btn-primary" (click)="editCustomer(viewingCustomer); closeViewModal()">Edit Customer</button>
+      </div>
+    </div>
+  </div>
   
   <!-- Customer Form Modal -->
   <div class="modal" [class.show]="showForm">
@@ -369,6 +670,28 @@
               placeholder="Auto-generated" 
               readonly>
           </div>
+
+<!-- Replace the Created Date form-group -->
+<div class="form-group">
+  <label for="createdDate">Created Date:</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           id="createdDateDisplay"
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(customerData.createdDate || '')"
+           (blur)="onManualDateInput($event, 'form')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('form')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <input #formDatePicker 
+           type="date" 
+           class="hidden-date-picker" 
+           [(ngModel)]="customerData.createdDate" 
+           name="createdDateInternal">
+  </div>
+  <small class="form-help">Format: DD-MM-YYYY</small>
+</div>
           
           <!-- Individual Specific Fields -->
           <div *ngIf="isIndividual" class="individual-fields">
@@ -418,41 +741,56 @@
               </div>
             </div>
             
-            <div class="form-group">
-              <label for="dob">Date of Birth:</label>
-              <input 
-                type="date" 
-                [(ngModel)]="customerData.dob" 
-                name="dob" 
-                id="dob" />
-            </div>
-          </div>
+   <!-- Enhanced Date of Birth Field -->
+<div class="form-group">
+  <label for="dob">Date of Birth:</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           id="dobDisplay"
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(getFormattedDate(customerData.dob))"
+           (blur)="onManualDateInput($event, 'dob')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('dob')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <!-- Hidden native picker -->
+    <input #dobPicker 
+           type="date" 
+           class="hidden-date-picker" 
+           [ngModel]="getFormattedDate(customerData.dob)"
+           (change)="onDobChange($event)"
+           name="dobInternal">
+  </div>
+  <small class="form-help">Format: DD-MM-YYYY</small>
+</div>
+</div>
 
           
           <!-- Add this after the Date of Birth field -->
-<div class="form-row">
-  <div class="form-group">
-    <label for="gender">Gender:</label>
-    <select [(ngModel)]="customerData.gender" name="gender" id="gender">
-      <option value="">Select Gender</option>
-      <option value="Male">Male</option>
-      <option value="Female">Female</option>
-      <option value="Other">Other</option>
-    </select>
-  </div>
-  
-  <div class="form-group">
-    <label for="age">Age:</label>
-    <input 
-      type="number" 
-      [(ngModel)]="customerData.age" 
-      name="age" 
-      id="age" 
-      min="0"
-      max="120"
-      placeholder="Enter Age" />
-  </div>
-</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="gender">Gender:</label>
+              <select [(ngModel)]="customerData.gender" name="gender" id="gender">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="age">Age:</label>
+              <input 
+                type="number" 
+                [(ngModel)]="customerData.age" 
+                name="age" 
+                id="age" 
+                min="0"
+                max="120"
+                placeholder="Enter Age" />
+            </div>
+          </div>
           <!-- Business Specific Fields -->
           <div *ngIf="!isIndividual" class="business-fields">
             <div class="form-group required">
@@ -467,96 +805,83 @@
             </div>
           </div>
           <!-- Add this after the contact information section -->
-<div class="form-group">
-  <label for="department">Department:</label>
-  <select [(ngModel)]="customerData.department" name="department" id="department">
-    <option value="">Select Department</option>
-    <option value="PC1">PC1</option>
-    <option value="PC2">PC2</option>
-    <option value="PC3">PC3</option>
-    <option value="PC4">PC4</option>
-    <option value="PC5">PC5</option>
-    <option value="PC6">PC6</option>
-    <option value="PC7">PC7</option>
-    <option value="PC8">PC8</option>
-  </select>
-</div>
+          <div class="form-group">
+            <label for="department">Department:</label>
+            <select [(ngModel)]="customerData.department" name="department" id="department">
+              <option value="">Select Department</option>
+              <option value="PC1">PC1</option>
+              <option value="PC2">PC2</option>
+              <option value="PC3">PC3</option>
+              <option value="PC4">PC4</option>
+              <option value="PC5">PC5</option>
+              <option value="PC6">PC6</option>
+              <option value="PC7">PC7</option>
+              <option value="PC8">PC8</option>
+            </select>
+          </div>
           
           <!-- Contact Information -->
           <h3>Contact Information</h3>
           <div class="form-row">
-            <div class="form-group required">
-              <label for="mobile">Mobile:</label>
-              <input 
-                type="text" 
-                [(ngModel)]="customerData.mobile" 
-                name="mobile" 
-                id="mobile" 
-                required 
-                placeholder="Enter Mobile Number" 
-                (input)="validatePhoneNumber($event, 'mobile')"
-                maxlength="10"
-                pattern="[0-9]{10}" />
-              <div *ngIf="phoneErrors.mobile" class="error-message">
-                {{ phoneErrors.mobile }}
-              </div>
-            </div>
-            
-            <div class="form-group">
-              <label for="landline">Landline:</label>
-              <input 
-                type="text" 
-                [(ngModel)]="customerData.landline" 
-                name="landline" 
-                id="landline" 
-                placeholder="Enter Landline Number" 
-                (input)="validatePhoneNumber($event, 'landline')"
-                maxlength="10"
-                pattern="[0-9]{10}" />
-              <div *ngIf="phoneErrors.landline" class="error-message">
-                {{ phoneErrors.landline }}
-              </div>
-            </div>
-          </div>
-<!-- Add this below the assignedTo field -->
-<div class="form-row">
-  <!-- Adcode Dropdown -->
-  <div class="form-group">
-    <label for="adcode">Ad Code:</label>
-    <select [(ngModel)]="customerData.adcode" name="adcode" id="adcode" class="form-control">
-      <option value="">Select Ad Code</option>
-      <option *ngFor="let status of leadStatuses" [value]="status.id">
-        {{ status.leadStatus }} 
-      </option>
-    </select>
-  </div>
-  <!-- LifeStage Dropdown -->
-  <div class="form-group">
-    <label for="lifestage">Life Stage:</label>
-    <select [(ngModel)]="customerData.lifestage" name="lifestage" id="lifestage" class="form-control">
-      <option value="">Select Life Stage</option>
-      <option *ngFor="let stage of lifeStages" [value]="stage.name">
-        {{ stage.name }}
-      </option>
-    </select>
+      <div class="form-group required">
+  <label for="mobile">Mobile:</label>
+  <input 
+    type="text" 
+    [(ngModel)]="customerData.mobile" 
+    name="mobile" 
+    id="mobile" 
+    required 
+    placeholder="Enter Mobile (10-12 digits)" 
+    (input)="onPhoneNumberInput($event, 'mobile')"
+    maxlength="25" /> <!-- Increased to 25 to allow spaces -->
+  <div *ngIf="phoneErrors.mobile" class="error-message">
+    {{ phoneErrors.mobile }}
   </div>
 </div>
+      <div class="form-group">
+  <label for="landline">Landline:</label>
+  <input 
+    type="text" 
+    [(ngModel)]="customerData.landline" 
+    name="landline" 
+    id="landline" 
+    placeholder="Enter Landline (10-12 digits)" 
+    (input)="onPhoneNumberInput($event, 'landline')"
+    maxlength="25" />
+  <div *ngIf="phoneErrors.landline" class="error-message">
+    {{ phoneErrors.landline }}
+  </div>
+</div>
+          </div>
+          
+          <!-- In the Basic Information section of the form -->
           <div class="form-row">
             <div class="form-group">
-              <label for="alternateContact">Alternate Contact:</label>
+              <label for="occupation">Occupation:</label>
               <input 
                 type="text" 
-                [(ngModel)]="customerData.alternateContact" 
-                name="alternateContact" 
-                id="alternateContact" 
-                placeholder="Enter Alternate Contact Number" 
-                (input)="validatePhoneNumber($event, 'alternateContact')"
-                maxlength="10"
-                pattern="[0-9]{10}" />
-              <div *ngIf="phoneErrors.alternateContact" class="error-message">
-                {{ phoneErrors.alternateContact }}
-              </div>
+                [(ngModel)]="customerData.occupation" 
+                name="occupation" 
+                id="occupation" 
+                placeholder="Enter Occupation" />
             </div>
+          </div>
+
+          <div class="form-row">
+ <div class="form-group">
+  <label for="alternateContact">Alternate Contact:</label>
+  <input 
+    type="text" 
+    [(ngModel)]="customerData.alternateContact" 
+    name="alternateContact" 
+    id="alternateContact" 
+    placeholder="Enter Alternate (10-12 digits)" 
+    (input)="onPhoneNumberInput($event, 'alternateContact')"
+    maxlength="25" />
+  <div *ngIf="phoneErrors.alternateContact" class="error-message">
+    {{ phoneErrors.alternateContact }}
+  </div>
+</div>
             
             <div class="form-group">
               <label for="email">Email:</label>
@@ -577,6 +902,30 @@
                 {{ user.username }}
               </option>
             </select>
+          </div>
+          
+          <!-- Add this below the assignedTo field -->
+          <div class="form-row">
+            <!-- Adcode Dropdown -->
+            <div class="form-group">
+              <label for="adcode">Ad Code:</label>
+              <select [(ngModel)]="customerData.adcode" name="adcode" id="adcode" class="form-control">
+                <option value="">Select Ad Code</option>
+                <option *ngFor="let status of leadStatuses" [value]="status.id">
+                  {{ status.leadStatus }} 
+                </option>
+              </select>
+            </div>
+            <!-- LifeStage Dropdown -->
+           <div class="form-group">
+              <label for="lifeStage">Life Stage:</label>
+              <select [(ngModel)]="customerData.lifeStage" name="lifeStage" id="lifeStage" class="form-control">
+                <option value="">Select Life Stage</option>
+                <option *ngFor="let stage of lifeStages" [value]="stage.name">
+                  {{ stage.name }}
+                </option>
+              </select>
+            </div>
           </div>
           
           <!-- More Information Accordion -->
@@ -609,22 +958,60 @@
                     [(ngModel)]="customerData.openingBalance" 
                     name="openingBalance" 
                     id="openingBalance" 
-                    placeholder="0" />
+                    placeholder="0.00" />
                 </div>
-                
                 <div class="form-group">
-                  <label for="payTerm">Pay Term:</label>
-                  <select [(ngModel)]="customerData.payTerm" name="payTerm" id="payTerm">
-                    <option value="0">Immediate</option>
-                    <option value="15">15 Days</option>
-                    <option value="30">30 Days</option>
-                    <option value="45">45 Days</option>
-                    <option value="60">60 Days</option>
-                    <option value="90">90 Days</option>
+                  <label for="billingType">Billing Type:</label>
+                  <select [(ngModel)]="customerData.billingType" name="billingType" id="billingType">
+                    <option value="">Select Billing Type</option>
+                    <option value="Prepaid">Prepaid</option>
+                    <option value="Postpaid">Postpaid</option>
                   </select>
+                </div>
+                <div class="form-group">
+                  <label for="creditLimit">Credit Limit:</label>
+                  <input 
+                    type="number" 
+                    [(ngModel)]="customerData.creditLimit" 
+                    name="creditLimit" 
+                    id="creditLimit" 
+                    placeholder="0.00" />
                 </div>
               </div>
               
+               <!-- Banking Details -->
+              <h4>Banking Details</h4>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="accountHolderName">Account Holder Name:</label>
+                  <input type="text" [(ngModel)]="customerData.accountHolderName" name="accountHolderName" id="accountHolderName" placeholder="Enter Account Holder Name" />
+                </div>
+                <div class="form-group">
+                  <label for="bankAccountNumber">Bank Account Number:</label>
+                  <input type="text" [(ngModel)]="customerData.bankAccountNumber" name="bankAccountNumber" id="bankAccountNumber" placeholder="Enter Bank Account Number" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="bankName">Bank Name:</label>
+                  <input type="text" [(ngModel)]="customerData.bankName" name="bankName" id="bankName" placeholder="Enter Bank Name" />
+                </div>
+                <div class="form-group">
+                  <label for="branch">Branch:</label>
+                  <input type="text" [(ngModel)]="customerData.branch" name="branch" id="branch" placeholder="Enter Branch Name" />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="bankIdentifierCode">Bank Identifier Code (IFSC):</label>
+                  <input type="text" [(ngModel)]="customerData.bankIdentifierCode" name="bankIdentifierCode" id="bankIdentifierCode" placeholder="Enter IFSC Code" />
+                </div>
+                 <div class="form-group">
+                  <label for="swiftCode">Swift Code:</label>
+                  <input type="text" [(ngModel)]="customerData.swiftCode" name="swiftCode" id="swiftCode" placeholder="Enter Swift Code" />
+                </div>
+              </div>
+
               <!-- Address Information -->
               <h4>Address</h4>
               <div class="form-group">
@@ -649,31 +1036,20 @@
               
               <div class="form-row">
                 <div class="form-group">
-                  <label for="city">City:</label>
-                  <input 
-                    type="text" 
-                    [(ngModel)]="customerData.city" 
-                    name="city" 
-                    id="city" 
-                    placeholder="Enter City" />
+                  <label for="state">State:</label>
+                  <select [(ngModel)]="customerData.state" name="state" id="state" (change)="onStateChange()">
+                    <option value="">Select State</option>
+                    <option *ngFor="let state of states" [value]="state">{{ state }}</option>
+                  </select>
                 </div>
-                
-        <div class="form-group">
-    <label for="state">State:</label>
-    <select [(ngModel)]="customerData.state" name="state" id="state" (change)="onStateChange()">
-      <option value="">Select State</option>
-      <option *ngFor="let state of states" [value]="state">{{ state }}</option>
-    </select>
-  </div>
-  
-  <div class="form-group">
-    <label for="district">District:</label>
-    <select [(ngModel)]="customerData.district" name="district" id="district" [disabled]="!customerData.state">
-      <option value="">Select District</option>
-      <option *ngFor="let district of districts" [value]="district">{{ district }}</option>
-    </select>
-  </div>
-</div>
+                <div class="form-group">
+                  <label for="district">District:</label>
+                  <select [(ngModel)]="customerData.district" name="district" id="district" [disabled]="!customerData.state">
+                    <option value="">Select District</option>
+                    <option *ngFor="let district of districts" [value]="district">{{ district }}</option>
+                  </select>
+                </div>
+              </div>
               
               <div class="form-row">
                 <div class="form-group">
@@ -702,11 +1078,12 @@
           <!-- Form Actions -->
           <div class="form-actions">
             <button type="button" class="btn-cancel" (click)="toggleForm()">Cancel</button>
-<button type="submit" class="btn-save" [disabled]="isSaving">
-  {{ isSaving ? 'Saving...' : 'Save' }}
-</button>          </div>
+            <button type="submit" class="btn-save" [disabled]="isSaving">
+              {{ isSaving ? 'Saving...' : 'Save' }}
+            </button>          
+          </div>
         </form>
       </div>
     </div>
-  </div>
+  </div>
 </div>

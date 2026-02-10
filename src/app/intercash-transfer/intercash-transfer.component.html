@@ -1,0 +1,177 @@
+<!-- src/app/intercash-transfer/intercash-transfer.component.html -->
+
+<!-- Main Page View: List of Transfers -->
+<!-- src/app/intercash-transfer/intercash-transfer.component.html -->
+
+<!-- Main Page View: List of Transfers -->
+<div class="page-container">
+    <header class="page-header">
+      <h1>Contra Entries (Bank/Cash Transfers)</h1>
+      <button class="btn btn-primary" (click)="openModal()">+ Add Transfer</button>
+    </header>
+  
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Voucher No.</th>
+            <th>Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let transfer of transfers">
+            <td>{{ transfer.date.toDate() | date:'shortDate' }}</td>
+            <td>{{ transfer.voucherNo }}</td>
+            <td>{{ transfer.totalAmount | currency:'INR' }}</td>
+            <td class="actions">
+              <!-- Action icons moved below the Actions header -->
+              <div class="action-icons">
+                <button class="btn-icon" (click)="openViewModal(transfer)" title="View Details">👁️</button>
+                <button class="btn-icon" title="Edit Transfer">✏️</button>
+                <button *ngIf="transfer.attachment" class="btn-icon" (click)="downloadAttachment(transfer)" title="Download Attachment">💾</button>
+                <button class="btn-icon" (click)="deleteTransfer(transfer.id)" title="Delete Transfer">🗑️</button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="transfers.length === 0">
+            <td colspan="4" style="text-align: center;">No transfers found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+</div>
+
+<!-- Rest of your modal code remains the same -->
+
+<!-- Modal Pop-up: Add/Edit Transfer Form -->
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="transfer-container modal-content">
+    <form [formGroup]="transferForm" (ngSubmit)="saveTransfer()">
+      <header class="modal-header">
+        <h1>INTER BANK / CASH TRANSFER</h1>
+        <button type="button" class="close-button" (click)="closeModal()">&times;</button>
+      </header>
+      <!-- ... form content from previous answer remains the same ... -->
+      <div class="top-section">
+        <div class="form-group"><label>Voucher No.</label><input type="text" formControlName="voucherNo"></div>
+       
+       
+       
+<!-- Inside the top-section -->
+<div class="form-group">
+  <label>Date</label>
+  <div class="date-input-wrapper">
+    <!-- Visible Text Input for DD-MM-YYYY -->
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(transferForm.get('date')?.value)"
+           (blur)="onManualDateInput($event, 'date')"
+           placeholder="DD-MM-YYYY">
+    
+    <!-- Calendar Button -->
+    <button type="button" class="calendar-btn" (click)="openDatePicker()">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    
+    <!-- Hidden Native Picker -->
+    <input #datePicker 
+           type="date" 
+           formControlName="date" 
+           class="hidden-date-picker">
+  </div>
+</div>      </div>
+      
+      
+      
+      <div class="ledger-section">
+        <div class="ledger-header"><h2>Ledgers</h2><div><button type="button" class="btn btn-add" (click)="addDebit()">+ Credit</button><button type="button" class="btn btn-add" (click)="addCredit()">+ Debit</button></div></div>
+        <div formArrayName="debits" class="ledger-rows">
+          <div *ngFor="let debit of debits.controls; let i = index" [formGroupName]="i" class="ledger-row">
+              <div class="ledger-label">Paid From</div>
+              <select formControlName="accountId" (change)="onAccountSelect('debits', i)"><option value="" disabled>Select Account to Credit</option><option *ngFor="let acc of assetAccounts" [value]="acc.id">{{ acc.name }}</option></select>
+              <div class="amount-group"><label>Paid</label><input type="number" formControlName="amount" placeholder="Rs."></div>
+              <button type="button" class="btn btn-remove" (click)="removeDebit(i)">Remove</button>
+          </div>
+        </div>
+         <div formArrayName="credits" class="ledger-rows">
+          <div *ngFor="let credit of credits.controls; let i = index" [formGroupName]="i" class="ledger-row">
+              <div class="ledger-label">Deposited in</div>
+              <select formControlName="accountId" (change)="onAccountSelect('credits', i)"><option value="" disabled>Select Account to Debit</option><option *ngFor="let acc of assetAccounts" [value]="acc.id">{{ acc.name }}</option></select>
+              <div class="amount-group"><label>Received</label><input type="number" formControlName="amount" placeholder="Rs."></div>
+              <button type="button" class="btn btn-remove" (click)="removeCredit(i)">Remove</button>
+          </div>
+        </div>
+      </div>
+      <div class="total-section">
+        <h2>Total</h2>
+        <div class="total-amounts"><div class="total-value">{{ totalDebits | number:'1.2-2' }}</div><div class="total-value">{{ totalCredits | number:'1.2-2' }}</div></div>
+        <div *ngIf="totalDebits !== totalCredits" class="unbalanced-message">Totals must match before saving.</div>
+      </div>
+      <div class="narration-section"><h2>Narration</h2><textarea formControlName="narration" rows="4"></textarea></div>
+      <div class="attachment-section" formGroupName="attachment">
+          <p class="note">Note: pdf, word, excel files are supported. pdf preferred.</p>
+          <input type="file" (change)="onFileSelect($event)" id="file-upload">
+          <span *ngIf="transferForm.get('attachment.name')?.value" class="file-name">
+            Selected: {{ transferForm.get('attachment.name')?.value }}
+          </span>
+      </div>
+      <footer class="modal-footer">
+          <button type="submit" class="btn btn-save" [disabled]="isSubmitting || totalDebits !== totalCredits || totalDebits === 0">{{ isSubmitting ? 'Saving...' : 'Save' }}</button>
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<!-- NEW: View Transfer Details Modal (READ-ONLY) -->
+<div class="modal-overlay" *ngIf="showViewModal">
+    <div class="modal-content">
+        <header class="modal-header">
+            <h2>Contra Entry Details</h2>
+            <button class="close-button" (click)="closeModal()">&times;</button>
+        </header>
+  
+        <div class="view-details-body" *ngIf="selectedTransferForView">
+            <div class="details-grid">
+                <div><strong>Date:</strong> {{ selectedTransferForView.date.toDate() | date:'longDate' }}</div>
+                <div><strong>Voucher No:</strong> {{ selectedTransferForView.voucherNo }}</div>
+                <div class="description-view"><strong>Narration:</strong> {{ selectedTransferForView.narration }}</div>
+            </div>
+  
+            <div class="journal-items-table">
+                <table>
+                    <thead>
+                        <tr><th>Account</th><th class="text-right">Credit</th><th class="text-right">Debit</th></tr>
+                    </thead>
+                    <tbody>
+                        <!-- Debit Items -->
+                        <tr *ngFor="let item of selectedTransferForView.debits">
+                            <td>{{ item.accountName }}</td>
+                            <td class="text-right">{{ item.amount | currency:'INR' }}</td>
+                            <td class="text-right">-</td>
+                        </tr>
+                        <!-- Credit Items -->
+                        <tr *ngFor="let item of selectedTransferForView.credits">
+                            <td>{{ item.accountName }}</td>
+                            <td class="text-right">-</td>
+                            <td class="text-right">{{ item.amount | currency:'INR' }}</td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td class="text-right"><strong>Totals:</strong></td>
+                            <td class="text-right"><strong>{{ selectedTransferForView.totalAmount | currency:'INR' }}</strong></td>
+                            <td class="text-right"><strong>{{ selectedTransferForView.totalAmount | currency:'INR' }}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+  
+        <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
+        </footer>
+    </div>
+</div>

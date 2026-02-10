@@ -1,215 +1,230 @@
-<!-- input-tax-report.component.html -->
-<div class="container-fluid">
-  <div class="card my-3">
-    <div class="card-header bg-light py-3">
+<div class="container-fluid py-4">
+  <div class="card shadow-sm border-0">
+    <div class="card-header d-flex justify-content-between align-items-center">
       <h4 class="mb-0">Input Tax Report</h4>
+      <div class="header-actions">
+        <button class="btn btn-success shadow-sm" (click)="exportToExcel()" title="Export to Excel">
+          <i class="fas fa-file-excel me-2"></i>Export Excel
+        </button>
+      </div>
     </div>
 
     <div class="card-body">
       <!-- Filters Section -->
-      <div class="row mb-3">
+      <div class="row mb-4 gx-3 filter-row shadow-sm">
+ <!-- FROM DATE Filter -->
+<div class="col-md-2">
+  <label class="form-label small fw-bold">FROM DATE</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(dateFilter.startDate)"
+           (blur)="onManualDateInput($event, 'start')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="dateFilter.startDate" (change)="applyFilters()">
+  </div>
+</div>
+
+<!-- TO DATE Filter -->
+<div class="col-md-2">
+  <label class="form-label small fw-bold">TO DATE</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(dateFilter.endDate)"
+           (blur)="onManualDateInput($event, 'end')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="dateFilter.endDate" (change)="applyFilters()">
+  </div>
+</div>
         <div class="col-md-3">
-          <label class="form-label">From Date</label>
-          <input type="date" class="form-control" [(ngModel)]="dateFilter.startDate">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">To Date</label>
-          <input type="date" class="form-control" [(ngModel)]="dateFilter.endDate">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Supplier</label>
-          <select class="form-select" [(ngModel)]="supplierFilter">
+          <label class="form-label small fw-bold">SUPPLIER</label>
+          <select class="form-select" [(ngModel)]="supplierFilter" (change)="applyFilters()">
             <option value="">All Suppliers</option>
-            <option *ngFor="let supplier of filteredSuppliers" [value]="supplier">
-              {{supplier}}
-            </option>
+            <option *ngFor="let s of uniqueSuppliers" [value]="s">{{s}}</option>
           </select>
         </div>
-        <div class="col-md-3 d-flex align-items-end">
-          <button class="btn btn-primary me-2" (click)="applyFilters()">
-            <i class="fas fa-filter me-1"></i> Apply
+        <div class="col-md-3">
+          <label class="form-label small fw-bold">TAX RATE</label>
+          <select class="form-select" [(ngModel)]="taxRateFilter" (change)="applyFilters()">
+            <option value="">All Tax Rates</option>
+            <option *ngFor="let r of taxRates" [value]="r.rate">{{ r.name }} ({{ r.rate }}%)</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-50 me-2" (click)="applyFilters()" title="Apply Filters">
+            <i class="fas fa-filter"></i>
           </button>
-          <button class="btn btn-secondary" (click)="resetFilters()">
-            <i class="fas fa-undo me-1"></i> Reset
+          <button class="btn btn-outline-secondary w-50" (click)="resetFilters()" title="Reset Filters">
+            <i class="fas fa-undo"></i>
           </button>
         </div>
       </div>
 
       <!-- Summary Cards -->
-<!-- Summary Cards -->
-<div class="row mb-4">
- <div class="col-md-3">
-  <div class="card bg-light">
-    <div class="card-body text-center">
-      <h6 class="card-title">Total Subtotal</h6>
-      <h4 class="card-text">₹ {{ summaryData.totalSubtotal.toFixed(2) }}</h4>
-    </div>
-  </div>
-</div>
-  
-
-
-
-        <div class="col-md-3">
-          <div class="card bg-light">
-            <div class="card-body text-center">
+      <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3 mb-4 summary-data-cards">
+        <!-- HIDDEN: Total Subtotal Card -->
+        <div class="col" style="display: none;">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title">Total Subtotal</h6>
+              <h4 [class.text-danger]="summaryData.totalSubtotal < 0">₹ {{ summaryData.totalSubtotal | number:'1.2-2' }}</h4>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body">
               <h6 class="card-title">Total Tax</h6>
-              <h4 class="card-text">₹ {{ summaryData.totalTax.toFixed(2) }}</h4>
+              <h4 [class.text-danger]="summaryData.totalTax < 0">₹ {{ summaryData.totalTax | number:'1.2-2' }}</h4>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card bg-light">
-            <div class="card-body text-center">
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body">
               <h6 class="card-title">Total CGST</h6>
-              <h4 class="card-text">₹ {{ summaryData.totalCGST.toFixed(2) }}</h4>
+              <h4 [class.text-danger]="summaryData.totalCGST < 0">₹ {{ summaryData.totalCGST | number:'1.2-2' }}</h4>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card bg-light">
-            <div class="card-body text-center">
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body">
               <h6 class="card-title">Total SGST</h6>
-              <h4 class="card-text">₹ {{ summaryData.totalSGST.toFixed(2) }}</h4>
+              <h4 [class.text-danger]="summaryData.totalSGST < 0">₹ {{ summaryData.totalSGST | number:'1.2-2' }}</h4>
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Export Options -->
-      <div class="d-flex justify-content-end mb-3">
-        <div class="btn-group">
-          <button class="btn btn-sm btn-outline-secondary" (click)="exportToCSV()">
-            <i class="fas fa-file-csv me-1"></i> Export CSV
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" (click)="exportToExcel()">
-            <i class="fas fa-file-excel me-1"></i> Export Excel
-          </button>
-    
+        <div class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h6 class="card-title">Total IGST</h6>
+              <h4 [class.text-danger]="summaryData.totalIGST < 0">₹ {{ summaryData.totalIGST | number:'1.2-2' }}</h4>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Main Table -->
-      <div class="table-responsive">
-        <table class="table table-hover" id="inputTaxTable">
-          <thead class="table-light">
+      <div class="table-responsive shadow-sm">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
             <tr>
-              <th (click)="sortTable('date')">
-                Date <i class="fas" [ngClass]="getSortIcon('date')"></i>
-              </th>
-              <th (click)="sortTable('referenceNo')">
-                Reference No <i class="fas" [ngClass]="getSortIcon('referenceNo')"></i>
-              </th>
-              <th (click)="sortTable('invoiceNo')">
-                Invoice No <i class="fas" [ngClass]="getSortIcon('invoiceNo')"></i>
-              </th>
-              <th (click)="sortTable('businessLocation')">
-                To Location <i class="fas" [ngClass]="getSortIcon('businessLocation')"></i>
-              </th>
-              <th (click)="sortTable('supplier')">
-                Supplier <i class="fas" [ngClass]="getSortIcon('supplier')"></i>
-              </th>
-          
-              <th (click)="sortTable('purchaseStatus')">
-                Status <i class="fas" [ngClass]="getSortIcon('purchaseStatus')"></i>
-              </th>
-              <th (click)="sortTable('paymentMethod')">
-                Payment Method <i class="fas" [ngClass]="getSortIcon('paymentMethod')"></i>
-              </th>
-              <th (click)="sortTable('totalTax')">
-                Tax <i class="fas" [ngClass]="getSortIcon('totalTax')"></i>
-              </th>
-              <th (click)="sortTable('cgst')">
-                CGST <i class="fas" [ngClass]="getSortIcon('cgst')"></i>
-              </th>
-              <th (click)="sortTable('sgst')">
-                SGST <i class="fas" [ngClass]="getSortIcon('sgst')"></i>
-              </th>
-         
-              <th (click)="sortTable('paymentAccount')">
-                Payment Account <i class="fas" [ngClass]="getSortIcon('paymentAccount')"></i>
-              </th>
-              <th (click)="sortTable('paymentDue')">
-                Payment Due <i class="fas" [ngClass]="getSortIcon('paymentDue')"></i>
-              </th>
-              <!-- Add these headers to your table -->
-
-<th (click)="sortTable('purchaseTotal')">
- Total Amount <i class="fas" [ngClass]="getSortIcon('purchaseTotal')"></i>
-</th>
+              <th (click)="sortTable('date')">Date <i class="fas" [ngClass]="getSortIcon('date')"></i></th>
+              <th>To Location</th>
+              <th>Supplier / Reference</th>
+              <th>Status</th>
+              <!-- HIDDEN: Taxable Amount Header -->
+              <th class="text-end" style="display: none;">Taxable Amount</th>
+              <th class="text-end">Tax</th>
+              <th class="text-end">CGST</th>
+              <th class="text-end">SGST</th>
+              <th class="text-end">IGST</th>
+              <th class="text-end">Tax %</th>
+              <th class="text-end">Line Total</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="isLoading">
-              <td colspan="14" class="text-center">
-                <div class="spinner-border" role="status">
-                  <span class="visually-hidden">Loading...</span>
-                </div>
+              <td colspan="10" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <div class="mt-2 text-muted">Processing tax data...</div>
               </td>
             </tr>
-            
-            <tr *ngFor="let purchase of filteredPurchases">
-              <td>{{ purchase.purchaseDate || 'N/A' }}</td>
-              <td>{{ purchase.referenceNo || 'N/A' }}</td>
-              <td>{{ purchase.invoiceNo || 'N/A' }}</td>
-              <td>{{ purchase.businessLocation || 'N/A' }}</td>
-              <td>{{ purchase.supplier || 'N/A' }}</td>
+
+            <!-- Rows iterate here -->
+            <tr *ngFor="let entry of paginatedEntries" [class.table-danger-light]="entry.type === 'return'">
+              <td class="fw-bold">{{ getEntryDate(entry) | date:'dd-MM-yyyy' }}</td>
+              <td>{{ getEntryLocation(entry) }}</td>
               <td>
-                <span [class]="getStatusClass(purchase.purchaseStatus)">
-                  {{ purchase.purchaseStatus || 'Unknown' }}
+                <div class="d-flex flex-column">
+                  <span [class.text-danger]="entry.type === 'return'">{{ getEntrySupplier(entry) }}</span>
+                  <small class="text-muted" *ngIf="entry.type === 'purchase'">{{ entry.referenceNo }}</small>
+                  <small class="text-muted" *ngIf="entry.type === 'return'">Ref: {{ entry.parentReference }}</small>
+                </div>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getStatusClass(getEntryStatus(entry))">
+                  {{ getEntryStatus(entry) }}
                 </span>
+                <span *ngIf="entry.type === 'return'" class="badge bg-danger ms-1">RETURN</span>
               </td>
-              <td>{{ purchase.paymentMethod || 'N/A' }}</td>
-              <td>₹ {{ purchase.totalTax?.toFixed(2) || '0.00' }}</td>
-              <td>₹ {{ purchase.cgst?.toFixed(2) || '0.00' }}</td>
-              <td>₹ {{ purchase.sgst?.toFixed(2) || '0.00' }}</td>
-              <td>
-                <div *ngIf="purchase.paymentAccount">
-                  {{ purchase.paymentAccount.name }}
-                  <small *ngIf="purchase.paymentAccount.accountNumber" class="text-muted d-block">
-                    {{ purchase.paymentAccount.accountNumber }}
-                  </small>
-                </div>
-                <div *ngIf="!purchase.paymentAccount">
-                  N/A
-                </div>
+              <!-- HIDDEN: Taxable Amount Data Cell -->
+              <td class="text-end" style="display: none;">
+                ₹ {{ (getEntryTotalAmount(entry) - getEntryTaxAmount(entry)) | number:'1.2-2' }}
               </td>
-              <td>₹ {{ purchase.paymentDue?.toFixed(2) || '0.00' }}</td>
-              <!-- Add these cells to your data rows -->
-<td>₹ {{ purchase.purchaseTotal?.toFixed(2) || '0.00' }}</td>
+              <!-- Tax Values -->
+              <td class="text-end" [class.text-danger]="getEntryTaxAmount(entry) < 0">
+                ₹ {{ getEntryTaxAmount(entry) | number:'1.2-2' }}
+              </td>
+              <td class="text-end text-muted" [class.text-danger]="getEntryCGST(entry) < 0">
+                ₹ {{ getEntryCGST(entry) | number:'1.2-2' }}
+              </td>
+              <td class="text-end text-muted" [class.text-danger]="getEntrySGST(entry) < 0">
+                ₹ {{ getEntrySGST(entry) | number:'1.2-2' }}
+              </td>
+              <td class="text-end text-muted" [class.text-danger]="getEntryIGST(entry) < 0">
+                ₹ {{ getEntryIGST(entry) | number:'1.2-2' }}
+              </td>
+              <!-- Tax % -->
+              <td class="text-end">
+                <span class="badge badge-light border text-dark">{{ getEntryTaxDisplay(entry) }}</span>
+              </td>
+              <!-- Total -->
+              <td class="text-end fw-bold" [class.text-danger]="getEntryTotalAmount(entry) < 0">
+                ₹ {{ getEntryTotalAmount(entry) | number:'1.2-2' }}
+              </td>
             </tr>
-            
-            <tr *ngIf="!isLoading && filteredPurchases.length === 0">
-              <td colspan="14" class="text-center">No data available in table</td>
+
+            <tr *ngIf="!isLoading && filteredEntries.length === 0">
+              <td colspan="10" class="text-center py-5 text-muted">
+                <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
+                <p>No tax entries found for the selected criteria.</p>
+              </td>
             </tr>
           </tbody>
-         <!-- Update the footer row -->
-
+          <!-- Optional Footer for Totals -->
+          <tfoot *ngIf="!isLoading && filteredEntries.length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="4" class="text-end">TOTAL:</td>
+              <td class="text-end" style="display: none;">₹ {{ summaryData.totalSubtotal | number:'1.2-2' }}</td>
+              <td class="text-end">₹ {{ summaryData.totalTax | number:'1.2-2' }}</td>
+              <td class="text-end">₹ {{ summaryData.totalCGST | number:'1.2-2' }}</td>
+              <td class="text-end">₹ {{ summaryData.totalSGST | number:'1.2-2' }}</td>
+              <td class="text-end">₹ {{ summaryData.totalIGST | number:'1.2-2' }}</td>
+              <td></td>
+              <td class="text-end">₹ {{ (summaryData.totalSubtotal + summaryData.totalTax) | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
       <!-- Pagination -->
-      <div class="row mt-3">
-        <div class="col-md-6">
-          <p>Showing {{ filteredPurchases.length }} of {{ allPurchases.length }} entries</p>
+      <div class="d-flex justify-content-between align-items-center mt-4">
+        <div class="text-muted small">
+          Showing <strong>{{ paginatedEntries.length }}</strong> of <strong>{{ filteredEntries.length }}</strong> entries
         </div>
-        <div class="col-md-6">
-          <nav aria-label="Page navigation" class="float-end">
-            <ul class="pagination pagination-sm">
-              <li class="page-item" [class.disabled]="currentPage === 1">
-                <a class="page-link" href="#" (click)="changePage(currentPage - 1)">Previous</a>
-              </li>
-              <li class="page-item" *ngFor="let page of getPages()" [class.active]="page === currentPage">
-                <a class="page-link" href="#" (click)="changePage(page)">{{ page }}</a>
-              </li>
-              <li class="page-item" [class.disabled]="currentPage === totalPages">
-                <a class="page-link" href="#" (click)="changePage(currentPage + 1)">Next</a>
-              </li>
-            </ul>
-          </nav>
-        </div>
+        <nav aria-label="Page navigation" *ngIf="totalPages > 1">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <a class="page-link" (click)="changePage(currentPage - 1)" style="cursor: pointer;"><i class="fas fa-chevron-left"></i></a>
+            </li>
+            <li class="page-item" *ngFor="let page of getPages()" [class.active]="page === currentPage">
+              <a class="page-link" (click)="changePage(+page)" style="cursor: pointer;">{{ page }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <a class="page-link" (click)="changePage(currentPage + 1)" style="cursor: pointer;"><i class="fas fa-chevron-right"></i></a>
+            </li>
+          </ul>
+        </nav>
       </div>
     </div>
   </div>
 </div>
-

@@ -1,87 +1,3 @@
-<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title" id="importModalLabel">Import Leaves</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="alert" [ngClass]="importMessageClass" *ngIf="importMessage">
-          {{ importMessage }}
-        </div>
-
-        <div class="mb-3">
-          <label for="importFile" class="form-label">Select Excel File</label>
-          <input 
-            class="form-control" 
-            type="file" 
-            id="importFile" 
-            accept=".xlsx, .xls, .csv"
-            (change)="onFileChange($event)"
-          >
-          <div class="form-text">Please upload an Excel file matching the template format</div>
-        </div>
-
-        <div class="progress mb-3" *ngIf="importInProgress">
-          <div 
-            class="progress-bar progress-bar-striped progress-bar-animated" 
-            role="progressbar" 
-            [style.width]="importProgress + '%'"
-            [attr.aria-valuenow]="importProgress" 
-            aria-valuemin="0" 
-            aria-valuemax="100"
-          >
-            {{ importProgress }}%
-          </div>
-        </div>
-
-        <div *ngIf="importData.length > 0" class="mb-3">
-          <h6>Preview ({{ importData.length }} records)</h6>
-          <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
-            <table class="table table-sm table-bordered">
-              <thead>
-                <tr>
-                  <th *ngFor="let key of getImportDataKeys()">{{ key }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let row of importData.slice(0, 5)">
-                  <td *ngFor="let key of getImportDataKeys()">
-                    <!-- Special handling for dates -->
-                    <ng-container *ngIf="key === 'startDate' || key === 'endDate'">
-                      {{ formatDisplayDate(row[key]) }}
-                    </ng-container>
-                    <ng-container *ngIf="key !== 'startDate' && key !== 'endDate'">
-                      {{ row[key] }}
-                    </ng-container>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button 
-          type="button" 
-          class="btn btn-success" 
-          (click)="downloadTemplateFile()"
-        >
-          <i class="bi bi-download"></i> Download Template
-        </button>
-        <button 
-          type="button" 
-          class="btn btn-primary" 
-          (click)="importLeaves()" 
-          [disabled]="importData.length === 0 || importInProgress"
-        >
-          <i class="bi bi-upload"></i> Import Data
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 <div class="container mt-4">
   <div class="d-flex justify-content-between mb-3">
     <!-- Search Container -->
@@ -103,12 +19,6 @@
     <!-- Action Buttons -->
     <div>
       <button class="btn btn-primary" (click)="toggleForm()">Add +</button>
-      <button class="btn btn-secondary ms-2" (click)="toggleFilterSidebar()">
-        <i class="bi bi-funnel"></i> Filter
-      </button>
-      <!-- <button class="btn btn-info ms-2" (click)="openImportModal()">
-        <i class="bi bi-upload"></i> Import
-      </button> -->
     </div>
     
     <!-- Export and Bulk Action Buttons -->
@@ -124,8 +34,6 @@
         </ul>
       </div>
       
-      <!-- Print Button -->
-    
       <!-- Column Visibility Dropdown -->
       <div class="dropdown me-2">
         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="columnVisibilityDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -149,18 +57,21 @@
         </ul>
       </div>
       
-      <!-- Bulk Action Buttons -->
-      <button *ngIf="hasSelectedLeaves" class="btn btn-success me-2" (click)="openBulkApproveModal()">
+      <!-- Bulk Action Buttons - Only show for HR Manager/Admin -->
+      <button *ngIf="hasSelectedLeaves && canApproveLeaves" class="btn btn-success me-2" (click)="openBulkApproveModal()">
         Approve Selected ({{ selectedLeaveCount }})
       </button>
-      <button *ngIf="hasSelectedLeaves" class="btn btn-danger" (click)="openBulkRejectModal()">
+      <button *ngIf="hasSelectedLeaves && canApproveLeaves" class="btn btn-danger" (click)="openBulkRejectModal()">
         Reject Selected ({{ selectedLeaveCount }})
       </button>
+      
+      <!-- Show message when user doesn't have permission but has selected leaves -->
+      <div *ngIf="hasSelectedLeaves && !canApproveLeaves" class="alert alert-warning p-2 mb-0 ms-2" style="font-size: 0.875rem;">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        You do not have permission to approve/reject leaves
+      </div>
     </div>
   </div>
-
-
-
 
   <!-- Add Leave Modal -->
   <div class="modal fade" id="addLeaveModal" tabindex="-1" aria-labelledby="addLeaveModalLabel" aria-hidden="true">
@@ -171,45 +82,38 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-        <form [formGroup]="leaveForm" (ngSubmit)="submitForm()">
-          <!-- Employee Field (hidden but still in form) -->
-          <input type="hidden" formControlName="employeeId">
-          
-          <!-- Display current user's name -->
-          <div class="mb-3">
-            <label class="form-label">Employee:</label>
-            <p class="form-control-plaintext">{{ currentUserName }}</p>
-          </div>
-          
-           
+          <form [formGroup]="leaveForm" (ngSubmit)="submitForm()">
+            <input type="hidden" formControlName="employeeId">
+            
+            <!-- Display current user's name -->
             <div class="mb-3">
-              <label for="leaveTypeSelect" class="form-label">Leave Type:*</label>
-              <select id="leaveTypeSelect" class="form-select" formControlName="leaveTypeId">
-                <option value="">Please Select</option>
-                <option *ngFor="let type of leaveTypes" [value]="type.id">{{ type.leaveType }}</option>
-              </select>
+              <label class="form-label">Employee:</label>
+              <p class="form-control-plaintext">{{ currentUserName }}</p>
             </div>
-  <div class="mb-3">
-  <label for="maxLeaveCount" class="form-label">Maximum Leave Count:*</label>
-  <input 
-    id="maxLeaveCount" 
-    type="number" 
-    class="form-control" 
-    formControlName="maxLeaveCount"
-    min="1"
-    required
-    [readonly]="leaveForm.get('leaveTypeId')?.value"
-  >
-  <div *ngIf="leaveForm.get('maxLeaveCount')?.invalid && (leaveForm.get('maxLeaveCount')?.dirty || leaveForm.get('maxLeaveCount')?.touched)"
+       <!-- In leave.component.html -->
+<div class="mb-3">
+  <label for="leaveTypeSelect" class="form-label">Leave Type:*</label>
+  <select id="leaveTypeSelect" class="form-select" formControlName="leaveTypeId" required>
+    <option value="">Please Select</option>
+    <option *ngFor="let type of leaveTypes" [value]="type.id">
+      {{ type.leaveType }} 
+      <span *ngIf="getRemainingBalance(type.id) === 0">(No balance remaining)</span>
+      <span *ngIf="getRemainingBalance(type.id) > 0">(Available: {{ getRemainingBalance(type.id) }} days)</span>
+    </option>
+  </select>
+  <div *ngIf="leaveForm.get('leaveTypeId')?.invalid && leaveForm.get('leaveTypeId')?.touched" 
        class="text-danger">
-    <div *ngIf="leaveForm.get('maxLeaveCount')?.errors?.['required']">
-      Maximum leave count is required
-    </div>
-    <div *ngIf="leaveForm.get('maxLeaveCount')?.errors?.['min']">
-      Minimum 1 day is required
-    </div>
+    Please select a leave type
   </div>
 </div>
+
+            <!-- Show current balance for selected leave type -->
+            <div class="mb-3" *ngIf="leaveForm.get('leaveTypeId')?.value">
+              <div class="alert alert-info">
+                <strong>Current Balance:</strong> {{ getRemainingBalance(leaveForm.get('leaveTypeId')?.value) }} days remaining
+              </div>
+            </div>
+
             <div class="mb-3">
               <label for="sessionSelect" class="form-label">Session:*</label>
               <select id="sessionSelect" class="form-select" formControlName="session">
@@ -224,10 +128,11 @@
               <label for="startDate" class="form-label">Start Date:*</label>
               <input id="startDate" type="date" class="form-control" formControlName="startDate">
             </div>
-  <div class="mb-3">
-      <label for="endDate" class="form-label">End Date:*</label>
-      <input id="endDate" type="date" class="form-control" formControlName="endDate">
-    </div>
+
+            <div class="mb-3">
+              <label for="endDate" class="form-label">End Date:*</label>
+              <input id="endDate" type="date" class="form-control" formControlName="endDate">
+            </div>
 
             <div class="mb-3">
               <label for="reason" class="form-label">Reason:</label>
@@ -242,11 +147,13 @@
       </div>
     </div>
   </div>
+
+  <!-- Leaves Table -->
   <div class="table-responsive mt-4" id="leaveTable">
     <table class="table table-bordered table-hover">
       <thead class="table-dark">
         <tr>
-          <th *ngIf="columns[0].visible">
+          <th *ngIf="columns[0].visible && canApproveLeaves">
             <div class="form-check">
               <input 
                 class="form-check-input" 
@@ -255,28 +162,25 @@
                 (change)="toggleSelectAll()" 
                 id="selectAllCheckbox"
               >
-          
             </div>
           </th>
+          <th *ngIf="columns[1].visible">Reference No</th>
           <th *ngIf="columns[2].visible">Leave Type</th>
           <th *ngIf="columns[3].visible">Employee</th>
-          <th *ngIf="columns[4].visible">Dates</th>
-              <th *ngIf="columns[5].visible">End Date</th>
-
-          <th *ngIf="columns[5].visible">Session</th>
-              <th *ngIf="columns[3].visible">Max Days</th>
-                    <th *ngIf="columns[10].visible">Days Taken</th>
-
-      <th *ngIf="columns[11].visible">Remaining Leave</th>
-
-          <th *ngIf="columns[6].visible">Reason</th>
-          <th *ngIf="columns[7].visible">Status</th>
-          <th *ngIf="columns[8].visible">Actions</th>
+          <th *ngIf="columns[4].visible">Start Date</th>
+          <th *ngIf="columns[5].visible">End Date</th>
+          <th *ngIf="columns[6].visible">Session</th>
+          <th *ngIf="columns[7].visible">Reason</th>
+          <th *ngIf="columns[8].visible">Status</th>
+          <th *ngIf="columns[10].visible">Max Days</th>
+          <th *ngIf="columns[11].visible">Days Taken</th>
+          <th *ngIf="columns[12].visible">Remaining Leave</th>
+          <th *ngIf="columns[13].visible">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let leave of filteredLeaves">
-          <td *ngIf="columns[0].visible">
+          <td *ngIf="columns[0].visible && canApproveLeaves">
             <div class="form-check">
               <input 
                 class="form-check-input" 
@@ -287,55 +191,59 @@
               >
             </div>
           </td>
+          <td *ngIf="columns[1].visible">{{ leave.referenceNo }}</td>
           <td *ngIf="columns[2].visible">{{ leave.leaveType }}</td>
           <td *ngIf="columns[3].visible">{{ leave.employeeName }}</td>
           <td *ngIf="columns[4].visible">{{ leave.startDate | date:'dd-MM-yyyy' }}</td>
-              <td *ngIf="columns[5].visible">{{ leave.endDate | date:'dd-MM-yyyy' }}</td>
-
-          <td *ngIf="columns[5].visible">{{ leave.session }}</td>
-              <td *ngIf="columns[3].visible">{{ leave.maxLeaveCount }}</td>
-<td *ngIf="columns[10].visible">
-  {{ leave.status === 'approved' ? leave.daysTaken + leave.daysTakenForThisLeave : leave.daysTaken }}
-</td>
-<td *ngIf="columns[11].visible">
-  <span [ngClass]="{'text-danger': leave.remainingLeave <= 0}">
-    {{ leave.remainingLeave }}
-  </span>
-</td>
-          <td *ngIf="columns[6].visible">{{ leave.reason }}</td>
-          <td *ngIf="columns[7].visible">
+          <td *ngIf="columns[5].visible">{{ leave.endDate | date:'dd-MM-yyyy' }}</td>
+          <td *ngIf="columns[6].visible">{{ leave.session }}</td>
+          <td *ngIf="columns[7].visible">{{ leave.reason }}</td>
+          <td *ngIf="columns[8].visible">
             <span 
               class="badge rounded-pill"
               [ngClass]="getStatusBadgeClass(leave.status)"
-              (click)="openStatusModal(leave)"
-              style="cursor: pointer;"
-              role="button"
-              tabindex="0"
-              aria-label="Change leave status"
+              [attr.style]="canApproveLeaves ? 'cursor: pointer;' : null"
+              [attr.role]="canApproveLeaves ? 'button' : null"
+              [attr.tabindex]="canApproveLeaves ? '0' : null"
+              [attr.aria-label]="canApproveLeaves ? 'Change leave status' : null"
+              (click)="canApproveLeaves ? openStatusModal(leave) : null"
             >
               {{ leave.status | titlecase }}
             </span>
+            <!-- Show message for non-authorized users -->
+            <div *ngIf="!canApproveLeaves && leave.status === 'pending'" class="small text-muted mt-1">
+              Only HR Manager/Admin can change status
+            </div>
           </td>
-          
-       <!-- In your table row (replace the current actions column) -->
-<td *ngIf="columns[8].visible">
-  <button class="btn btn-info btn-sm" (click)="viewActivity(leave)">
-    <i class="bi bi-activity"></i> View
-  </button>
-  <button class="btn btn-primary btn-sm ms-1" (click)="openEditModal(leave)">
-    <i class="bi bi-pencil"></i> Edit
-  </button>
-  <button class="btn btn-danger btn-sm ms-1" (click)="deleteLeave(leave.id)">
-    <i class="bi bi-trash"></i> Delete
-  </button>
-</td>
+          <td *ngIf="columns[10].visible">{{ leave.maxLeaveCount }}</td>
+          <td *ngIf="columns[11].visible">
+            {{ leave.status === 'approved' ? leave.daysTaken : leave.daysRequested || 0 }}
+          </td>
+          <td *ngIf="columns[12].visible">
+            <span [ngClass]="{'text-danger': leave.remainingLeave <= 0}">
+              {{ leave.remainingLeave || 0 }}
+            </span>
+          </td>
+          <td *ngIf="columns[13].visible">
+            <button class="btn btn-info btn-sm" (click)="viewActivity(leave)">
+              <i class="bi bi-activity"></i> View
+            </button>
+            <button class="btn btn-primary btn-sm ms-1" (click)="openEditModal(leave)">
+              <i class="bi bi-pencil"></i> Edit
+            </button>
+            <button class="btn btn-danger btn-sm ms-1" (click)="deleteLeave(leave.id)">
+              <i class="bi bi-trash"></i> Delete
+            </button>
+          </td>
         </tr>
       </tbody>
     </table>
   </div>
 </div>
+
 <!-- Edit Leave Modal -->
-<div #editLeaveModal class="modal fade" id="editLeaveModal" tabindex="-1" aria-labelledby="editLeaveModalLabel" aria-hidden="true">  <div class="modal-dialog">
+<div #editLeaveModal class="modal fade" id="editLeaveModal" tabindex="-1" aria-labelledby="editLeaveModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="editLeaveModalLabel">Edit Leave</h5>
@@ -348,13 +256,12 @@
             <p class="form-control-plaintext">{{ currentUserName }}</p>
           </div>
           
-      <!-- In your edit modal template -->
-<select formControlName="leaveTypeId" class="form-control">
-  <option value="">Select Leave Type</option>
-  <option *ngFor="let type of leaveTypes" [value]="type.id">
-    {{ type.leaveType }}
-  </option>
-</select>
+          <select formControlName="leaveTypeId" class="form-control">
+            <option value="">Select Leave Type</option>
+            <option *ngFor="let type of leaveTypes" [value]="type.id">
+              {{ type.leaveType }}
+            </option>
+          </select>
           
           <div class="mb-3">
             <label for="editMaxLeaveCount" class="form-label">Maximum Leave Count:*</label>
@@ -401,8 +308,8 @@
   </div>
 </div>
 
-<!-- Leave Status Modal -->
-<div #statusModal class="modal fade" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+<!-- Leave Status Modal - Only show for authorized users -->
+<div #statusModal class="modal fade" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true" *ngIf="canApproveLeaves">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header bg-primary text-white">
@@ -420,27 +327,27 @@
               <option value="rejected">Rejected</option>
             </select>
           </div>
-<!-- In your status modal HTML -->
-<div *ngIf="statusForm.get('status')?.value === 'approved'" class="mb-3">
-  <label class="form-label fw-bold">Approved By:*</label>
-  <div class="form-control" style="background-color: #e9ecef;">
-    {{ statusForm.get('approvedBy')?.value || currentUserName || 'N/A' }}
-  </div>
-</div>
 
-<div *ngIf="statusForm.get('status')?.value === 'rejected'" class="mb-3">
-  <label for="statusRejectedBy" class="form-label fw-bold">Rejected By:*</label>
-  <select 
-    id="statusRejectedBy" 
-    class="form-select" 
-    formControlName="approvedBy" 
-    required
-  >
-    <option value="">-- Select Rejector --</option>
-    <option [value]="currentUserName" selected>{{ currentUserName }}</option>
-    <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
-  </select>
-</div>
+          <div *ngIf="statusForm.get('status')?.value === 'approved'" class="mb-3">
+            <label class="form-label fw-bold">Approved By:*</label>
+            <div class="form-control" style="background-color: #e9ecef;">
+              {{ statusForm.get('approvedBy')?.value || currentUserName || 'N/A' }}
+            </div>
+          </div>
+
+          <div *ngIf="statusForm.get('status')?.value === 'rejected'" class="mb-3">
+            <label for="statusRejectedBy" class="form-label fw-bold">Rejected By:*</label>
+            <select 
+              id="statusRejectedBy" 
+              class="form-select" 
+              formControlName="approvedBy" 
+              required
+            >
+              <option value="">-- Select Rejector --</option>
+              <option [value]="currentUserName" selected>{{ currentUserName }}</option>
+              <option *ngFor="let user of users" [value]="user.username">{{ user.username }}</option>
+            </select>
+          </div>
 
           <div class="mb-3">
             <label for="statusNote" class="form-label fw-bold">Note:</label>
@@ -464,8 +371,8 @@
   </div>
 </div>
 
-<!-- Bulk Approve Modal -->
-<div #bulkApproveModal class="modal fade" tabindex="-1" aria-labelledby="bulkApproveModalLabel" aria-hidden="true">
+<!-- Bulk Approve Modal - Only show for authorized users -->
+<div #bulkApproveModal class="modal fade" tabindex="-1" aria-labelledby="bulkApproveModalLabel" aria-hidden="true" *ngIf="canApproveLeaves">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
@@ -518,8 +425,8 @@
   </div>
 </div>
 
-<!-- Bulk Reject Modal -->
-<div #bulkRejectModal class="modal fade" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true">
+<!-- Bulk Reject Modal - Only show for authorized users -->
+<div #bulkRejectModal class="modal fade" tabindex="-1" aria-labelledby="bulkRejectModalLabel" aria-hidden="true" *ngIf="canApproveLeaves">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header bg-danger text-white">
@@ -605,49 +512,7 @@
             <p><strong>Reason:</strong> {{ selectedLeave?.reason }}</p>
           </div>
         </div>
-
-
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div><!-- In your leave.component.html - activity modal section -->
-<div #activityModal class="modal fade" tabindex="-1" aria-labelledby="activityModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-info text-white">
-        <h5 class="modal-title" id="activityModalLabel">Leave Request History</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-
-      <div class="modal-body">
-        <div class="card mb-3">
-          <div class="card-header bg-light">
-            <h6>Leave Request Details</h6>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-6">
-                <p><strong>Employee:</strong> {{ selectedLeave?.employeeName }}</p>
-                <p><strong>Leave Type:</strong> {{ selectedLeave?.leaveType }}</p>
-              </div>
-              <div class="col-md-6">
-                <p><strong>Date:</strong> {{ selectedLeave?.startDate | date:'dd-MM-yyyy' }}</p>
-                <p><strong>Session:</strong> {{ selectedLeave?.session }}</p>
-                <p><strong>Current Status:</strong> 
-                  <span class="badge rounded-pill" [ngClass]="getStatusBadgeClass(selectedLeave?.status)">
-                    {{ selectedLeave?.status | titlecase }}
-                  </span>
-                </p>
-              </div>
-            </div>
-            <p><strong>Reason:</strong> {{ selectedLeave?.reason }}</p>
-          </div>
-        </div>
-
+<!-- 
         <div class="card">
           <div class="card-header bg-light">
             <h6>Activity History</h6>
@@ -694,12 +559,21 @@
               </div>
             </div>
           </div>
-        </div>
+        </div> -->
       </div>
 
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Role Information Display (Optional - for debugging/info) -->
+<div *ngIf="currentUserRole" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1050;">
+  <div class="bg-light p-2 rounded shadow-sm small">
+    <strong>Role:</strong> {{ currentUserRole | titlecase }}
+    <br>
+    <strong>Can Approve:</strong> {{ canApproveLeaves ? 'Yes' : 'No' }}
   </div>
 </div>

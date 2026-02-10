@@ -3,7 +3,9 @@
     <div>
       <h2 class="mb-0">Not-for-Selling Products</h2>
       <p class="text-muted mb-0">Manage products marked as not for selling</p>
+    </div>
 
+  </div>
 
   <div class="card border-0 shadow-sm">
     <div class="card-body p-0">
@@ -13,9 +15,10 @@
           <div class="me-3">
             <label class="form-label mb-0">Show</label>
             <select class="form-select form-select-sm" [(ngModel)]="itemsPerPage" (change)="updatePaginatedProducts()">
-              <option>25</option>
-              <option>50</option>
-              <option>100</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
             </select>
           </div>
         </div>
@@ -41,6 +44,7 @@
           <thead class="table-light">
             <tr>
               <th width="120">Actions</th>
+
               <th (click)="sortBy('productName')">
                 Product
                 <i class="fas ms-1" [ngClass]="{
@@ -49,21 +53,20 @@
                   'fa-sort-down': currentSortColumn === 'productName' && !isAscending
                 }"></i>
               </th>
-              <th>Locations</th>
-              <th class="text-end" (click)="sortBy('defaultSellingPriceExcTax')">
-                Selling Price (Exc Tax)
+              <th class="text-end" (click)="sortBy('defaultPurchasePriceExcTax')">
+                Purchase Price
                 <i class="fas ms-1" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'defaultSellingPriceExcTax',
-                  'fa-sort-up': currentSortColumn === 'defaultSellingPriceExcTax' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'defaultSellingPriceExcTax' && !isAscending
+                  'fa-sort': currentSortColumn !== 'defaultPurchasePriceExcTax',
+                  'fa-sort-up': currentSortColumn === 'defaultPurchasePriceExcTax' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'defaultPurchasePriceExcTax' && !isAscending
                 }"></i>
               </th>
-              <th class="text-end" (click)="sortBy('currentStock')">
-                Current Stock
+              <th class="text-end" (click)="sortBy('totalStock')">
+                Stock by Location
                 <i class="fas ms-1" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'currentStock',
-                  'fa-sort-up': currentSortColumn === 'currentStock' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'currentStock' && !isAscending
+                  'fa-sort': currentSortColumn !== 'totalStock',
+                  'fa-sort-up': currentSortColumn === 'totalStock' && isAscending,
+                  'fa-sort-down': currentSortColumn === 'totalStock' && !isAscending
                 }"></i>
               </th>
               <th (click)="sortBy('productType')">
@@ -102,6 +105,7 @@
                   </button>
                 </div>
               </td>
+  
               <td>
                 <div class="d-flex align-items-center">
                   <div>
@@ -115,38 +119,41 @@
                   </div>
                 </div>
               </td>
-              <td>
-                <div *ngIf="product.locationNames?.length > 0">
-                  <span *ngFor="let locName of product.locationNames" class="badge bg-light text-dark me-1">
-                    {{ locName }}
-                  </span>
-                </div>
-                <div *ngIf="!product.locationNames?.length" class="text-muted">
-                  No Location
-                </div>
-              </td>
-              <td class="text-end">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</td>
+              <td class="text-end">₹{{ product.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</td>
               <td class="text-end">
-                <span class="badge" [ngClass]="{
-                  'bg-success': (product.currentStock || 0) > 10,
-                  'bg-warning': (product.currentStock || 0) <= 10 && (product.currentStock || 0) > 0,
-                  'bg-danger': (product.currentStock || 0) <= 0
-                }">
-                  {{ product.currentStock || '0.00' }}
-                </span>
+                <!-- Show total stock with breakdown -->
+                <div class="d-flex flex-column align-items-end" style="min-width: 120px">
+                  <span class="badge mb-1" [ngClass]="{
+                    'bg-success': (product.totalStock || 0) > 10,
+                    'bg-warning': (product.totalStock || 0) <= 10 && (product.totalStock || 0) > 0,
+                    'bg-danger': (product.totalStock || 0) <= 0
+                  }">
+                    Total: {{ product.totalStock || '0' }}
+                  </span>
+                  
+                  <!-- Location breakdown -->
+                  <div *ngIf="product.locationStocks && getObjectKeys(product.locationStocks).length > 0" 
+                       class="small text-muted">
+                    <div *ngFor="let locationEntry of getLocationStockEntries(product.locationStocks)" 
+                         class="d-flex justify-content-between">
+                      <span>{{ getLocationName(locationEntry.locationId) }}:</span>
+                      <span class="ms-2">{{ locationEntry.stock }}</span>
+                    </div>
+                  </div>
+                </div>
               </td>
               <td>{{ product.productType }}</td>
               <td>{{ product.category || '-' }}</td>
               <td>{{ product.sku || '-' }}</td>
             </tr>
             <tr *ngIf="filteredProducts.length === 0 && !isLoading">
-              <td colspan="8" class="text-center py-4 text-muted">
+              <td colspan="7" class="text-center py-4 text-muted">
                 <i class="fas fa-box-open fa-2x mb-2"></i>
                 <p class="mb-0">No not-for-selling products found</p>
               </td>
             </tr>
             <tr *ngIf="isLoading">
-              <td colspan="8" class="text-center py-4">
+              <td colspan="7" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
                 </div>
@@ -157,24 +164,28 @@
       </div>
 
       <!-- Pagination -->
-      <div class="d-flex flex-wrap justify-content-between align-items-center p-3 border-top">
+      <div class="d-flex justify-content-between align-items-center p-3 border-top">
         <div class="text-muted">
           Showing {{ filteredProducts.length ? (currentPage-1)*itemsPerPage + 1 : 0 }} to 
           {{ Math.min(currentPage*itemsPerPage, filteredProducts.length) }} of 
           {{ filteredProducts.length }} entries
         </div>
+        
         <nav *ngIf="filteredProducts.length > itemsPerPage">
           <ul class="pagination pagination-sm mb-0">
             <li class="page-item" [class.disabled]="currentPage === 1">
-              <a class="page-link" (click)="currentPage = currentPage - 1">
+              <a class="page-link" (click)="previousPage()">
                 <i class="fas fa-chevron-left"></i>
               </a>
             </li>
+            
             <li class="page-item" *ngFor="let page of getPages()" [class.active]="page === currentPage">
-              <a class="page-link" (click)="currentPage = page">{{ page }}</a>
+              <a class="page-link" (click)="goToPage(page)" *ngIf="page !== -1">{{ page }}</a>
+              <span class="page-link" *ngIf="page === -1">...</span>
             </li>
+            
             <li class="page-item" [class.disabled]="currentPage*itemsPerPage >= filteredProducts.length">
-              <a class="page-link" (click)="currentPage = currentPage + 1">
+              <a class="page-link" (click)="nextPage()">
                 <i class="fas fa-chevron-right"></i>
               </a>
             </li>
@@ -186,6 +197,9 @@
 </div>
 
 <!-- Product Details Modal -->
+<!-- In not-selling.component.html -->
+
+<!-- Find your Product Details Modal -->
 <div class="modal fade" [class.show]="showProductDetailsModal" tabindex="-1" role="dialog" 
      [style.display]="showProductDetailsModal ? 'block' : 'none'">
   <div class="modal-dialog modal-lg modal-dialog-scrollable" role="document">
@@ -198,6 +212,21 @@
         <button type="button" class="btn-close" (click)="closeProductDetailsModal()"></button>
       </div>
       <div class="modal-body">
+
+        <!-- +++ START: ADD THIS ENTIRE BLOCK FOR THE IMAGE +++ -->
+        <div *ngIf="hasProductImage(selectedProduct)" class="row mb-4">
+          <div class="col-12 text-center">
+            <div class="product-image-modal-container">
+              <!-- This [src] binding uses your existing helper function -->
+              <img [src]="getProductImageUrl(selectedProduct)"
+                   [alt]="selectedProduct?.productName"
+                   class="img-fluid rounded border shadow-sm">
+            </div>
+          </div>
+        </div>
+        <!-- +++ END: ADD THIS ENTIRE BLOCK FOR THE IMAGE +++ -->
+
+        <!-- The rest of your modal content remains the same -->
         <div class="row">
           <!-- Left Column -->
           <div class="col-md-6">
@@ -221,6 +250,10 @@
                 </div>
               </div>
               <div class="row mb-2">
+                <div class="col-4 fw-medium">Purchase Price:</div>
+                <div class="col-8">₹{{ selectedProduct?.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</div>
+              </div>
+              <div class="row mb-2">
                 <div class="col-4 fw-medium">Product Type:</div>
                 <div class="col-8">{{ selectedProduct?.productType || '-' }}</div>
               </div>
@@ -238,27 +271,33 @@
           <!-- Right Column -->
           <div class="col-md-6">
             <div class="mb-3">
-              <h6 class="text-muted">Pricing & Stock</h6>
+              <h6 class="text-muted">Stock Information</h6>
               <hr class="mt-1">
               <div class="row mb-2">
-                <div class="col-4 fw-medium">Selling Price:</div>
-                <div class="col-8">₹{{ selectedProduct?.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</div>
-              </div>
-              <div class="row mb-2">
-                <div class="col-4 fw-medium">Current Stock:</div>
+                <div class="col-4 fw-medium">Total Stock:</div>
                 <div class="col-8">
                   <span class="badge" [ngClass]="{
-                    'bg-success': (selectedProduct?.currentStock || 0) > 10,
-                    'bg-warning': (selectedProduct?.currentStock || 0) <= 10 && (selectedProduct?.currentStock || 0) > 0,
-                    'bg-danger': (selectedProduct?.currentStock || 0) <= 0
+                    'bg-success': (selectedProduct?.totalStock || 0) > 10,
+                    'bg-warning': (selectedProduct?.totalStock || 0) <= 10 && (selectedProduct?.totalStock || 0) > 0,
+                    'bg-danger': (selectedProduct?.totalStock || 0) <= 0
                   }">
-                    {{ selectedProduct?.currentStock || '0.00' }}
+                    {{ selectedProduct?.totalStock || '0' }}
                   </span>
                 </div>
               </div>
-              <div class="row mb-2">
-                <div class="col-4 fw-medium">Location:</div>
-                <div class="col-8">{{ selectedProduct?.locationName || '-' }}</div>
+              
+              <!-- Stock by Location -->
+              <div *ngIf="selectedProduct?.locationStocks && getObjectKeys(selectedProduct.locationStocks).length > 0" class="mb-3">
+                <div class="row mb-2">
+                  <div class="col-4 fw-medium">Stock by Location:</div>
+                  <div class="col-8">
+                    <div *ngFor="let locationEntry of getLocationStockEntries(selectedProduct.locationStocks)" 
+                         class="d-flex justify-content-between mb-1">
+                      <span>{{ getLocationName(locationEntry.locationId) }}:</span>
+                      <span class="badge bg-light text-dark">{{ locationEntry.stock }}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

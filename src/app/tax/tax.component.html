@@ -24,6 +24,14 @@
             For tax group only
           </label>
         </div>
+        <!-- ================== NEW IGST CHECKBOX ================== -->
+        <div class="form-group checkbox">
+          <label>
+            <input type="checkbox" [(ngModel)]="taxRate.isIGST" name="isIGST" />
+            Is this an IGST rate?
+          </label>
+        </div>
+        <!-- ======================================================= -->
         <div class="form-actions">
           <button type="submit" class="btn save-btn">{{ isEditingRate ? 'Update' : 'Save' }}</button>
           <button type="button" class="btn cancel-btn" (click)="toggleTaxRateForm()">Cancel</button>
@@ -57,6 +65,15 @@
                 <i class="fas fa-caret-down" [class.active]="taxRateSortColumn === 'forTaxGroupOnly' && taxRateSortDirection === 'desc'"></i>
               </span>
             </th>
+            <!-- ================== NEW IGST COLUMN HEADER ================== -->
+            <th (click)="sortTaxRates('isIGST')">
+              IGST
+              <span class="sort-icon">
+                <i class="fas fa-caret-up" [class.active]="taxRateSortColumn === 'isIGST' && taxRateSortDirection === 'asc'"></i>
+                <i class="fas fa-caret-down" [class.active]="taxRateSortColumn === 'isIGST' && taxRateSortDirection === 'desc'"></i>
+              </span>
+            </th>
+            <!-- =========================================================== -->
             <th>Actions</th>
           </tr>
         </thead>
@@ -65,6 +82,9 @@
             <td>{{ rate.name }}</td>
             <td>{{ rate.rate }}</td>
             <td>{{ rate.forTaxGroupOnly ? 'Yes' : 'No' }}</td>
+            <!-- ================== NEW IGST COLUMN DATA ================== -->
+            <td>{{ rate.isIGST ? 'Yes' : 'No' }}</td>
+            <!-- ========================================================== -->
             <td class="actions">
               <button class="btn edit-btn" (click)="editTaxRate(rate)">Edit</button>
               <button class="btn delete-btn" (click)="deleteTaxRate(rate.id)">Delete</button>
@@ -75,14 +95,12 @@
     </div>
   </div>
 
-  <!-- Tax Groups Section -->
+  <!-- Tax Groups Section (No changes here) -->
   <div class="box">
     <div class="header">
       <h3>Tax Groups (Combined Taxes)</h3>
       <button class="btn add-btn" (click)="toggleTaxGroupForm()">+ Add</button>
     </div>
-
-    <!-- Tax Group Form -->
     <div *ngIf="showTaxGroupForm" class="form-container">
       <h4>{{ isEditingGroup ? 'Edit' : 'Add' }} Tax Group</h4>
       <form (ngSubmit)="addTaxGroup()" class="form">
@@ -104,34 +122,33 @@
         </div>
       </form>
     </div>
-
-    <!-- Tax Groups Table -->
-   <!-- Tax Groups Table -->
-<div class="table-wrapper" *ngIf="taxGroups.length > 0">
-  <h4>All Tax Groups</h4>
-  <table>
-    <thead>
-      <tr>
-        <th (click)="sortTaxGroups('name')">
-          Group Name
-          <span class="sort-icon">
-            <i class="fas fa-caret-up" [class.active]="taxGroupSortColumn === 'name' && taxGroupSortDirection === 'asc'"></i>
-            <i class="fas fa-caret-down" [class.active]="taxGroupSortColumn === 'name' && taxGroupSortDirection === 'desc'"></i>
-          </span>
-        </th>
-        <th>Included Taxes</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let group of taxGroups">
-        <td>{{ group.name }}</td>
-        <td>{{ getTaxRateNames(group.taxRates) }}</td>
-        <td class="actions">
-          <button class="btn edit-btn" (click)="editTaxGroup(group)">Edit</button>
-          <button class="btn delete-btn" (click)="deleteTaxGroup(group.id)">Delete</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+    <div class="table-wrapper" *ngIf="taxGroups.length > 0">
+      <h4>All Tax Groups</h4>
+      <table>
+        <thead>
+          <tr>
+            <th (click)="sortTaxGroups('name')">
+              Group Name
+              <span class="sort-icon">
+                <i class="fas fa-caret-up" [class.active]="taxGroupSortColumn === 'name' && taxGroupSortDirection === 'asc'"></i>
+                <i class="fas fa-caret-down" [class.active]="taxGroupSortColumn === 'name' && taxGroupSortDirection === 'desc'"></i>
+              </span>
+            </th>
+            <th>Included Taxes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let group of taxGroups">
+            <td>{{ group.name }}</td>
+            <td>{{ getTaxRateNames(group.taxRates) }}</td>
+            <td class="actions">
+              <button class="btn edit-btn" (click)="editTaxGroup(group)">Edit</button>
+              <button class="btn delete-btn" (click)="deleteTaxGroup(group.id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>

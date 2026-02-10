@@ -11,6 +11,40 @@
 h2{
   margin-top: 2%;
 }
+/* Add to sales.component.scss */
+.badge {
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+}
+.active-filters-display {
+  padding: 8px 12px;
+  background-color: #fcfcfc;
+  border-radius: 6px;
+  
+  .badge {
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: white !important;
+
+    &:hover {
+      border-color: #0d6efd !important;
+    }
+
+    i:hover {
+      color: #dc3545 !important;
+      transform: scale(1.2);
+    }
+  }
+}
+/* Ensure 'N/A' or empty statuses are never invisible */
+.bg-light.text-dark.border {
+    background-color: #f8f9fa !important;
+    color: #343a40 !important;
+    border: 1px solid #dee2e6 !important;
+}
 .row {
   display: flex;
   flex-wrap: wrap;
@@ -1464,4 +1498,159 @@ th:hover .fa-sort {
   height: 1px;
   background: #eee;
   margin: 5px 0;
+}/* Add to your component's CSS */
+.btn-outline-secondary {
+  border-color: #6c757d;
+  color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: white;
+}
+
+.list-group-item-action {
+  cursor: pointer;
+}/* Modal Backdrop */
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1040;
+  display: block;
+}
+
+/* Action Modal */
+.action-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1050;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 300px;
+  padding: 20px;
+}
+
+.action-modal-header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+.action-checkbox {
+  margin-right: 10px;
+}
+
+.action-footer {
+  margin-top: 15px;
+  text-align: right;
+}
+
+.close-btn {
+  background: none;
+  border: 1px solid #ddd;
+  padding: 5px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f1f1f1;
+  }
+}/* Dropdown styling */
+.dropdown-menu {
+  min-width: 200px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  border: none;
+}
+
+.dropdown-item {
+  padding: 8px 15px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  
+  &:hover {
+    background-color: #f8f9fa;
+    color: #212529;
+  }
+  
+  i {
+    width: 20px;
+    text-align: center;
+    margin-right: 10px;
+  }
+}
+
+.dropdown-toggle::after {
+  vertical-align: middle;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}.modal-backdrop {
+  opacity: 0.5 !important;
+  background-color: #000 !important;
+}
+
+.modal {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+/*
+* SCSS for Invoice Modal Header with Logo
+* Add this to your sales.component.scss file
+*/
+
+.modal-body {
+  // This class is used in both invoice modals for consistency
+  .invoice-print-header {
+    display: flex;
+    align-items: center; // Vertically align the logo and text
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #dee2e6; // A standard Bootstrap border color
+
+    .logo {
+      width: 80px;      // Set a fixed width for the logo
+      height: auto;     // Maintain aspect ratio
+      margin-right: 20px; // Add space between the logo and company details
+    }
+
+    .company-details {
+      text-align: left;
+
+      h3 {
+        font-size: 1.1rem; // Adjust font size as needed
+        font-weight: bold;
+        margin: 0;
+        color: #212529; // Dark color for better readability
+      }
+
+      p {
+        font-size: 0.8rem; // Smaller font for address details
+        margin: 2px 0;
+        color: #495057; // A slightly lighter text color
+        line-height: 1.4;
+      }
+    }
+  }
 }

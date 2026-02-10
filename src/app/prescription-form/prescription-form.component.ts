@@ -29,7 +29,6 @@ export class PrescriptionFormComponent {
   selectedMedicineType: string | null = null;
   selectedPrescription: Prescription | null = null;
 
-
   // Main form
   prescriptionForm: FormGroup;
 
@@ -221,58 +220,84 @@ export class PrescriptionFormComponent {
     this.prescriptionForm.reset();
     alert('Prescription saved! You can add another one.');
   }
-async submitAllPrescriptions(): Promise<void> {
-  if (this.allPrescriptions.length === 0 && this.currentMedicines.length > 0) {
-    await this.saveCurrentPrescription();
+
+  async submitAllPrescriptions(): Promise<void> {
+    if (this.allPrescriptions.length === 0 && this.currentMedicines.length > 0) {
+      this.saveCurrentPrescription();
+    }
+
+    if (this.allPrescriptions.length > 0) {
+      try {
+        // Create a sale record for the prescriptions
+        const saleData: Omit<SalesOrder, 'id'> = {
+          orderNo: this.generateOrderNumber(),
+          customerId: this.prescriptionForm.value.patientName || 'Anonymous',
+          customerName: this.prescriptionForm.value.patientName || 'Anonymous',
+          saleDate: new Date(),
+          invoiceNo: this.generateInvoiceNumber(),
+          typeOfService: 'Prescription',
+          typeOfServiceName: 'Ayurvedic Prescription',
+          products: [] as { productId: string | undefined; id?: string; name?: string; quantity?: number; unitPrice?: number; subtotal?: number; }[],
+          status: 'Completed',
+          shippingStatus: 'Not Applicable',
+          paymentStatus: 'Paid',
+          paymentAmount: 0,
+          paymentMethod: 'Prescription Service',
+          paidOn: new Date(),
+          shippingDetails: 'Not Required',
+          total: 0,
+          subtotal: 0,
+          tax: 0,
+          shippingCharges: 0,
+          shippingCost: 0,
+          balance: 0,
+          transactionId: this.generateTransactionId(),
+          totalPayable: 0,
+          discountAmount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          customerAge: null,
+          customerDob: null,
+          customerGender: '',
+          businessLocationId: undefined,
+          businessLocation: undefined,
+          orderStatus: ''
+        };
+        
+        // Save the sale data using the service
+        await this.saleService['createSale'](saleData).toPromise();
+        
+        // Emit the form submit event
+        this.formSubmit.emit(this.allPrescriptions);
+        
+        // Clear the form after successful submission
+        this.allPrescriptions = [];
+        this.currentMedicines = [];
+        this.prescriptionForm.reset();
+        
+        alert('Prescriptions submitted successfully!');
+      } catch (error) {
+        console.error('Error saving prescriptions:', error);
+        alert('Error saving prescriptions. Please try again.');
+      }
+    } else {
+      alert('No prescriptions to submit');
+    }
   }
 
-  if (this.allPrescriptions.length > 0) {
-    try {
-      // Create a sale record for the prescriptions
-      const saleData: Omit<SalesOrder, 'id'> = {
-        status: 'Completed',
-        paymentStatus: 'Paid',
-        total: 0,
-        subtotal: 0,
-        tax: 0,
-        shippingCost: 0,
-        discountAmount: 0,
-        paymentAmount: 0,
-        balance: 0,
-        saleDate: new Date().toISOString(),
-        invoiceNo: this.generateInvoiceNumber(),
-        customerId: this.prescriptionForm.value.patientName || 'Anonymous',
-        shippingStatus: 'Not Applicable',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        customerName: this.prescriptionForm.value.patientName || 'Anonymous',
-        shippingCharges: 0,
-        products: [] as Product[]
-      };
-      
-      // Save the sale data using the service
-      await this.saleService['createSale'](saleData).toPromise();
-      
-      // Emit the form submit event
-      this.formSubmit.emit(this.allPrescriptions);
-      
-      // Clear the form after successful submission
-      this.allPrescriptions = [];
-      this.currentMedicines = [];
-      this.prescriptionForm.reset();
-      
-      alert('Prescriptions submitted successfully!');
-    } catch (error) {
-      console.error('Error saving prescriptions:', error);
-      alert('Error saving prescriptions. Please try again.');
-    }
-  } else {
-    alert('No prescriptions to submit');
-  }
-}
   private generateInvoiceNumber(): string {
     const date = new Date();
     return `INV-${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+
+  private generateOrderNumber(): string {
+    const date = new Date();
+    return `PRX-${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+
+  private generateTransactionId(): string {
+    const date = new Date();
+    return `TXN-${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Math.floor(10000 + Math.random() * 90000)}`;
   }
 
   clearForm(): void {

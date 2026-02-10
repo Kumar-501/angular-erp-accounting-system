@@ -1,0 +1,165 @@
+/* src/app/account-dashboard/account-dashboard.component.scss */
+
+:host {
+  display: block;
+  background-color: #f8f9fa;
+  padding: 2rem;
+}
+
+.dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 2rem;
+  h1 {
+    margin: 0 0 0.25rem 0;
+    font-size: 2.5rem;
+    color: #2c3e50;
+  }
+  p {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #7f8c8d;
+  }
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto auto;
+  gap: 1.5rem;
+}
+
+.card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+}
+
+/* --- Top Summary Cards --- */
+.summary-card {
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+  }
+  .card-body {
+    .amount {
+      font-size: 2rem;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    .amount-plain {
+      font-size: 2.25rem;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+    .trend {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+  }
+}
+
+/* --- Main Content Cards --- */
+.account-summary-card {
+  grid-column: 1 / 3; // Span first two columns
+}
+
+.recent-transactions-card {
+  grid-column: 3 / 5; // Span last two columns
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #2c3e50;
+  }
+}
+
+/* --- Account Summary List --- */
+.summary-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  li {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.8rem 0;
+    font-size: 1rem;
+    color: #34495e;
+
+    span:last-child {
+      font-weight: 500;
+    }
+    
+    &.separator {
+      height: 1px;
+      padding: 0;
+      margin: 0.5rem 0;
+      background-color: #ecf0f1;
+    }
+
+    strong {
+        font-size: 1.1rem;
+    }
+  }
+}
+
+/* --- Recent Transactions List --- */
+.transactions-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    &:not(:last-child) {
+      border-bottom: 1px solid #ecf0f1;
+    }
+  }
+
+  .tx-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .tx-description {
+    font-weight: 500;
+    color: #34495e;
+  }
+  
+  .tx-meta {
+    font-size: 0.85rem;
+    color: #95a5a6;
+  }
+  
+  .tx-amount {
+    font-weight: 600;
+  }
+}
+
+/* --- Reusable Helper Classes --- */
+.positive { color: #27ae60; }
+.negative { color: #e74c3c; }
+
+.loading-message {
+  grid-column: 1 / -1; // Span all columns
+  text-align: center;
+  padding: 4rem;
+  font-size: 1.2rem;
+  color: #7f8c8d;
+}

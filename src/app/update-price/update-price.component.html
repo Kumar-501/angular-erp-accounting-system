@@ -1,48 +1,190 @@
 <div class="update-price-container">
-  <h1 class="page-title">Update Price</h1>
-
-  <div class="price-card">
-    <h5 class="card-title">Import Export Product Price</h5>
-    
-    <div class="content-container">
-      <div class="export-section">
-        <button (click)="exportToExcel()" class="export-btn">
-          <span *ngIf="!exporting">Export product prices</span>
-          <span *ngIf="exporting" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-          <span *ngIf="exporting"> Exporting...</span>
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="page-title mb-0">Update Product Prices</h1>
+        <button 
+          class="btn btn-outline-info" 
+          (click)="downloadSampleTemplate()" 
+          [disabled]="exporting || importing">
+          <i class="fas fa-download me-2"></i>Download Template
         </button>
       </div>
-      
-      <div class="import-section">
-        <div class="file-input-container">
-          <span class="file-label">File To Import:</span>
-          <input type="file" (change)="onFileSelected($event)" class="file-input" accept=".xlsx, .xls">
-          <span class="file-name">{{selectedFileName || 'No file chosen'}}</span>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-sync-alt me-2"></i>Import Export Product Prices
+          </h5>
         </div>
         
-        <button (click)="importUpdatedPrices()" class="submit-btn" [disabled]="!selectedFile || importing">
-          <span *ngIf="!importing">Submit</span>
-          <span *ngIf="importing" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-          <span *ngIf="importing"> Updating...</span>
-        </button>
+        <div class="card-body">
+          <!-- Export Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h6 class="text-muted mb-3">
+                <i class="fas fa-file-export me-2"></i>Step 1: Export Current Prices
+              </h6>
+              <button 
+                (click)="exportToExcel()" 
+                class="btn btn-success btn-lg"
+                [disabled]="exporting || importing">
+                <span *ngIf="!exporting">
+                  <i class="fas fa-file-excel me-2"></i>Export Current Product Prices
+                </span>
+                <span *ngIf="exporting">
+                  <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Exporting... Please wait
+                </span>
+              </button>
+              <div class="mt-2">
+                <small class="text-muted">
+                  This will download an Excel file with all current product prices that you can modify.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- Import Section -->
+          <div class="row">
+            <div class="col-12">
+              <h6 class="text-muted mb-3">
+                <i class="fas fa-file-import me-2"></i>Step 2: Import Updated Prices
+              </h6>
+              
+              <div class="mb-3">
+                <label class="form-label fw-bold">Select Excel File to Import:</label>
+                <div class="input-group">
+                  <input 
+                    type="file" 
+                    class="form-control" 
+                    (change)="onFileSelected($event)" 
+                    accept=".xlsx,.xls"
+                    [disabled]="importing || exporting">
+                  <button 
+                    class="btn btn-outline-secondary" 
+                    type="button" 
+                    *ngIf="selectedFile"
+                    (click)="clearFileSelection()">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+                <div class="mt-2" *ngIf="selectedFileName">
+                  <small class="text-success">
+                    <i class="fas fa-file-check me-1"></i>Selected: {{ selectedFileName }}
+                  </small>
+                </div>
+              </div>
+              
+              <button 
+                (click)="importUpdatedPrices()" 
+                class="btn btn-primary btn-lg"
+                [disabled]="!selectedFile || importing || exporting">
+                <span *ngIf="!importing">
+                  <i class="fas fa-upload me-2"></i>Import & Update Prices
+                </span>
+                <span *ngIf="importing">
+                  <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Updating Prices... Please wait
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    
-    <div class="instructions">
-      <h5>Instructions:</h5>
-      <ol>
-        <li>Click "Export product prices" to download current prices</li>
-        <li>Open the Excel file and modify the SellingPrice and DefaultPurchasePrice columns</li>
-        <li>Do NOT change product names or SKUs</li>
-        <li>Save the Excel file</li>
-        <li>Click "Choose File" to select your modified Excel file</li>
-        <li>Click "Submit" to update prices in the system</li>
-      </ol>
-    </div>
+  </div>
 
-    <!-- Status messages -->
-    <div *ngIf="statusMessage" class="status-message" [class.success]="isSuccess" [class.error]="!isSuccess">
-      {{statusMessage}}
+  <!-- Instructions Card -->
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-info text-white">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-info-circle me-2"></i>How to Update Prices
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="text-primary">Step-by-Step Instructions:</h6>
+              <ol class="list-styled">
+                <li class="mb-2">
+                  <strong>Export:</strong> Click "Export Current Product Prices" to download the current price data
+                </li>
+                <li class="mb-2">
+                  <strong>Edit:</strong> Open the downloaded Excel file and modify the price columns as needed
+                </li>
+                <li class="mb-2">
+                  <strong>Save:</strong> Save the Excel file with your changes
+                </li>
+                <li class="mb-2">
+                  <strong>Import:</strong> Use "Select Excel File" to choose your modified file
+                </li>
+                <li class="mb-2">
+                  <strong>Update:</strong> Click "Import & Update Prices" to apply all changes
+                </li>
+              </ol>
+            </div>
+            <div class="col-md-6">
+              <h6 class="text-danger">Important Notes:</h6>
+              <ul class="list-unstyled">
+                <li class="mb-2">
+                  <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                  <strong>DO NOT</strong> change Product Names or SKU values
+                </li>
+                <li class="mb-2">
+                  <i class="fas fa-check text-success me-2"></i>
+                  Only modify price and percentage columns
+                </li>
+                <li class="mb-2">
+                  <i class="fas fa-file-excel text-info me-2"></i>
+                  Ensure all price values are valid numbers
+                </li>
+                <li class="mb-2">
+                  <i class="fas fa-percentage text-primary me-2"></i>
+                  Tax and margin percentages should be between 0-100
+                </li>
+                <li class="mb-2">
+                  <i class="fas fa-save text-secondary me-2"></i>
+                  Save the file in Excel format (.xlsx or .xls)
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+  </div>
+
+  <!-- Status Messages -->
+  <div class="row mt-3" *ngIf="statusMessage">
+    <div class="col-12">
+      <div class="alert" [ngClass]="{
+        'alert-success': isSuccess,
+        'alert-danger': !isSuccess
+      }" role="alert">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <i class="fas" [ngClass]="{
+              'fa-check-circle': isSuccess,
+              'fa-exclamation-triangle': !isSuccess
+            }" class="me-2"></i>
+            {{ statusMessage }}
+          </div>
+          <button 
+            type="button" 
+            class="btn-close" 
+            (click)="clearStatusMessage()"
+            aria-label="Close"></button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

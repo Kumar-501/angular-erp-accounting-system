@@ -631,72 +631,42 @@ updateDepartment(): void {
       });
   }
 
-loadCustomers(): void {
-  this.customerService.getCustomers('all').subscribe((customers) => {
-    // Get current user
-    const currentUser = this.authService.currentUserValue;
-    
-    console.log('Current user:', currentUser); // Debug log
-    console.log('All customers before filtering:', customers.length); // Debug log
-    
-    // Filter customers based on user role
-    let filteredCustomers = customers as Customer[];
-    
-    // Check if user is executive (case-insensitive)
-    if (currentUser?.role?.toLowerCase() === 'executive') {
-      console.log('Filtering for executive user'); // Debug log
+  loadCustomers(): void {
+    this.customerService.getCustomers('all').subscribe((customers) => {
+      // Get the current logged-in user from the authentication service
+      const currentUser = this.authService.currentUserValue;
       
-      // Get possible user identifiers to match against assignedTo field
-      const userIdentifiers = [
-        currentUser.displayName,
-        currentUser.username,
-        currentUser.email
-      ].filter(identifier => identifier && identifier.length > 0);
+      let filteredCustomerList = customers as Customer[];
       
-      console.log('User identifiers to match:', userIdentifiers); // Debug log
-      
-      // Filter customers assigned to the current executive
-      filteredCustomers = filteredCustomers.filter(customer => {
-        const customerAssignedTo = customer.assignedTo;
-        
-        if (!customerAssignedTo) {
-          return false; // Skip customers not assigned to anyone
+      // Check if the user has a role and it's not 'admin'
+      if (currentUser && currentUser.role?.toLowerCase() !== 'admin') {
+        // If the user is assigned to a department, filter customers by that department.
+        if (currentUser.department) {
+          const userDepartment = currentUser.department;
+          filteredCustomerList = filteredCustomerList.filter(customer => customer.department === userDepartment);
+        } else {
+          // If a non-admin user has no department, they see no customers to prevent data leakage.
+          filteredCustomerList = [];
         }
-        
-        // Check if assignedTo matches any of the user identifiers (case-insensitive)
-        const isAssigned = userIdentifiers.some(identifier => 
-          identifier && customerAssignedTo.toLowerCase().trim() === identifier.toLowerCase().trim()
-        );
-        
-        if (isAssigned) {
-          console.log('Customer assigned to executive:', customer.firstName, 'AssignedTo:', customer.assignedTo); // Debug log
-        }
-        
-        return isAssigned;
-      });
+      } 
+      // If the user is an 'admin', they will see all customers, so no filtering is applied here.
+  
+      // Process the final list of customers
+      this.customersList = filteredCustomerList.map(customer => ({
+        ...customer,
+        isIndividual: customer.isIndividual ?? !customer.businessName,
+        lastCallTime: customer.lastCallTime ? 
+          (this.isFirebaseTimestamp(customer.lastCallTime) ? 
+            this.convertToDate(customer.lastCallTime) : 
+            new Date(customer.lastCallTime)) : 
+          undefined,
+        callCount: customer.callCount || 0
+      }));
       
-      console.log('Filtered customers for executive:', filteredCustomers.length); // Debug log
-    } else {
-      console.log('User is not executive, showing all customers'); // Debug log
-    }
-    
-    // Process the filtered customers
-    this.customersList = filteredCustomers.map(customer => ({
-      ...customer,
-      isIndividual: customer.isIndividual ?? !customer.businessName,
-      lastCallTime: customer.lastCallTime ? 
-        (this.isFirebaseTimestamp(customer.lastCallTime) ? 
-          this.convertToDate(customer.lastCallTime) : 
-          new Date(customer.lastCallTime)) : 
-        undefined,
-      callCount: customer.callCount || 0
-    }));
-    
-    console.log('Final customers list:', this.customersList.length); // Debug log
-    
-    this.applyFilters();
-  });
-}
+      // Apply any other active filters from the UI (like search term, status filters, etc.)
+      this.applyFilters();
+    });
+  }
 
   // Helper method to check if an object is a Firebase timestamp
   isFirebaseTimestamp(obj: any): boolean {

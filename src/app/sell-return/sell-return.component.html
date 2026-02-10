@@ -1,139 +1,370 @@
-<div class="container mt-4">
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h4>Process Return - Invoice #{{ saleData?.invoiceNo }}</h4>
-      <button class="btn btn-secondary btn-sm" (click)="navigateToSales()" [disabled]="isProcessing">
-        <i class="fa fa-arrow-left"></i> Back to Sales
-      </button>
+<div class="container-fluid">
+  <div class="card my-3">
+    <div class="card-header bg-light py-3">
+      <h4 class="mb-0">Process Sales Return - Invoice #{{ saleData?.invoiceNo }}</h4>
     </div>
-    
-    <div class="card-body">
-      <!-- Sale Information -->
-      <div class="row mb-4">
-        <div class="col-md-6">
-          <h5>Customer: {{ saleData?.customer }}</h5>
-          <p><strong>Original Sale Date:</strong> {{ saleData?.saleDate | date:'mediumDate' }}</p>
-          <p><strong>Sale ID:</strong> {{ saleData?.id }}</p>
-        </div>
-        <div class="col-md-6 text-end">
-          <div class="alert alert-info">
-            <h5 class="mb-1">Total Refund Amount: ₹{{ totalRefundAmount | number:'1.2-2' }}</h5>
-            <small class="text-muted">Amount will be refunded to customer</small>
+  </div>
+</div>
+
+<!-- Sales Return Modal -->
+<div class="modal fade" id="returnModal" tabindex="-1" aria-labelledby="returnModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content return-modal-custom">
+      
+      <!-- Loading Overlay -->
+      <div class="screen-overlay" *ngIf="isDisabled">
+        <div class="spinner-border text-primary overlay-spinner" role="status"></div>
+        <div class="overlay-message" *ngIf="disabledMessage">{{disabledMessage}}</div>
+      </div>
+      
+      <!-- Modal Header -->
+      <div class="modal-header return-modal-header">
+        <h5 class="modal-title" id="returnModalLabel">
+          <i class="fas fa-undo-alt me-2"></i>Process Sales Return
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="navigateToSales()" 
+                aria-label="Close" [disabled]="isDisabled"></button>
+      </div>
+      
+      <!-- Modal Body -->
+      <div class="modal-body return-modal-body" [class.disabled-content]="isDisabled">
+        <div *ngIf="saleData" class="return-form-container">
+          
+          <!-- Header Information -->
+          <div class="row mb-4 header-section">
+            <div class="col-md-3">
+              <label class="form-label return-label">Invoice No:</label>
+              <div class="return-reference-value">{{saleData.invoiceNo}}</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label return-label">Customer:</label>
+              <div class="return-supplier-value">{{saleData.customer}}</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label return-label">Return Date (Stock):</label>
+              <input type="date" class="form-control return-date-input" 
+                     [(ngModel)]="returnData.returnDate" [disabled]="isDisabled">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label return-label">Return Status:</label>
+              <select class="form-select" [(ngModel)]="returnData.returnStatus" [disabled]="isDisabled">
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Products Table -->
+          <div class="table-responsive mb-4 return-products-table">
+            <table class="table table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th class="product-col">Product Name</th>
+                  <th class="qty-col text-center">Sold Qty</th>
+                  <th class="return-col text-center">Return Qty</th>
+                  <th class="price-col text-center">Unit Price (Before Tax)</th>
+                  <th class="price-col text-center">Unit Price (With Tax)</th>
+                  <th class="tax-col text-center">Tax Rate (%)</th>
+                  <th class="total-col text-center">Subtotal (Before Tax)</th>
+                  <th class="total-col text-center">Tax Amount</th>
+                  <th class="total-col text-center">Total (With Tax)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let product of returnData.products; let i = index" 
+                    [class.table-warning]="product.isReturning">
+                  <td class="product-name">
+                    <div class="product-details">
+                      <strong>{{ product.name || product.productName }}</strong>
+                      <small class="text-muted d-block" *ngIf="product.sku">SKU: {{ product.sku }}</small>
+                      <small class="text-muted d-block" *ngIf="product.barcode">Barcode: {{ product.barcode }}</small>
+                    </div>
+                  </td>
+                  <td class="purchased-qty text-center">
+                    <span class="badge bg-info">{{ product.originalQuantity }}</span>
+                  </td>
+                  <td class="return-qty-input text-center">
+                    <div class="input-group input-group-sm" style="max-width: 220px;">
+                      <button class="btn btn-outline-secondary" type="button" 
+                              (click)="decreaseReturnQuantity(i)"
+                              [disabled]="isDisabled || product.returnQuantity <= 0">
+                        <i class="fa fa-minus"></i>
+                      </button>
+                      <input type="number" 
+                             class="form-control text-center" 
+                             [(ngModel)]="product.returnQuantity" 
+                             (input)="onReturnQuantityChange(i)"
+                             (blur)="onReturnQuantityBlur(i)"
+                             min="0" 
+                             [max]="product.originalQuantity ?? 0" 
+                             [disabled]="isDisabled"
+                             placeholder="0">
+                      <button class="btn btn-outline-secondary" type="button" 
+                              (click)="increaseReturnQuantity(i)"
+                              [disabled]="isDisabled || product.returnQuantity >= product.originalQuantity">
+                        <i class="fa fa-plus"></i>
+                      </button>
+                    </div>
+                  </td>
+                  <td class="unit-price-before-tax text-center">
+                    <strong class="text-primary">₹ {{ getUnitPriceBeforeTax(product) | number:'1.2-2' }}</strong>
+                  </td>
+                  <td class="unit-price text-center">
+                    ₹ {{ (product.unitPrice || product.price || 0) | number:'1.2-2' }}
+                  </td>
+                  <td class="tax-rate text-center">
+                    <span class="badge bg-warning">{{ product.taxRate || 0 }}%</span>
+                  </td>
+                  <td class="subtotal-before-tax text-center">
+                    <strong class="text-success">₹ {{ (product.returnSubtotal || 0) | number:'1.2-2' }}</strong>
+                  </td>
+                  <td class="tax-amount text-center">
+                    ₹ {{ calculateReturnTaxAmount(product) | number:'1.2-2' }}
+                  </td>
+                  <td class="total-amount text-center">
+                    <strong class="text-info">₹ {{ calculateReturnTotalWithTax(product) | number:'1.2-2' }}</strong>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Return Reason -->
+          <div class="mb-4 return-reason-section">
+            <label class="form-label return-label">Return Reason:</label>
+            <textarea class="form-control return-reason-textarea" rows="2" 
+                      placeholder="Please specify the reason for return (optional)..." 
+                      [(ngModel)]="returnData.reason" [disabled]="isDisabled"
+                      maxlength="500"></textarea>
+            <small class="form-text text-muted">{{ returnData.reason.length }}/500 characters</small>
+          </div>
+
+          <!-- ========================================== -->
+          <!-- NEW: REFUND PAYMENT TOGGLE SECTION         -->
+          <!-- ========================================== -->
+          <div class="card bg-light mb-4 border-0 shadow-sm">
+            <div class="card-body">
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="processRefundToggle" 
+                       [(ngModel)]="processRefundNow" [disabled]="isDisabled">
+                <label class="form-check-label fw-bold" for="processRefundToggle">
+                  Process Refund Payment Now?
+                </label>
+                <small class="d-block text-muted mt-1">
+                  <i class="fa fa-info-circle me-1"></i>
+                  If <strong>unchecked</strong>, the return is recorded as a Credit Note (Stock returned, but no money deducted from accounts yet).
+                  If <strong>checked</strong>, the money is immediately deducted from the selected account in the Account Book.
+                </small>
+              </div>
+
+              <!-- Conditional Payment Fields -->
+              <div class="row animate__animated animate__fadeIn" *ngIf="processRefundNow">
+                <div class="col-md-4 mb-3">
+                  <label class="form-label return-label">Refund Date <span class="text-danger">*</span></label>
+                  <input type="date" class="form-control" [(ngModel)]="refundDate" [disabled]="isDisabled">
+                </div>
+
+                <div class="col-md-4 mb-3">
+                  <label class="form-label return-label">Refund From Account <span class="text-danger">*</span></label>
+                  <select class="form-select" [(ngModel)]="selectedAccountId" [disabled]="isDisabled">
+                      <option value="" disabled selected>-- Select Account --</option>
+                      <option *ngFor="let acc of paymentAccounts" [value]="acc.id">
+                          {{ acc.name }}
+                      </option>
+                  </select>
+                  <small class="text-muted">Account balance will decrease.</small>
+                </div>
+
+                <div class="col-md-4 mb-3">
+                  <label class="form-label return-label">Payment Method</label>
+                  <select class="form-select" [(ngModel)]="refundMethod" [disabled]="isDisabled">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Card">Card</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- ========================================== -->
+          <!-- END REFUND TOGGLE SECTION                  -->
+          <!-- ========================================== -->
+          
+          <!-- Total Amount Section with Rounding Display -->
+          <div class="total-amount-section">
+            <div class="row justify-content-end">
+              <div class="col-md-8">
+                <div class="total-breakdown border rounded p-3">
+                  <!-- Product totals -->
+                  <div class="breakdown-row d-flex justify-content-between">
+                    <span class="breakdown-label">Products Subtotal (Before Tax):</span>
+                    <span class="breakdown-value">₹ {{ calculateTotalReturnAmountWithoutTax() | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="breakdown-row d-flex justify-content-between">
+                    <span class="breakdown-label">Product Tax Amount:</span>
+                    <span class="breakdown-value">₹ {{ calculateTotalReturnTaxAmount() | number:'1.2-2' }}</span>
+                  </div>
+                  
+                  <!-- Shipping breakdown for full returns -->
+                  <ng-container *ngIf="isFullReturn() && saleData && getShippingChargeWithoutTax() > 0">
+                    <hr class="my-2">
+                    <div class="breakdown-row shipping-header d-flex justify-content-between">
+                      <span class="breakdown-label text-success"><strong>Shipping Refund Breakdown:</strong></span>
+                      <span class="breakdown-value text-success"><strong>Full Return</strong></span>
+                    </div>
+                    
+                    <div class="breakdown-row shipping-row d-flex justify-content-between">
+                      <span class="breakdown-label">+ Shipping Charge (Before Tax):</span>
+                      <span class="breakdown-value text-warning">
+                        ₹ {{ getShippingChargeWithoutTax() | number:'1.2-2' }}
+                      </span>
+                    </div>
+                    
+                    <div class="breakdown-row shipping-row d-flex justify-content-between">
+                      <span class="breakdown-label">+ Shipping Tax ({{ getShippingTaxRate() }}%):</span>
+                      <span class="breakdown-value text-warning">
+                        ₹ {{ getShippingTaxAmount() | number:'1.2-2' }}
+                      </span>
+                    </div>
+                    
+                    <div class="breakdown-row shipping-row d-flex justify-content-between">
+                      <span class="breakdown-label font-weight-bold">+ Total Shipping Refund:</span>
+                      <span class="breakdown-value text-warning font-weight-bold">
+                        ₹ {{ getShippingChargeWithTax() | number:'1.2-2' }}
+                      </span>
+                    </div>
+                  </ng-container>
+                  
+                  <!-- Message for partial returns -->
+                  <div class="breakdown-row partial-return-note" 
+                       *ngIf="!isFullReturn() && hasReturnItems() && saleData && getShippingChargeWithoutTax() > 0">
+                    <hr class="my-2">
+                    <div class="alert alert-info py-2 mb-2">
+                      <small class="text-muted">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Partial Return Policy:</strong><br>
+                        Shipping charges are not refunded for partial returns<br>
+                        <strong>Shipping Charge:</strong> ₹{{ getShippingChargeWithoutTax() | number:'1.2-2' }} (Before Tax)<br>
+                        <strong>Shipping Tax:</strong> ₹{{ getShippingTaxAmount() | number:'1.2-2' }} ({{ getShippingTaxRate() }}%)<br>
+                        <strong>Total Shipping:</strong> ₹{{ getShippingChargeWithTax() | number:'1.2-2' }} (Retained)
+                      </small>
+                    </div>
+                  </div>
+                  
+                  <!-- No shipping message -->
+                  <div class="breakdown-row no-shipping-note" 
+                       *ngIf="hasReturnItems() && (!saleData || getShippingChargeWithoutTax() === 0)">
+                    <hr class="my-2">
+                    <div class="alert alert-secondary py-2 mb-2">
+                      <small class="text-muted">
+                        <i class="fas fa-info-circle"></i> 
+                        No shipping charges applied to this sale
+                      </small>
+                    </div>
+                  </div>
+                  
+                  <!-- Rounding calculation -->
+                  <div class="breakdown-row exact-calculation" 
+                       *ngIf="hasReturnItems() && Math.abs(getRoundingAdjustment()) > 0.01">
+                    <hr class="my-2">
+                    <div class="breakdown-row d-flex justify-content-between">
+                      <span class="breakdown-label text-muted">Exact Calculated Amount:</span>
+                      <span class="breakdown-value text-muted">₹ {{ getExactReturnAmount() | number:'1.2-2' }}</span>
+                    </div>
+                    <div class="breakdown-row d-flex justify-content-between">
+                      <span class="breakdown-label" [ngClass]="getRoundingAdjustment() > 0 ? 'text-success' : 'text-danger'">
+                        Rounding Adjustment:
+                      </span>
+                      <span class="breakdown-value" [ngClass]="getRoundingAdjustment() > 0 ? 'text-success' : 'text-danger'">
+                        {{ getRoundingAdjustment() >= 0 ? '+' : '' }}₹ {{ getRoundingAdjustment() | number:'1.2-2' }}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <hr class="total-divider">
+                  <div class="breakdown-row grand-total d-flex justify-content-between">
+                    <span class="total-amount-label"><strong>Net Return Amount (Rounded):</strong></span>
+                    <span class="total-amount-value">
+                      <strong class="text-primary fs-5">₹ {{ calculateTotalReturnAmount() | number:'1.0-0' }}</strong>
+                    </span>
+                  </div>
+                  
+                  <!-- Summary breakdown -->
+                  <div class="mt-3 p-2 bg-light rounded">
+                    <small class="text-muted">
+                      <strong>Return Summary:</strong><br>
+                      Return Type: {{ isFullReturn() ? 'Full Return' : 'Partial Return' }}<br>
+                      Products: {{ getReturningItemsCount() }} item(s)<br>
+                      <span *ngIf="isFullReturn() && getShippingChargeWithTax() > 0">
+                        Shipping Refund: ₹{{ getShippingChargeWithTax() | number:'1.2-2' }} (included)<br>
+                      </span>
+                      <span *ngIf="!isFullReturn() && getShippingChargeWithTax() > 0">
+                        Shipping: ₹{{ getShippingChargeWithTax() | number:'1.2-2' }} (not refunded - partial return)<br>
+                      </span>
+                      <span *ngIf="Math.abs(getRoundingAdjustment()) > 0.01" class="text-info">
+                        <i class="fas fa-calculator"></i> Amount rounded {{ getRoundingAdjustment() > 0 ? 'up' : 'down' }} by ₹{{ Math.abs(getRoundingAdjustment()) | number:'1.2-2' }}<br>
+                      </span>
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      
-      <!-- Return Items Table -->
-      <div class="table-responsive">
-        <table class="table table-bordered">
-          <thead class="table-light">
-            <tr>
-              <th>Product</th>
-              <th>Original Qty</th>
-              <th>Return Qty</th>
-              <th>Unit Price (₹)</th>
-              <th>Subtotal (₹)</th>
-              <th class="text-center">Return Item</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let item of returnedItems; let i = index" 
-                [class.table-warning]="item.isReturning">
-              <td>
-                <strong>{{ item.name }}</strong>
-                <br>
-                <small class="text-muted">
-                  ID: {{ item.productId || item.id || 'N/A' }}
-                  <span *ngIf="item.sku"> | SKU: {{ item.sku }}</span>
-                </small>
-              </td>
-              <td>
-                <span class="badge bg-primary">{{ item.originalQuantity }}</span>
-              </td>
-              <td>
-                <div class="input-group input-group-sm" style="max-width: 150px;">
-                  <button class="btn btn-outline-secondary" type="button" 
-                          (click)="decreaseReturnQuantity(i)"
-                          [disabled]="!item.isReturning || item.returnQuantity <= 0">
-                    <i class="fa fa-minus"></i>
-                  </button>
-                  <input type="number" class="form-control text-center" 
-                         [(ngModel)]="item.returnQuantity" 
-                         [disabled]="!item.isReturning"
-                         (change)="validateReturnQuantity(i)"
-                         min="0" [max]="item.originalQuantity">
-                  <button class="btn btn-outline-secondary" type="button" 
-                          (click)="increaseReturnQuantity(i)"
-                          [disabled]="!item.isReturning || item.returnQuantity >= item.originalQuantity">
-                    <i class="fa fa-plus"></i>
-                  </button>
-                </div>
-              </td>
-              <td>₹{{ item.unitPrice | number:'1.2-2' }}</td>
-              <td>
-                <strong>₹{{ (item.isReturning ? (item.unitPrice * item.returnQuantity) : 0) | number:'1.2-2' }}</strong>
-              </td>
-              <td class="text-center">
-                <div class="form-check form-switch d-flex justify-content-center">
-                  <input class="form-check-input" type="checkbox" 
-                         [(ngModel)]="item.isReturning"
-                         (change)="toggleItemReturn(i)"
-                         [id]="'returnSwitch' + i">
-                  <label class="form-check-label ms-2" [for]="'returnSwitch' + i">
-                    <span class="badge" 
-                          [ngClass]="item.isReturning ? 'bg-success' : 'bg-secondary'">
-                      {{ item.isReturning ? 'Returning' : 'Keep' }}
-                    </span>
-                  </label>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="table-info">
-              <td colspan="4" class="text-end"><strong>Total Refund:</strong></td>
-              <td><strong>₹{{ totalRefundAmount | number:'1.2-2' }}</strong></td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      
-      <!-- Return Reason and Process Button -->
-      <div class="row mt-4">
-        <div class="col-md-8">
-          <label for="returnReason" class="form-label">
-            <strong>Return Reason *</strong>
-          </label>
-          <textarea class="form-control" id="returnReason" rows="3" 
-                    [(ngModel)]="returnReason" 
-                    [disabled]="isProcessing"
-                    placeholder="Please enter the reason for return (required)"
-                    maxlength="500"></textarea>
-          <small class="form-text text-muted">{{ returnReason.length }}/500 characters</small>
-        </div>
-        <div class="col-md-4 d-flex align-items-end">
-          <button class="btn btn-primary btn-lg w-100" 
-                  (click)="processReturn()"
-                  [disabled]="isProcessing || !returnReason.trim() || totalRefundAmount <= 0">
-            <span *ngIf="isProcessing" class="spinner-border spinner-border-sm me-2"></span>
-            <i class="fa fa-check me-2" *ngIf="!isProcessing"></i>
-            {{ isProcessing ? 'Processing...' : 'Process Return' }}
-          </button>
-        </div>
-      </div>
-      
-      <!-- Instructions -->
-      <div class="alert alert-info mt-3">
-        <h6><i class="fa fa-info-circle"></i> Instructions:</h6>
-        <ul class="mb-0">
-          <li>Select the items you want to return by toggling the "Return Item" switch</li>
-          <li>Adjust the return quantity using the +/- buttons or by typing in the field</li>
-          <li>Provide a clear reason for the return</li>
-          <li>The stock will be automatically restored to inventory upon processing</li>
-          <li>The original sale record will be updated to reflect the returned items</li>
-        </ul>
+
+      <div class="modal-footer return-modal-footer">
+        <button type="button" class="btn btn-cancel" (click)="navigateToSales()" [disabled]="isDisabled">
+          <i class="fas fa-times me-2"></i>Cancel
+        </button>
+        <button type="button" class="btn btn-submit" (click)="submitReturn()" 
+                [disabled]="isDisabled || !hasReturnItems()">
+          <i class="fas fa-check me-2"></i>
+          {{ processRefundNow ? 'Submit & Refund' : 'Submit Return' }}
+        </button>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Instructions Alert -->
+<div class="alert alert-info mt-3" *ngIf="saleData">
+  <h6><i class="fa fa-info-circle"></i> Instructions:</h6>
+  <ul class="mb-0">
+    <li>Adjust the return quantity using the +/- buttons or by typing in the field.</li>
+    <li>Use the <strong>"Process Refund Payment Now?"</strong> toggle to decide if money should be deducted from the ledger immediately.</li>
+    <li>Unit prices are calculated before tax for accurate refund amounts.</li>
+    <li>Tax amounts are calculated separately and included in the total refund.</li>
+    <li>For full returns, shipping charges and shipping tax will be included in the refund.</li>
+    <li>For partial returns, shipping charges are retained as per policy.</li>
+    <li><strong>Return amounts are automatically rounded to the nearest rupee.</strong></li>
+    <li>Stock will be automatically restored to inventory upon processing.</li>
+  </ul>
+</div>
+
+<style>
+.exact-calculation {
+  background-color: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 8px 0;
+}
+
+.total-amount-value .text-primary {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+}
+
+.breakdown-row {
+  padding: 2px 0;
+}
+
+.grand-total {
+  background-color: #e9ecef;
+  padding: 8px;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+</style>

@@ -235,7 +235,170 @@
 .btn-action .fa-trash {
   color: #ea4335;
 }
+/* Styles for the main container of the list expenses page */
+.expenses-container {
+  padding: 20px;
+  background-color: #f8f9fa;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
 
+.expenses-title {
+  margin-bottom: 20px;
+}
+
+/* Styling for the cards holding filters and the main table */
+.filters-card,
+.expenses-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  padding: 25px;
+  margin-bottom: 25px;
+}
+
+/* Header sections for cards */
+.filters-header,
+.expenses-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #dee2e6;
+  margin-bottom: 20px;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Button groups */
+.filter-buttons,
+.action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* Controls above the table (Show entries, Export, Search) */
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.table-options {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entries-select,
+.search-input {
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+/* ============================================= */
+/* THE MAIN FIX TO SOLVE THE OVERFLOW ISSUE      */
+/* ============================================= */
+.table-container {
+  width: 100%;
+  overflow-x: auto; /* This enables the horizontal scrollbar when needed */
+  -webkit-overflow-scrolling: touch; /* Provides a smoother scrolling experience on mobile */
+}
+
+.expenses-table {
+  width: 100%;
+  min-width: 1800px; /* Set a minimum width to ensure columns don't get too crushed */
+  border-collapse: collapse;
+
+  th, td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #dee2e6;
+    text-align: left;
+    white-space: nowrap; /* This is crucial: it prevents text from wrapping and keeps rows clean */
+    vertical-align: middle;
+  }
+
+  thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    position: sticky;
+    top: 0;
+  }
+
+  tbody tr:hover {
+    background-color: #f1f3f5;
+  }
+
+  .actions {
+    text-align: center;
+  }
+}
+
+/* Row coloring for different entry types */
+.expense-row { background-color: rgba(220, 53, 69, 0.05); }
+.income-row { background-color: rgba(40, 167, 69, 0.05); }
+.sale-row { background-color: rgba(0, 123, 255, 0.05); }
+.shipment-row { background-color: rgba(255, 193, 7, 0.05); }
+.payroll-row { background-color: rgba(111, 66, 193, 0.05); }
+.purchase-row { background-color: rgba(232, 62, 140, 0.05); }
+
+/* Footer row with totals */
+.total-row {
+  font-weight: bold;
+  background-color: #f8f9fa;
+  td {
+    padding: 15px;
+  }
+}
+
+.no-data {
+  text-align: center;
+  padding: 30px;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+/* Pagination styling */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  flex-wrap: wrap;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 5px;
+}
+
+/* Badge styling for entry types and statuses */
+.badge {
+  padding: 6px 12px;
+  border-radius: 15px;
+  color: #fff;
+  font-size: 0.8em;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &.bg-info { background-color: #17a2b8; }
+  &.bg-success { background-color: #28a745; }
+  &.bg-primary { background-color: #007bff; }
+  &.bg-danger { background-color: #dc3545; }
+  &.bg-warning { background-color: #ffc107; color: #212529; }
+  &.bg-payroll { background-color: #6f42c1; }
+}
 /* Optional: Add hover effects to make the icons more interactive */
 .btn-action:hover .fa-eye {
   color: #0d47a1; /* Darker blue on hover */
@@ -352,4 +515,206 @@ input[type="checkbox"] {
 .btn-delete:disabled {
   background-color: #6c757d;
   cursor: not-allowed;
+}.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.pagination-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-page {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.btn-page:hover:not([disabled]) {
+  background: #f0f0f0;
+}
+
+.btn-page[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-page.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}/* ==========================================================================
+   Pay Balance Modal Styles
+   ========================================================================== */
+
+// -- Variables for consistent styling --
+$modal-backdrop-color: rgba(0, 0, 0, 0.5);
+$modal-background-color: #ffffff;
+$modal-border-radius: 8px;
+$modal-box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+$modal-header-bg: #f8f9fa;
+$modal-border-color: #dee2e6;
+$info-card-bg: #f8f9fa; // Light gray for the details card
+
+// --- Main Modal Overlay ---
+// This creates the semi-transparent background and centers the modal.
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: $modal-backdrop-color;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050; // Ensure it's on top of other content
+  animation: fadeIn 0.3s ease-out;
+}
+
+// --- Modal Dialog & Content ---
+// The main container for the modal card.
+.modal-dialog {
+  width: 100%;
+  max-width: 800px; // A good width for a large modal
+  margin: 1.75rem auto;
+  animation: scaleIn 0.3s ease-out;
+
+  .modal-content {
+    background-color: $modal-background-color;
+    border-radius: $modal-border-radius;
+    box-shadow: $modal-box-shadow;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; // Prevent modal from being too tall on smaller screens
+  }
+}
+
+// --- Modal Sections ---
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid $modal-border-color;
+  background-color: $modal-header-bg;
+  border-top-left-radius: $modal-border-radius;
+  border-top-right-radius: $modal-border-radius;
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    color: #343a40;
+  }
+}
+
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto; // Add scrollbar if content overflows vertically
+  flex-grow: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid $modal-border-color;
+  background-color: $modal-header-bg;
+  border-bottom-left-radius: $modal-border-radius;
+  border-bottom-right-radius: $modal-border-radius;
+
+  .btn {
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+// --- Specific Content Styling ---
+
+// Left-side "Transaction Details" card
+.info-card {
+  background-color: $info-card-bg;
+  padding: 1.5rem;
+  border-radius: $modal-border-radius;
+  height: 100%;
+  border: 1px solid $modal-border-color;
+
+  .card-title {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    border-bottom: 1px solid $modal-border-color;
+    padding-bottom: 0.75rem;
+  }
+
+  p {
+    margin-bottom: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.95rem;
+
+    strong {
+      color: #495057;
+      margin-right: 1rem;
+    }
+
+    span {
+      text-align: right;
+    }
+  }
+}
+
+// Right-side payment form
+.payment-form {
+  padding: 0 1rem; // Add some spacing
+}
+
+// --- Form Element Styling ---
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: #fff;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+  &:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+}
+
+// --- Animations for smooth appearance ---
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }

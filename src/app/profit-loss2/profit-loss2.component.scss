@@ -1,0 +1,257 @@
+.pl-container {
+  font-family: Arial, sans-serif;
+  background-color: #f4f6f9;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 1200px;
+  margin: auto;
+}
+/*
+ * Styles for the Profit & Loss Report Component
+ */
+.custom-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+
+  .date-separator {
+    color: #666;
+    font-weight: 500;
+  }
+
+  .apply-btn {
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover {
+      background-color: #0056b3;
+    }
+  }
+}
+
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 150px;
+
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    height: 35px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    background-color: #fff !important;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      color: #0d6efd;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+/* Main header container for title and filters */
+.pl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap; /* Allows filters to wrap on smaller screens */
+  margin-bottom: 20px;
+  gap: 15px; /* Adds space between items */
+}
+
+/* Container for the predefined filter buttons (Today, Yesterday, etc.) */
+.filter-buttons {
+  display: flex;
+  gap: 10px; /* Space between buttons */
+}
+
+/* Styling for the new custom date filter section */
+.custom-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between date inputs and the button */
+  border: 1px solid #ccc;
+  padding: 8px;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+/* Style for the date input fields */
+.custom-date-filter input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.custom-date-filter input[type="date"]:focus {
+  border-color: #007bff; /* Highlight border on focus */
+}
+
+/* Style for the "Apply Filter" button */
+.custom-date-filter button {
+  padding: 7px 15px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  background-color: #333; /* A neutral dark color for the button */
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.custom-date-filter button:hover {
+  background-color: #555; /* Darker shade on hover */
+}
+
+/* Style for the existing filter buttons to ensure consistency */
+.filter-btn {
+    padding: 8px 16px;
+    font-size: 14px;
+    color: white;
+    background-color: #007bff; /* Matching the blue from the screenshot */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.filter-btn:hover {
+    background-color: #0056b3; /* Darker blue on hover */
+}
+.pl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  h3 {
+    color: #333;
+    margin: 0;
+  }
+}
+
+.filter-btn {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: background-color 0.3s;
+
+  &:hover {
+    background-color: #0056b3;
+  }
+}
+
+.pl-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  background-color: #fff;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+}
+
+.pl-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.pl-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 10px;
+  border-bottom: 1px solid #f0f0f0;
+  
+  &.header {
+    font-weight: bold;
+    color: #555;
+    background-color: #fafafa;
+    border-bottom: 2px solid #e0e0e0;
+  }
+  
+  &.sub-item {
+    padding-left: 30px;
+    color: #666;
+  }
+
+  span:first-child {
+    text-align: left;
+  }
+
+  span:last-child {
+    text-align: right;
+  }
+}
+
+.pl-total-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  background-color: #fff;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  margin-bottom: 20px;
+  font-size: 1.1em;
+
+  strong {
+     display: block;
+     padding: 0 10px;
+  }
+  
+  strong:nth-child(odd) {
+    text-align: left;
+  }
+  strong:nth-child(even) {
+    text-align: right;
+  }
+}
+
+.loading-overlay {
+  text-align: center;
+  padding: 50px;
+  font-size: 1.2em;
+  color: #555;
+}

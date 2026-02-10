@@ -184,7 +184,12 @@
       <option *ngFor="let gender of genders" [value]="gender">{{gender}}</option>
     </select>
   </div>
-  
+  <!-- Add this after the business name field (for both individual and business) -->
+<div class="form-group">
+  <label for="occupation">Occupation</label>
+  <input type="text" formControlName="occupation" id="occupation" 
+         placeholder="Occupation" class="form-control">
+</div>
   <div class="form-group">
     <label for="dateOfBirth">Date of Birth</label>
     <input type="date" formControlName="dateOfBirth" id="dateOfBirth" class="form-control">
@@ -192,75 +197,87 @@
 </div>
 
 
-       <!-- Mobile field -->
-  <div class="form-group">
-    <label for="mobile">Mobile<span class="required-asterisk">*</span></label>
-    <div class="input-container">
-      <span class="icon-container">
-        <i class="mobile-icon"></i>
-      </span>
-      <input type="text" formControlName="mobile" id="mobile" 
-             placeholder="Mobile" class="form-control" 
-             [ngClass]="{'invalid': f['mobile'].touched && f['mobile'].invalid}"
-             (input)="validateMobileNumber()"
-             (blur)="validateMobileNumber()"
-             maxlength="10">
-    </div>
-    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['required']">
-      Mobile number is required
-    </small>
-    <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['pattern']">
-      Mobile number must be exactly 10 digits
-    </small>
-  </div>
-
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="landline">Landline</label>
-              <input type="text" formControlName="landline" id="landline" 
-                     placeholder="Landline" class="form-control"
-                     (input)="validateLandline()"
-                     (blur)="validateLandline()"
-                     maxlength="10">
-              <small class="error-text" *ngIf="landlineValidationMessage">
-                {{ landlineValidationMessage }}
-              </small>
-            </div>
 <div class="form-group">
-  <label for="alternateContact">Alternate Contact</label>
+  <label for="mobile">Mobile<span class="required-asterisk">*</span></label>
   <div class="input-container">
-    <input type="text" formControlName="alternateContact" id="alternateContact" 
-           placeholder="Alternate Contact" class="form-control"
-           (input)="validateAlternateContact()"
-           (blur)="validateAlternateContact()"
-           maxlength="10">
+    <span class="icon-container">
+      <i class="mobile-icon"></i>
+    </span>
+    <input type="text" 
+           formControlName="mobile" 
+           id="mobile" 
+           placeholder="Mobile (10-12 digits)" 
+           class="form-control" 
+           [ngClass]="{'invalid': f['mobile'].touched && (f['mobile'].invalid || mobileValidationMessage)}"
+           (input)="onPhoneNumberInput($event, 'mobile')"
+           (blur)="validateMobileNumber()"
+           maxlength="25">
   </div>
-  <small class="error-text" *ngIf="f['alternateContact'].touched && f['alternateContact'].errors?.['pattern']">
-    Alternate contact must be exactly 10 digits
+  <!-- Error for Required -->
+  <small class="error-text" *ngIf="f['mobile'].touched && f['mobile'].errors?.['required']">
+    Mobile number is required
+  </small>
+  <!-- Error for Digit Count (10-12) -->
+  <small class="error-text" *ngIf="mobileValidationMessage">
+    {{ mobileValidationMessage }}
   </small>
 </div>
 
 
-
+<div class="form-row">
+  <!-- Landline field -->
   <div class="form-group">
-    <label for="email">Email<span class="required-asterisk"></span></label>
+    <label for="landline">Landline</label>
+    <input type="text" 
+           formControlName="landline" 
+           id="landline" 
+           placeholder="Landline (10-12 digits)" 
+           class="form-control"
+           [ngClass]="{'invalid': landlineValidationMessage}"
+           (input)="onPhoneNumberInput($event, 'landline')"
+           maxlength="25">
+    <small class="error-text" *ngIf="landlineValidationMessage">
+      {{ landlineValidationMessage }}
+    </small>
+  </div>
+<div class="form-group">
+    <label for="alternateContact">Alternate Contact</label>
+    <div class="input-container">
+      <input type="text" 
+             formControlName="alternateContact" 
+             id="alternateContact" 
+             placeholder="Alternate (10-12 digits)" 
+             class="form-control"
+             [ngClass]="{'invalid': alternateContactValidationMessage}"
+             (input)="onPhoneNumberInput($event, 'alternateContact')"
+             maxlength="25">
+    </div>
+    <small class="error-text" *ngIf="alternateContactValidationMessage">
+      {{ alternateContactValidationMessage }}
+    </small>
+  </div>
+
+
+
+ <div class="form-group">
+    <label for="email">Email</label>
     <div class="input-container">
       <span class="icon-container">
         <i class="email-icon"></i>
       </span>
-      <input type="email" formControlName="email" id="email" placeholder="Email" 
-             class="form-control" [ngClass]="{'invalid': f['email'].touched && f['email'].invalid}">
+      <input type="email" 
+             formControlName="email" 
+             id="email" 
+             placeholder="Email" 
+             class="form-control" 
+             [ngClass]="{'invalid': f['email'].touched && f['email'].invalid}">
     </div>
-    <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['required']">
-      Email is required
-    </small>
     <small class="error-text" *ngIf="f['email'].touched && f['email'].errors?.['email']">
       Please enter a valid email
     </small>
   </div>
+</div>
 
-          </div>
 
 
 
@@ -437,11 +454,12 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" (click)="toggleForm()" class="close-btn">Close</button>
+  <!-- +++ CHANGE THE (click) EVENT ON THIS BUTTON +++ -->
+  <button type="button" (click)="closeForm()" class="close-btn">Close</button>
   <button type="submit" class="save-btn" [disabled]="isSaving">
     {{ isSaving ? 'Saving...' : 'Save' }}
   </button>
-</div>       
+</div>
         </form>
    
   <!-- Recent Leads Section (40%) -->

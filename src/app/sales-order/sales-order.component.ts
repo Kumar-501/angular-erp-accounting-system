@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { SaleService } from '../services/sale.service';
-import { Observable, BehaviorSubject, combineLatest } from 'rxjs';
+import { Observable, BehaviorSubject, combineLatest, async } from 'rxjs';
 import { Router } from '@angular/router';
 import { FormControl } from '@angular/forms';
 import { map, startWith, debounceTime, distinctUntilChanged } from 'rxjs/operators';
@@ -8,8 +8,13 @@ import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { LocationService } from '../services/location.service';
 import { TypeOfServiceService } from '../services/type-of-service.service';
 import { AuthService } from '../auth.service';
-import * as moment from 'moment'; // Add moment.js for date handling
-import { Modal } from 'bootstrap';interface SelectedSale {
+import * as moment from 'moment';
+import { Modal } from 'bootstrap';
+import { UserService } from '../services/user.service';
+import * as XLSX from 'xlsx'; // Import the Excel library
+
+
+interface SelectedSale {
   id: string;
   selected: boolean;
 }
@@ -23,7 +28,7 @@ interface Product {
   quantityRemaining?: number;
   taxRate: number;
   taxAmount: number;
-  taxType?: string; // 'CGST+SGST' or 'IGST'
+  taxType?: string;
   cgstAmount?: number;
   sgstAmount?: number;
   igstAmount?: number;
@@ -45,6 +50,8 @@ interface SalesOrder {
   paymentDue: number;
   alternateContact?: string;
   totalPayable?: number;
+  orderStatus: string;
+
   balanceAmount: number;
   customerPhone: string;
   shippingDetails?: string;
@@ -54,9 +61,10 @@ interface SalesOrder {
   billingAddress: string;
   transactionId?: string;
   prescriptions?: Prescription[];
-  saleDate: string;
   orderNo: string;
   status: string;
+    saleDate?: string | Date | { toDate: () => Date };
+
   serviceType: string;
   typeOfService: string;
   customerName?: string;
@@ -77,11 +85,13 @@ interface SalesOrder {
   addedByDepartment?: string;
   shippingAddress: string;
   sellNote: string;
+    department?: string; // For filtering and display
+
   paymentNote: string;
   deliveryPerson: string;
   products: Product[];
+  commissionPercentage?: number;
   
-  // Tax-related properties
   taxAmount?: number;
   taxDetails?: {
     cgst: number;
@@ -112,6 +122,7 @@ interface Medicine {
 }
 
 interface PartialSalesOrder {
+  commissionPercentage: number;
   paymentAccountName: any;
   paymentAccount: any;
   id?: string;
@@ -119,6 +130,8 @@ interface PartialSalesOrder {
   customerPhone?: string;
   businessLocation?: string;
   location?: string;
+    orderStatus?: string; // Add this line
+
   saleDate?: string;
   alternateContact?: string;
   invoiceNo?: string;
@@ -154,8 +167,8 @@ interface PartialSalesOrder {
   product?: Array<Partial<Product>>;
   transactionId?: string;
   prescriptions?: Prescription[];
-  
-  // Tax-related properties
+    department?: string; // <-- FIX: Added this property to resolve the error
+
   taxAmount?: number;
   taxDetails?: {
     cgst: number;
@@ -175,7 +188,10 @@ interface FilterOptions {
   addedBy?: string;
   addedByDepartment?: string;
   addedByRole?: string;
+    department?: string; // Added for filtering
+
   serviceType: string;
+  paymentMethod?: string;
   dateRange: {
     startDate: string;
     endDate: string;
@@ -215,95 +231,52 @@ interface DepartmentExecutive {
 export class SalesOrderComponent implements OnInit {
   selectedSales: SelectedSale[] = [];
   allSelected = false;
-  // In your sales-order.component.ts
-// Date filter properties
-isDateDrawerOpen: boolean = false;
-selectedRange: string = '';
-isCustomDate: boolean = false;
-dateRangeLabel: string = '';
+  isDateDrawerOpen: boolean = false;
+  selectedRange: string = '';
+  
+  isCustomDate: boolean = false;
+  pageSize = 10;
+  dateRangeLabel: string = '';
   currentUser: User | null = null;
   departmentExecutives: DepartmentExecutive[] = [];
   departmentSalesCount = 0;
   selectedSaleForAction: SalesOrder | null = null;
-actionModal: any;
+  actionModal: any;
+    users: any[] = []; // Add this property to store user data
+
+  // Raw data from service
   private allSalesData$ = new BehaviorSubject<SalesOrder[]>([]);
-  private modal: any;
-// Add these properties to your component class
-quickDateFilters = [
-  { value: 'today', label: 'Today' },
-  { value: 'yesterday', label: 'Yesterday' },
-  { value: 'thisWeek', label: 'This Week' },
-  { value: 'thisMonth', label: 'This Month' },
-  { value: 'lastMonth', label: 'Last Month' },
-  { value: 'custom', label: 'Custom Range' }
-];
-
-activeQuickFilter: string = '';
-
-// Add this method to your component
-// Add this method to your component
-applyQuickDateFilter(filter: string): void {
-  this.activeQuickFilter = filter;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  switch(filter) {
-    case 'today':
-      this.filterOptions.dateRange.startDate = today.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-      break;
-      
-    case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      this.filterOptions.dateRange.startDate = yesterday.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = yesterday.toISOString().split('T')[0];
-      break;
-      
-    case 'thisWeek':
-      const firstDayOfWeek = new Date(today);
-      firstDayOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
-      this.filterOptions.dateRange.startDate = firstDayOfWeek.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-      break;
-      
-    case 'thisMonth':
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      this.filterOptions.dateRange.startDate = firstDayOfMonth.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-      break;
-      
-    case 'lastMonth':
-      const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      this.filterOptions.dateRange.startDate = firstDayOfLastMonth.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = lastDayOfLastMonth.toISOString().split('T')[0];
-      break;
-      
-    case 'custom':
-      // You'll need to implement custom date picker logic here
-      // For now, just clear the dates
-      this.filterOptions.dateRange.startDate = '';
-      this.filterOptions.dateRange.endDate = '';
-      return;
-  }
   
-  // Apply the filters
-  this.applyFilters();
-}
+  // Filtered data
+  filteredSales: SalesOrder[] = [];
+  
+  // Filter properties
+  searchTerm: string = '';
+  statusFilter: string = '';
+  paymentMethodFilter: string = '';
+  shippingStatusFilter: string = '';
+  addedByFilter: string = '';
+  locationFilter: string = '';
+  startDate: string = '';
+  endDate: string = '';
+  quickDateFilter: string = '';
+  minCommission: number | null = null;
+  maxCommission: number | null = null;
+
+  quickDateFilters = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'thisWeek', label: 'This Week' },
+    { value: 'thisMonth', label: 'This Month' },
+    { value: 'lastMonth', label: 'Last Month' },
+    { value: 'custom', label: 'Custom Range' }
+  ];
+
+  activeQuickFilter: string = '';
+
   searchControl = new FormControl('');
   selectedSale: SalesOrder | null = null;
   viewSaleModal: any;
-
-  viewSale(sale: SalesOrder, event?: Event): void {
-    if (event) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
-    
-    this.selectedSale = sale;
-    this.viewSaleModal?.show();
-  }
 
   sales$!: Observable<SalesOrder[]>;
   sortedSales$!: Observable<SalesOrder[]>;
@@ -313,40 +286,49 @@ applyQuickDateFilter(filter: string): void {
   sortColumn: string = '';
   sortDirection: 'asc' | 'desc' = 'asc';
   
-  columns = [
-    { key: 'actions', label: 'Actions', visible: true },
-    { key: 'select', label: 'Select', visible: true },
-    { key: 'contactNumbers', label: 'Contact Numbers', visible: true },
-    { key: 'sno', label: 'S.No', visible: true },
-    { key: 'alternateContact', label: 'Alternate Contact', visible: true },
-    { key: 'department', label: 'Department', visible: true },
-    { key: 'customer', label: 'Customer Name', visible: true },
-    { key: 'product', label: 'Product', visible: true },
-    { key: 'customerPhone', label: 'Contact Number', visible: true },
-    { key: 'location', label: 'Location', visible: true },
-    { key: 'shippingAddress', label: 'Shipping Address', visible: true },
-    { key: 'paymentMethod', label: 'Payment Method', visible: true },
-    { key: 'paymentAccount', label: 'Payment Account', visible: true },
-    { key: 'saleDate', label: 'Sale Date', visible: true },
-    { key: 'orderNo', label: 'Order No', visible: true },
-    { key: 'typeOfService', label: 'Type of Service', visible: true },
-    { key: 'status', label: 'Status', visible: true },
-    { key: 'shippingStatus', label: 'Shipping Status', visible: true },
-    { key: 'addedBy', label: 'Added By', visible: true },
-    { key: 'billingAddress', label: 'Billing Address', visible: true },
-    { key: 'transactionId', label: 'Transaction ID', visible: true },
-    { key: 'shippingDetails', label: 'Shipping Details', visible: true },
-    { key: 'invoiceNo', label: 'Invoice No', visible: true },
-    { key: 'paymentDue', label: 'Payment Due', visible: true },
-    { key: 'balanceAmount', label: 'Balance Amount', visible: true },
-    { key: 'batchNumber', label: 'Batch No', visible: true },
-    { key: 'expiryDate', label: 'Expiry Date', visible: true },
+columns = [
+  { key: 'actions', label: 'Actions', visible: true },
+    { key: 'select', label: 'Select', visible: true }, // Changed from false to true
+
+  { key: 'select', label: 'Select', visible: false }, // Hidden by default
+  { key: 'sno', label: 'S.No', visible: false }, // Hidden by default
+  { key: 'saleDate', label: 'Sale Date', visible: true },
+    { key: 'invoiceNo', label: 'Invoice No', visible: true }, // Change this to true
+
+  { key: 'orderNo', label: 'Order No', visible: true },
+    { key: 'orderStatus', label: 'Order Status', visible: true },
+
+  { key: 'customer', label: 'Customer Name', visible: true },
+  { key: 'customerPhone', label: 'Contact Number', visible: true },
+  { key: 'transactionId', label: 'Transaction ID', visible: true },
+  { key: 'location', label: 'Location', visible: true },
+  { key: 'status', label: 'Status', visible: true },
+  { key: 'typeOfService', label: 'Type of Service', visible: true },
+  { key: 'shippingStatus', label: 'Shipping Status', visible: true },
+  { key: 'addedBy', label: 'Added By', visible: true },
+   { key: 'product', label: 'Product', visible: true },
+    { key: 'quantity', label: 'Total Qty', visible: true },
     { key: 'totalPayable', label: 'Total Payable', visible: true },
-    { key: 'taxAmount', label: 'Tax Amount', visible: true },
-    { key: 'cgstAmount', label: 'CGST', visible: true },
-    { key: 'sgstAmount', label: 'SGST', visible: true },
-    { key: 'igstAmount', label: 'IGST', visible: true }
-  ];
+  
+  // All other columns should be hidden by default
+  { key: 'alternateContact', label: 'Alternate Contact', visible: false },
+  { key: 'product', label: 'Product', visible: true },
+  { key: 'shippingAddress', label: 'Shipping Address', visible: false },
+  { key: 'paymentMethod', label: 'Payment Method', visible: false },
+  { key: 'paymentAccount', label: 'Payment Account', visible: false },
+  { key: 'billingAddress', label: 'Billing Address', visible: false },
+  { key: 'shippingDetails', label: 'Shipping Details', visible: false },
+  { key: 'invoiceNo', label: 'Invoice No', visible: false },
+  { key: 'paymentDue', label: 'Payment Due', visible: false },
+  { key: 'balanceAmount', label: 'Balance Amount', visible: false },
+  { key: 'batchNumber', label: 'Batch No', visible: false },
+  { key: 'expiryDate', label: 'Expiry Date', visible: false },
+  { key: 'totalPayable', label: 'Total Payable', visible: false },
+  { key: 'taxAmount', label: 'Tax Amount', visible: false },
+  { key: 'cgstAmount', label: 'CGST', visible: false },
+  { key: 'sgstAmount', label: 'SGST', visible: false },
+  { key: 'igstAmount', label: 'IGST', visible: false }
+];
   
   showFilters = false;
   Math = Math;
@@ -355,7 +337,10 @@ applyQuickDateFilter(filter: string): void {
     customer: '',
     status: '',
     serviceType: '',
+        department: '', // <-- ADDED THIS LINE
+
     shippingStatus: '',
+    paymentMethod: '',
     dateRange: {
       startDate: '',
       endDate: ''
@@ -363,7 +348,6 @@ applyQuickDateFilter(filter: string): void {
   };
   
   currentPage = 1;
-  pageSize = 25;
   expandedSaleId: string | null = null;
   
   serviceTypes: any[] = [];
@@ -378,56 +362,823 @@ applyQuickDateFilter(filter: string): void {
     private modalService: NgbModal,  
     private locationService: LocationService,
     private typeOfServiceService: TypeOfServiceService,
-    private authService: AuthService
+    private authService: AuthService,
+    private userService:UserService
   ) {}
 
-  toggleSelectAll(): void {
-    this.allSelected = !this.allSelected;
-    
-    const displayedSales = this.getDisplayedSales();
-    
-    if (this.allSelected) {
-      displayedSales.forEach(sale => {
-        const existingIndex = this.selectedSales.findIndex(s => s.id === sale.id);
-        if (existingIndex === -1) {
-          this.selectedSales.push({ id: sale.id, selected: true });
-        } else {
-          this.selectedSales[existingIndex].selected = true;
-        }
-      });
-    } else {
-      displayedSales.forEach(sale => {
-        const existingIndex = this.selectedSales.findIndex(s => s.id === sale.id);
-        if (existingIndex > -1) {
-          this.selectedSales[existingIndex].selected = false;
-        }
-      });
-      
-      this.selectedSales = this.selectedSales.filter(s => s.selected);
+// Make sure these helper methods are present in your component:
+
+/**
+ * Helper: Check if any sales are selected
+ */
+hasSelectedSales(): boolean {
+  return this.selectedSales.some(s => s.selected);
+}
+
+/**
+ * Helper: Toggle selection of a single sale
+ */
+toggleSelectSale(saleId: string, event: any): void {
+  const checked = event.target.checked;
+  if (checked) {
+    if (!this.selectedSales.find(s => s.id === saleId)) {
+      this.selectedSales.push({ id: saleId, selected: true });
     }
+  } else {
+    this.selectedSales = this.selectedSales.filter(s => s.id !== saleId);
+    this.allSelected = false;
   }
-getCurrentDateRangeDisplay(): string {
-  if (!this.filterOptions.dateRange.startDate || !this.filterOptions.dateRange.endDate) {
-    return '';
+}
+
+/**
+ * Helper: Toggle select all checkboxes
+ */
+toggleSelectAll(): void {
+  if (this.allSelected) {
+    // Select all filtered sales on current page
+    const currentPageSales = this.filteredSales.slice(
+      (this.currentPage - 1) * this.pageSize,
+      this.currentPage * this.pageSize
+    );
+    
+    currentPageSales.forEach(sale => {
+      if (!this.isSaleSelected(sale.id)) {
+        this.selectedSales.push({ id: sale.id, selected: true });
+      }
+    });
+  } else {
+    // Unselect all on current page
+    const currentPageSaleIds = this.filteredSales
+      .slice((this.currentPage - 1) * this.pageSize, this.currentPage * this.pageSize)
+      .map(s => s.id);
+    
+    this.selectedSales = this.selectedSales.filter(
+      s => !currentPageSaleIds.includes(s.id)
+    );
+  }
+}
+
+/**
+ * Helper: Check if a sale is selected
+ */
+isSaleSelected(saleId: string): boolean {
+  return this.selectedSales.some(s => s.id === saleId && s.selected);
+}
+  ngOnInit(): void {
+    this.authService.getCurrentUser().subscribe(user => {
+      this.currentUser = user;
+      
+      if (user) {
+        this.loadDepartmentInfo();
+        this.applyRoleBasedFilters();
+      }
+    });
+    
+    this.loadBusinessLocations();
+    this.loadCustomers();
+        this.loadUsers(); // Add this call
+
+    this.loadServiceTypes();
+    this.setupSearchFilter();
+    this.loadSalesData();
+  }
+// Add these methods inside the SalesOrderComponent class
+
+/**
+ * Returns an array of currently active filters for display as chips
+ */
+
+// Toggle all checkboxes based on current filtered results
+/**
+ * ✅ FIXED: Bulk convert selected sales to Completed with proper UI refresh
+ */
+async bulkConvertToCompleted(): Promise<void> {
+  const selectedIds = this.selectedSales
+    .filter(sale => sale.selected)
+    .map(sale => sale.id);
+
+  if (selectedIds.length === 0) {
+    alert('Please select at least one order to convert to Completed');
+    return;
   }
 
-  const start = new Date(this.filterOptions.dateRange.startDate);
-  const end = new Date(this.filterOptions.dateRange.endDate);
+  // Get orders to convert (exclude already completed)
+  const ordersToConvert = this.filteredSales.filter(sale => 
+    selectedIds.includes(sale.id) && sale.orderStatus !== 'Completed'
+  );
+
+  if (ordersToConvert.length === 0) {
+    alert('All selected orders are already Completed');
+    return;
+  }
+
+  const skippedCount = selectedIds.length - ordersToConvert.length;
+  const confirmMsg = `Are you sure you want to mark ${ordersToConvert.length} selected order(s) as Completed?\n\n` +
+    `This will:\n` +
+    `- Update order status to Completed\n` +
+    `- Reduce stock levels\n` +
+    `- Create account ledger entries\n\n` +
+    (skippedCount > 0 ? `Note: ${skippedCount} order(s) are already completed and will be skipped.` : '');
   
-  return `Showing data from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    console.log(`Converting ${ordersToConvert.length} orders to Completed...`);
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    // Process in batches of 5
+    const batchSize = 5;
+    for (let i = 0; i < ordersToConvert.length; i += batchSize) {
+      const batch = ordersToConvert.slice(i, i + batchSize);
+      
+      await Promise.allSettled(
+        batch.map(async (sale) => {
+          try {
+            console.log(`Converting sale ${sale.id} to Completed...`);
+            await this.saleService.updateSaleStatus(sale.id, 'Completed');
+            successCount++;
+            console.log(`✅ Sale ${sale.id} converted successfully`);
+          } catch (error: any) {
+            errorCount++;
+            errors.push(`Order #${sale.orderNo}: ${error.message}`);
+            console.error(`❌ Failed to convert sale ${sale.id}:`, error);
+          }
+        })
+      );
+    }
+
+    // ✅ FIX: Clear selections BEFORE showing alert
+    this.selectedSales = [];
+    this.allSelected = false;
+    
+    // ✅ FIX: Force UI refresh by manually updating the local data
+    // This ensures the UI updates immediately without waiting for Firebase
+    ordersToConvert.forEach(convertedSale => {
+      const saleInList = this.filteredSales.find(s => s.id === convertedSale.id);
+      if (saleInList) {
+        saleInList.orderStatus = 'Completed';
+        saleInList.status = 'Completed';
+      }
+    });
+    
+    // ✅ FIX: Trigger change detection
+    this.filteredSales = [...this.filteredSales];
+    
+    // Show results
+    let message = `Bulk conversion completed:\n✅ ${successCount} order(s) successfully converted to Completed`;
+    
+    if (errorCount > 0) {
+      message += `\n❌ ${errorCount} order(s) failed`;
+      if (errors.length > 0) {
+        message += '\n\nErrors:\n' + errors.slice(0, 5).join('\n');
+        if (errors.length > 5) {
+          message += `\n... and ${errors.length - 5} more errors`;
+        }
+      }
+    }
+    
+    alert(message);
+    
+    // ✅ FIX: Wait a moment for Firebase to sync, then refresh data
+    setTimeout(() => {
+      console.log('Refreshing sales data after bulk conversion...');
+      this.loadSalesData();
+    }, 1000);
+    
+  } catch (error: any) {
+    console.error('Error in bulk conversion:', error);
+    alert('Error during bulk conversion. Please check the console for details.');
+  }
 }
+
+/**
+ * ✅ FIXED: Convert single sale with proper UI refresh
+ */
+async convertToCompleted(sale: SalesOrder): Promise<void> {
+  if (!sale || !sale.id) {
+    alert('Invalid sale data');
+    return;
+  }
+
+  if (sale.orderStatus === 'Completed') {
+    alert('This order is already completed');
+    return;
+  }
+
+  const confirmMsg = `Are you sure you want to mark Order #${sale.orderNo} as Completed?\n\n` +
+    `This will:\n` +
+    `- Update the order status to Completed\n` +
+    `- Reduce stock levels\n` +
+    `- Create account ledger entries`;
+  
+  if (confirm(confirmMsg)) {
+    try {
+      console.log(`Converting sale ${sale.id} to Completed...`);
+      
+      await this.saleService.updateSaleStatus(sale.id, 'Completed');
+      
+      console.log(`✅ Sale ${sale.id} converted successfully`);
+      
+      // ✅ FIX: Update local data immediately
+      const saleInList = this.filteredSales.find(s => s.id === sale.id);
+      if (saleInList) {
+        saleInList.orderStatus = 'Completed';
+        saleInList.status = 'Completed';
+      }
+      
+      // ✅ FIX: Trigger change detection
+      this.filteredSales = [...this.filteredSales];
+      
+      alert(`Order #${sale.orderNo} has been successfully marked as Completed`);
+      
+      // Close the modal if it's open
+      if (this.actionModal) {
+        this.actionModal.hide();
+      }
+      
+      // ✅ FIX: Refresh data after a moment
+      setTimeout(() => {
+        console.log('Refreshing sales data after conversion...');
+        this.loadSalesData();
+      }, 1000);
+      
+    } catch (error: any) {
+      console.error('Error converting sale to completed:', error);
+      alert('Failed to convert order to Completed: ' + (error.message || 'Unknown error'));
+    }
+  }
+}
+
+
+/**
+ * Removes a specific filter and recalculates the list
+ */
+removeActiveFilter(key: string): void {
+  switch (key) {
+    case 'searchTerm':
+      this.searchControl.setValue('');
+      this.searchTerm = '';
+      break;
+    case 'dateRange':
+      this.filterOptions.dateRange.startDate = '';
+      this.filterOptions.dateRange.endDate = '';
+      this.dateRangeLabel = '';
+      this.selectedRange = '';
+      break;
+    case 'status':
+      this.filterOptions.status = '';
+      break;
+    case 'department':
+      this.filterOptions.department = '';
+      break;
+    case 'addedBy':
+      this.filterOptions.addedBy = '';
+      break;
+    case 'shippingStatus':
+      this.filterOptions.shippingStatus = '';
+      break;
+    case 'paymentMethod':
+      this.filterOptions.paymentMethod = '';
+      break;
+    case 'businessLocation':
+      this.filterOptions.businessLocation = '';
+      break;
+    case 'commission':
+      this.minCommission = null;
+      this.maxCommission = null;
+      break;
+  }
+  this.applyFilters();
+}
+getActiveFilters(): { label: string, key: string }[] {
+  const active: { label: string, key: string }[] = [];
+
+  if (this.searchTerm) {
+    active.push({ label: `Search: ${this.searchTerm}`, key: 'searchTerm' });
+  }
+
+  if (this.dateRangeLabel) {
+    active.push({ label: `Date: ${this.dateRangeLabel}`, key: 'dateRange' });
+  }
+
+  if (this.filterOptions.status) {
+    active.push({ label: `Status: ${this.filterOptions.status}`, key: 'status' });
+  }
+
+  // FIXED: Find the Name from the ID for the label
+  if (this.filterOptions.businessLocation) {
+    const loc = this.businessLocations.find(l => l.id === this.filterOptions.businessLocation);
+    active.push({ label: `Location: ${loc ? loc.name : this.filterOptions.businessLocation}`, key: 'businessLocation' });
+  }
+
+  // FIXED: Find the Service Name from the ID for the label
+  if (this.filterOptions.serviceType) {
+    const serv = this.serviceTypes.find(s => s.id === this.filterOptions.serviceType);
+    active.push({ label: `Service: ${serv ? serv.name : this.filterOptions.serviceType}`, key: 'serviceType' });
+  }
+
+  if (this.filterOptions.addedBy) {
+    active.push({ label: `User: ${this.filterOptions.addedBy}`, key: 'addedBy' });
+  }
+
+  return active;
+}
+
+/**
+   * Individual Functionality: Convert a specific Sales Order to 'Completed' status
+   * This calls the service which handles stock reduction and ledger entries.
+   */
+  async updateSaleStatus(sale: SalesOrder, newStatus: string): Promise<void> {
+    if (!sale || !sale.id) return;
+
+    const confirmMsg = `Are you sure you want to change Order #${sale.orderNo} status to ${newStatus}? \n\nThis will reduce stock and create account ledger entries if marked as Completed.`;
+    
+    if (confirm(confirmMsg)) {
+      try {
+        await this.saleService.updateSaleStatus(sale.id, newStatus);
+        
+        // UI Notification (Optional)
+        console.log(`Sale ${sale.orderNo} updated to ${newStatus}`);
+        
+        // Note: The onSnapshot listener in loadSalesData() will automatically 
+        // refresh the table data when the Firestore document changes.
+      } catch (error: any) {
+        console.error('Error updating status:', error);
+        alert('Failed to update status: ' + error.message);
+      }
+    }
+  }
+
+  /**
+   * Bulk Functionality: Change status for all selected checkboxes to 'Completed'
+   */
+  async bulkUpdateStatus(newStatus: string): Promise<void> {
+    const selectedIds = this.selectedSales
+      .filter(sale => sale.selected)
+      .map(sale => sale.id);
+
+    if (selectedIds.length === 0) {
+      alert('Please select at least one sale to update.');
+      return;
+    }
+
+    const confirmed = confirm(`Are you sure you want to mark ${selectedIds.length} selected orders as "${newStatus}"?`);
+    if (!confirmed) return;
+
+    try {
+      // Show a simple loading state if needed
+      const batchSize = 5; // Update in small chunks to avoid transaction locks
+      for (let i = 0; i < selectedIds.length; i += batchSize) {
+        const batch = selectedIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(id => this.saleService.updateSaleStatus(id, newStatus)));
+      }
+
+      // Clear selections
+      this.selectedSales = [];
+      this.allSelected = false;
+      
+      alert(`${selectedIds.length} orders updated to ${newStatus} successfully.`);
+      
+    } catch (error: any) {
+      console.error('Error in bulk status update:', error);
+      alert('Error updating some orders. Please check logs.');
+    }
+  }
+
+  // Helper method to get product names for search
+  private getProductNames(products: Product[]): string {
+    if (!products || products.length === 0) return '';
+    return products.map(p => p.name).join(' ');
+  }
+formatStatus(status: string): string {
+  switch ((status || '').toLowerCase()) {
+    case 'active':
+    case 'completed':
+      return 'Completed';
+    case 'partial return':
+      return 'Partial Return';
+    case 'pending':
+      return 'Pending';
+    case 'inactive':
+    case 'cancelled':
+      return 'Cancelled';
+    default:
+      return status || 'Pending';
+  }
+}
+
+  // Update sorted sales observable
+  private updateSortedSales(): void {
+    if (this.sortColumn) {
+      this.filteredSales = this.sortSalesData([...this.filteredSales], this.sortColumn, this.sortDirection);
+    }
+  }
+
+  // FIXED: Setup search filter to work with new filter system
+  setupSearchFilter(): void {
+    this.searchControl.valueChanges.pipe(
+      startWith(''),
+      debounceTime(300),
+      distinctUntilChanged()
+    ).subscribe(searchTerm => {
+      this.searchTerm = searchTerm || '';
+      this.applyFilters();
+    });
+  }
+  getTotalQuantity(products: Product[]): number {
+    if (!products || products.length === 0) return 0;
+    return products.reduce((sum, product) => sum + (product.quantity || 0), 0);
+  }  getProductsDisplayText(products: Product[]): string {
+    if (!products || products.length === 0) return 'No products';
+    
+    if (products.length === 1) {
+      return `${products[0].name}`; // Simplified to just show the name
+    } else {
+      return `${products[0].name} and ${products.length - 1} more`;
+    }
+  }
+loadSalesData(): void {
+  const filters: any = {};
+  
+  if (this.currentUser) {
+    switch(this.currentUser.role?.toLowerCase()) {
+      case 'admin': break;
+      case 'supervisor':
+        if (this.currentUser.department) {
+          filters.supervisorDepartment = this.currentUser.department;
+          filters.supervisorId = this.currentUser.uid;
+        }
+        break;
+      case 'executive':
+        filters.addedBy = this.currentUser.uid;
+        break;
+    }
+  }
+
+  // combineLatest waits for all streams to emit at least once
+  combineLatest([
+    this.saleService.listenForSales(filters),
+    this.loadUsers(),
+    this.loadServiceTypes(),
+    this.loadBusinessLocations()
+  ]).subscribe({
+    next: ([salesFromService, users, serviceTypes, locations]) => {
+      const salesWithResolvedNames = salesFromService.map((sale: PartialSalesOrder) => {
+        
+        // Resolve Names from the fresh arrays provided by combineLatest
+        const locationObj = locations.find(loc => loc.id === sale.businessLocation);
+        const serviceObj = serviceTypes.find(st => st.id === sale.typeOfService);
+        const userObj = users.find(u => u.id === sale.addedBy);
+
+        const productItems = Array.isArray(sale.products) ? sale.products : 
+                          Array.isArray(sale.product) ? sale.product : [];
+          
+        return {
+          ...sale,
+          id: sale.id || '',
+          customer: sale.customer || 'Unknown Customer',
+          totalPayable: sale.totalPayable || sale.total || 0,
+          saleDate: this.convertSaleDateToString(sale.saleDate),
+          orderStatus: sale.orderStatus || sale.status || 'Pending',
+          department: sale.department || userObj?.department || '',
+
+          // --- DISPLAY PROPERTIES (This fixes the "System" / "ID" issue) ---
+          location: locationObj ? locationObj.name : (sale.location || 'N/A'),
+          typeOfService: serviceObj ? serviceObj.name : (sale.typeOfService || 'N/A'),
+          typeOfServiceName: serviceObj ? serviceObj.name : (sale.typeOfService || 'N/A'),
+          addedByDisplayName: userObj ? userObj.displayName : (sale.addedByDisplayName || 'N/A'),
+
+          // --- LOGIC PROPERTIES ---
+          businessLocation: sale.businessLocation || '',
+          typeOfServiceId: sale.typeOfService || '',
+          addedBy: sale.addedBy || '',
+
+          products: productItems.map(product => ({
+            ...product,
+            name: product.name || '',
+            quantity: product.quantity || 0,
+            subtotal: product.subtotal || 0
+          }))
+        } as unknown as SalesOrder;
+      });
+
+      this.allSalesData$.next(salesWithResolvedNames);
+      this.applyFilters();
+      this.departmentSalesCount = salesWithResolvedNames.length;
+    },
+    error: (error: any) => console.error('Error loading combined sales data:', error)
+  });
+}
+  applyFilters(): void {
+    let filtered = [...this.allSalesData$.value];
+
+    // 1. Date Range Filter
+    if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
+      const startDate = new Date(this.filterOptions.dateRange.startDate);
+      const endDate = new Date(this.filterOptions.dateRange.endDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+
+      filtered = filtered.filter(sale => {
+        const saleDate = this.convertToDateForSorting(sale.saleDate);
+        return saleDate >= startDate.getTime() && saleDate <= endDate.getTime();
+      });
+    }
+
+    // 2. Search Term Filter (Checks against Names/Labels)
+    if (this.searchTerm && this.searchTerm.trim()) {
+      const term = this.searchTerm.toLowerCase().trim();
+      filtered = filtered.filter(sale =>
+        this.safeIncludes(sale.customer, term) ||
+        this.safeIncludes(sale.orderNo, term) ||
+        this.safeIncludes(sale.invoiceNo, term) ||
+        this.safeIncludes(sale.location, term) || // Searching by Name
+        this.safeIncludes(sale.typeOfService, term) || // Searching by Name
+        this.safeIncludes(sale.customerPhone, term) ||
+        this.safeIncludes(sale.addedByDisplayName, term)
+      );
+    }
+
+    // 3. Status Filter (orderStatus)
+    if (this.filterOptions.status) {
+      filtered = filtered.filter(sale => sale.orderStatus === this.filterOptions.status);
+    }
+
+    // 4. Department Filter
+    if (this.filterOptions.department) {
+      filtered = filtered.filter(sale => sale.department === this.filterOptions.department);
+    }
+
+    // 5. FIXED: Location Filter (ID vs ID)
+    if (this.filterOptions.businessLocation) {
+      filtered = filtered.filter(sale => 
+        sale.businessLocation === this.filterOptions.businessLocation
+      );
+    }
+
+    // 6. FIXED: Service Type Filter (ID vs ID)
+    if (this.filterOptions.serviceType) {
+      filtered = filtered.filter(sale => 
+        (sale as any).typeOfServiceId === this.filterOptions.serviceType
+      );
+    }
+
+    // 7. Shipping Status Filter
+    if (this.filterOptions.shippingStatus) {
+      filtered = filtered.filter(sale => sale.shippingStatus === this.filterOptions.shippingStatus);
+    }
+
+    // 8. Payment Method Filter
+    if (this.filterOptions.paymentMethod) {
+      filtered = filtered.filter(sale => sale.paymentMethod === this.filterOptions.paymentMethod);
+    }
+
+    // 9. Added By Filter (Checks ID if dropdown provides ID, or Name if custom)
+    if (this.filterOptions.addedBy) {
+      filtered = filtered.filter(sale => 
+        sale.addedBy === this.filterOptions.addedBy || 
+        sale.addedByDisplayName === this.filterOptions.addedBy
+      );
+    }
+
+    this.filteredSales = filtered;
+    this.currentPage = 1;
+    this.allSelected = false;
+    this.updateSortedSales();
+}
+
+// Update loadServiceTypes to return the Observable
+loadServiceTypes(): Observable<any[]> {
+  return this.typeOfServiceService.getServicesRealtime().pipe(
+    map(services => {
+      this.serviceTypes = services.map(service => ({
+        id: service.id,
+        name: service.name
+      }));
+      return this.serviceTypes;
+    })
+  );
+}
+
+// Update loadUsers to return the Observable
+loadUsers(): Observable<any[]> {
+  return this.userService.getUsers().pipe(
+    map(users => {
+      this.users = users.map(user => ({
+        id: user.id,
+        displayName: user.displayName || user.username || user.email,
+        department: user.department || ''
+      }));
+      return this.users;
+    })
+  );
+}
+
+// Update loadBusinessLocations to return the Observable
+loadBusinessLocations(): Observable<any[]> {
+  return this.locationService.getLocations().pipe(
+    map(locations => {
+      this.businessLocations = locations.map(loc => ({
+        id: loc.id,
+        name: loc.name || 'Unnamed Location'
+      }));
+      return this.businessLocations;
+    })
+  );
+}
+  // Helper method to convert Firebase timestamp to string
+private convertSaleDateToString(saleDate: any): string {
+  if (!saleDate) return new Date().toISOString();
+  
+  try {
+    // Handle Firestore Timestamp
+    if (typeof saleDate === 'object' && 'toDate' in saleDate) {
+      return saleDate.toDate().toISOString();
+    }
+    // Handle string date (ensure it's treated as local time)
+    if (typeof saleDate === 'string') {
+      // If it's already in ISO format, return as-is
+      if (saleDate.includes('T')) {
+        return saleDate;
+      }
+      // If it's just a date string (YYYY-MM-DD), add time component
+      const parts = saleDate.split('-');
+      if (parts.length === 3) {
+        const localDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        return localDate.toISOString();
+      }
+      return `${saleDate}T00:00:00`;
+    }
+    // Handle Date object
+    if (saleDate instanceof Date) {
+      return saleDate.toISOString();
+    }
+  } catch (error) {
+    console.error('Error converting sale date:', error);
+  }
+  
+  return new Date().toISOString();
+}
+
+  // FIXED: Reset filters method
+  resetFilters(): void {
+    this.filterOptions = {
+      businessLocation: '',
+      customer: '',
+      status: '',
+      shippingStatus: '',
+            department: '', // <-- ADDED THIS LINE
+
+      serviceType: '',
+      paymentMethod: '',
+      dateRange: {
+        startDate: '',
+        endDate: ''
+      }
+    };
+
+    this.selectedRange = '';
+    this.isCustomDate = false;
+    this.dateRangeLabel = '';
+    this.searchTerm = '';
+    this.statusFilter = '';
+    this.paymentMethodFilter = '';
+    this.shippingStatusFilter = '';
+    this.addedByFilter = '';
+    this.locationFilter = '';
+    this.startDate = '';
+    this.endDate = '';
+    this.quickDateFilter = '';
+    this.minCommission = null;
+    this.maxCommission = null;
+
+    // Reset the search control
+    this.searchControl.setValue('');
+
+    // Reset sorting
+    this.sortColumn = '';
+    this.sortDirection = 'asc';
+
+    // Apply filters (which will now show all data)
+    this.applyFilters();
+  }
+  getUniqueDepartments(): string[] {
+    const departments = new Set<string>();
+    this.allSalesData$.value.forEach(sale => {
+      if (sale.department) {
+        departments.add(sale.department);
+      }
+    });
+    return Array.from(departments).sort();
+  }
+
+  // Add method to get unique values for filter dropdowns
+  getUniqueAddedByUsers(): string[] {
+    const users = new Set<string>();
+    this.allSalesData$.value.forEach(sale => {
+      const userName = sale.addedByDisplayName || sale.addedBy;
+      if (userName) {
+        users.add(userName);
+      }
+    });
+    return Array.from(users).sort();
+  }
+
+  getUniqueLocations(): string[] {
+    const locations = new Set<string>();
+    this.allSalesData$.value.forEach(sale => {
+      const locationName = sale.location || sale.businessLocation;
+      if (locationName) {
+        locations.add(locationName);
+      }
+    });
+    return Array.from(locations).sort();
+  }
+
+  // Update observable when filters change
+  private updateObservables(): void {
+    this.sales$ = new BehaviorSubject(this.filteredSales).asObservable();
+    this.sortedSales$ = this.sales$.pipe(
+      map(sales => {
+        if (!this.sortColumn) {
+          return sales;
+        }
+        return this.sortSalesData([...sales], this.sortColumn, this.sortDirection);
+      })
+    );
+  }
+
+
+
+  getCurrentDateRangeDisplay(): string {
+    if (!this.filterOptions.dateRange.startDate || !this.filterOptions.dateRange.endDate) {
+      return '';
+    }
+
+    const start = new Date(this.filterOptions.dateRange.startDate);
+    const end = new Date(this.filterOptions.dateRange.endDate);
+    
+    return `Showing data from ${start.toLocaleDateString()} to ${end.toLocaleDateString()}`;
+  }
+
   private getDisplayedSales(): SalesOrder[] {
-    const allSales = this.allSalesData$.value || [];
     const startIndex = (this.currentPage - 1) * this.pageSize;
     const endIndex = startIndex + this.pageSize;
-    return allSales.slice(startIndex, endIndex);
+    return this.filteredSales.slice(startIndex, endIndex);
+  }
+
+  getTotalPages(): number {
+    return Math.ceil(this.filteredSales.length / this.pageSize);
+  }
+
+  getPageNumbers(): number[] {
+    const totalPages = this.getTotalPages();
+    const maxVisiblePages = 5;
+    const pages: number[] = [];
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const start = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+      const end = Math.min(totalPages, start + maxVisiblePages - 1);
+      
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+      
+      if (start > 1) {
+        pages.unshift(1);
+        if (start > 2) {
+          pages.splice(1, 0, -1);
+        }
+      }
+      
+      if (end < totalPages) {
+        if (end < totalPages - 1) {
+          pages.push(-1);
+        }
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  }
+
+  goToPage(page: number): void {
+    if (page > 0 && page <= this.getTotalPages() && page !== this.currentPage) {
+      this.currentPage = page;
+    }
   }
 
   private getCurrentPageSales(): SalesOrder[] {
-    const allSales = this.allSalesData$.value || [];
     const startIndex = (this.currentPage - 1) * this.pageSize;
     const endIndex = startIndex + this.pageSize;
-    return allSales.slice(startIndex, endIndex);
+    return this.filteredSales.slice(startIndex, endIndex);
   }
 
   getProductTaxTotal(products: Product[]): number {
@@ -446,7 +1197,6 @@ getCurrentDateRangeDisplay(): string {
       }
     }, 0);
   }
-// In your sales-order.component.ts
 
   getColSpanCount(): number {
     const columns = [
@@ -454,119 +1204,119 @@ getCurrentDateRangeDisplay(): string {
       'customerPhone', 'location', 'status', 'typeOfService', 
       'shippingStatus', 'addedBy', 'product', 'shippingDetails', 
       'paymentMethod', 'transactionId', 'invoiceNo', 
-      'paymentDue', 'balanceAmount', 'taxAmount', 'cgstAmount', 'sgstAmount', 'igstAmount'
+      'paymentDue', 'balanceAmount', 'taxAmount', 'cgstAmount', 'sgstAmount', 'igstAmount','deppartment'
     ];
 
-    return columns.filter(col => this.isColumnVisible(col)).length;
-  }
-openActionModal(sale: SalesOrder): void {
-  this.selectedSaleForAction = sale;
-  
-  if (!this.actionModal) {
-    const modalElement = document.getElementById('actionModal');
-    if (modalElement) {
-      this.actionModal = new Modal(modalElement);
+ const visibleColumns = this.columns.filter(col => col.visible);
+  return visibleColumns.length;  }
+
+  openActionModal(sale: SalesOrder): void {
+    this.selectedSaleForAction = sale;
+    
+    if (!this.actionModal) {
+      const modalElement = document.getElementById('actionModal');
+      if (modalElement) {
+        this.actionModal = new Modal(modalElement);
+      }
+    }
+    
+    if (this.actionModal) {
+      this.actionModal.show();
     }
   }
-  
-  if (this.actionModal) {
-    this.actionModal.show();
-  }
-}
-// Date filter methods
 
+// Date filter methods
 filterByDate(range: string): void {
   this.selectedRange = range;
   this.isCustomDate = false;
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // Get current date in local timezone
+  const today = new Date(); // FIXED: Removed the extra 'new' keyword
+  today.setHours(0, 0, 0, 0); // Set to start of day in local time
+
+  const currentMonth = today.getMonth(); // 0 = January, 11 = December
+  const currentYear = today.getFullYear();
   
+  // Helper function to format date as YYYY-MM-DD in local time
+  const formatLocalDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   switch (range) {
     case 'today':
-      this.filterOptions.dateRange.startDate = today.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
+      this.filterOptions.dateRange.startDate = formatLocalDate(today);
+      this.filterOptions.dateRange.endDate = formatLocalDate(today);
       this.dateRangeLabel = 'Today';
       break;
       
     case 'yesterday':
       const yesterday = new Date(today);
       yesterday.setDate(yesterday.getDate() - 1);
-      this.filterOptions.dateRange.startDate = yesterday.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = yesterday.toISOString().split('T')[0];
+      this.filterOptions.dateRange.startDate = formatLocalDate(yesterday);
+      this.filterOptions.dateRange.endDate = formatLocalDate(yesterday);
       this.dateRangeLabel = 'Yesterday';
       break;
       
-    case 'sevenDays':
+    case 'last7days':
       const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      this.filterOptions.dateRange.startDate = sevenDaysAgo.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      this.filterOptions.dateRange.startDate = formatLocalDate(sevenDaysAgo);
+      this.filterOptions.dateRange.endDate = formatLocalDate(today);
       this.dateRangeLabel = 'Last 7 Days';
       break;
       
-    case 'thirtyDays':
+    case 'last30days':
       const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      this.filterOptions.dateRange.startDate = thirtyDaysAgo.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+      this.filterOptions.dateRange.startDate = formatLocalDate(thirtyDaysAgo);
+      this.filterOptions.dateRange.endDate = formatLocalDate(today);
       this.dateRangeLabel = 'Last 30 Days';
+      break;
+      
+    case 'thisMonth':
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      this.filterOptions.dateRange.startDate = formatLocalDate(firstDayOfMonth);
+      this.filterOptions.dateRange.endDate = formatLocalDate(today);
+      this.dateRangeLabel = 'This Month';
       break;
       
     case 'lastMonth':
       const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      this.filterOptions.dateRange.startDate = firstDayOfLastMonth.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = lastDayOfLastMonth.toISOString().split('T')[0];
+      this.filterOptions.dateRange.startDate = formatLocalDate(firstDayOfLastMonth);
+      this.filterOptions.dateRange.endDate = formatLocalDate(lastDayOfLastMonth);
       this.dateRangeLabel = 'Last Month';
       break;
-      
-    case 'thisMonth':
-      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      this.filterOptions.dateRange.startDate = firstDayOfMonth.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-      this.dateRangeLabel = 'This Month';
-      break;
-      
+
     case 'thisFinancialYear':
-      // Assuming financial year starts April 1
-      const currentYear = today.getFullYear();
-      const financialYearStartMonth = 3; // April (0-indexed)
+      let startYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+      const financialYearStart = new Date(startYear, 3, 1); // April 1st
+      const financialYearEnd = new Date(startYear + 1, 2, 31); // March 31st
       
-      let financialYearStart;
-      if (today.getMonth() >= financialYearStartMonth) {
-        financialYearStart = new Date(currentYear, financialYearStartMonth, 1);
-      } else {
-        financialYearStart = new Date(currentYear - 1, financialYearStartMonth, 1);
-      }
-      
-      this.filterOptions.dateRange.startDate = financialYearStart.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
+      this.filterOptions.dateRange.startDate = formatLocalDate(financialYearStart);
+      this.filterOptions.dateRange.endDate = formatLocalDate(financialYearEnd > today ? today : financialYearEnd);
       this.dateRangeLabel = 'This Financial Year';
       break;
-      
+
     case 'lastFinancialYear':
-      const currentYearForLast = today.getFullYear();
-      const financialYearStartMonthForLast = 3; // April (0-indexed)
+      let lastStartYear = currentMonth >= 3 ? currentYear - 1 : currentYear - 2;
+      const lastFinancialYearStart = new Date(lastStartYear, 3, 1); // April 1st
+      const lastFinancialYearEnd = new Date(lastStartYear + 1, 2, 31); // March 31st
       
-      let lastFinancialYearStart;
-      let lastFinancialYearEnd;
-      if (today.getMonth() >= financialYearStartMonthForLast) {
-        lastFinancialYearStart = new Date(currentYearForLast - 1, financialYearStartMonthForLast, 1);
-        lastFinancialYearEnd = new Date(currentYearForLast, financialYearStartMonthForLast, 0);
-      } else {
-        lastFinancialYearStart = new Date(currentYearForLast - 2, financialYearStartMonthForLast, 1);
-        lastFinancialYearEnd = new Date(currentYearForLast - 1, financialYearStartMonthForLast, 0);
-      }
-      
-      this.filterOptions.dateRange.startDate = lastFinancialYearStart.toISOString().split('T')[0];
-      this.filterOptions.dateRange.endDate = lastFinancialYearEnd.toISOString().split('T')[0];
+      this.filterOptions.dateRange.startDate = formatLocalDate(lastFinancialYearStart);
+      this.filterOptions.dateRange.endDate = formatLocalDate(lastFinancialYearEnd);
       this.dateRangeLabel = 'Last Financial Year';
       break;
+      
+    case 'custom':
+      this.selectCustomRange();
+      return;
   }
   
   this.applyFilters();
-  this.isDateDrawerOpen = false;
 }
 
 selectCustomRange(): void {
@@ -576,86 +1326,105 @@ selectCustomRange(): void {
   this.filterOptions.dateRange.endDate = '';
 }
 
-
+private formatDateForInput(date: Date): string {
+  return date.toISOString().split('T')[0];
+}formatDisplayDate(date: any): string {
+  if (!date) return '';
+  
+  try {
+    let jsDate: Date;
+    
+    if (typeof date === 'object' && 'toDate' in date) {
+      jsDate = date.toDate();
+    } else if (typeof date === 'string') {
+      jsDate = new Date(date.includes('T') ? date : `${date}T00:00:00`);
+    } else if (date instanceof Date) {
+      jsDate = date;
+    } else {
+      jsDate = new Date();
+    }
+    
+    return jsDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+}
 cancelCustomRange(): void {
   this.isCustomDate = false;
   this.filterOptions.dateRange.startDate = '';
   this.filterOptions.dateRange.endDate = '';
+  this.selectedRange = '';
+  this.dateRangeLabel = '';
+  this.applyFilters();
 }
 
-toggleDateDrawer(): void {
-  this.isDateDrawerOpen = !this.isDateDrawerOpen;
-}
+ applyCustomRange(): void {
+    // Ensure both dates are selected before applying
+    if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
+      // Create the display label from the selected dates
+      const start = this.convertToLocalDate(this.filterOptions.dateRange.startDate);
+      const end = this.convertToLocalDate(this.filterOptions.dateRange.endDate);
 
-applyCustomRange(): void {
-  if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-    const start = new Date(this.filterOptions.dateRange.startDate);
-    const end = new Date(this.filterOptions.dateRange.endDate);
-    
-    this.dateRangeLabel = `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
-    this.applyFilters();
-    this.isDateDrawerOpen = false;
-  } else {
-    alert('Please select both from and to dates');
-  }
-}
-  toggleSelectSale(saleId: string, event: Event): void {
-    event.stopPropagation();
-    
-    const saleIndex = this.selectedSales.findIndex(s => s.id === saleId);
-    
-    if (saleIndex > -1) {
-      this.selectedSales[saleIndex].selected = !this.selectedSales[saleIndex].selected;
-      
-      if (!this.selectedSales[saleIndex].selected) {
-        this.selectedSales.splice(saleIndex, 1);
+      // Check for valid dates before setting the label
+      if (start && end) {
+        this.dateRangeLabel = `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
       }
+      
+      // Apply the filter and hide the custom date picker
+      this.applyFilters();
+      this.isCustomDate = false;
     } else {
-      this.selectedSales.push({
-        id: saleId,
-        selected: true
-      });
+      alert('Please select both a "From" and "To" date.');
     }
-    
-    this.allSelected = this.selectedSales.length > 0 && 
-      this.getCurrentPageSales().every(sale => 
-        this.selectedSales.some(s => s.id === sale.id && s.selected)
-      );
   }
+  toggleDateDrawer(): void {
+    this.isDateDrawerOpen = !this.isDateDrawerOpen;
+    
+    if (this.isDateDrawerOpen) {
+      this.showFilters = false;
+    }
+  }
+
+
+
+
+
   async deleteSelectedSales(): Promise<void> {
-  // Get the IDs of selected sales
-  const selectedIds = this.selectedSales
-    .filter(sale => sale.selected)
-    .map(sale => sale.id);
-    
-  if (selectedIds.length === 0) {
-    alert('Please select at least one sale to delete');
-    return;
-  }
-  
-  const confirmed = confirm(`Are you sure you want to delete ${selectedIds.length} selected sales?`);
-  if (!confirmed) return;
-  
-  try {
-    // Delete in batches to avoid overloading
-    const batchSize = 10;
-    for (let i = 0; i < selectedIds.length; i += batchSize) {
-      const batch = selectedIds.slice(i, i + batchSize);
-      await Promise.all(batch.map(id => this.saleService.deleteSale(id)));
+    const selectedIds = this.selectedSales
+      .filter(sale => sale.selected)
+      .map(sale => sale.id);
+      
+    if (selectedIds.length === 0) {
+      alert('Please select at least one sale to delete');
+      return;
     }
     
-    // Refresh the data
-    this.loadSalesData();
-    this.selectedSales = [];
-    this.allSelected = false;
+    const confirmed = confirm(`Are you sure you want to delete ${selectedIds.length} selected sales?`);
+    if (!confirmed) return;
     
-    alert(`${selectedIds.length} sales deleted successfully`);
-    
-  } catch (error) {
-    console.error('Error deleting sales:', error);
-    alert('Error deleting sales. Please try again.');
+    try {
+      const batchSize = 10;
+      for (let i = 0; i < selectedIds.length; i += batchSize) {
+        const batch = selectedIds.slice(i, i + batchSize);
+        await Promise.all(batch.map(id => this.saleService.deleteSale(id)));
+      }
+      
+      this.loadSalesData();
+      this.selectedSales = [];
+      this.allSelected = false;
+      
+      alert(`${selectedIds.length} sales deleted successfully`);
+      
+    } catch (error) {
+      console.error('Error deleting sales:', error);
+      alert('Error deleting sales. Please try again.');
+    }
   }
-}
 
   getProductBatchNumbers(products: Product[]): string {
     if (!products || products.length === 0) return 'N/A';
@@ -690,35 +1459,15 @@ applyCustomRange(): void {
     }
   }
 
-  isSaleSelected(saleId: string): boolean {
-    return this.selectedSales.some(s => s.id === saleId && s.selected);
-  }
 
-  hasSelectedSales(): boolean {
-    return this.selectedSales.some(s => s.selected);
-  }
+
+
 
   getSortIconClass(column: string): string {
     if (this.sortColumn !== column) {
       return 'fa-sort';
     }
     return this.sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
-  }
-
-  ngOnInit(): void {
-    this.authService.getCurrentUser().subscribe(user => {
-      this.currentUser = user;
-      
-      if (user) {
-        this.loadDepartmentInfo();
-        this.applyRoleBasedFilters();
-      }
-    });
-    
-    this.loadBusinessLocations();
-    this.loadCustomers();
-    this.loadServiceTypes();
-    this.setupSearchFilter();
   }
 
   private async loadDepartmentInfo(): Promise<void> {
@@ -729,9 +1478,6 @@ applyCustomRange(): void {
       console.log('Department executives:', this.departmentExecutives);
     }
   }
-
-
-
 
   private applyRoleBasedFilters(): void {
     if (!this.currentUser) return;
@@ -786,97 +1532,7 @@ applyCustomRange(): void {
     }
   }
 
-  setupSearchFilter(): void {
-    const search$ = this.searchControl.valueChanges.pipe(
-      startWith(''),
-      debounceTime(300),
-      distinctUntilChanged()
-    );
-    
-    this.sales$ = combineLatest([
-      this.allSalesData$,
-      search$
-    ]).pipe(
-      map(([sales, searchTerm]) => {
-        if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim() === '') {
-          return sales;
-        }
-        
-        const term = searchTerm.toLowerCase().trim();
-        
-        return sales.filter(sale => {
-          const customerMatch = this.safeIncludes(sale.customer, term);
-          const phoneMatch = this.safeIncludes(sale.customerPhone, term);
-          const orderMatch = this.safeIncludes(sale.orderNo, term);
-          const invoiceMatch = this.safeIncludes(sale.invoiceNo, term);
-          const locationMatch = 
-            this.safeIncludes(sale.location, term) || 
-            this.safeIncludes(sale.businessLocation, term);
-          const statusMatch = this.safeIncludes(sale.status, term);
-          const shippingStatusMatch = this.safeIncludes(sale.shippingStatus, term);
-          const serviceMatch = 
-            this.safeIncludes(sale.typeOfService, term) || 
-            this.safeIncludes(sale.typeOfServiceName, term);
-          const addedByMatch = 
-            this.safeIncludes(sale.addedBy, term) || 
-            this.safeIncludes(sale.addedByDisplayName, term);
-          const shippingAddressMatch = this.safeIncludes(sale.shippingAddress, term);
-          const paymentMethodMatch = this.safeIncludes(sale.paymentMethod, term);
-          
-          let productMatch = false;
-          if (sale.products && sale.products.length > 0) {
-            productMatch = sale.products.some(product => 
-              this.safeIncludes(product.name, term)
-            );
-          }
-          
-          return customerMatch || phoneMatch || orderMatch || invoiceMatch || 
-                 locationMatch || statusMatch || shippingStatusMatch || 
-                 serviceMatch || addedByMatch || shippingAddressMatch || 
-                 paymentMethodMatch || productMatch;
-        });
-      })
-    );
 
-    this.sortedSales$ = this.sales$.pipe(
-      map(sales => {
-        if (!this.sortColumn) {
-          return sales;
-        }
-
-        return this.sortSalesData([...sales], this.sortColumn, this.sortDirection);
-      })
-    );
-  }
-
-deleteSale(id: string): void {
-  if (confirm('Are you sure you want to delete this sale?')) {
-    this.saleService.deleteSale(id)
-      .then(() => {
-        console.log('Sale deleted successfully');
-        this.loadSalesData();
-        if (this.actionModal) {
-          this.actionModal.hide();
-        }
-      })
-      .catch(error => {
-        console.error('Delete failed:', error);
-        alert('Failed to delete sale: ' + error.message);
-      });
-  }
-}
-
-  loadBusinessLocations(): void {
-    this.locationService.getLocations().subscribe({
-      next: (locations) => {
-        this.businessLocations = locations.map(loc => ({
-          id: loc.id,
-          name: loc.name || 'Unnamed Location'
-        }));
-      },
-      error: (err) => console.error('Error loading locations:', err)
-    });
-  }
 
   safeIncludes(value: any, searchTerm: string): boolean {
     if (value === null || value === undefined) {
@@ -889,6 +1545,19 @@ deleteSale(id: string): void {
   
   toggleFilters(): void {
     this.showFilters = !this.showFilters;
+    
+    if (this.showFilters) {
+      this.isDateDrawerOpen = false;
+    }
+    
+    if (this.showFilters) {
+      setTimeout(() => {
+        const filterElement = document.querySelector('.filter-sidebar');
+        if (filterElement) {
+          filterElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
   }
 
   sortData(column: string): void {
@@ -899,9 +1568,7 @@ deleteSale(id: string): void {
       this.sortDirection = 'asc';
     }
 
-    this.sortedSales$ = this.sales$.pipe(
-      map(sales => this.sortSalesData([...sales], this.sortColumn, this.sortDirection))
-    );
+    this.updateSortedSales();
   }
 
   private sortSalesData(sales: SalesOrder[], column: string, direction: 'asc' | 'desc'): SalesOrder[] {
@@ -910,8 +1577,9 @@ deleteSale(id: string): void {
       let valueB: any = b[column as keyof SalesOrder];
       
       if (column === 'saleDate') {
-        valueA = new Date(valueA).getTime();
-        valueB = new Date(valueB).getTime();
+        // Handle Firebase timestamp objects for sorting
+        valueA = this.convertToDateForSorting(valueA);
+        valueB = this.convertToDateForSorting(valueB);
       } 
       else if (typeof valueA === 'string' && typeof valueB === 'string') {
         valueA = valueA.toLowerCase();
@@ -928,182 +1596,43 @@ deleteSale(id: string): void {
     });
   }
 
-  loadSalesData(): void {
-    const filters: any = {};
-    
-    if (this.currentUser) {
-      switch(this.currentUser.role?.toLowerCase()) {
-        case 'admin':
-          break;
-        case 'supervisor':
-          if (this.currentUser.department) {
-            filters.supervisorDepartment = this.currentUser.department;
-            filters.supervisorId = this.currentUser.uid;
-          }
-          break;
-        case 'executive':
-          filters.addedBy = this.currentUser.uid;
-          break;
-          
-      }
-    }
-    if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-    filters.startDate = this.filterOptions.dateRange.startDate;
-    filters.endDate = this.filterOptions.dateRange.endDate;
-  }
-    if (this.filterOptions.businessLocation) {
-      filters.businessLocation = this.filterOptions.businessLocation;
-    }
-    if (this.filterOptions.customer) {
-      filters.customer = this.filterOptions.customer;
-    }
-    if (this.filterOptions.status) {
-      filters.status = this.filterOptions.status;
-    }
-    if (this.filterOptions.shippingStatus) {
-      filters.shippingStatus = this.filterOptions.shippingStatus;
-    }
-    if (this.filterOptions.serviceType) {
-      filters.serviceType = this.filterOptions.serviceType;
-    }
-    
-    if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-      filters.startDate = this.filterOptions.dateRange.startDate;
-      filters.endDate = this.filterOptions.dateRange.endDate;
-    }
-
-    console.log('Loading sales with filters:', filters);
-  this.saleService.listenForSales(filters).subscribe(
-    (salesFromService: PartialSalesOrder[]) => {
-      const salesWithProducts = salesFromService.map((sale: PartialSalesOrder) => {
-        const productItems = Array.isArray(sale.products) ? sale.products : 
-                          Array.isArray(sale.product) ? sale.product : [];
-          
-          const paymentDue = sale.balance || 0;
-          const balanceAmount = sale.balance || 0;
-          
-          return {
-            prescriptions: sale.prescriptions || [],
-            id: sale.id || '',
-            customer: sale.customer || 'Unknown Customer',
-            customerPhone: sale.customerPhone || '',
-            alternateContact: sale.alternateContact || '',
-            shippingDetails: sale.shippingDetails || '',
-            paymentAccount: sale.paymentAccountName || sale.paymentAccount || 'N/A',
-            paymentAccountName: sale.paymentAccountName || sale.paymentAccount || 'N/A',
-            businessLocation: sale.businessLocation || '',
-            totalPayable: sale.totalPayable || sale.total || 0,
-            location: sale.location || sale.businessLocation || '',
-            saleDate: sale.saleDate || new Date().toISOString(),
-            invoiceNo: sale.invoiceNo || '',
-            paymentStatus: sale.paymentStatus || 'Due',
-            transactionId: sale.transactionId || '',
-            balanceAmount: sale.balance || 0,
-            shippingStatus: sale.shippingStatus || 'Pending',
-            orderNo: sale.orderNo || `SO-${new Date().getTime().toString().slice(-6)}`,
-            status: sale.status || 'Pending',
-            serviceType: sale.serviceType || sale.typeOfService || 'Standard',
-            typeOfService: sale.typeOfServiceName || sale.typeOfService || '',
-            typeOfServiceName: sale.typeOfServiceName || sale.typeOfService || '',
-            shippingCharges: sale.shippingCharges || 0,
-            discountType: sale.discountType || 'Percentage',
-            discountAmount: sale.discountAmount || 0,
-            orderTax: sale.orderTax || 0,
-            paymentAmount: sale.paymentAmount || 0,
-            paymentMethod: sale.paymentMethod || '',
-            paidOn: sale.paidOn || '',
-            balance: sale.balance || 0,
-            changeReturn: sale.changeReturn || 0,
-            quantityRemaining: sale.quantityRemaining || 0,
-            addedBy: sale.addedBy || 'System',
-            addedByDisplayName: sale.addedByDisplayName || sale.addedBy || 'System',
-            addedByDepartment: sale.addedByDepartment || '',
-            billingAddress: sale.billingAddress || '',
-            shippingAddress: sale.shippingAddress || '',
-            sellNote: sale.sellNote || '',
-            paymentNote: sale.paymentNote || '',
-            deliveryPerson: sale.deliveryPerson || '',
-            paymentDue: paymentDue,
-            
-            // Tax information - use the comprehensive tax data from the sale
-            taxAmount: sale.taxAmount || sale.taxDetails?.total || 0,
-            taxDetails: sale.taxDetails || {
-              cgst: 0,
-              sgst: 0,
-              igst: 0,
-              total: sale.taxAmount || 0
-            },
-            productTaxAmount: sale.productTaxAmount || 0,
-            shippingTaxAmount: sale.shippingTaxAmount || 0,
-            
-            products: productItems.map(product => ({
-              name: product.name || '',
-              quantity: product.quantity || 0,
-              unitPrice: product.unitPrice || 0,
-              discount: product.discount || 0,
-              subtotal: product.subtotal || 0,
-              quantityRemaining: product.quantityRemaining || 0,
-              taxRate: product.taxRate || 0,
-              taxAmount: product.taxAmount || 0,
-              taxType: product.taxType || '',
-              cgstAmount: product.cgstAmount || 0,
-              sgstAmount: product.sgstAmount || 0,
-              igstAmount: product.igstAmount || 0,
-              batchNumber: product.batchNumber || '',
-              expiryDate: product.expiryDate || '',
-              priceBeforeTax: product.priceBeforeTax || 0
-            }))
-          } as unknown as SalesOrder;
-        });
-
-        this.selectedSales = salesWithProducts.map(sale => ({
-          id: sale.id,
-          selected: false
-        }));
-     let filteredSales = salesWithProducts;
-      if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-        filteredSales = this.filterSalesByDate(salesWithProducts);
-      }
-              this.allSalesData$.next(filteredSales);
-
-        console.log('Processed sales data with tax info:', filteredSales);
-        this.allSalesData$.next(filteredSales);
-        this.departmentSalesCount = filteredSales.length;
-        
-        this.allSelected = false;
-      },
-      (error: any) => console.error('Error loading sales data:', error)
-    );
-  }
-
-private filterSalesByDate(sales: SalesOrder[]): SalesOrder[] {
-  if (!this.filterOptions.dateRange.startDate || !this.filterOptions.dateRange.endDate) {
-    return sales;
-  }
-
-  const startDate = new Date(this.filterOptions.dateRange.startDate);
-  const endDate = new Date(this.filterOptions.dateRange.endDate);
+  // Helper method to convert various date formats to timestamp for sorting
+private convertToDateForSorting(dateValue: any): number {
+  if (!dateValue) return 0;
   
-  // Set time to end of day for end date
-  endDate.setHours(23, 59, 59, 999);
+  try {
+    if (dateValue && typeof dateValue === 'object' && 'toDate' in dateValue) {
+      return dateValue.toDate().getTime();
+    } else if (typeof dateValue === 'string') {
+      return new Date(dateValue).getTime();
+    } else if (dateValue instanceof Date) {
+      return dateValue.getTime();
+    }
+  } catch (error) {
+    console.error('Error converting date for sorting:', error);
+  }
   
-  return sales.filter(sale => {
-    const saleDate = new Date(sale.saleDate);
-    return saleDate >= startDate && saleDate <= endDate;
-  });
+  return 0;
 }
 
-  loadServiceTypes(): void {
-    this.typeOfServiceService.getServicesRealtime().subscribe({
-      next: (services) => {
-        this.serviceTypes = services.map(service => ({
-          id: service.id,
-          name: service.name
-        }));
-      },
-      error: (err) => console.error('Error loading service types:', err)
-    });
+  deleteSale(id: string): void {
+    if (confirm('Are you sure you want to delete this sale?')) {
+      this.saleService.deleteSale(id)
+        .then(() => {
+          console.log('Sale deleted successfully');
+          this.loadSalesData();
+          if (this.actionModal) {
+            this.actionModal.hide();
+          }
+        })
+        .catch(error => {
+          console.error('Delete failed:', error);
+          alert('Failed to delete sale: ' + error.message);
+        });
+    }
   }
+
+
     
   loadCustomers(): void {
     // In a real application, you would fetch this from a service
@@ -1113,58 +1642,15 @@ private filterSalesByDate(sales: SalesOrder[]): SalesOrder[] {
     return products.reduce((sum, product) => sum + (product.unitPrice * product.quantity), 0);
   }
 
-applyFilters(): void {
-  this.currentPage = 1;
-  
-  // If we have a date range selected, ensure the dates are properly set
-  if (this.selectedRange && this.selectedRange !== 'custom') {
-    this.filterByDate(this.selectedRange);
-  }
-  
-  // Load data with current filters
-  this.loadSalesData();
-  this.showFilters = false;
-}
-    
-resetFilters(): void {
-  this.filterOptions = {
-    businessLocation: '',
-    customer: '',
-    status: '',
-    shippingStatus: '',
-    serviceType: '',
-    dateRange: {
-      startDate: '',
-      endDate: ''
-    }
-  };
-
-  this.selectedRange = '';
-  this.isCustomDate = false;
-  this.dateRangeLabel = '';
-
-  // Reset the search term
-  this.searchControl.setValue('');
-
-  // Reset sorting
-  this.sortColumn = '';
-  this.sortDirection = 'asc';
-
-  // Reload data with cleared filters and update displayed sales
-  this.loadSalesData();
-
-  // If you want to immediately update the filtered table in the UI:
-  // (This will trigger the observable pipeline to update sortedSales$)
-  this.setupSearchFilter();
-}
-
   changePageSize(size: number): void {
     this.pageSize = size;
     this.currentPage = 1;
   }
     
   nextPage(): void {
-    this.currentPage++;
+    if (this.currentPage < this.getTotalPages()) {
+      this.currentPage++;
+    }
   }
     
   previousPage(): void {
@@ -1173,14 +1659,6 @@ resetFilters(): void {
     }
   }
 
-  // Ensure quick date filter applies and updates the UI
-  onQuickDateFilterChange(filter: string): void {
-    this.filterOptions.quickDateFilter = filter;
-    this.applyQuickDateFilter(filter);
-    this.currentPage = 1;
-    // No need to call loadSalesData() here, as applyQuickDateFilter already calls applyFilters, which calls loadSalesData.
-  }
-    
   exportData(format: 'csv' | 'excel' | 'pdf'): void {
     this.saleService.exportSales(format, this.filterOptions)
       .catch(error => console.error('Export failed:', error));
@@ -1191,11 +1669,10 @@ resetFilters(): void {
     return invoiceNo;
   }
 
-printData(): void {
+  printData(): void {
     this.showFilters = false;
     
     setTimeout(() => {
-      // Create optimized print styles
       const printStyle = `
         <style>
           @media print {
@@ -1258,17 +1735,14 @@ printData(): void {
         </style>
       `;
       
-      // Get current date for the report
       const currentDate = new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       });
       
-      // Try to open print window
       const printWindow = window.open('', '_blank');
       if (printWindow) {
-        // Get the card content to print
         const cardContent = document.querySelector('.card')?.outerHTML || '<div>No content available</div>';
         
         printWindow.document.write(`
@@ -1293,25 +1767,31 @@ printData(): void {
         
         printWindow.document.close();
         
-        // Ensure content is loaded before printing
         printWindow.onload = () => {
           setTimeout(() => {
             printWindow.focus();
             printWindow.print();
-            // Don't close immediately to allow print dialog to appear properly
           }, 200);
         };
       } else {
-        // Fallback to regular print if popup is blocked
         window.print();
       }
     }, 100);
   }
+
   editSale(saleId: string): void {
     this.router.navigate(['/sales-order/edit', saleId]);
   }
-    
 
+  viewSale(sale: SalesOrder, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
+    this.selectedSale = sale;
+    this.viewSaleModal?.show();
+  }
 
   viewPrescription(sale: SalesOrder, event?: Event): void {
     if (event) {
@@ -1441,13 +1921,90 @@ printData(): void {
     }
   }
 
-  getProductsDisplayText(products: Product[]): string {
-    if (!products || products.length === 0) return 'No products';
-    
-    if (products.length === 1) {
-      return `${products[0].name} (${products[0].quantity})`;
-    } else {
-      return `${products[0].name} (${products[0].quantity}) and ${products.length - 1} more`;
+
+
+  // Helper method to convert sale date for display in template
+convertSaleDateForDisplay(saleDate: any): Date {
+  if (!saleDate) return new Date();
+  
+  try {
+    if (saleDate && typeof saleDate === 'object' && 'toDate' in saleDate) {
+      return saleDate.toDate();
+    } else if (typeof saleDate === 'string') {
+      return new Date(saleDate);
+    } else if (saleDate instanceof Date) {
+      return saleDate;
     }
+  } catch (error) {
+    console.error('Error converting sale date for display:', error);
   }
+  
+  return new Date();
+}
+  private convertToLocalDate(dateInput: any): Date | null {
+    if (!dateInput) return null;
+    try {
+      if (dateInput instanceof Date) {
+        return dateInput;
+      }
+      // Handle Firebase Timestamp objects
+      if (typeof dateInput === 'object' && typeof dateInput.toDate === 'function') {
+        return dateInput.toDate();
+      }
+      if (typeof dateInput === 'string') {
+        // If string is "YYYY-MM-DD", it's often parsed as UTC midnight.
+        // Appending 'T00:00:00' forces it to be parsed in the local timezone.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+          return new Date(`${dateInput}T00:00:00`);
+        }
+        // Handles full ISO strings and other valid date formats
+        return new Date(dateInput);
+      }
+    } catch (error) {
+      console.error('Failed to convert date:', dateInput, error);
+      return null;
+    }
+    return null;
+  }
+  exportToExcel(): void {
+  // Prepare the data for export
+  const dataForExport = this.filteredSales.map(sale => {
+    return {
+      'S.No': this.filteredSales.indexOf(sale) + 1,
+      'Sale Date': this.formatDisplayDate(sale.saleDate),
+      'Order No': sale.orderNo || 'N/A',
+      'Customer Name': sale.customer,
+      'Contact Number': sale.customerPhone,
+      'Location': sale.location,
+      'Status': this.formatStatus(sale.status),
+      'Type of Service': sale.typeOfServiceName || sale.typeOfService || 'N/A',
+      'Shipping Status': sale.shippingStatus || 'Pending',
+      'Added By': sale.addedByDisplayName || sale.addedBy || 'N/A',
+      'Products': this.getProductsDisplayText(sale.products),
+      'Payment Method': sale.paymentMethod || 'N/A',
+      'Payment Account': sale.paymentAccountName || 'N/A',
+      'Invoice No': sale.invoiceNo || 'N/A',
+      'Total Payable': sale.totalPayable || 0,
+      'Tax Amount': this.getProductTaxTotal(sale.products),
+      'CGST': this.getProductTaxBreakdown(sale.products, 'cgst'),
+      'SGST': this.getProductTaxBreakdown(sale.products, 'sgst'),
+      'IGST': this.getProductTaxBreakdown(sale.products, 'igst'),
+      'Payment Status': sale.paymentStatus || 'Due',
+      'Balance Amount': sale.balanceAmount || 0
+    };
+  });
+
+  // Create worksheet
+  const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(dataForExport);
+
+  // Create workbook
+  const wb: XLSX.WorkBook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'SalesOrders');
+
+  // Generate file name with current date
+  const fileName = `SalesOrders_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  // Save to file
+  XLSX.writeFile(wb, fileName);
+}
 }

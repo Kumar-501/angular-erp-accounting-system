@@ -191,10 +191,11 @@
                           </span>
                         </div>
                       </div>
-                      <div class="row mb-2" *ngIf="sale.paidOn">
-                        <div class="col-md-4 fw-bold">Payment Date:</div>
-                        <div class="col-md-8">{{ sale.paidOn | date: 'medium' }}</div>
-                      </div>
+                    <div class="row mb-2" *ngIf="sale.paidOn">
+  <div class="col-md-4 fw-bold">Payment Date:</div>
+  <div class="col-md-8">{{ sale.paidOn | date: 'mediumDate' }}</div>
+</div>
+
                       <div class="row mb-2">
                         <div class="col-md-4 fw-bold">Payment Amount:</div>
                         <div class="col-md-8">{{ sale.paymentAmount | currency }}</div>

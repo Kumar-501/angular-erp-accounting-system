@@ -18,6 +18,24 @@ h3 {
   padding-bottom: 10px;
   border-bottom: 2px solid #3498db;
 }
+.active-filters-display {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+
+  .badge {
+    font-weight: 500;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    
+    .btn-close {
+      &:hover {
+        background-color: #ff000021;
+      }
+    }
+  }
+}
 
 /* Search bar styling */
 .input-group .form-control {
@@ -920,4 +938,49 @@ tr.ng-enter-active {
 
 .filter-sidebar.show + .filter-backdrop {
   display: block;
+}/* Container for the filter button - align to right */
+.filter-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+/* If the button is inside a card header or toolbar */
+.card-header .btn,
+.toolbar .btn {
+  margin-left: auto;
+}
+
+/* If you want to align it within a flex container */
+.d-flex .btn-outline-secondary {
+  margin-left: auto;
+}
+
+/* Alternative approach using float (less preferred) */
+.filter-btn-right {
+  float: right;
+  margin-bottom: 1rem;
+}
+
+/* If you're using Bootstrap's utility classes */
+.text-end .btn {
+  display: inline-block;
+}
+.filter-container {
+  text-align: right;
+  margin-bottom: 1rem;
+}
+
+.filter-container .btn {
+  margin-left: auto;
+}.select-no-arrow {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: none !important;
+}
+
+/* For Firefox */
+.select-no-arrow::-ms-expand {
+  display: none;
 }

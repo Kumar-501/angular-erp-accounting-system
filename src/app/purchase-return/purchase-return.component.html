@@ -1,12 +1,9 @@
-<!-- purchase-return.component.html -->
 <div class="purchase-return-container">
   <h2>Purchase Return</h2>
-  
+
   <div class="filters-section mb-3">
-    <h5>Filters</h5>
     <div class="filter-options">
       <div class="form-check form-check-inline">
-        <input class="form-check-input" type="radio" name="filterOptions" id="allReturns" checked>
         <label class="form-check-label" for="allReturns">All Purchase Returns</label>
       </div>
     </div>
@@ -14,10 +11,11 @@
 
   <div class="card">
     <div class="card-body">
+      <!-- Search and Controls Section -->
       <div class="table-controls d-flex justify-content-between align-items-center mb-3">
-        <div class="show-entries">
-          Show 
-          <select class="form-select form-select-sm" [(ngModel)]="pageSize">
+        <div class="show-entries d-flex align-items-center">
+          Show
+          <select class="form-select form-select-sm mx-2" [(ngModel)]="pageSize" (change)="onPageSizeChange()" style="width: auto;">
             <option value="10">10</option>
             <option value="25">25</option>
             <option value="50">50</option>
@@ -25,18 +23,35 @@
           </select>
           entries
         </div>
+
+        <!-- Search Box -->
+        <div class="search-box d-flex align-items-center">
+          <label class="me-2">Search:</label>
+          <div class="input-group" style="width: 250px;">
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="Search returns..."
+              [(ngModel)]="searchTerm"
+              (input)="onSearchInput()"
+            />
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+              (click)="clearSearch()"
+              *ngIf="searchTerm"
+            >
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+        </div>
+
         <div class="export-buttons">
-          <button class="btn btn-sm btn-outline-secondary" (click)="onExport('csv')">
-            <i class="bi bi-file-earmark-excel"></i> Export CSV
-          </button>
           <button class="btn btn-sm btn-outline-secondary" (click)="onExport('excel')">
             <i class="bi bi-file-excel"></i> Export Excel
           </button>
           <button class="btn btn-sm btn-outline-secondary" (click)="onExport('pdf')">
             <i class="bi bi-file-earmark-pdf"></i> Export PDF
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" (click)="onExport('print')">
-            <i class="bi bi-printer"></i> Print
           </button>
         </div>
       </div>
@@ -45,56 +60,56 @@
         <table class="table table-bordered table-hover">
           <thead class="table-light">
             <tr>
-              <th (click)="sort('returnDate')">
-                Date 
+              <th (click)="sort('returnDate')" style="cursor: pointer;">
+                Date
                 <span *ngIf="sortColumn === 'returnDate'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('referenceNo')">
+              <th (click)="sort('referenceNo')" style="cursor: pointer;">
                 Reference No
                 <span *ngIf="sortColumn === 'referenceNo'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('parentPurchaseRef')">
+              <th (click)="sort('parentPurchaseRef')" style="cursor: pointer;">
                 Parent Purchase
                 <span *ngIf="sortColumn === 'parentPurchaseRef'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('businessLocation')">
+              <th (click)="sort('businessLocation')" style="cursor: pointer;">
                 Location
                 <span *ngIf="sortColumn === 'businessLocation'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('supplier')">
+              <th (click)="sort('supplier')" style="cursor: pointer;">
                 Supplier
                 <span *ngIf="sortColumn === 'supplier'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('returnStatus')">
-                Return Status
+              <!-- Corrected Headers -->
+              <th (click)="sort('returnStatus')" style="cursor: pointer;">
+               Payment Status
                 <span *ngIf="sortColumn === 'returnStatus'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('paymentStatus')">
-                Payment Status
+              <th (click)="sort('paymentStatus')" style="cursor: pointer;">
+              Return Status
                 <span *ngIf="sortColumn === 'paymentStatus'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
-              <th (click)="sort('grandTotal')">
+              <th (click)="sort('grandTotal')" style="cursor: pointer;">
                 Grand Total
                 <span *ngIf="sortColumn === 'grandTotal'">
                   <i class="bi" [ngClass]="{'bi-arrow-up': sortDirection === 'asc', 'bi-arrow-down': sortDirection === 'desc'}"></i>
                 </span>
               </th>
               <th>Payment due</th>
-
               <th>Action</th>
             </tr>
           </thead>
@@ -106,35 +121,37 @@
                 </div>
               </td>
             </tr>
-            
-            <tr *ngIf="!isLoading && purchaseReturns.length === 0">
-              <td colspan="10" class="text-center py-4">No data available in table</td>
+
+            <tr *ngIf="!isLoading && paginatedPurchaseReturns.length === 0">
+              <td colspan="10" class="text-center py-4">
+                <span *ngIf="searchTerm">No data found matching "{{ searchTerm }}"</span>
+                <span *ngIf="!searchTerm">No data available in table</span>
+              </td>
             </tr>
 
-            <tr *ngFor="let ret of sortedPurchaseReturns">
+            <tr *ngFor="let ret of paginatedPurchaseReturns">
               <td>{{ ret.returnDate | date: 'dd/MM/yyyy' }}</td>
               <td>{{ ret.referenceNo }}</td>
               <td>{{ ret.parentPurchaseRef }}</td>
               <td>{{ ret.businessLocation }}</td>
               <td>{{ ret.supplier }}</td>
-              <td>
+              <!-- Updated: Made status fields clickable -->
+              <td (click)="openStatusModal(ret)" style="cursor: pointer;">
                 <span [ngClass]="getStatusClass(ret.returnStatus)">
                   {{ ret.returnStatus }}
                 </span>
               </td>
-              <td>
+              <td (click)="openStatusModal(ret)" style="cursor: pointer;">
                 <span [ngClass]="getStatusClass(ret.paymentStatus)">
                   {{ ret.paymentStatus }}
                 </span>
               </td>
               <td>₹{{ ret.grandTotal | number:'1.2-2' }}</td>
               <td>₹{{ ret.grandTotal | number:'1.2-2' }}</td>
-<!-- Update the products display in your table -->
-
               <td>
                 <div class="btn-group">
                   <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#statusModal" (click)="openStatusModal(ret)">
-                    <i class="bi bi-toggle-on"></i>
+                    <i class="bi bi-pencil-square"></i>
                     <span class="btn-text">Edit</span>
                   </button>
                   <button class="btn btn-sm btn-outline-danger" (click)="onDelete(ret.id!)">
@@ -157,38 +174,83 @@
         </table>
       </div>
 
-      <div class="table-footer d-flex justify-content-between align-items-center">
+      <!-- Pagination Section -->
+      <div class="pagination-section d-flex justify-content-between align-items-center mt-3">
         <div class="showing-entries">
-          Showing {{ purchaseReturns.length > 0 ? 1 : 0 }} to {{ purchaseReturns.length }} of {{ purchaseReturns.length }} entries
+          Showing {{ startRecord }} to {{ endRecord }} of {{ totalRecords }} entries
+          <span *ngIf="searchTerm" class="text-muted">(filtered from {{ purchaseReturns.length }} total entries)</span>
         </div>
+
+        <nav aria-label="Page navigation" *ngIf="totalPages > 1">
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" [class.disabled]="currentPage === 1">
+              <button class="page-link" (click)="previousPage()" [disabled]="currentPage === 1">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+            </li>
+            <li class="page-item" *ngFor="let page of getVisiblePages()" [class.active]="page === currentPage">
+              <button class="page-link" (click)="goToPage(page)">{{ page }}</button>
+            </li>
+            <li class="page-item" [class.disabled]="currentPage === totalPages">
+              <button class="page-link" (click)="nextPage()" [disabled]="currentPage === totalPages">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="table-footer d-flex justify-content-center align-items-center mt-3">
         <div class="copyright">
           HYBRID CRM - V6.2 | Copyright © 2025 All rights reserved.
         </div>
       </div>
     </div>
   </div>
-  
-  <!-- Status Update Modal -->
-  <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-body">
-          <label for="statusSelect" class="form-label">Status:</label>
-          <select id="statusSelect" class="form-select" [(ngModel)]="tempStatus">
+
+<!-- UPDATED: Status Update Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="statusModalLabel">Update Statuses</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" [disabled]="isUpdating"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedReturn">
+        <p><strong>Reference:</strong> {{ selectedReturn.referenceNo }}</p>
+        
+        <!-- Return Status Dropdown -->
+        <div class="mb-3">
+          <label for="returnStatusSelect" class="form-label">Payment Status:</label>
+          <select id="returnStatusSelect" class="form-select" [(ngModel)]="tempStatus" [disabled]="isUpdating">
             <option value="pending">Pending</option>
             <option value="completed">Completed</option>
-            <option value="partial">Partial</option>
             <option value="rejected">Rejected</option>
           </select>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="button" class="btn btn-primary" [disabled]="isUpdating" (click)="updateReturnStatus(selectedReturn.id!, tempStatus)">
-            <span *ngIf="isUpdating" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-            Update
-          </button>
+
+        <!-- Payment Status Dropdown -->
+        <div>
+          <label for="paymentStatusSelect" class="form-label">Return Status:</label>
+          <select id="paymentStatusSelect" class="form-select" [(ngModel)]="tempPaymentStatus" [disabled]="isUpdating">
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+            <option value="rejected">Rejected</option>
+          </select>
         </div>
+        
+        <div class="alert alert-danger mt-3" *ngIf="errorMessage">
+          {{ errorMessage }}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" [disabled]="isUpdating">Close</button>
+        <button type="button" class="btn btn-primary" (click)="updateStatuses()" [disabled]="isUpdating">
+          <span *ngIf="isUpdating" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          Update
+        </button>
       </div>
     </div>
   </div>
+</div>
 </div>

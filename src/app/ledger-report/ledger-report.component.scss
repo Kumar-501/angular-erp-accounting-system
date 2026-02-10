@@ -1,0 +1,172 @@
+/* src/app/ledger-report/ledger-report.component.scss */
+
+:host {
+  display: block;
+  background-color: #f4f6f9;
+  min-height: 100vh;
+}
+
+.report-page-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* Custom Date Input Wrapper */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 150px;
+
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    height: 35px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding-left: 10px;
+    font-size: 0.9rem;
+    background-color: #fff !important;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      color: #0d6efd;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+.filter-bar {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  align-items: center;
+}
+
+.ledger-select, .date-input {
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  background-color: #f8f9fa;
+}
+
+.ledger-select {
+  flex-grow: 1; // Take up available space
+}
+
+.submit-btn {
+  padding: 10px 25px;
+  border: none;
+  border-radius: 5px;
+  background-color: #27ae60;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #229954;
+  }
+  &:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+}
+
+.report-container {
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 2rem;
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  
+  h2 {
+    color: #27ae60;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+  }
+  h3 {
+    margin: 0 0 0.5rem 0;
+    font-weight: 500;
+  }
+  p {
+    margin: 0;
+    color: #666;
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  
+  th, td {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  thead th {
+    background-color: #34495e;
+    color: white;
+    font-weight: 600;
+    text-align: left;
+  }
+  
+  tbody tr:hover {
+    background-color: #f8f9fa;
+  }
+
+  tfoot {
+    font-size: 1.1rem;
+    tr:last-child td {
+      border-top: 2px solid #34495e;
+    }
+  }
+
+  .text-right {
+    text-align: right;
+  }
+}

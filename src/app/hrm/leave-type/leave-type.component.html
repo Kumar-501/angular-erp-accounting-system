@@ -158,3 +158,65 @@
     </tbody>
   </table>
 </div>
+<!-- Pagination Controls -->
+<div class="pagination-controls" *ngIf="filteredLeaveTypes.length > 0">
+  <div class="pagination-info">
+    Showing {{ (currentPage - 1) * itemsPerPage + 1 }} to 
+    {{ Math.min(currentPage * itemsPerPage, filteredLeaveTypes.length) }} 
+    of {{ filteredLeaveTypes.length }} entries
+  </div>
+  
+  <div class="pagination-buttons">
+    <button 
+      class="btn btn-outline-secondary" 
+      (click)="goToPage(1)" 
+      [disabled]="currentPage === 1"
+    >
+      First
+    </button>
+    <button 
+      class="btn btn-outline-secondary" 
+      (click)="previousPage()" 
+      [disabled]="currentPage === 1"
+    >
+      Previous
+    </button>
+    
+    <span class="page-numbers">
+      <button 
+        *ngFor="let page of getPageNumbers()" 
+        class="btn" 
+        [class.btn-primary]="page === currentPage"
+        [class.btn-outline-secondary]="page !== currentPage"
+        (click)="goToPage(page)"
+      >
+        {{ page }}
+      </button>
+    </span>
+    
+    <button 
+      class="btn btn-outline-secondary" 
+      (click)="nextPage()" 
+      [disabled]="currentPage === getTotalPages()"
+    >
+      Next
+    </button>
+    <button 
+      class="btn btn-outline-secondary" 
+      (click)="goToPage(getTotalPages())" 
+      [disabled]="currentPage === getTotalPages()"
+    >
+      Last
+    </button>
+  </div>
+  
+  <div class="items-per-page">
+    <label>Items per page:</label>
+    <select class="form-control" [(ngModel)]="itemsPerPage" (change)="onItemsPerPageChange()">
+      <option value="5">5</option>
+      <option value="10">10</option>
+      <option value="20">20</option>
+      <option value="50">50</option>
+    </select>
+  </div>
+</div>

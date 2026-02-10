@@ -1,170 +1,303 @@
 <div class="goods-received-container">
-  <div class="header">
-    <h2>Add Goods Received Note</h2>
-    <hr />
-  </div>
-
-  <form [formGroup]="goodsReceivedForm">
-    <div class="form-header">
-      <div class="form-row">
-        <div class="form-group purchase-order-group">
-          <label for="purchaseOrder">Purchase Order:</label>
-          <select formControlName="purchaseOrder" id="purchaseOrder" class="form-control" 
-                  (change)="onPurchaseOrderChange($event)">
-            <option value="">Select Purchase Order</option>
-            <option *ngFor="let order of filteredPurchaseOrders" [value]="order.id">
-              {{ order.referenceNo }} ({{ order.supplierName }})
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group supplier-group">
-          <label for="supplier">Supplier Name<span class="required">*</span></label>
-          <select formControlName="supplier" id="supplier" class="form-control" 
-                  (change)="onSupplierChange($event)">
-            <option value="">Select Supplier</option>
-            <option *ngFor="let supplier of filteredSuppliers" [value]="supplier.id">
-              {{ supplier.isIndividual 
-                  ? (supplier.firstName + ' ' + (supplier.lastName || '')).trim()
-                  : supplier.businessName }}
-            </option>
-          </select>
-          <div *ngIf="goodsReceivedForm.get('supplier')?.invalid && goodsReceivedForm.get('supplier')?.touched" 
-               class="error-message">
-            Supplier is required
-          </div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="businessLocation">Business Location<span class="required">*</span></label>
-          <div class="input-with-icon">
-            <select formControlName="businessLocation" id="businessLocation" class="form-control">
-              <option value="">Please Select</option>
-              <option *ngFor="let location of locations" [value]="location.id">
-                {{ location.name }}
+    <div class="header">
+      <h2>Add Goods Received Note</h2>
+      <hr />
+    </div>
+  
+    <form [formGroup]="goodsReceivedForm">
+      <div class="form-header">
+        <div class="form-row">
+          <!-- **FIXED**: Using getters from component to simplify template -->
+          <div class="form-group purchase-order-group">
+            <label for="purchaseOrder">Purchase Order / Direct Purchase:</label>
+            <select formControlName="purchaseOrder" id="purchaseOrder" class="form-control" 
+                    (change)="onPurchaseOrderChange($event)"
+                    [disabled]="isValidatingOrder">
+              <option value="">Select Purchase Order or Direct Purchase</option>
+              
+              <!-- Use purchaseOrdersOnly getter -->
+              <optgroup *ngIf="purchaseOrdersOnly.length > 0" 
+                        label="Purchase Orders">
+                <option *ngFor="let order of purchaseOrdersOnly" 
+                        [value]="order.id">
+                  PO: {{ order.referenceNo }} - {{ order.supplierName }} 
+                  <!-- *** FIX: The DatePipe will now work correctly *** -->
+                  ({{ order.purchaseDate | date:'shortDate' }})
+                  <span *ngIf="order.orderTotal"> - {{ order.orderTotal | currency:'INR' }}</span>
+                </option>
+              </optgroup>
+              
+              <!-- Use directPurchasesOnly getter -->
+              <optgroup *ngIf="directPurchasesOnly.length > 0" 
+                        label="Direct Purchases">
+                <option *ngFor="let purchase of directPurchasesOnly" 
+                        [value]="purchase.id">
+                  Purchase: {{ purchase.referenceNo }} - {{ purchase.supplierName }} 
+                  <!-- *** FIX: The DatePipe will now work correctly *** -->
+                  ({{ purchase.purchaseDate | date:'shortDate' }})
+                  <span *ngIf="purchase.orderTotal"> - {{ purchase.orderTotal | currency:'INR' }}</span>
+                </option>
+              </optgroup>
+  
+              <option *ngIf="filteredPurchaseOrders.length === 0" disabled>
+                No available purchase orders or direct purchases
               </option>
             </select>
-            <input type="text" 
-                   formControlName="businessLocationName" 
-                   class="form-control mt-2" 
-                   readonly 
-                   *ngIf="goodsReceivedForm.get('businessLocationName')?.value">
-          </div>
-          <div *ngIf="goodsReceivedForm.get('businessLocation')?.invalid && goodsReceivedForm.get('businessLocation')?.touched" 
-               class="error-message">
-            Business Location is required
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="purchaseDate">Purchase Date<span class="required">*</span></label>
-          <input type="datetime-local" formControlName="purchaseDate" id="purchaseDate" class="form-control">
-          <div *ngIf="goodsReceivedForm.get('purchaseDate')?.invalid && goodsReceivedForm.get('purchaseDate')?.touched" class="error-message">
-            Purchase Date is required
-          </div>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="document">Attach Document</label>
-          <div class="file-upload">
-            <input type="file" id="document" (change)="onFileSelected($event)" class="form-control">
-            <button type="button" class="browse-btn">Browse...</button>
-          </div>
-          <div class="file-info">
-            <small>Max File size: 5MB</small>
-            <small>Allowed Files: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group address-group">
-        <label for="address">Address:</label>
-        <div id="address" class="address-display">
-          {{ getFormattedAddress(selectedSupplier) }}
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="invoiceNo">Invoice Number:</label>
-          <select formControlName="invoiceNo" id="invoiceNo" class="form-control" 
-                  #invoiceSelect
-                  (change)="onInvoiceNoChange(invoiceSelect.value)">
-            <option value="">Select Invoice Number</option>
-            <option *ngFor="let invoiceNo of filteredInvoiceNumbers" [value]="invoiceNo">
-              {{ invoiceNo }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="addedBy">Added By:</label>
-          <input type="text" formControlName="addedBy" id="addedBy" class="form-control" readonly>
-        </div>
-      </div>
-    </div>
-
-    <div class="products-section">
-      <table class="products-table">
-        <thead>
-          <tr>
-            <th width="5%">#</th>
-            <th width="30%">Product Name</th>
-            <th width="15%">Order Quantity</th>
-            <th width="15%">Received Quantity</th>
-            <th width="10%">
-              <button type="button" class="add-btn" (click)="addProduct()">+</button>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let product of products; let i = index">
-            <td>{{ i + 1 }}</td>
-            <td>
-              <input type="text" class="form-control" [(ngModel)]="product.name" [ngModelOptions]="{standalone: true}" readonly>
-            </td>
-            <td><input type="number" class="form-control" [(ngModel)]="product.orderQuantity" [ngModelOptions]="{standalone: true}"></td>
-            <td>
-              <input type="number" class="form-control" 
-                     [(ngModel)]="product.receivedQuantity" 
+            
+            <div *ngIf="isValidatingOrder" class="text-info mt-1">
+              <small><i class="fa fa-spinner fa-spin"></i> Validating purchase order/purchase...</small>
+            </div>
+            
+            <div class="search-container mt-2" *ngIf="purchaseOrders.length > 5">
+              <input type="text" 
+                     class="form-control form-control-sm" 
+                     placeholder="Search purchase orders and direct purchases..." 
+                     [(ngModel)]="searchPurchaseOrderTerm"
                      [ngModelOptions]="{standalone: true}"
-                     (change)="onQuantityChange(i)"
-                     min="0" [max]="product.orderQuantity">
-            </td>
-            <td>
-              <button type="button" class="remove-btn" (click)="removeProduct(i)">-</button>
-            </td>
-          </tr>
-          <tr *ngIf="products.length === 0">
-            <td colspan="5" class="no-products">No products added yet</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div class="notes-section">
-      <div class="form-group">
-        <label for="additionalNotes">Additional Notes</label>
-        <textarea formControlName="additionalNotes" id="additionalNotes" class="form-control"></textarea>
-      </div>
-    </div>
-
-    <div class="form-footer">
-   
-      <div class="action-buttons">
-        <button type="button" class="save-btn" 
-                (click)="saveForm()" 
-                [disabled]="isProcessing">
-          <span *ngIf="!isProcessing">Save</span>
-          <span *ngIf="isProcessing">
-            <i class="fa fa-spinner fa-spin"></i> Saving...
-          </span>
-        </button>
-      </div>
-    </div>
-  </form>
+                     (input)="filterPurchaseOrders($event)">
+            </div>
+            
+            <div class="d-flex justify-content-between align-items-center mt-1">
+              <small class="text-muted">
+                {{ filteredPurchaseOrders.length }} item(s) available
+                <!-- **FIXED**: Using getters for the count breakdown -->
+                <span *ngIf="filteredPurchaseOrders.length > 0">
+                  ({{ purchaseOrdersOnly.length }} POs, 
+                  {{ directPurchasesOnly.length }} Direct Purchases)
+                </span>
+              </small>
+              <button type="button" class="btn btn-sm btn-link text-primary" 
+                      (click)="refreshPurchaseOrders()"
+                      title="Refresh purchase orders and direct purchases list">
+                <i class="fa fa-refresh"></i> Refresh
+              </button>
+            </div>
+          </div>
+  
+          <div class="form-group" *ngIf="selectedPurchaseReferenceNo">
+            <label for="purchaseReferenceNo">Reference No:</label>
+            <input type="text" 
+                   id="purchaseReferenceNo" 
+                   class="form-control" 
+                   [value]="selectedPurchaseReferenceNo" 
+                   readonly
+                   style="background-color: #f8f9fa; font-weight: 500;">
+            <small class="text-muted" *ngIf="selectedPurchaseOrder">
+              Type: {{ selectedPurchaseOrder.type === 'purchase-order' ? 'Purchase Order' : 'Direct Purchase' }}
+            </small>
+          </div>
+  
+          <div class="form-group supplier-group">
+            <label for="supplier">Supplier Name<span class="required">*</span></label>
+            <select formControlName="supplier" id="supplier" class="form-control" 
+                    (change)="onSupplierChange($event)">
+              <option value="">Select Supplier</option>
+              <option *ngFor="let supplier of filteredSuppliers" [value]="supplier.id">
+                {{ supplier.isIndividual 
+                    ? (supplier.firstName + ' ' + (supplier.lastName || '')).trim()
+                    : supplier.businessName }}
+              </option>
+            </select>
+            <div *ngIf="goodsReceivedForm.get('supplier')?.invalid && goodsReceivedForm.get('supplier')?.touched" 
+                 class="error-message">
+              Supplier is required
+            </div>
+          </div>
+        </div>
+  
+        <div class="form-row">
+          <div class="form-group">
+            <label for="businessLocation">Business Location<span class="required">*</span></label>
+            <div class="input-with-icon">
+              <select formControlName="businessLocation" id="businessLocation" class="form-control"
+                      (change)="onBusinessLocationChange($event)">
+                <option value="">Please Select</option>
+                <option *ngFor="let location of locations" [value]="location.id">
+                  {{ location.name }}
+                </option>
+              </select>
+            </div>
+            <div *ngIf="goodsReceivedForm.get('businessLocation')?.invalid && goodsReceivedForm.get('businessLocation')?.touched" 
+                 class="error-message">
+              Business Location is required
+            </div>
+          </div>
+<div class="form-group">
+  <label for="purchaseDate">Received Date<span class="required">*</span></label>
+  <div class="date-input-wrapper">
+    <!-- Visible Text Input for DD-MM-YYYY -->
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(goodsReceivedForm.get('purchaseDate')?.value)"
+           (blur)="onManualDateInput($event, 'purchaseDate')"
+           placeholder="DD-MM-YYYY">
+    
+    <!-- Calendar Button -->
+    <button type="button" class="calendar-btn" (click)="openDatePicker()">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    
+    <!-- Hidden Native Picker -->
+    <input #receivedDatePicker 
+           type="date" 
+           formControlName="purchaseDate" 
+           class="hidden-date-picker">
+  </div>
+  
+  <div *ngIf="goodsReceivedForm.get('purchaseDate')?.invalid && goodsReceivedForm.get('purchaseDate')?.touched" class="error-message">
+    Received Date is required
+  </div>
 </div>
+        </div>
+  
+        <div class="form-row">
+          <div class="form-group">
+            <label for="document">Attach Document</label>
+            <div class="file-upload">
+              <input type="file" id="document" (change)="onFileSelected($event)" class="form-control">
+              <button type="button" class="browse-btn">Browse...</button>
+            </div>
+            <div class="file-info">
+              <small>Max File size: 5MB</small>
+              <small>Allowed Files: .pdf, .csv, .zip, .doc, .docx, .jpeg, .jpg, .png</small>
+            </div>
+          </div>
+        </div>
+  
+        <div class="form-group address-group">
+          <label for="address">Supplier Address:</label>
+          <div id="address" class="address-display">
+            {{ getFormattedAddress(selectedSupplier) }}
+          </div>
+        </div>
+  
+        <div class="form-row">
+          <div class="form-group">
+            <label for="invoiceNo">Invoice Number:</label>
+            <select formControlName="invoiceNo" id="invoiceNo" class="form-control" 
+                    #invoiceSelect
+                    (change)="onInvoiceNoChange(invoiceSelect.value)">
+              <option value="">Select Invoice Number</option>
+              <option *ngFor="let invoiceNo of filteredInvoiceNumbers" [value]="invoiceNo">
+                {{ invoiceNo }}
+              </option>
+            </select>
+          </div>
+  
+          <div class="form-group">
+            <label for="addedBy">Added By:</label>
+            <input type="text" formControlName="addedBy" id="addedBy" class="form-control" readonly>
+          </div>
+        </div>
+        
+        <div class="form-group" *ngIf="false">
+          <button type="button" class="btn btn-info btn-sm" (click)="debugFormState()">
+            Debug Form State
+          </button>
+        </div>
+      </div>
+  
+      <div class="products-section">
+        <h3>Products</h3>
+        <div *ngIf="selectedPurchaseOrder" class="alert alert-info">
+          <strong>{{ selectedPurchaseOrder.type === 'purchase-order' ? 'Purchase Order' : 'Direct Purchase' }}:</strong> 
+          {{ selectedPurchaseOrder.referenceNo }} 
+          <span *ngIf="selectedPurchaseOrder.orderTotal">(Total: {{ selectedPurchaseOrder.orderTotal | currency:'INR' }})</span>
+        </div>
+        
+        <table class="products-table">
+          <thead>
+            <tr>
+              <th width="5%">#</th>
+              <th width="25%">Product Name</th>
+              <th width="12%">Order Quantity</th>
+              <th width="12%">Received Quantity</th>
+              <th width="12%">Pending Quantity</th>
+              <th width="24%">Reason (if partial)</th>
+              <th width="10%">
+                <button type="button" class="add-btn" (click)="addProduct()">+</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of products; let i = index" 
+                [ngClass]="{'partial-delivery-row': product.isPartialDelivery}">
+              <td>{{ i + 1 }}</td>
+              <td>
+                <input type="text" class="form-control" [(ngModel)]="product.name" 
+                       [ngModelOptions]="{standalone: true}" 
+                       [readonly]="!!selectedPurchaseOrder">
+                <small class="text-muted">{{ product.sku }}</small>
+              </td>
+              <td>
+                <input type="number" class="form-control" [(ngModel)]="product.orderQuantity" 
+                       [ngModelOptions]="{standalone: true}" readonly>
+              </td>
+              <td>
+                <input type="number" class="form-control" 
+                       [(ngModel)]="product.receivedQuantity" 
+                       [ngModelOptions]="{standalone: true}"
+                       (ngModelChange)="onQuantityChange(i)"
+                       min="0" [max]="product.orderQuantity"
+                       [ngClass]="{'partial-input': product.isPartialDelivery}">
+              </td>
+              <td>
+                <input type="number" class="form-control pending-quantity" 
+                       [(ngModel)]="product.pendingQuantity"
+                       [ngModelOptions]="{standalone: true}"
+                       (ngModelChange)="onPendingQuantityChange(i)"
+                       [ngClass]="{'has-pending': (product.pendingQuantity || 0) > 0}">
+              </td>
+              <td>
+                <textarea class="form-control reason-textarea" 
+                          [(ngModel)]="product.pendingReason"
+                          [ngModelOptions]="{standalone: true}"
+                          (ngModelChange)="onReasonChange(i, $event)"
+                          placeholder="Enter reason for pending quantity..."
+                          [disabled]="!product.isPartialDelivery">
+                </textarea>
+                <div *ngIf="product.isPartialDelivery && (product.pendingQuantity || 0) > 0 && (!product.pendingReason || product.pendingReason.trim() === '')" 
+                     class="reason-error">
+                  (Optional) Reason for partial delivery
+                </div>
+              </td>
+              <td>
+                <button type="button" class="remove-btn" (click)="removeProduct(i)">-</button>
+              </td>
+            </tr>
+            <tr *ngIf="products.length === 0">
+              <td colspan="7" class="no-products">
+                {{ selectedPurchaseOrder ? 'No products found in selected purchase order/purchase' : 'No products added yet' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+  
+      <div class="notes-section">
+        <div class="form-group">
+          <label for="additionalNotes">Additional Notes</label>
+          <textarea formControlName="additionalNotes" id="additionalNotes" class="form-control" 
+                    placeholder="Enter any additional notes or comments..."></textarea>
+        </div>
+      </div>
+  
+      <div class="form-footer">
+        <div class="action-buttons">
+          <button type="button" class="save-btn" 
+                  (click)="saveForm()" 
+                  [disabled]="isProcessing || !goodsReceivedForm.valid">
+            <span *ngIf="!isProcessing">Save</span>
+            <span *ngIf="isProcessing">
+              <i class="fa fa-spinner fa-spin"></i> Saving...
+            </span>
+          </button>
+          
+          <button type="button" class="btn btn-secondary ml-2" 
+                  (click)="resetForm()">
+            Reset Form
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>

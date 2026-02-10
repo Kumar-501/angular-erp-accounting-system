@@ -28,6 +28,8 @@ export class PayrollComponent implements OnInit, OnDestroy {
   locations: any[] = [];
   users: Employee[] = [];
   isEditing: boolean = false;
+    filteredUsersForAddModal: Employee[] = [];
+
   editPayrollId: string = '';
   payrollData: any = {
     location: '',
@@ -134,9 +136,11 @@ getFormattedEmployeeNames(employees: any[]): string {
     return user ? (user.username || user.name || 'Unknown') : 'Unknown';
   }
 
-  removeEmployee(employeeId: string) {
-    this.payrollData.employees = this.payrollData.employees.filter((id: string) => id !== employeeId);
-  }
+removeEmployee(employeeId: string) {
+  this.payrollData.employees = this.payrollData.employees.filter((id: string) => id !== employeeId);
+  // After removing an employee, refresh the dropdown list
+  this.updateFilteredUsers();
+}
 
   fetchLocations() {
     this.locationService.getLocations().subscribe(locations => {
@@ -157,19 +161,57 @@ getFormattedEmployeeNames(employees: any[]): string {
     this.modalService.open(content, { size: 'lg' });
   }
 
-  openEditPayrollModal(content: any, payroll: any) {
-    this.isEditing = true;
-    this.editPayrollId = payroll.id;
-    this.payrollData = {
-      location: payroll.location,
-      employees: [...(payroll.employees || [])],
-      monthYear: payroll.monthYear,
-      selectedEmployeeId: '',
-      employeeDetails: payroll.employeeDetails || []
-    };
-    this.modalService.open(content, { size: 'lg' });
+// In payroll.component.ts
+
+// ... inside the PayrollComponent class
+
+// --- REPLACE this method with the updated version ---
+openEditPayrollModal(content: any, payroll: any) {
+  this.isEditing = true;
+  this.editPayrollId = payroll.id;
+  this.updateFilteredUsers();
+
+  // --- THIS IS THE FIX ---
+  // 1. Format the monthYear from the payroll object.
+  // Firestore might store it as a Timestamp or a different string format.
+  // We need to convert it to the 'yyyy-MM' string format for the input field.
+  let formattedMonthYear = '';
+  if (payroll.monthYear) {
+    try {
+      // Handles both 'yyyy-MM' strings and Date objects/Timestamps
+      const date = new Date(payroll.monthYear.toDate ? payroll.monthYear.toDate() : payroll.monthYear);
+      const year = date.getFullYear();
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      formattedMonthYear = `${year}-${month}`;
+    } catch (e) {
+      console.error("Could not format monthYear:", payroll.monthYear, e);
+      formattedMonthYear = this.getCurrentMonthYear(); // Fallback to current month
+    }
   }
 
+  // 2. Set the payrollData for the modal form.
+  this.payrollData = {
+    location: payroll.location,
+    employees: payroll.employees ? [...payroll.employees] : [],
+    monthYear: formattedMonthYear, // Use the correctly formatted date string
+    selectedEmployeeId: '',
+    employeeDetails: payroll.employeeDetails || []
+  };
+  // --- END OF FIX ---
+
+  this.modalService.open(content, { size: 'lg' });
+}
+updateFilteredUsers(): void {
+  if (this.isEditing && this.payrollData.employees) {
+    // Filter out users who are already in the payroll's employee list
+    this.filteredUsersForAddModal = this.users.filter(user => 
+      !this.payrollData.employees.includes(user.id)
+    );
+  } else {
+    // If adding a new payroll, all users are available
+    this.filteredUsersForAddModal = [...this.users];
+  }
+}
   getCurrentMonthYear(): string {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

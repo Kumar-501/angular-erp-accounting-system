@@ -1,0 +1,219 @@
+<div class="pl-container">
+<div class="pl-header">
+  <h3>Profit & Loss From {{ startDate | date: 'dd MMM yyyy' }} - {{ endDate | date: 'dd MMM yyyy' }}</h3>
+  
+  <div class="header-controls">
+    <div class="filter-buttons">
+       <button class="filter-btn" (click)="setDateFilter('today')">Today</button>
+       <button class="filter-btn" (click)="setDateFilter('yesterday')">Yesterday</button>
+       <button class="filter-btn" (click)="setDateFilter('week')">This Week</button>
+    </div>
+
+    <!-- UPDATED: Custom Date Filter with DD-MM-YYYY format -->
+    <div class="custom-date-filter">
+      <div class="date-group">
+        <div class="date-input-wrapper">
+          <input 
+            type="text" 
+            class="form-control date-input" 
+            [value]="getFormattedDate(customStartDate)"
+            (blur)="onDateInput($event, 'start')"
+            (keyup.enter)="onDateInput($event, 'start')"
+            placeholder="DD-MM-YYYY"
+            maxlength="10">
+          <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+            <i class="fas fa-calendar-alt"></i>
+          </button>
+          <input 
+            #startDatePicker
+            type="date" 
+            class="hidden-date-picker" 
+            [(ngModel)]="customStartDate">
+        </div>
+      </div>
+
+      <div class="date-group">
+        <div class="date-input-wrapper">
+          <input 
+            type="text" 
+            class="form-control date-input" 
+            [value]="getFormattedDate(customEndDate)"
+            (blur)="onDateInput($event, 'end')"
+            (keyup.enter)="onDateInput($event, 'end')"
+            placeholder="DD-MM-YYYY"
+            maxlength="10">
+          <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+            <i class="fas fa-calendar-alt"></i>
+          </button>
+          <input 
+            #endDatePicker
+            type="date" 
+            class="hidden-date-picker" 
+            [(ngModel)]="customEndDate">
+        </div>
+      </div>
+
+      <button class="apply-btn" (click)="applyCustomDateFilter()" [disabled]="isLoading">
+        <i class="fas fa-filter" *ngIf="!isLoading"></i>
+        <i class="fas fa-spinner fa-spin" *ngIf="isLoading"></i>
+        {{ isLoading ? 'Loading...' : 'Apply Filter' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+  <div *ngIf="isLoading" class="loading-overlay">
+    <p>Loading Report...</p>
+  </div>
+
+  <div *ngIf="!isLoading">
+    <!-- TRADING ACCOUNT SECTION (for Gross Profit) -->
+    <div class="pl-section">
+      <div class="pl-column">
+        <div class="pl-row header">
+          <span>Particulars</span>
+          <span>Amount</span>
+        </div>
+        <div class="pl-row">
+          <span>Opening Stock</span>
+          <span>{{ plData.openingStock | currency:'INR' }}</span>
+        </div>
+        <div class="pl-row">
+          <span>Purchase</span>
+          <span>{{ plData.purchases | currency:'INR' }}</span>
+        </div>
+        <div class="pl-row">
+          <span>Direct Expense</span>
+          <span>{{ plData.directExpense | currency:'INR' }}</span>
+        </div>
+        <!-- Direct Expense Breakdown -->
+        <ng-container *ngFor="let item of directExpenseBreakdown">
+          <div class="pl-row sub-item">
+            <span>-- {{ item.name }}</span>
+            <span>{{ item.amount | currency:'INR' }}</span>
+          </div>
+        </ng-container>
+
+        <!-- Changed > 0 to >= 0 to show Gross Profit 0 if balanced -->
+        <div class="pl-row gross-profit" *ngIf="plData.grossProfit >= 0">
+          <strong>Gross Profit c/d</strong>
+          <strong>{{ plData.grossProfit | currency:'INR' }}</strong>
+        </div>
+      </div>
+      <div class="pl-column">
+        <div class="pl-row header">
+          <span>Particulars</span>
+          <span>Amount</span>
+        </div>
+        <div class="pl-row">
+          <span>Closing Stock</span>
+          <span>{{ plData.closingStock | currency:'INR' }}</span>
+        </div>
+        <div class="pl-row">
+          <span>Sale</span>
+          <span>{{ plData.sales | currency:'INR' }}</span>
+        </div>
+        <div class="pl-row">
+          <span>Direct Income</span>
+          <span>{{ plData.directIncome | currency:'INR' }}</span>
+        </div>
+        <!-- Direct Income Breakdown -->
+        <ng-container *ngFor="let item of directIncomeBreakdown">
+          <div class="pl-row sub-item">
+            <span>-- {{ item.name }}</span>
+            <span>{{ item.amount | currency:'INR' }}</span>
+          </div>
+        </ng-container>
+
+         <div class="pl-row gross-profit" *ngIf="plData.grossProfit < 0">
+          <strong>Gross Loss c/d</strong>
+          <strong>{{ -plData.grossProfit | currency:'INR' }}</strong>
+        </div>
+      </div>
+    </div>
+    <div class="pl-total-row">
+        <strong>Total</strong>
+        <strong>{{ plData.tradingAccountTotal | currency:'INR' }}</strong>
+        <strong>Total</strong>
+        <strong>{{ plData.tradingAccountTotal | currency:'INR' }}</strong>
+    </div>
+
+    <!-- PROFIT & LOSS ACCOUNT SECTION (for Net Profit) -->
+    <div class="pl-section">
+      <div class="pl-column">
+        <div class="pl-row header">
+          <span>Particulars</span>
+          <span>Amount</span>
+        </div>
+        <div class="pl-row" *ngIf="plData.grossProfit < 0">
+          <strong>Gross Loss b/d</strong>
+          <strong>{{ -plData.grossProfit | currency:'INR' }}</strong>
+        </div>
+        <div class="pl-row">
+          <span>Indirect Expense</span>
+          <span>{{ plData.indirectExpense | currency:'INR' }}</span>
+        </div>
+        <!-- Indirect Expense Breakdown -->
+        <ng-container *ngFor="let item of indirectExpenseBreakdown">
+          <div class="pl-row sub-item">
+            <span>-- {{ item.name }}</span>
+            <span>{{ item.amount | currency:'INR' }}</span>
+          </div>
+        </ng-container>
+
+        <div class="pl-row">
+          <span>Operational Expense</span>
+          <span>{{ plData.operationalExpense | currency:'INR' }}</span>
+        </div>
+        <!-- Operational Expense Breakdown -->
+        <ng-container *ngFor="let item of operationalExpenseBreakdown">
+          <div class="pl-row sub-item">
+            <span>-- {{ item.name }}</span>
+            <span>{{ item.amount | currency:'INR' }}</span>
+          </div>
+        </ng-container>
+
+        <!-- UPDATED: Changed > 0 to >= 0 to display Net Profit: ₹0.00 -->
+        <div class="pl-row net-profit" *ngIf="plData.netProfit >= 0">
+          <strong>Net Profit</strong>
+          <strong>{{ plData.netProfit | currency:'INR' }}</strong>
+        </div>
+      </div>
+      <div class="pl-column">
+        <div class="pl-row header">
+          <span>Particulars</span>
+          <span>Amount</span>
+        </div>
+        
+        <!-- Updated to match logic: show gross profit b/d if >= 0 -->
+        <div class="pl-row" *ngIf="plData.grossProfit >= 0">
+          <strong>Gross Profit b/d</strong>
+          <strong>{{ plData.grossProfit | currency:'INR' }}</strong>
+        </div>
+        
+        <div class="pl-row">
+          <span>Indirect Income</span>
+          <span>{{ plData.indirectIncome | currency:'INR' }}</span>
+        </div>
+        <!-- Indirect Income Breakdown -->
+        <ng-container *ngFor="let item of indirectIncomeBreakdown">
+          <div class="pl-row sub-item">
+            <span>-- {{ item.name }}</span>
+            <span>{{ item.amount | currency:'INR' }}</span>
+          </div>
+        </ng-container>
+
+        <div class="pl-row net-profit" *ngIf="plData.netProfit < 0">
+          <strong>Net Loss</strong>
+          <strong>{{ -plData.netProfit | currency:'INR' }}</strong>
+        </div>
+      </div>
+    </div>
+     <div class="pl-total-row">
+        <strong>Total</strong>
+        <strong>{{ plData.plAccountTotal | currency:'INR' }}</strong>
+        <strong>Total</strong>
+        <strong>{{ plData.plAccountTotal | currency:'INR' }}</strong>
+    </div>
+  </div>
+</div>

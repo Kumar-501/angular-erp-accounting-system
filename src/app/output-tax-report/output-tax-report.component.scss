@@ -4,6 +4,50 @@
   padding: 1.5rem;
   background-color: #f8f9fa;
   min-height: 100vh;
+}/* Custom Date Input Styling */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    background-color: #fff !important;
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+
+    &:hover {
+      color: #0d6efd;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
 }
 
 /* Header Styles */

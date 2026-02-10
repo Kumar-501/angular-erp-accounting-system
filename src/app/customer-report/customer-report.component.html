@@ -25,15 +25,8 @@
     </div>
 
     <div class="action-buttons">
-      <button class="btn-generate" (click)="generateReport()" [disabled]="loading">
-        <span *ngIf="!loading">Generate Report</span>
-        <span *ngIf="loading">Generating...</span>
-      </button>
       <button class="btn-export" (click)="exportToExcel()" [disabled]="reportData.length === 0">
         Export to Excel
-      </button>
-      <button class="btn-export" (click)="exportToPDF()" [disabled]="reportData.length === 0">
-        Export to PDF
       </button>
     </div>
   </div>

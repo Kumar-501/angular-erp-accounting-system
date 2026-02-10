@@ -82,6 +82,8 @@ export class SalesCallComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.loadSalesCalls();
     this.loadAvailableUsers();
+      this.loadUsersForFilter(); // <-- ADD THIS LINE
+
   }
 
   ngOnDestroy(): void {
@@ -90,120 +92,112 @@ export class SalesCallComponent implements OnInit, OnDestroy {
     }
   }
 
-async updateIndividualCallStatus(customerId: string, newStatus: string): Promise<void> {
-  if (!customerId || !newStatus) {
-    console.warn('Invalid customerId or status');
-    return;
-  }
-
-  // Prevent multiple simultaneous updates for the same customer
-  if (this.isUpdatingStatus.has(customerId)) {
-    console.log('Update already in progress for customer:', customerId);
-    return;
-  }
-
-  console.log('Updating status for customer:', customerId, 'to:', newStatus);
-  
-  // Mark as updating
-  this.isUpdatingStatus.add(customerId);
-  
-  try {
-    // Find the call in our arrays to get the current data
-    const callIndex = this.salesCalls.findIndex(c => c.customerId === customerId);
-    if (callIndex === -1) return;
-
-    const callData = this.salesCalls[callIndex];
-    
-    // Update the status using the service
-    await this.salesCallService.updateSalesCall(customerId, {
-      callStatus: newStatus,
-      statusUpdatedAt: new Date()
-    });
-    
-    // Update local state immediately for better UX
-    this.updateLocalCallStatus(customerId, newStatus);
-    
-    // Create a call log entry for this status change
-    const currentUserId = await this.getCurrentUserId();
-    await this.callLogService.addCallLog(customerId, {
-      subject: `Status changed to ${newStatus}`,
-      description: `Status manually changed to ${newStatus}`,
-      callOutcome: this.mapStatusToCallOutcome(newStatus),
-      createdAt: Timestamp.now(),
-      createdBy: currentUserId,
-      isStatusUpdate: true
-    });
-
-    console.log('Status updated successfully for customer:', customerId);
-    
-  } catch (error) {
-    console.error('Error updating status for customer:', customerId, error);
-    
-    // Revert the UI change on error
-    const originalCall = this.salesCalls.find(call => call.customerId === customerId);
-    if (originalCall) {
-      originalCall.callStatus = originalCall.callStatus || 'Pending';
-    }
-    
-    alert('Failed to update status. Please try again.');
-  } finally {
-    // Remove from updating set
-    this.isUpdatingStatus.delete(customerId);
-  }
-}
-
-private updateLocalCallStatus(customerId: string, newStatus: string): void {
-  // Update in salesCalls array
-  const salesCallIndex = this.salesCalls.findIndex(call => call.customerId === customerId);
-  if (salesCallIndex >= 0) {
-    this.salesCalls[salesCallIndex].callStatus = newStatus;
-    this.salesCalls[salesCallIndex].statusUpdatedAt = new Date();
-  }
-  
-  // Update in filteredCalls array
-  const filteredCallIndex = this.filteredCalls.findIndex(call => call.customerId === customerId);
-  if (filteredCallIndex >= 0) {
-    this.filteredCalls[filteredCallIndex].callStatus = newStatus;
-    this.filteredCalls[filteredCallIndex].statusUpdatedAt = new Date();
-  }
-}
-
-private mapStatusToCallOutcome(status: string): string {
-  switch(status) {
-    case 'Completed': return 'Successful';
-    case 'Pending': return 'No Answer';
-    case 'Follow-up': return 'Left Message';
-    case 'Not Interested': return 'Wrong Number';
-    default: return status;
-  }
-}
-
-
-
-  // Track by function for better performance
-  trackByFn(index: number, item: any): any {
-    return item.customerId || index;
-  }
-
-  // Get visible column count for colspan
-  getVisibleColumnCount(): number {
-    return this.visibleColumns.length;
-  }
-
   loadSalesCalls(): void {
     this.callsSubscription = this.salesCallService.getSalesCalls().subscribe({
       next: (calls) => {
-        console.log('Loaded sales calls:', calls.length);
-        this.salesCalls = calls;
-        this.filteredCalls = [...calls];
-        this.totalItems = calls.length;
+        const currentUser = this.authService.currentUserValue;
+        let finalCalls = calls;
+
+        // If the user is not an admin, filter the calls by their department
+        if (currentUser && currentUser.role?.toLowerCase() !== 'admin') {
+          if (currentUser.department) {
+            finalCalls = calls.filter(call => call.department === currentUser.department);
+          } else {
+            // If a non-admin user has no department assigned, show an empty list
+            finalCalls = [];
+          }
+        }
+        // Admins will see all calls as `finalCalls` remains unfiltered
+
+        console.log(`Loaded ${calls.length} total calls, displaying ${finalCalls.length} for the current user.`);
+
+        this.salesCalls = finalCalls;
+        this.filteredCalls = [...finalCalls];
+        this.totalItems = finalCalls.length;
         this.calculateTotalPages();
+        this.applyFilters(); // Re-apply any UI filters
       },
       error: (err) => {
         console.error('Error loading sales calls:', err);
         alert('Failed to load sales calls. Please refresh the page.');
       }
     });
+  }
+
+  async updateIndividualCallStatus(customerId: string, newStatus: string): Promise<void> {
+    if (!customerId || !newStatus) {
+      console.warn('Invalid customerId or status');
+      return;
+    }
+
+    if (this.isUpdatingStatus.has(customerId)) {
+      return;
+    }
+
+    this.isUpdatingStatus.add(customerId);
+    
+    try {
+      const callIndex = this.salesCalls.findIndex(c => c.customerId === customerId);
+      if (callIndex === -1) return;
+      
+      await this.salesCallService.updateSalesCall(customerId, {
+        callStatus: newStatus,
+        statusUpdatedAt: new Date()
+      });
+      
+      this.updateLocalCallStatus(customerId, newStatus);
+      
+      const currentUserId = await this.getCurrentUserId();
+      await this.callLogService.addCallLog(customerId, {
+        subject: `Status changed to ${newStatus}`,
+        description: `Status manually changed to ${newStatus}`,
+        callOutcome: this.mapStatusToCallOutcome(newStatus),
+        createdAt: Timestamp.now(),
+        createdBy: currentUserId,
+        isStatusUpdate: true
+      });
+    } catch (error) {
+      console.error('Error updating status for customer:', customerId, error);
+      const originalCall = this.salesCalls.find(call => call.customerId === customerId);
+      if (originalCall) {
+        originalCall.callStatus = originalCall.callStatus || 'Pending';
+      }
+      alert('Failed to update status. Please try again.');
+    } finally {
+      this.isUpdatingStatus.delete(customerId);
+    }
+  }
+
+  private updateLocalCallStatus(customerId: string, newStatus: string): void {
+    const salesCallIndex = this.salesCalls.findIndex(call => call.customerId === customerId);
+    if (salesCallIndex >= 0) {
+      this.salesCalls[salesCallIndex].callStatus = newStatus;
+      this.salesCalls[salesCallIndex].statusUpdatedAt = new Date();
+    }
+    
+    const filteredCallIndex = this.filteredCalls.findIndex(call => call.customerId === customerId);
+    if (filteredCallIndex >= 0) {
+      this.filteredCalls[filteredCallIndex].callStatus = newStatus;
+      this.filteredCalls[filteredCallIndex].statusUpdatedAt = new Date();
+    }
+  }
+
+  private mapStatusToCallOutcome(status: string): string {
+    switch(status) {
+      case 'Completed': return 'Successful';
+      case 'Pending': return 'No Answer';
+      case 'Follow-up': return 'Left Message';
+      case 'Not Interested': return 'Wrong Number';
+      default: return status;
+    }
+  }
+
+  trackByFn(index: number, item: any): any {
+    return item.customerId || index;
+  }
+
+  getVisibleColumnCount(): number {
+    return this.visibleColumns.length;
   }
 
   loadAvailableUsers(): void {
@@ -232,23 +226,13 @@ private mapStatusToCallOutcome(status: string): string {
     }
   }
 
-
-  // Enhanced bulk update method with call logs
   async bulkUpdateStatus(newStatus: string): Promise<void> {
-    if (!newStatus || this.selectedCalls.length === 0) {
-      return;
-    }
+    if (!newStatus || this.selectedCalls.length === 0) return;
 
-    console.log('Bulk updating status to:', newStatus, 'for calls:', this.selectedCalls);
-
-    // Mark all as updating
     this.selectedCalls.forEach(id => this.isUpdatingStatus.add(id));
     
     try {
-      // Get current user ID for the call logs
       const currentUserId = await this.getCurrentUserId();
-      
-      // Prepare updates
       const updates = this.selectedCalls.map(customerId => ({
         id: customerId,
         data: { 
@@ -257,21 +241,13 @@ private mapStatusToCallOutcome(status: string): string {
         }
       }));
 
-      // Perform the bulk update
       const result = await this.salesCallService.bulkUpdateCalls(updates);
-      console.log('Bulk update result:', result);
-      
-      // Create call logs and update local state for successful updates
       const successfulIds = updates
         .map(update => update.id)
         .filter(id => !result.failures.find(f => f.id === id));
       
-      // Update local state and create call logs for successful updates
       for (const customerId of successfulIds) {
-        // Update local state
         this.updateLocalCallStatus(customerId, newStatus);
-        
-        // Create call log entry
         await this.callLogService.addCallLog(customerId, {
           subject: `Status changed to ${newStatus}`,
           description: `Status bulk updated to ${newStatus}`,
@@ -282,21 +258,15 @@ private mapStatusToCallOutcome(status: string): string {
         });
       }
       
-      // Clear selection after update
-      this.selectedCalls = [];
-      this.selectAll = false;
+      this.clearSelection();
 
       if (result.failures.length > 0) {
         alert(`Updated ${result.success} calls successfully. Failed to update ${result.failures.length} calls.`);
-      } else {
-        console.log('Bulk status update completed successfully');
       }
-
     } catch (error) {
       console.error('Bulk update failed:', error);
       alert('Failed to update status for some calls. Please try again.');
     } finally {
-      // Remove all from updating set
       this.selectedCalls.forEach(id => this.isUpdatingStatus.delete(id));
     }
   }
@@ -319,23 +289,16 @@ private mapStatusToCallOutcome(status: string): string {
       }));
 
       await this.salesCallService.bulkUpdateCalls(updates);
+      
+      const updateLocal = (call: any) => 
+        this.selectedCalls.includes(call.customerId) 
+          ? { ...call, assignedTo: userName, assignedToId: userId, department: user.department } 
+          : call;
 
-      // Update local state
-      this.salesCalls = this.salesCalls.map(call => 
-        this.selectedCalls.includes(call.customerId) 
-          ? { ...call, assignedTo: userName, assignedToId: userId, department: user.department } 
-          : call
-      );
+      this.salesCalls = this.salesCalls.map(updateLocal);
+      this.filteredCalls = this.filteredCalls.map(updateLocal);
       
-      this.filteredCalls = this.filteredCalls.map(call => 
-        this.selectedCalls.includes(call.customerId) 
-          ? { ...call, assignedTo: userName, assignedToId: userId, department: user.department } 
-          : call
-      );
-      
-      this.selectedCalls = [];
-      this.selectAll = false;
-      
+      this.clearSelection();
     } catch (error) {
       console.error('Bulk assign failed:', error);
       alert('Failed to assign users. Please try again.');
@@ -344,15 +307,27 @@ private mapStatusToCallOutcome(status: string): string {
 
   updateCallNotes(customerId: string, notes: string): void {
     if (!customerId) return;
-    
     this.salesCallService.updateSalesCall(customerId, { notes })
       .catch(err => {
         console.error('Error updating call notes:', err);
         alert('Failed to update notes. Please try again.');
       });
   }
+loadUsersForFilter(): void {
+  this.userService.getUsers().pipe(take(1)).subscribe({
+    next: (users) => {
+      // You can filter for specific roles if needed, e.g., only show sales executives
+      this.availableUsers = users.filter(user => 
+        user.role === 'Executive' || user.role === 'Sales' || user.role === 'Admin'
+      );
+      console.log('Loaded users for filter dropdown:', this.availableUsers);
+    },
+    error: (err) => {
+      console.error('Error loading users for filter:', err);
+    }
+  });
+}
 
-  // Column visibility methods
   toggleColumnDropdown(): void {
     this.showColumnDropdown = !this.showColumnDropdown;
   }
@@ -367,20 +342,12 @@ private mapStatusToCallOutcome(status: string): string {
     } else {
       this.visibleColumns = [...this.visibleColumns, columnKey];
     }
-    
-    if (this.visibleColumns.length === 0) {
-      this.visibleColumns = ['customerName'];
-    }
   }
 
   resetColumnVisibility(): void {
-    this.visibleColumns = [
-      'select', 'customerName', 'mobile', 'lastTransactionDate', 
-      'assignedTo', 'callStatus', 'department', 'notes', 'actions'
-    ];
+    this.visibleColumns = this.allColumns.map(c => c.key);
   }
 
-  // Sorting
   sort(column: string): void {
     if (this.sortColumn === column) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -388,7 +355,6 @@ private mapStatusToCallOutcome(status: string): string {
       this.sortColumn = column;
       this.sortDirection = 'asc';
     }
-    
     this.applySorting();
   }
 
@@ -413,11 +379,9 @@ private mapStatusToCallOutcome(status: string): string {
         ? (aValue > bValue ? 1 : -1) 
         : (bValue > aValue ? 1 : -1);
     });
-    
     this.currentPage = 1;
   }
 
-  // Filtering
   applyFilters(): void {
     let filtered = [...this.salesCalls];
 
@@ -446,25 +410,16 @@ private mapStatusToCallOutcome(status: string): string {
     if (this.filters.status) {
       filtered = filtered.filter(call => call.callStatus === this.filters.status);
     }
-
     if (this.filters.assignedTo) {
       filtered = filtered.filter(call => call.assignedTo === this.filters.assignedTo);
     }
-
     if (this.filters.startDate) {
       const startDate = new Date(this.filters.startDate);
-      filtered = filtered.filter(call => {
-        const callDate = call.callDate ? new Date(call.callDate) : null;
-        return callDate && callDate >= startDate;
-      });
+      filtered = filtered.filter(call => call.callDate && new Date(call.callDate) >= startDate);
     }
-
     if (this.filters.endDate) {
       const endDate = new Date(this.filters.endDate);
-      filtered = filtered.filter(call => {
-        const callDate = call.callDate ? new Date(call.callDate) : null;
-        return callDate && callDate <= endDate;
-      });
+      filtered = filtered.filter(call => call.callDate && new Date(call.callDate) <= endDate);
     }
 
     this.filteredCalls = filtered;
@@ -475,18 +430,8 @@ private mapStatusToCallOutcome(status: string): string {
   }
 
   resetAdvancedFilters(): void {
-    this.filters = {
-      status: '',
-      assignedTo: '',
-      startDate: '',
-      endDate: '',
-      transactionType: '',
-      callOutcome: ''
-    };
-    this.filteredCalls = [...this.salesCalls];
-    this.totalItems = this.filteredCalls.length;
-    this.currentPage = 1;
-    this.calculateTotalPages();
+    this.filters = { status: '', assignedTo: '', startDate: '', endDate: '', transactionType: '', callOutcome: '' };
+    this.applyFilters();
   }
 
   resetFilters(): void {
@@ -502,7 +447,6 @@ private mapStatusToCallOutcome(status: string): string {
     this.showFilterSidebar = !this.showFilterSidebar;
   }
 
-  // Selection methods
   toggleCallSelection(callId: string): void {
     const index = this.selectedCalls.indexOf(callId);
     if (index === -1) {
@@ -510,9 +454,7 @@ private mapStatusToCallOutcome(status: string): string {
     } else {
       this.selectedCalls.splice(index, 1);
     }
-    
-    // Update selectAll state
-    this.selectAll = this.selectedCalls.length === this.paginatedCalls.length;
+    this.selectAll = this.selectedCalls.length > 0 && this.selectedCalls.length === this.paginatedCalls.length;
   }
 
   toggleSelectAll(): void {
@@ -532,7 +474,6 @@ private mapStatusToCallOutcome(status: string): string {
     this.selectAll = false;
   }
 
-  // Pagination
   get paginatedCalls(): any[] {
     const start = (this.currentPage - 1) * this.itemsPerPage;
     return this.filteredCalls.slice(start, start + this.itemsPerPage);
@@ -550,41 +491,10 @@ private mapStatusToCallOutcome(status: string): string {
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
-    const totalVisiblePages = 5;
-    
-    if (this.totalPages <= totalVisiblePages) {
-      for (let i = 1; i <= this.totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-      
-      let startPage = Math.max(2, this.currentPage - 1);
-      let endPage = Math.min(this.totalPages - 1, this.currentPage + 1);
-      
-      if (this.currentPage <= 3) {
-        endPage = Math.min(totalVisiblePages - 1, this.totalPages - 1);
-      }
-      
-      if (this.currentPage >= this.totalPages - 2) {
-        startPage = Math.max(2, this.totalPages - (totalVisiblePages - 2));
-      }
-      
-      if (startPage > 2) {
-        pages.push(-1);
-      }
-      
-      for (let i = startPage; i <= endPage; i++) {
-        pages.push(i);
-      }
-      
-      if (endPage < this.totalPages - 1) {
-        pages.push(-2);
-      }
-      
-      pages.push(this.totalPages);
+    // This is a simplified pagination display logic, can be enhanced
+    for (let i = 1; i <= this.totalPages; i++) {
+      pages.push(i);
     }
-    
     return pages;
   }
   
@@ -593,30 +503,20 @@ private mapStatusToCallOutcome(status: string): string {
     this.calculateTotalPages();
   }
 
-  // Navigation methods
   viewCustomerDetails(customerId: string): void {
-    this.router.navigate(['/crm/customers/view', customerId], {
-      state: { 
-        fromSalesCall: true,
-        returnUrl: this.router.url 
-      }
-    });
+    this.router.navigate(['/crm/customers/view', customerId]);
   }
 
   addNewCallLog(customerId: string): void {
-    this.router.navigate(['/crm/calls/new'], {
-      queryParams: { customerId }
-    });
+    this.router.navigate(['/crm/calls/new'], { queryParams: { customerId } });
   }
 
-  // Export methods
   exportToExcel(): void {
     const dataForExport = this.filteredCalls.map(call => ({
       'Customer Name': call.customerName,
       'Business Name': call.businessName || '',
       'Mobile': call.mobile,
-      'Last Transaction': call.lastTransactionDate ? 
-        new Date(call.lastTransactionDate).toLocaleDateString() : 'None',
+      'Last Transaction': call.lastTransactionDate ? new Date(call.lastTransactionDate).toLocaleDateString() : 'None',
       'Assigned To': call.assignedTo || 'Not Assigned',
       'Department': call.department || 'Not assigned',
       'Status': call.callStatus || 'Pending',
@@ -626,52 +526,35 @@ private mapStatusToCallOutcome(status: string): string {
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(dataForExport);
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'SalesCalls');
-    
     const fileName = `SalesCalls_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, fileName);
   }
 
   printTable(): void {
     const printContent = document.querySelector('.sales-call-table')?.outerHTML;
-    
-    if (!printContent) {
-      console.error('Table not found for printing');
-      return;
-    }
+    if (!printContent) return;
   
     const printWindow = window.open('', '_blank');
-    
-    if (!printWindow) {
-      alert('Pop-up blocker might be preventing the print window. Please allow pop-ups for this site.');
-      return;
-    }
+    if (!printWindow) return;
   
     printWindow.document.write(`
       <html>
         <head>
           <title>Sales Calls Report</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            h1 { color: #333; text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            body { font-family: Arial, sans-serif; }
+            table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
-            .status-pending { color: #ff9800; }
-            .status-completed { color: #4caf50; }
-            .status-follow-up { color: #2196f3; }
-            .status-not-interested { color: #f44336; }
           </style>
         </head>
         <body>
           <h1>Sales Calls Report</h1>
-          <p>Generated on: ${new Date().toLocaleString()}</p>
           ${printContent}
           <script>
             window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                window.close();
-              }, 100);
+              window.print();
+              window.close();
             };
           </script>
         </body>

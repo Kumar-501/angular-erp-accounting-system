@@ -13,11 +13,9 @@ export class TaxComponent implements OnInit {
   isEditingRate = false;
   isEditingGroup = false;
   
-  // Sorting variables for tax rates
   taxRateSortColumn: string = 'name';
   taxRateSortDirection: string = 'asc';
   
-  // Sorting variables for tax groups
   taxGroupSortColumn: string = 'name';
   taxGroupSortDirection: string = 'asc';
   
@@ -29,6 +27,7 @@ export class TaxComponent implements OnInit {
     rate: 0,
     active: true,
     forTaxGroupOnly: false,
+    isIGST: false, // <-- MODIFICATION: Added default value
   };
 
   taxGroup: Omit<TaxGroup, 'id'> = {
@@ -39,27 +38,25 @@ export class TaxComponent implements OnInit {
 
   taxRates: TaxRate[] = [];
   taxGroups: TaxGroup[] = [];
-
   constructor(private taxService: TaxService) {}
 
   ngOnInit() {
     this.getTaxRates();
     this.getTaxGroups();
   }
-
-  toggleTaxRateForm() {
+   toggleTaxRateForm() {
     this.showTaxRateForm = !this.showTaxRateForm;
     this.isEditingRate = false;
     this.currentRateId = '';
+    // --- MODIFICATION: Reset the form with the new isIGST property ---
     this.taxRate = { 
       name: '', 
       rate: 0, 
       active: true, 
-      forTaxGroupOnly: false 
+      forTaxGroupOnly: false,
+      isIGST: false 
     };
   }
-
-  // Tax Rates Sorting
   sortTaxRates(column: string) {
     if (this.taxRateSortColumn === column) {
       this.taxRateSortDirection = this.taxRateSortDirection === 'asc' ? 'desc' : 'asc';
@@ -73,18 +70,16 @@ export class TaxComponent implements OnInit {
       const valB = b[column as keyof TaxRate];
       
       if (typeof valA === 'string' && typeof valB === 'string') {
-        const comparison = valA.localeCompare(valB);
-        return this.taxRateSortDirection === 'asc' ? comparison : -comparison;
+        return this.taxRateSortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
       } else if (typeof valA === 'number' && typeof valB === 'number') {
-        const comparison = valA - valB;
-        return this.taxRateSortDirection === 'asc' ? comparison : -comparison;
+        return this.taxRateSortDirection === 'asc' ? valA - valB : valB - valA;
       } else if (typeof valA === 'boolean' && typeof valB === 'boolean') {
-        const comparison = valA === valB ? 0 : valA ? 1 : -1;
-        return this.taxRateSortDirection === 'asc' ? comparison : -comparison;
+        return this.taxRateSortDirection === 'asc' ? (valA === valB ? 0 : valA ? 1 : -1) : (valA === valB ? 0 : valA ? -1 : 1);
       }
       return 0;
     });
   }
+
 
   // Tax Groups Sorting
   sortTaxGroups(column: string) {
@@ -132,6 +127,7 @@ export class TaxComponent implements OnInit {
     }
   }
 
+
   addTaxGroup() {
     if (this.isEditingGroup) {
       this.taxService.updateTaxGroup(this.currentGroupId, this.taxGroup).then(() => {
@@ -149,22 +145,24 @@ export class TaxComponent implements OnInit {
   editTaxRate(rate: TaxRate) {
     this.isEditingRate = true;
     this.currentRateId = rate.id || '';
+    // ======================= THE FIX =======================
+    // When editing, correctly populate the `isIGST` property.
     this.taxRate = {
       name: rate.name,
       rate: rate.rate,
       active: rate.active,
       forTaxGroupOnly: rate.forTaxGroupOnly,
+      isIGST: rate.isIGST || false, // Fallback to false if the property doesn't exist on older data
     };
+    // ===================== END OF THE FIX ====================
     this.showTaxRateForm = true;
   }
 
+
   deleteTaxRate(id: string | undefined) {
     if (!id) return;
-    
     if (confirm('Are you sure you want to delete this tax rate?')) {
-      this.taxService.deleteTaxRate(id).then(() => {
-        this.getTaxRates();
-      });
+      this.taxService.deleteTaxRate(id).then(() => this.getTaxRates());
     }
   }
 
@@ -193,15 +191,18 @@ export class TaxComponent implements OnInit {
     return taxRates.map(t => t.name).join(', ');
   }
 
-  getTaxRates() {
+ getTaxRates() {
     this.taxService.getTaxRates().subscribe((rates) => {
       this.taxRates = rates;
+      this.sortTaxRates(this.taxRateSortColumn); // Apply initial sort
     });
   }
 
   getTaxGroups() {
     this.taxService.getTaxGroups().subscribe((groups) => {
       this.taxGroups = groups;
+      // You can add sorting for groups here if needed
     });
   }
+
 }

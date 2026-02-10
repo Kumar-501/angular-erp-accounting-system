@@ -1,16 +1,17 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { LeaveService } from '../../services/leave.service';
+import { LeaveService, UserLeaveBalance } from '../../services/leave.service';
 import { UserService } from '../../services/user.service';
 import { Modal } from 'bootstrap';
 import { AuthService } from '../../auth.service';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable'; // Import for PDF table functionality
-import * as XLSX from 'xlsx'; // Import XLSX library
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { parse, isValid, format } from 'date-fns';
-
-import {  format as dateFormat } from 'date-fns';
-import { type } from 'node:os';
+import { collection as firestoreCollection, CollectionReference, DocumentData, getDoc, doc } from '@firebase/firestore';
+import { format as dateFormat } from 'date-fns';
+import { addDoc } from 'firebase/firestore';
+import { Firestore } from '@angular/fire/firestore';
 
 @Component({
   selector: 'app-leave',
@@ -26,13 +27,15 @@ export class LeaveComponent implements OnInit {
   selectedFile: File | null = null;
   bulkApproveForm: FormGroup;
   selectedLeave: any = null;
-isLoadingActivities = false;
+  isLoadingActivities = false;
   bulkRejectForm: FormGroup;
   editLeaveForm!: FormGroup;
-selectedLeaveId: string | null = null;
-private editLeaveModalInstance!: Modal;
+  selectedLeaveId: string | null = null;
+  private editLeaveModalInstance!: Modal;
   currentUser: any;
-currentUserName: string = '';
+  currentUserName: string = '';
+  currentUserRole: string = '';
+  canApproveLeaves: boolean = false;
   modal: Modal | null = null;
   importInProgress = false;
   importProgress = 0;
@@ -40,27 +43,23 @@ currentUserName: string = '';
   importMessageClass = 'alert-info';
   importData: any[] = [];
   importFile: File | null = null;
-  showAvailableEmployees() {
-    console.log("Available Employees:", this.users.map(u => ({
-      username: u.username,
-      fullName: `${u.firstName} ${u.lastName}`,
-      email: u.email
-    })));
-  }
   
-isLoading: boolean = false;
-importError: string | null = null;
-  filterForm!: FormGroup; // Added for filter sidebar
+  isLoading: boolean = false;
+  importError: string | null = null;
+  filterForm!: FormGroup;
   showForm = false;
-  showFilterSidebar = false; // Added for filter sidebar toggle
+  showFilterSidebar = false;
 
   importModalInstance!: Modal;
   @ViewChild('importModal') importModalRef!: ElementRef;
   leaveTypes: any[] = [];
   users: any[] = [];
   leaves: any[] = [];
-  filteredLeaves: any[] = []; // Added for filtered leaves display
+  filteredLeaves: any[] = [];
   leaveActivities: any[] = [];
+  userLeaveBalances: UserLeaveBalance[] = [];
+  Math = Math;
+
   columns = [
     { field: 'select', header: 'Select', visible: true },
     { field: 'referenceNo', header: 'Reference No', visible: true },
@@ -72,17 +71,10 @@ importError: string | null = null;
     { field: 'reason', header: 'Reason', visible: true },
     { field: 'status', header: 'Status', visible: true },
     { field: 'approvedBy', header: 'Approved By', visible: true },
-    { field: 'approvalLeaveType', header: 'Approval Leave Type', visible: true },
-    { field: 'note', header: 'Note', visible: true },
-    { field: 'createdAt', header: 'Created At', visible: true },
-    { field: 'days', header: 'Days', visible: true }, // New column
+    { field: 'maxLeaveCount', header: 'Max Days', visible: true },
+    { field: 'daysTaken', header: 'Days Taken', visible: true },
+    { field: 'remainingLeave', header: 'Remaining Leave', visible: true },
     { field: 'actions', header: 'Actions', visible: true },
-      { field: 'maxLeaveCount', header: 'Max Days', visible: true }, // Add this line
-        { field: 'endDate', header: 'End Date', visible: true },
-          { field: 'daysTaken', header: 'Days Taken', visible: true },
-  { field: 'remainingLeave', header: 'Remaining Leave', visible: true },
-
-
   ];
   
   // For checkboxes and bulk operations
@@ -104,121 +96,273 @@ importError: string | null = null;
   private addLeaveModalInstance!: Modal;
   leaveTableRef: any;
 
-constructor(
-  private fb: FormBuilder,
-  private leaveService: LeaveService,
-  private userService: UserService,
-  private authService: AuthService
-) {
-  // Initialize forms
+  constructor(
+    private fb: FormBuilder,
+    private leaveService: LeaveService,
+    private userService: UserService,
+    private firestore: Firestore,
+    private authService: AuthService
+  ) {
+    // Initialize forms
+    this.statusForm = this.fb.group({
+      status: ['pending', Validators.required],
+      note: [''],
+      approvedBy: ['']
+    });
+    
+    this.bulkApproveForm = this.fb.group({
+      approvedBy: ['', Validators.required],
+      note: ['']
+    });
+    
+    this.bulkRejectForm = this.fb.group({
+      rejectedBy: ['', Validators.required],
+      note: ['']
+    });
+
+    // Initialize filter form
+    this.initFilterForm();
+  }
+
+  initFilterForm() {
+    this.filterForm = this.fb.group({
+      employee: [''],
+      status: [''],
+      leaveType: [''],
+      startDate: [''],
+      endDate: ['']
+    });
+
+    // Load initial data when filters are initialized
+    this.loadInitialData();
+  }
+
+ngOnInit(): void {
+  this.initializeForm(); // Initialize fresh form
+  this.loadInitialData();
+  this.initializeEditForm();
+  this.setupFormListeners();
+  
+  // Initialize modals after view is initialized
+  setTimeout(() => {
+    this.initModals();
+  });
+  
+  // Enhanced leave type change listener
+  this.leaveForm.get('leaveTypeId')?.valueChanges.subscribe(leaveTypeId => {
+    this.updateMaxLeaveCountAndBalance(leaveTypeId);
+  });
+  
   this.statusForm = this.fb.group({
-    status: ['pending', Validators.required],
+    status: ['', Validators.required],
     note: [''],
     approvedBy: ['']
   });
   
-  this.bulkApproveForm = this.fb.group({
-    approvedBy: ['', Validators.required],
-    note: ['']
-  });
-  
-  this.bulkRejectForm = this.fb.group({
-    rejectedBy: ['', Validators.required],
-    note: ['']
-  });
-
-  // Initialize filter form
-  this.initFilterForm();
-}
-initFilterForm() {
-  this.filterForm = this.fb.group({
-    employee: [''],
-    status: [''],
-    leaveType: [''],
-    startDate: [''],
-    endDate: ['']
-  });
-
-  // Load initial data when filters are initialized
-  this.loadInitialData();
-}
-
-// Add this method to open the edit modal with data
-openEditModal(leave: any) {
-  this.selectedLeaveId = leave.id;
-  
-  // Find the leave in the leaves array to get all data
-  const selectedLeave = this.leaves.find(l => l.id === leave.id);
-  
-  if (selectedLeave) {
-    this.editLeaveForm.patchValue({
-      leaveTypeId: selectedLeave.leaveTypeId, // Make sure this matches your data structure
-      maxLeaveCount: selectedLeave.maxLeaveCount,
-      session: selectedLeave.session,
-      startDate: this.formatDateForInput(selectedLeave.startDate),
-      endDate: this.formatDateForInput(selectedLeave.endDate),
-      reason: selectedLeave.reason
-    });
-  }
-  
-  // Show the modal
-  this.editLeaveModalInstance = new Modal(this.editLeaveModalRef.nativeElement);
-  this.editLeaveModalInstance.show();
-}// Helper method to format date for input field
-private formatDateForInput(date: Date | string): string {
-  const d = new Date(date);
-  return d.toISOString().split('T')[0];
-}
-  ngOnInit(): void {
-    this.initializeForm();
-    this.loadInitialData();
-      this.initializeEditForm(); // Add this line
-
-    this.setupFormListeners();
-    const modalElement = document.getElementById('importModal');
-    if (modalElement) {
-      this.modal = new Modal(modalElement);
-    }
-     this.leaveForm.get('leaveTypeId')?.valueChanges.subscribe(leaveTypeId => {
-    this.updateMaxLeaveCount(leaveTypeId);
-     });
-    this.statusForm = this.fb.group({
-  status: ['', Validators.required],
-  note: [''],
-  approvedBy: ['']
-});
-      this.editLeaveModalInstance = new Modal(this.editLeaveModalRef.nativeElement);
   this.currentUser = this.authService.currentUserValue;
   this.currentUserName = this.currentUser?.displayName || this.currentUser?.username || '';
-  }
   
-  initializeEditForm() {
-  this.editLeaveForm = this.fb.group({
-    leaveTypeId: ['', Validators.required],
-    maxLeaveCount: [1, [Validators.required, Validators.min(1)]],
-    session: ['Full Day', Validators.required],
-    startDate: ['', Validators.required],
-    endDate: ['', Validators.required],
-    reason: ['', Validators.required]
+  // Check user role and permissions
+  this.checkUserPermissions();
+  
+  // Initialize user leave balances
+  this.initializeCurrentUserBalances();
+  
+  this.authService.getCurrentUser().subscribe(user => {
+    if (user) {
+      this.initializeForm(); // Reinitialize form for new user
+      this.loadUserLeaveBalances(user.uid);
+      this.checkUserPermissions(); // Recheck permissions when user changes
+    }
   });
 }
-  // Add this new method
-updateMaxLeaveCount(leaveTypeId: string): void {
-  if (!leaveTypeId) {
-    this.leaveForm.patchValue({ maxLeaveCount: 1 }); // Reset to default
+
+private async checkUserPermissions(): Promise<void> {
+  if (!this.currentUser) {
+    this.canApproveLeaves = false;
     return;
   }
 
-  const selectedLeaveType = this.leaveTypes.find(type => type.id === leaveTypeId);
-  if (selectedLeaveType) {
-    this.leaveForm.patchValue({
-      maxLeaveCount: selectedLeaveType.maxLeaveCount || 1
-    });
+  try {
+    // Get current user's complete profile from the users collection
+    this.userService.getUserByIdOnce(this.currentUser.uid).subscribe(
+      (userProfile) => {
+        if (userProfile) {
+          this.currentUserRole = userProfile.role?.toLowerCase() || '';
+          
+          // Check if user has approval permissions
+          this.canApproveLeaves = this.currentUserRole === 'hr manager' || 
+                                 this.currentUserRole === 'admin' ||
+                                 this.currentUserRole === 'hrmanager';
+          
+          console.log('User role:', this.currentUserRole, 'Can approve:', this.canApproveLeaves);
+        } else {
+          // Fallback: check auth user role if user profile not found
+          this.currentUserRole = this.currentUser.role?.toLowerCase() || '';
+          this.canApproveLeaves = this.currentUserRole === 'hr manager' || 
+                                 this.currentUserRole === 'admin' ||
+                                 this.currentUserRole === 'hrmanager';
+        }
+      },
+      (error) => {
+        console.error('Error getting user profile:', error);
+        // Fallback to auth user role
+        this.currentUserRole = this.currentUser.role?.toLowerCase() || '';
+        this.canApproveLeaves = this.currentUserRole === 'hr manager' || 
+                               this.currentUserRole === 'admin' ||
+                               this.currentUserRole === 'hrmanager';
+      }
+    );
+  } catch (error) {
+    console.error('Error checking user permissions:', error);
+    this.canApproveLeaves = false;
   }
 }
 
+private initModals(): void {
+  if (this.editLeaveModalRef) {
+    this.editLeaveModalInstance = new Modal(this.editLeaveModalRef.nativeElement);
+  }
+  
+  if (this.statusModalRef) {
+    this.bootstrapModalInstance = new Modal(this.statusModalRef.nativeElement);
+  }
+  
+  if (this.bulkApproveModalRef) {
+    this.bulkApproveModalInstance = new Modal(this.bulkApproveModalRef.nativeElement);
+  }
+  
+  if (this.bulkRejectModalRef) {
+    this.bulkRejectModalInstance = new Modal(this.bulkRejectModalRef.nativeElement);
+  }
+  
+  if (this.activityModalRef) {
+    this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
+  }
+  
+  const addLeaveModalElement = document.getElementById('addLeaveModal');
+  if (addLeaveModalElement) {
+    this.addLeaveModalInstance = new Modal(addLeaveModalElement);
+  }
+}
+
+  
+
+  async initializeCurrentUserBalances() {
+    if (this.currentUser) {
+      const user = this.users.find(u => 
+        u.username === this.currentUser.username || 
+        u.email === this.currentUser.email
+      );
+      
+      if (user) {
+        try {
+          await this.leaveService.initializeUserLeaveBalances(user.id);
+          await this.loadUserLeaveBalances(user.id);
+        } catch (error) {
+          console.error('Error initializing user balances:', error);
+        }
+      }
+    }
+  }
+
+async loadUserLeaveBalances(userId: string) {
+  try {
+    // First try to get existing balances
+    this.userLeaveBalances = await this.leaveService.getUserLeaveBalances(userId);
+    
+    // If no balances exist, initialize them
+    if (this.userLeaveBalances.length === 0) {
+      await this.leaveService.initializeUserLeaveBalances(userId);
+      this.userLeaveBalances = await this.leaveService.getUserLeaveBalances(userId);
+    }
+  } catch (error) {
+    console.error('Error loading user leave balances:', error);
+    // Fallback to properly formatted leave type max values
+    const currentDate = new Date();
+    this.userLeaveBalances = this.leaveTypes.map(type => ({
+      userId: userId,
+      leaveTypeId: type.id,
+      leaveTypeName: type.leaveType || type.name,
+      allocated: type.maxLeaveCount || type.maxDays || 0,
+      used: 0,
+      remaining: type.maxLeaveCount || type.maxDays || 0,
+      year: currentDate.getFullYear(),
+      createdAt: currentDate,
+      updatedAt: currentDate
+    } as UserLeaveBalance));
+  }
+}
+
+  initializeEditForm() {
+    this.editLeaveForm = this.fb.group({
+      leaveTypeId: ['', Validators.required],
+      maxLeaveCount: [1, [Validators.required, Validators.min(1)]],
+      session: ['Full Day', Validators.required],
+      startDate: ['', Validators.required],
+      endDate: ['', Validators.required],
+      reason: ['', Validators.required]
+    });
+  }
+
+  // Enhanced method to update max leave count and show current balance
+  async updateMaxLeaveCountAndBalance(leaveTypeId: string): Promise<void> {
+    if (!leaveTypeId) {
+      this.leaveForm.patchValue({ maxLeaveCount: 1 });
+      return;
+    }
+
+    const selectedLeaveType = this.leaveTypes.find(type => type.id === leaveTypeId);
+    if (!selectedLeaveType) return;
+
+    // Get current user
+    const user = this.users.find(u => u.id === this.leaveForm.get('employeeId')?.value);
+    if (!user) return;
+
+    try {
+      // Get user's current balance for this leave type
+      const balance = await this.leaveService.getUserLeaveBalance(user.id, leaveTypeId);
+      
+      if (balance) {
+        this.leaveForm.patchValue({
+          maxLeaveCount: balance.remaining // Show remaining balance, not total allocation
+        });
+        
+        // Show balance information to user
+        console.log(`Available ${selectedLeaveType.leaveType} balance: ${balance.remaining} days`);
+      } else {
+        // If no balance record exists, show total allocation
+        this.leaveForm.patchValue({
+          maxLeaveCount: selectedLeaveType.maxLeaveCount || selectedLeaveType.maxDays || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error getting balance:', error);
+      // Fallback to leave type max
+      this.leaveForm.patchValue({
+        maxLeaveCount: selectedLeaveType.maxLeaveCount || selectedLeaveType.maxDays || 0
+      });
+    }
+  }
+
+getRemainingBalance(leaveTypeId: string): number {
+  const balance = this.userLeaveBalances.find(b => b.leaveTypeId === leaveTypeId);
+  if (balance) {
+    return balance.remaining;
+  }
+  
+  // If no balance record exists, check the leave type's max days
+  const leaveType = this.leaveTypes.find(t => t.id === leaveTypeId);
+  return leaveType ? (leaveType.maxLeaveCount || leaveType.maxDays || 0) : 0;
+}
+
+  // Get used balance for display
+  getUsedBalance(leaveTypeId: string): number {
+    const balance = this.userLeaveBalances.find(b => b.leaveTypeId === leaveTypeId);
+    return balance ? balance.used : 0;
+  }
+
   setupFormListeners(): void {
-    // Add valueChanges subscription for status in the status form
     this.statusForm.get('status')?.valueChanges.subscribe(status => {
       const approvedByControl = this.statusForm.get('approvedBy');
       if (status === 'approved') {
@@ -229,7 +373,326 @@ updateMaxLeaveCount(leaveTypeId: string): void {
       approvedByControl?.updateValueAndValidity();
     });
   }
+
+// In leave.component.ts
+
+initializeForm() {
+  this.leaveForm = this.fb.group({
+    employeeId: ['', ],
+    leaveTypeId: ['', ],
+    session: ['Full Day', ],
+    startDate: ['', ],
+    endDate: ['', ],
+    reason: ['', ]
+  });
+
+  // Set current user if available
+  const currentUser = this.authService.currentUserValue;
+  if (currentUser) {
+    const user = this.users.find(u => u.id === currentUser.uid);
+    if (user) {
+      this.leaveForm.patchValue({
+        employeeId: user.id,
+      });
+    }
+  }
+}
+  loadInitialData() {
+    this.currentUser = this.authService.currentUserValue;
+    this.currentUserName = this.currentUser?.displayName || this.currentUser?.username || '';
+    
+    this.leaveService.getLeaveTypes().subscribe((types) => {
+      this.leaveTypes = types;
+    });
+
+    this.leaveService.getLeaves().subscribe((leaves) => {
+      this.leaves = leaves.map(leave => {
+        const processedLeave = {
+          ...leave,
+          startDate: leave.startDate?.toDate ? leave.startDate.toDate() : new Date(leave.startDate),
+          endDate: leave.endDate?.toDate ? leave.endDate.toDate() : new Date(leave.endDate || leave.startDate),
+          session: leave.session || 'Full Day'
+        };
+        return this.calculateLeaveDetails(processedLeave);
+      });
+      this.filteredLeaves = [...this.leaves];
+      this.resetSelections();
+    });
+
+    this.userService.getUsers().subscribe((users) => {
+      this.users = users;
+      const user = this.users.find(u => 
+        u.username === this.currentUser?.username || 
+        u.email === this.currentUser?.email
+      );
+      
+      if (user) {
+        this.leaveForm.patchValue({
+          employeeId: user.id,
+          department: user.department
+        });
+        
+        // Load user's leave balances
+        this.loadUserLeaveBalances(user.id);
+      }
+    });
+
+    this.filteredLeaves = [...this.leaves];
+    this.isLoading = false;
+    this.resetSelections();
+  }
+
+// In leave.component.ts
+
+async submitForm() {
+  if (this.leaveForm.invalid) {
+    this.leaveForm.markAllAsTouched();
+    return;
+  }
+
+  const formValue = this.leaveForm.value;
   
+  // Validate leave type selection
+  if (!formValue.leaveTypeId) {
+    alert('Please select a valid leave type');
+    return;
+  }
+
+  // Validate dates
+  if (!formValue.startDate || !formValue.endDate) {
+    alert('Please select valid start and end dates');
+    return;
+  }
+
+  const startDate = new Date(formValue.startDate);
+  const endDate = new Date(formValue.endDate);
+  
+  if (startDate > endDate) {
+    alert('End date cannot be before start date');
+    return;
+  }
+
+  // Find selected user and leave type
+  const selectedUser = this.users.find(user => user.id === formValue.employeeId);
+  const selectedLeaveType = this.leaveTypes.find(type => type.id === formValue.leaveTypeId);
+
+  if (!selectedUser || !selectedLeaveType) {
+    alert('Please select valid employee and leave type');
+    return;
+  }
+
+  // Calculate requested days
+  const daysRequested = this.leaveService.calculateLeaveDays(
+    startDate,
+    endDate,
+    formValue.session
+  );
+
+  // Get current balance (or default to leave type max if no balance record exists)
+  let remainingBalance = this.getRemainingBalance(selectedLeaveType.id);
+  
+  // If no balance record exists, use the leave type's max days as initial balance
+  if (remainingBalance === 0 && !this.userLeaveBalances.some(b => b.leaveTypeId === selectedLeaveType.id)) {
+    remainingBalance = selectedLeaveType.maxLeaveCount || selectedLeaveType.maxDays || 0;
+  }
+
+  // Check available balance (allow 0 days if that's all they have)
+  if (daysRequested > remainingBalance) {
+    alert(`Insufficient balance. You only have ${remainingBalance} days remaining.`);
+    return;
+  }
+
+  // Prepare leave data
+  const leaveData = {
+    referenceNo: 'LV' + new Date().getFullYear() + '/' + Math.floor(Math.random() * 100000),
+    leaveType: selectedLeaveType.leaveType,
+    leaveTypeId: selectedLeaveType.id,
+    employeeName: selectedUser.username,
+    employeeId: selectedUser.id,
+    userId: selectedUser.id,
+    startDate: startDate,
+    endDate: endDate,
+    session: formValue.session,
+    reason: formValue.reason,
+    daysRequested: daysRequested,
+    status: 'pending',
+    remainingLeave: remainingBalance - daysRequested
+  };
+
+  try {
+    const result = await this.leaveService.applyForLeave(leaveData);
+    
+    if (result.success) {
+      // Reset form and close modal
+      this.leaveForm.reset({
+        employeeId: selectedUser.id,
+        session: 'Full Day'
+      });
+      
+      if (this.addLeaveModalInstance) {
+        this.addLeaveModalInstance.hide();
+      }
+      
+      alert('Leave application submitted successfully!');
+      
+      // Refresh the data
+      this.loadInitialData();
+      
+      // Reload user balances to show updated remaining balance
+      await this.loadUserLeaveBalances(selectedUser.id);
+    } else {
+      alert(`Leave application failed: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Error submitting leave:', error);
+    alert('Failed to submit leave. Please try again.');
+  }
+}
+
+  // Enhanced approve/reject with proper balance handling and permission check
+  async updateStatus() {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to approve or reject leave requests.');
+      return;
+    }
+
+    if (this.statusForm.invalid || !this.selectedLeave) return;
+
+    const { status, note, approvedBy } = this.statusForm.value;
+    const changedBy = approvedBy || this.currentUserName;
+
+    try {
+      if (status === 'approved') {
+        await this.leaveService.approveLeave(this.selectedLeave.id, changedBy, note);
+      } else if (status === 'rejected') {
+        await this.leaveService.rejectLeave(this.selectedLeave.id, changedBy, note);
+      }
+
+      // Close modal and refresh data
+      this.bootstrapModalInstance.hide();
+      this.loadInitialData();
+      
+      // Reload user balances
+      if (this.selectedLeave.userId) {
+        await this.loadUserLeaveBalances(this.selectedLeave.userId);
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert(`Error updating status: ${error}`);
+    }
+  }
+
+  // Rest of the methods remain the same, but with enhanced balance tracking...
+  
+openEditModal(leave: any) {
+  this.selectedLeaveId = leave.id;
+  
+  const selectedLeave = this.leaves.find(l => l.id === leave.id);
+  
+  if (selectedLeave) {
+    this.editLeaveForm.patchValue({
+      leaveTypeId: selectedLeave.leaveTypeId,
+      maxLeaveCount: selectedLeave.maxLeaveCount,
+      session: selectedLeave.session,
+      startDate: this.formatDateForInput(selectedLeave.startDate),
+      endDate: this.formatDateForInput(selectedLeave.endDate),
+      reason: selectedLeave.reason
+    });
+  }
+  
+  // Initialize modal if not already done
+  if (!this.editLeaveModalInstance && this.editLeaveModalRef) {
+    this.editLeaveModalInstance = new Modal(this.editLeaveModalRef.nativeElement);
+  }
+  
+  this.editLeaveModalInstance?.show();
+}
+
+  private formatDateForInput(date: Date | string): string {
+    const d = new Date(date);
+    return d.toISOString().split('T')[0];
+  }
+
+  async updateLeave() {
+    if (this.editLeaveForm.invalid || !this.selectedLeaveId) {
+      this.editLeaveForm.markAllAsTouched();
+      return;
+    }
+
+    try {
+      const formValue = this.editLeaveForm.value;
+      const updates = {
+        leaveTypeId: formValue.leaveTypeId,
+        maxLeaveCount: formValue.maxLeaveCount,
+        session: formValue.session,
+        startDate: new Date(formValue.startDate),
+        endDate: new Date(formValue.endDate),
+        reason: formValue.reason,
+        updatedAt: new Date()
+      };
+
+      await this.leaveService.updateLeave(this.selectedLeaveId, updates);
+      
+      const index = this.leaves.findIndex(l => l.id === this.selectedLeaveId);
+      if (index !== -1) {
+        this.leaves[index] = { 
+          ...this.leaves[index], 
+          ...updates,
+          leaveType: this.leaveTypes.find(t => t.id === formValue.leaveTypeId)?.leaveType || ''
+        };
+        this.filteredLeaves = [...this.leaves];
+      }
+
+      this.editLeaveModalInstance.hide();
+      this.selectedLeaveId = null;
+      
+      alert('Leave updated successfully!');
+    } catch (error) {
+      console.error('Error updating leave:', error);
+      alert('Failed to update leave. Please try again.');
+    }
+  }
+
+
+
+private calculateDaysForLeave(leave: any): number {
+  const startDate = new Date(leave.startDate);
+  const endDate = new Date(leave.endDate || leave.startDate);
+  
+  // Same day leave
+  if (startDate.toDateString() === endDate.toDateString()) {
+    return leave.session === 'Full Day' ? 1 : 0.5;
+  }
+  
+  // Multi-day leave
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Inclusive counting
+  
+  // Adjust for half days
+  if (leave.session === 'First Half' || leave.session === 'Second Half') {
+    return diffDays - 0.5;
+  }
+  
+  return diffDays;
+}
+
+  calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
+    if (!startDate || !endDate) return 0;
+    
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    const diffTime = Math.abs(end.getTime() - start.getTime());
+    let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (session === 'First Half' || session === 'Second Half') {
+      days = days - 0.5;
+    }
+    
+    return days;
+  }
+
   // Export functionality methods
   exportToCSV(): void {
     const data = this.filteredLeaves.map(leave => ({
@@ -237,11 +700,10 @@ updateMaxLeaveCount(leaveTypeId: string): void {
       'Leave Type': leave.leaveType,
       'Employee': leave.employeeName,
       'Start Date': this.formatDate(leave.startDate),
+      'End Date': this.formatDate(leave.endDate),
       'Session': leave.session,
       'Reason': leave.reason,
       'Status': leave.status,
-          'End Date': this.formatDate(leave.endDate),  // Add this line
-
     }));
 
     const csv = this.convertToCSV(data);
@@ -254,6 +716,7 @@ updateMaxLeaveCount(leaveTypeId: string): void {
       'Leave Type': leave.leaveType,
       'Employee': leave.employeeName,
       'Start Date': this.formatDate(leave.startDate),
+      'End Date': this.formatDate(leave.endDate),
       'Session': leave.session,
       'Reason': leave.reason,
       'Status': leave.status
@@ -265,98 +728,8 @@ updateMaxLeaveCount(leaveTypeId: string): void {
     XLSX.writeFile(wb, 'leaves_export.xlsx');
   }
 
-  exportToPDF(): void {
-    const doc = new jsPDF();
-    const title = 'Leaves Report';
-    const currentDate = new Date().toLocaleDateString();
-    
-    // Add title and date
-    doc.setFontSize(18);
-    doc.text(title, 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${currentDate}`, 14, 22);
-    
-    // Prepare data for the table
-    const data = this.filteredLeaves.map(leave => [
-      leave.referenceNo,
-      leave.leaveType,
-      leave.employeeName,
-      this.formatDate(leave.startDate),
-      leave.session,
-      leave.reason,
-      leave.status
-    ]);
-    
-    // Add table
-    (doc as any).autoTable({
-      head: [['Reference No', 'Leave Type', 'Employee', 'Date', 'Session', 'Reason', 'Status']],
-      body: data,
-      startY: 30,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: 'linebreak'
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: 'bold'
-      }
-    });
-    
-    doc.save('leaves_export.pdf');
-  }
-
-printTable(): void {
-  // Get the table HTML
-  const printContent = document.getElementById('leaveTable')?.innerHTML;
-  
-  if (!printContent) {
-    console.error('Could not find table to print');
-    return;
-  }
-
-  // Create a print window
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) {
-    alert('Popup blocker might be preventing the print window from opening. Please allow popups for this site.');
-    return;
-  }
-
-  // Write the print content
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Leaves Report</title>
-        <style>
-          body { font-family: Arial, sans-serif; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; }
-          @page { size: auto; margin: 5mm; }
-        </style>
-      </head>
-      <body>
-        <h2>Leaves Report</h2>
-        <p>Generated on: ${new Date().toLocaleDateString()}</p>
-        ${printContent}
-        <script>
-          // Print automatically when loaded
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 100);
-          };
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
-}
   updateColumnVisibility(): void {
     // This method is triggered when column visibility checkboxes are changed
-    // No need to do anything as the template uses *ngIf to show/hide columns
   }
 
   private convertToCSV(objArray: any[]): string {
@@ -364,14 +737,12 @@ printTable(): void {
     let str = '';
     let row = '';
 
-    // Add headers
     for (const index in objArray[0]) {
       row += index + ',';
     }
     row = row.slice(0, -1);
     str += row + '\r\n';
 
-    // Add data
     for (let i = 0; i < array.length; i++) {
       let line = '';
       for (const index in array[i]) {
@@ -383,6 +754,7 @@ printTable(): void {
 
     return str;
   }
+
   downloadTemplateFile(): void {
     const templateData = [
       {
@@ -397,29 +769,11 @@ printTable(): void {
     ];
   
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(templateData);
-    
-    // Set column widths and formats
-    if (ws['!ref']) {
-      const range = XLSX.utils.decode_range(ws['!ref']);
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const header = XLSX.utils.encode_col(C) + "1";
-        if (ws[header]?.v?.includes('Date')) {
-          // Apply date format to date columns
-          for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-            const cell = XLSX.utils.encode_col(C) + (R + 1);
-            if (!ws[cell]) continue;
-            ws[cell].z = 'yyyy-mm-dd';
-          }
-        }
-      }
-    }
-  
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Leaves Template');
     XLSX.writeFile(wb, 'leaves_import_template.xlsx');
   }
-  
-  
+
   private downloadFile(data: string, filename: string, type: string): void {
     const blob = new Blob([data], { type });
     const url = window.URL.createObjectURL(blob);
@@ -433,40 +787,15 @@ printTable(): void {
       window.URL.revokeObjectURL(url);
     }, 100);
   }
-  
-  initializeForm() {
-    this.leaveForm = this.fb.group({
-      employeeId: ['', Validators.required],
-      leaveTypeId: ['', Validators.required],
-      session: ['Full Day', Validators.required],
-      startDate: ['', Validators.required],
-      reason: ['', Validators.required],
-          endDate: ['', Validators.required],  // Add this line
 
-          maxLeaveCount: [1, [Validators.required, Validators.min(1)]], // Add this line
-
-    });
-  }
-  updateEndDate() {
-  const startDate = this.leaveForm.get('startDate')?.value;
-  if (startDate) {
-    // Set end date same as start date by default
-    this.leaveForm.patchValue({
-      endDate: startDate
-    });
-  }
-}
-  
-  // Search methods
   applySearch() {
     if (!this.searchQuery) {
-      this.applyFilters(); // If search is empty, just apply other filters
+      this.applyFilters();
       return;
     }
 
     const query = this.searchQuery.toLowerCase();
     this.filteredLeaves = this.leaves.filter(leave => {
-      // Search across multiple fields
       return (
         (leave.referenceNo?.toLowerCase().includes(query)) ||
         (leave.employeeName?.toLowerCase().includes(query)) ||
@@ -483,155 +812,62 @@ printTable(): void {
     this.searchQuery = '';
     this.applyFilters();
   }
-  
-loadInitialData() {
-  // Get current user
-  this.currentUser = this.authService.currentUserValue;
-  this.currentUserName = this.currentUser?.displayName || this.currentUser?.username || '';
-  
-  this.leaveService.getLeaveTypes().subscribe((types) => {
-    this.leaveTypes = types;
-  });
-// In loadInitialData() - make sure leaves have proper references
-this.leaveService.getLeaves().subscribe((leaves) => {
-  this.leaves = leaves.map(leave => {
-    return {
-      ...leave,
-      employee: this.users.find(u => u.id === leave.employeeId),
-      leaveType: this.leaveTypes.find(t => t.id === leave.leaveTypeId),
-      startDate: new Date(leave.startDate),
-      endDate: leave.endDate ? new Date(leave.endDate) : new Date(leave.startDate)
-    };
-  });
-  this.filteredLeaves = [...this.leaves];
-});
-  this.userService.getUsers().subscribe((users) => {
-    this.users = users;
-    const user = this.users.find(u => 
-      u.username === this.currentUser?.username || 
-      u.email === this.currentUser?.email
-    );
+
+  applyFilters() {
+    const filters = this.filterForm.value;
     
-    if (user) {
-      this.leaveForm.patchValue({
-        employeeId: user.id,
-        department: user.department
-      });
-    }
-  });
-this.filteredLeaves = [...this.leaves];
-    this.isLoading = false;
-    this.resetSelections();
-this.leaveService.getLeaves().subscribe((leaves) => {
-    this.leaves = leaves.map(leave => {
-      const processedLeave = {
-        ...leave,
-        startDate: leave.startDate?.toDate ? leave.startDate.toDate() : new Date(leave.startDate),
-        endDate: leave.endDate?.toDate ? leave.endDate.toDate() : new Date(leave.endDate || leave.startDate),
-        session: leave.session || 'Full Day'
-      };
-      return this.calculateLeaveDetails(processedLeave);
+    this.filteredLeaves = this.leaves.filter(leave => {
+      if (filters.employee && leave.employeeId !== filters.employee) {
+        return false;
+      }
+      
+      if (filters.status && leave.status !== filters.status) {
+        return false;
+      }
+      
+      if (filters.leaveType && leave.leaveTypeId !== filters.leaveType) {
+        return false;
+      }
+      
+      if (filters.startDate || filters.endDate) {
+        const leaveStartDate = this.parseDate(leave.startDate);
+        const leaveEndDate = this.parseDate(leave.endDate || leave.startDate);
+        
+        const filterStartDate = filters.startDate ? this.parseDate(filters.startDate) : null;
+        const filterEndDate = filters.endDate ? this.parseDate(filters.endDate) : null;
+        
+        if (filterStartDate && leaveEndDate < filterStartDate) {
+          return false;
+        }
+        
+        if (filterEndDate && leaveStartDate > filterEndDate) {
+          return false;
+        }
+      }
+      
+      return true;
     });
-    this.filteredLeaves = [...this.leaves];
-    this.resetSelections();
-  });
-
-}
-
-  
-// Updated applyFilters method
-applyFilters() {
-  const filters = this.filterForm.value;
-  
-  this.filteredLeaves = this.leaves.filter(leave => {
-    // Employee filter - compare IDs
-    if (filters.employee && leave.employeeId !== filters.employee) {
-      return false;
-    }
-    
-    // Status filter
-    if (filters.status && leave.status !== filters.status) {
-      return false;
-    }
-    
-    // Leave type filter - compare IDs
-    if (filters.leaveType && leave.leaveTypeId !== filters.leaveType) {
-      return false;
-    }
-    
-    // Date range filter - proper date comparison
-    if (filters.startDate || filters.endDate) {
-      const leaveStartDate = this.parseDate(leave.startDate);
-      const leaveEndDate = this.parseDate(leave.endDate || leave.startDate);
-      
-      const filterStartDate = filters.startDate ? this.parseDate(filters.startDate) : null;
-      const filterEndDate = filters.endDate ? this.parseDate(filters.endDate) : null;
-      
-      // Check if leave is completely before filter start date
-      if (filterStartDate && leaveEndDate < filterStartDate) {
-        return false;
-      }
-      
-      // Check if leave is completely after filter end date
-      if (filterEndDate && leaveStartDate > filterEndDate) {
-        return false;
-      }
-    }
-    
-    return true;
-  });
-}
-
-// Improved parseDate method
-private parseDate(date: any): Date {
-  if (!date) return new Date(0); // Return epoch if no date
-  
-  // If already a Date object and valid
-  if (date instanceof Date && !isNaN(date.getTime())) {
-    return date;
   }
-  
-  // If string or number, try to parse
-  try {
-    const parsed = new Date(date);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
+
+  private parseDate(date: any): Date {
+    if (!date) return new Date(0);
+    
+    if (date instanceof Date && !isNaN(date.getTime())) {
+      return date;
     }
-  } catch (e) {
-    console.warn('Date parsing error:', e);
-  }
-  
-  // Fallback to current date
-  return new Date();
-}
-
-
-  
-  // Template and import methods
-  async downloadTemplate() {
-    const templateData = [
-      {
-        'Leave Type': 'Annual Leave',
-        'Employee': 'john.doe@example.com',
-        'Start Date': '2023-01-01',
-        'Session': 'Full Day',
-        'Reason': 'Vacation',
-        'Status': 'pending'
+    
+    try {
+      const parsed = new Date(date);
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
       }
-    ];
-  
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(templateData);
-    const wb: XLSX.WorkBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Leaves Template');
-    XLSX.writeFile(wb, 'leaves_template.xlsx');
+    } catch (e) {
+      console.warn('Date parsing error:', e);
+    }
+    
+    return new Date();
   }
-  
 
-  
- 
-  
-
-  
   resetSelections() {
     this.selectedLeaves = {};
     this.selectAll = false;
@@ -641,15 +877,12 @@ private parseDate(date: any): Date {
     this.selectAll = !this.selectAll;
     
     this.leaves.forEach(leave => {
-      // Allow selecting all leaves regardless of status
       this.selectedLeaves[leave.id] = this.selectAll;
     });
   }
   
   toggleSelect(leaveId: string) {
     this.selectedLeaves[leaveId] = !this.selectedLeaves[leaveId];
-    
-    // Update selectAll status
     this.selectAll = this.leaves.every(leave => this.selectedLeaves[leave.id]);
   }
   
@@ -660,216 +893,360 @@ private parseDate(date: any): Date {
   get selectedLeaveCount(): number {
     return Object.values(this.selectedLeaves).filter(selected => selected).length;
   }
-  
-  // Get selected leaves with specific status
-  getSelectedLeavesByStatus(status: string): number {
-    const selectedIds = Object.entries(this.selectedLeaves)
-      .filter(([_, selected]) => selected)
-      .map(([id, _]) => id);
-      
-    return this.leaves.filter(leave => 
-      selectedIds.includes(leave.id) && leave.status === status
-    ).length;
-  }
-  
-  // Get all selected leaves that are not of a specific status
-  getSelectedLeavesNotOfStatus(status: string): number {
-    const selectedIds = Object.entries(this.selectedLeaves)
-      .filter(([_, selected]) => selected)
-      .map(([id, _]) => id);
-      
-    return this.leaves.filter(leave => 
-      selectedIds.includes(leave.id) && leave.status !== status
-    ).length;
-  }
-  openImportModal() {
-    this.resetImportState();
-    const modalElement = document.getElementById('importModal');
-    if (modalElement) {
-      const modal = new Modal(modalElement);
-      modal.show();
+
+  openBulkApproveModal() {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to approve leave requests.');
+      return;
     }
-  }
 
-  
-  resetImportState() {
-    this.importData = [];
-    this.importFile = null;
-    this.importMessage = '';
-    this.importInProgress = false;
-    this.importProgress = 0;
-  }
-
-
-
-  private async readExcelFile(file: File): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      const fileReader = new FileReader();
-      
-      fileReader.onload = (e: any) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-            reject(new Error('No sheets found in the Excel file'));
-            return;
-          }
-          
-          const firstSheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[firstSheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-            defval: null,
-            raw: false
-          });
-          
-          resolve(jsonData);
-        } catch (parseError) {
-          reject(new Error('Could not parse Excel file. Please check the file format.'));
-        }
-      };
-      
-      fileReader.onerror = () => {
-        reject(new Error('Error reading file'));
-      };
-      
-      fileReader.readAsArrayBuffer(file);
-    });
-  }
-
-  /**
-   * Validates the imported data structure
-   */
-  private validateImportData(data: any[]): boolean {
-    // Check if data array exists and has items
-    if (!Array.isArray(data) || data.length === 0) {
-      return false;
+    if (!this.hasSelectedLeaves) {
+      alert('Please select at least one leave request to approve');
+      return;
     }
     
-    // Check if required columns exist
-    // Replace with your actual required columns
-    const requiredColumns = ['name', 'date', 'status'];
-    const firstRow = data[0];
+    this.bulkApproveForm.reset({
+      approvedBy: '',
+      note: '',
+    });
     
-    return requiredColumns.every(col => 
-      Object.keys(firstRow).some(key => 
-        key.toLowerCase().includes(col.toLowerCase())
-      )
-    );
+    this.bulkApproveModalInstance = new Modal(this.bulkApproveModalRef.nativeElement);
+    this.bulkApproveModalInstance.show();
+  }
+  
+  openBulkRejectModal() {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to reject leave requests.');
+      return;
+    }
+
+    if (!this.hasSelectedLeaves) {
+      alert('Please select at least one leave request to reject');
+      return;
+    }
+    
+    this.bulkRejectForm.reset({
+      rejectedBy: '',
+      note: ''
+    });
+    
+    this.bulkRejectModalInstance = new Modal(this.bulkRejectModalRef.nativeElement);
+    this.bulkRejectModalInstance.show();
   }
 
-
-
-
-  
-  private async processImportedData(data: any[]) {
-    if (!data.length) {
-      throw new Error('File is empty');
+  async approveBulkLeaves() {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to approve leave requests.');
+      return;
     }
-  
-    // Transform and validate data
-    const leavesToImport = data.map((item, index) => {
-      // Ensure employeeName exists
-      const employeeName = item['Employee Name'] || item['Employee'];
-      if (!employeeName) {
-        throw new Error(`Missing employee name in row ${index + 1}`);
-      }
-  
-      // Ensure leaveType exists
-      const leaveType = item['Leave Type'] || 'Annual';
-      
-      // Validate start date
-      let startDate: Date;
-      try {
-        startDate = new Date(item['Start Date']);
-        if (isNaN(startDate.getTime())) {
-          throw new Error('Invalid date');
-        }
-      } catch (e) {
-        throw new Error(`Invalid start date in row ${index + 1}`);
-      }
-  
-      // Validate end date (default to start date if not provided)
-      let endDate: Date;
-      if (item['End Date']) {
-        try {
-          endDate = new Date(item['End Date']);
-          if (isNaN(endDate.getTime())) {
-            endDate = new Date(startDate);
-          }
-        } catch (e) {
-          endDate = new Date(startDate);
-        }
-      } else {
-        endDate = new Date(startDate);
-      }
-  
-      return {
-        employeeName,
-        leaveType,
-          endDate: new Date(item['End Date'] || item['Start Date']),  // Default to start date if not provided
 
-        reason: item['Reason'] || '',
-        status: 'pending',
-        // Add other required fields with defaults if needed
-        session: item['Session'] || 'Full Day',
-        createdAt: new Date()
-      };
-    });
-  
-    // Save to database
-    for (const leave of leavesToImport) {
+    if (this.bulkApproveForm.invalid) {
+      this.bulkApproveForm.markAllAsTouched();
+      return;
+    }
+    
+    const { approvedBy, note } = this.bulkApproveForm.value;
+    const currentUser = this.authService.currentUserValue;
+    const userName = currentUser?.displayName || currentUser?.username || approvedBy;
+    
+    const selectedLeaveIds = Object.entries(this.selectedLeaves)
+      .filter(([_, selected]) => selected)
+      .map(([id, _]) => id);
+    
+    try {
+      await this.leaveService.bulkApproveLeaves(selectedLeaveIds, userName, note);
+      this.bulkApproveModalInstance.hide();
+      this.resetSelections();
+      this.loadInitialData();
+    } catch (error) {
+      console.error('Error approving leaves:', error);
+    }
+  }
+
+  async rejectBulkLeaves() {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to reject leave requests.');
+      return;
+    }
+
+    if (this.bulkRejectForm.invalid) {
+      this.bulkRejectForm.markAllAsTouched();
+      return;
+    }
+    
+    const { rejectedBy, note } = this.bulkRejectForm.value;
+    const currentUser = this.authService.currentUserValue;
+    const userName = currentUser?.displayName || currentUser?.username || rejectedBy;
+    
+    const selectedLeaveIds = Object.entries(this.selectedLeaves)
+      .filter(([_, selected]) => selected)
+      .map(([id, _]) => id);
+    
+    try {
+      await this.leaveService.bulkRejectLeaves(selectedLeaveIds, userName, note);
+      this.bulkRejectModalInstance.hide();
+      this.resetSelections();
+      this.loadInitialData();
+    } catch (error) {
+      console.error('Error rejecting leaves:', error);
+    }
+  }
+
+  toggleForm() {
+    this.leaveForm.reset();
+    const currentUser = this.authService.currentUserValue;
+
+    if (currentUser) {
+      const user = this.users.find(
+        (u) => u.username === currentUser.displayName || u.email === currentUser.email
+      );
+
+      if (user) {
+        this.leaveForm.patchValue({
+          employeeId: user.id,
+        });
+      }
+    }
+
+    const addLeaveModal = document.getElementById('addLeaveModal');
+    if (addLeaveModal) {
+      this.addLeaveModalInstance = new Modal(addLeaveModal);
+      this.addLeaveModalInstance.show();
+    }
+  }
+
+  async deleteLeave(id: string) {
+    if (confirm('Are you sure you want to delete this leave record?')) {
       try {
-        await this.leaveService.addLeave(leave);
+        await this.leaveService.deleteLeave(id);
       } catch (error) {
-        console.error('Error saving leave:', leave, error);
-        throw new Error(`Failed to save leave for ${leave.employeeName}`);
+        console.error('Error deleting leave:', error);
       }
     }
   }
 
+  async openStatusModal(leave: any) {
+    // Check permissions first
+    if (!this.canApproveLeaves) {
+      alert('You do not have permission to change leave status.');
+      return;
+    }
 
-// Fix for handleFileInput to prevent null reference issues
-handleFileInput(event: Event): void {
-  const input = event.target as HTMLInputElement;
-  const files = input.files;
-  
-  if (!files || files.length === 0) {
-    this.selectedFile = null;
-    return;
+    this.selectedLeave = leave;
+    this.statusForm.reset({
+      status: leave.status,
+      approvedBy: this.currentUserName
+    });
+
+    this.statusForm.get('status')?.valueChanges.subscribe(status => {
+      const approvedByControl = this.statusForm.get('approvedBy');
+      if (status === 'approved') {
+        approvedByControl?.setValidators([Validators.required]);
+      } else {
+        approvedByControl?.clearValidators();
+      }
+      approvedByControl?.updateValueAndValidity();
+    });
+
+    this.bootstrapModalInstance = new Modal(this.statusModalRef.nativeElement);
+    this.bootstrapModalInstance.show();
   }
 
-  this.selectedFile = files[0];
-  this.importError = null;
-  
-  // Validate file type
-  const validExtensions = ['.xlsx', '.xls', '.csv'];
-  const fileName = this.selectedFile.name.toLowerCase();
-  
-  if (!validExtensions.some(ext => fileName.endsWith(ext))) {
-    this.importError = 'Please select a valid Excel or CSV file.';
-    this.clearFileSelection();
-    return;
-  }
-}
+  async viewActivity(leave: any) {
+    this.selectedLeave = leave;
+    this.isLoadingActivities = true;
+    
+    try {
+      this.leaveActivities = await this.leaveService.getLeaveActivities(leave.id);
+      
+      if (this.leaveActivities.length === 0) {
+        this.leaveActivities = [{
+          action: 'created',
+          status: leave.status || 'pending',
+          timestamp: leave.createdAt || new Date(),
+          by: leave.employeeName || 'System',
+          note: 'Leave request was created'
+        }];
+      }
+    } catch (error) {
+      console.error('Error loading activities:', error);
+      this.leaveActivities = [{
+        action: 'error',
+        status: leave.status || 'unknown',
+        timestamp: new Date(),
+        by: 'System',
+        note: 'Failed to load activity history. Showing current status.'
+      }];
+    } finally {
+      this.isLoadingActivities = false;
+    }
 
-  clearFileSelection(): void {
-    this.selectedFile = null;
-    if (this.fileInput && this.fileInput.nativeElement) {
-      this.fileInput.nativeElement.value = '';
+    this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
+    this.activityModalInstance.show();
+  }
+
+  formatDate(excelDate: string | Date, formatString: string = 'yyyy-MM-dd'): string {
+    if (!excelDate) return '';
+    
+    if (excelDate instanceof Date) {
+      return dateFormat(excelDate, 'yyyy-MM-dd');
+    }
+    
+    try {
+      const parsed = parse(excelDate, 'yyyy-MM-dd', new Date());
+      if (isValid(parsed)) {
+        return dateFormat(parsed, 'yyyy-MM-dd');
+      }
+      return '';
+    } catch (e) {
+      console.error('Error parsing date:', e);
+      return '';
     }
   }
 
-  
+  formatActivityAction(activity: any): string {
+    if (activity.action === 'status_change') {
+      if (activity.newStatus === 'approved') return 'approved';
+      if (activity.newStatus === 'rejected') return 'rejected';
+      return 'status updated';
+    }
+    return activity.action || 'updated';
+  }
+
+  getStatusBadgeClass(status: string): string {
+    switch (status) {
+      case 'approved': return 'bg-success';
+      case 'rejected': return 'bg-danger';
+      case 'pending': return 'bg-warning text-dark';
+      default: return 'bg-secondary';
+    }
+  }
+
+  getActivityIcon(action: string): string {
+    switch (action) {
+      case 'created': return 'bi-plus-circle';
+      case 'approved': return 'bi-check-circle';
+      case 'rejected': return 'bi-x-circle';
+      case 'updated': return 'bi-pencil';
+      default: return 'bi-clock-history';
+    }
+  }
+
+  toggleFilterSidebar() {
+    this.showFilterSidebar = !this.showFilterSidebar;
+  }
+
+  resetFilters() {
+    this.filterForm.reset({
+      employee: '',
+      status: '',
+      leaveType: '',
+      startDate: '',
+      endDate: ''
+    });
+    
+    this.searchQuery = '';
+    this.applyFilters();
+  }
+
+  // Import related methods (keeping existing functionality)
+  onFileChange(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const fileReader = new FileReader();
+    fileReader.onload = (e) => {
+      try {
+        const arrayBuffer: any = e.target?.result;
+        const data = new Uint8Array(arrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          raw: false,
+          dateNF: 'yyyy-mm-dd',
+          defval: null
+        });
+
+        this.importData = jsonData.map((item: any) => {
+          if (!item['Employee Name'] && !item['Employee']) {
+            throw new Error('Employee name is missing');
+          }
+
+          return {
+            referenceNo: item['Reference No'] || '',
+            employeeName: item['Employee Name'] || item['Employee'],
+            leaveType: item['Leave Type'],
+            startDate: this.parseExcelDate(item['Start Date']),
+            endDate: this.parseExcelDate(item['End Date']),
+            session: item['Session'] || 'Full Day',
+            reason: item['Reason'] || '',
+            status: item['Status'] || 'pending'
+          };
+        });
+
+        this.importMessage = `Successfully loaded ${this.importData.length} records`;
+        this.importMessageClass = 'alert-success';
+
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        this.importMessage = error instanceof Error ? error.message : 'Error parsing file';
+        this.importMessageClass = 'alert-danger';
+        this.importData = [];
+      }
+    };
+    fileReader.readAsArrayBuffer(file);
+  }
+
+  private parseExcelDate(excelDate: any): Date | null {
+    if (!excelDate) return null;
+    
+    if (excelDate instanceof Date) {
+      return excelDate;
+    }
+    
+    if (typeof excelDate === 'number') {
+      return new Date((excelDate - (25567 + 2)) * 86400 * 1000);
+    }
+    
+    if (typeof excelDate === 'string') {
+      const isoDate = new Date(excelDate);
+      if (!isNaN(isoDate.getTime())) return isoDate;
+      
+      const formats = [
+        'yyyy-MM-dd', 'MM/dd/yyyy', 'dd-MM-yyyy',
+        'yyyy/MM/dd', 'MM-dd-yyyy', 'dd/MM/yyyy',
+        'EEE MMM dd yyyy HH:mm:ss'
+      ];
+      
+      for (const fmt of formats) {
+        try {
+          const parsed = parse(excelDate, fmt, new Date());
+          if (isValid(parsed)) return parsed;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    console.warn('Could not parse date:', excelDate);
+    return null;
+  }
 
   getImportDataKeys(): string[] {
     if (this.importData.length === 0) return [];
     return Object.keys(this.importData[0]);
   }
+
   async importLeaves() {
     if (!this.importData.length || !this.importFile) return;
     
-    // Validate all records first
     const errors: string[] = [];
     
     this.importData.forEach((record, index) => {
@@ -892,588 +1269,48 @@ handleFileInput(event: Event): void {
       this.importMessageClass = 'alert-danger';
       return;
     }
-    
-    // Proceed with import...
   }
-
-  onFileChange(event: any) {
-    const file = event.target.files[0];
-    if (!file) return;
-  
-    const fileReader = new FileReader();
-    fileReader.onload = (e) => {
-      try {
-        const arrayBuffer: any = e.target?.result;
-        const data = new Uint8Array(arrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // Convert to JSON with proper date handling
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-          raw: false,
-          dateNF: 'yyyy-mm-dd', // Specify the desired date format
-          defval: null
-        });
-  
-        // Process the imported data
-        this.importData = jsonData.map((item: any) => {
-          // Ensure required fields exist
-          if (!item['Employee Name'] && !item['Employee']) {
-            throw new Error('Employee name is missing');
-          }
-  
-          return {
-            referenceNo: item['Reference No'] || '',
-            employeeName: item['Employee Name'] || item['Employee'],
-            leaveType: item['Leave Type'],
-            startDate: this.parseExcelDate(item['Start Date']),
-            endDate: this.parseExcelDate(item['End Date']),
-            session: item['Session'] || 'Full Day',
-            reason: item['Reason'] || '',
-            status: item['Status'] || 'pending'
-          };
-        });
-  
-        this.importMessage = `Successfully loaded ${this.importData.length} records`;
-        this.importMessageClass = 'alert-success';
-  
-      } catch (error) {
-        console.error('Error parsing file:', error);
-        this.importMessage = error instanceof Error ? error.message : 'Error parsing file';
-        this.importMessageClass = 'alert-danger';
-        this.importData = [];
-      }
-    };
-    fileReader.readAsArrayBuffer(file);
-  }
-  // Add this new helper method
-  private formatExcelDate(excelDate: any): string {
-    if (!excelDate) return '';
-    
-    // If already a Date object
-    if (excelDate instanceof Date) {
-      return excelDate.toISOString().split('T')[0];
-    }
-    
-    // If Excel serial number
-    if (typeof excelDate === 'number') {
-      const date = new Date((excelDate - (25567 + 2)) * 86400 * 1000);
-      return date.toISOString().split('T')[0];
-    }
-    
-    // If string, try to parse
-    if (typeof excelDate === 'string') {
-      // Try common date formats
-      const formats = [
-        'yyyy-MM-dd', 'MM/dd/yyyy', 'dd-MM-yyyy',
-        'yyyy/MM/dd', 'MM-dd-yyyy', 'dd/MM/yyyy'
-      ];
-      
-      for (const formatStr of formats) {
-        try {
-          const parsed = parse(excelDate, formatStr, new Date());
-          if (isValid(parsed)) {
-            // Use dateFormat (the alias) instead of format
-            return dateFormat(parsed, 'yyyy-MM-dd');
-          }
-        } catch (e) {
-          // Just try the next format
-          continue;
-        }
-      }
-    }
-    
-    // Fallback - return as-is
-    return String(excelDate);
-  }
-  
-  private parseExcelDate(excelDate: any): Date | null {
-    if (!excelDate) return null;
-    
-    // If already a Date object
-    if (excelDate instanceof Date) {
-      return excelDate;
-    }
-    
-    // If Excel serial number (number of days since 1900-01-01)
-    if (typeof excelDate === 'number') {
-      return new Date((excelDate - (25567 + 2)) * 86400 * 1000);
-    }
-    
-    // If string, try parsing different formats
-    if (typeof excelDate === 'string') {
-      // Try ISO format first
-      const isoDate = new Date(excelDate);
-      if (!isNaN(isoDate.getTime())) return isoDate;
-      
-      // Try common date formats
-      const formats = [
-        'yyyy-MM-dd', 'MM/dd/yyyy', 'dd-MM-yyyy',
-        'yyyy/MM/dd', 'MM-dd-yyyy', 'dd/MM/yyyy',
-        'EEE MMM dd yyyy HH:mm:ss' // For formats like 'Sun Jan 01 2023 05:30:00'
-      ];
-      
-      for (const fmt of formats) {
-        try {
-          const parsed = parse(excelDate, fmt, new Date());
-          if (isValid(parsed)) return parsed;
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-    
-    console.warn('Could not parse date:', excelDate);
-    return null;
-  }
-  
- 
-  openBulkApproveModal() {
-    if (!this.hasSelectedLeaves) {
-      alert('Please select at least one leave request to approve');
-      return;
-    }
-    
-    this.bulkApproveForm.reset({
-      approvedBy: '',
-      note: '',
-
-    });
-    
-    this.bulkApproveModalInstance = new Modal(this.bulkApproveModalRef.nativeElement);
-    this.bulkApproveModalInstance.show();
-  }
-  
-  openBulkRejectModal() {
-    if (!this.hasSelectedLeaves) {
-      alert('Please select at least one leave request to reject');
-      return;
-    }
-    
-    this.bulkRejectForm.reset({
-      rejectedBy: '',
-      note: ''
-    });
-    
-    this.bulkRejectModalInstance = new Modal(this.bulkRejectModalRef.nativeElement);
-    this.bulkRejectModalInstance.show();
-  }
-  
-async approveBulkLeaves() {
-  if (this.bulkApproveForm.invalid) {
-    this.bulkApproveForm.markAllAsTouched();
-    return;
-  }
-  
-  const { approvedBy, note } = this.bulkApproveForm.value;
-  const currentUser = this.authService.currentUserValue;
-  const userName = currentUser?.displayName || currentUser?.username || approvedBy;
-  
-  const selectedLeaveIds = Object.entries(this.selectedLeaves)
-    .filter(([_, selected]) => selected)
-    .map(([id, _]) => id);
-  
-  try {
-    await this.leaveService.bulkApproveLeaves(selectedLeaveIds, userName, note);
-    this.bulkApproveModalInstance.hide();
-    this.resetSelections();
-  } catch (error) {
-    console.error('Error approving leaves:', error);
-  }
-}
-
-
-async rejectBulkLeaves() {
-  if (this.bulkRejectForm.invalid) {
-    this.bulkRejectForm.markAllAsTouched();
-    return;
-  }
-  
-  const { rejectedBy, note } = this.bulkRejectForm.value;
-  const currentUser = this.authService.currentUserValue;
-  const userName = currentUser?.displayName || currentUser?.username || rejectedBy;
-  
-  const selectedLeaveIds = Object.entries(this.selectedLeaves)
-    .filter(([_, selected]) => selected)
-    .map(([id, _]) => id);
-  
-  try {
-    await this.leaveService.bulkRejectLeaves(selectedLeaveIds, userName, note);
-    this.bulkRejectModalInstance.hide();
-    this.resetSelections();
-  } catch (error) {
-    console.error('Error rejecting leaves:', error);
-  }
-}
-getCurrentUserName(): string {
-  const currentUser = this.authService.currentUserValue;
-  if (!currentUser) return '';
-  
-  const user = this.users.find(u => u.id === this.leaveForm.get('employeeId')?.value);
-  return user?.username || currentUser.displayName || '';
-}
-  toggleForm() {
-    // Reset form before showing modal
-    this.leaveForm.reset();
-    const currentUser = this.authService.currentUserValue;
-
-    if (currentUser) {
-      // Find the user in the users list to get their ID
-      const user = this.users.find(
-        (u) => u.username === currentUser.displayName || u.email === currentUser.email
-      );
-
-      if (user) {
-        this.leaveForm.patchValue({
-          employeeId: user.id,
-        });
-      }
-    }
-
-    // Show modal instead of inline form
-    const addLeaveModal = document.getElementById('addLeaveModal');
-    if (addLeaveModal) {
-      this.addLeaveModalInstance = new Modal(addLeaveModal);
-      this.addLeaveModalInstance.show();
-    }
-  }
-async submitForm() {
-  if (this.leaveForm.invalid) {
-    this.leaveForm.markAllAsTouched();
-    return;
-  }
-
-  const formValue = this.leaveForm.value;
-  
-  // Find selected user and leave type
-  const selectedUser = this.users.find(user => user.id === formValue.employeeId);
-  const selectedLeaveType = this.leaveTypes.find(type => type.id === formValue.leaveTypeId);
-
-  if (!selectedUser || !selectedLeaveType) {
-    alert('Please select valid employee and leave type.');
-    return;
-  }
-
-  // Prepare leave data
-  const leaveData = {
-    referenceNo: 'LV' + new Date().getFullYear() + '/' + Math.floor(Math.random() * 100000),
-    leaveType: selectedLeaveType.leaveType,
-    leaveTypeId: selectedLeaveType.id,
-    maxLeaveCount: formValue.maxLeaveCount, // Add this line
-    employeeName: selectedUser.username,
-    employeeId: selectedUser.id,
-    startDate: new Date(formValue.startDate),
-    session: formValue.session,
-    reason: formValue.reason,
-        endDate: new Date(formValue.endDate),  // Add this line
-
-    status: 'pending',
-    createdAt: new Date(),
-  };
-
-  try {
-    // Add the leave
-    await this.leaveService.addLeave(leaveData);
-    
-    // Reset form and close modal
-    this.leaveForm.reset();
-    if (this.addLeaveModalInstance) {
-      this.addLeaveModalInstance.hide();
-    }
-    
-    // Refresh the list
-    this.loadInitialData();
-  } catch (error) {
-    console.error('Error submitting leave:', error);
-    alert('Failed to submit leave. Please try again.');
-  }
-}
-  async deleteLeave(id: string) {
-    if (confirm('Are you sure you want to delete this leave record?')) {
-      try {
-        await this.leaveService.deleteLeave(id);
-      } catch (error) {
-        console.error('Error deleting leave:', error);
-      }
-    }
-  }
-
-async openStatusModal(leave: any) {
-  this.selectedLeave = leave;
-  this.statusForm.reset({
-    status: leave.status,
-    approvedBy: this.currentUserName
-  });
-
-  // Update validation based on status selection
-  this.statusForm.get('status')?.valueChanges.subscribe(status => {
-    const approvedByControl = this.statusForm.get('approvedBy');
-    if (status === 'approved') {
-      approvedByControl?.setValidators([Validators.required]);
-    } else {
-      approvedByControl?.clearValidators();
-    }
-    approvedByControl?.updateValueAndValidity();
-  });
-
-  // Show the modal
-  this.bootstrapModalInstance = new Modal(this.statusModalRef.nativeElement);
-  this.bootstrapModalInstance.show();
-}
-
-// Update leave method
-async updateLeave() {
-  if (this.editLeaveForm.invalid || !this.selectedLeaveId) {
-    this.editLeaveForm.markAllAsTouched();
-    return;
-  }
-
-  try {
-    const formValue = this.editLeaveForm.value;
-    const updates = {
-      leaveTypeId: formValue.leaveTypeId,
-      maxLeaveCount: formValue.maxLeaveCount,
-      session: formValue.session,
-      startDate: new Date(formValue.startDate),
-      endDate: new Date(formValue.endDate),
-      reason: formValue.reason,
-      updatedAt: new Date()
-    };
-
-    // Update in Firestore
-    await this.leaveService.updateLeave(this.selectedLeaveId, updates);
-    
-    // Update in local array
-    const index = this.leaves.findIndex(l => l.id === this.selectedLeaveId);
-    if (index !== -1) {
-      this.leaves[index] = { 
-        ...this.leaves[index], 
-        ...updates,
-        leaveType: this.leaveTypes.find(t => t.id === formValue.leaveTypeId)?.leaveType || ''
-      };
-      this.filteredLeaves = [...this.leaves];
-    }
-
-    // Close modal and reset
-    this.editLeaveModalInstance.hide();
-    this.selectedLeaveId = null;
-    
-    // Show success message
-    alert('Leave updated successfully!');
-  } catch (error) {
-    console.error('Error updating leave:', error);
-    alert('Failed to update leave. Please try again.');
-  }
-}
-async updateStatus() {
-  if (this.statusForm.invalid || !this.selectedLeave) return;
-
-  const { status, note, approvedBy } = this.statusForm.value;
-  const changedBy = approvedBy || this.currentUserName;
-
-  try {
-    await this.leaveService.updateLeaveStatus(
-      this.selectedLeave.id,
-      {
-        status,
-        changedBy,
-        note
-      },
-      this.selectedLeave.status
-    );
-
-    // Close modal and refresh data
-    this.bootstrapModalInstance.hide();
-    this.loadInitialData();
-  } catch (error) {
-    console.error('Error updating status:', error);
-  }
-}
-
-
-async viewActivity(leave: any) {
-  this.selectedLeave = leave;
-  this.isLoadingActivities = true;
-  
-  try {
-    this.leaveActivities = await this.leaveService.getLeaveActivities(leave.id);
-    
-    // If no activities found, create a default one
-    if (this.leaveActivities.length === 0) {
-      this.leaveActivities = [{
-        action: 'created',
-        status: leave.status || 'pending',
-        timestamp: leave.createdAt || new Date(),
-        by: leave.employeeName || 'System',
-        note: 'Leave request was created'
-      }];
-    }
-  } catch (error) {
-    console.error('Error loading activities:', error);
-    // Create a fallback activity if there's an error
-    this.leaveActivities = [{
-      action: 'error',
-      status: leave.status || 'unknown',
-      timestamp: new Date(),
-      by: 'System',
-      note: 'Failed to load activity history. Showing current status.'
-    }];
-  } finally {
-    this.isLoadingActivities = false;
-  }
-
-  // Show the modal
-  this.activityModalInstance = new Modal(this.activityModalRef.nativeElement);
-  this.activityModalInstance.show();
-}
-
-  private hideModal(): void {
-    const modalElement = document.getElementById('importModal');
-    if (modalElement) {
-      const modal = Modal.getInstance(modalElement);
-      if (modal) {
-        modal.hide();
-      }
-    }
-  }
-  
-  formatDate(excelDate: string | Date, formatString: string = 'yyyy-MM-dd'): string {
-    if (!excelDate) return '';
-    
-    // If date is already a Date object
-    if (excelDate instanceof Date) {
-      return dateFormat(excelDate, 'yyyy-MM-dd');
-    }
-    
-    // If date is a string, parse it using appropriate format
-    try {
-      // Adjust the format parameter according to your actual date string format
-      // For example, if the input is '2023-01-01', the format should be 'yyyy-MM-dd'
-      const parsed = parse(excelDate, 'yyyy-MM-dd', new Date());
-      if (isValid(parsed)) {
-        return dateFormat(parsed, 'yyyy-MM-dd');
-      }
-      return '';
-    } catch (e) {
-      console.error('Error parsing date:', e);
-      return '';
-    }
-  }
-
-formatActivityAction(activity: any): string {
-  if (activity.action === 'status_change') {
-    if (activity.newStatus === 'approved') return 'approved';
-    if (activity.newStatus === 'rejected') return 'rejected';
-    return 'status updated';
-  }
-  return activity.action || 'updated';
-}
-getStatusBadgeClass(status: string): string {
-  switch (status) {
-    case 'approved': return 'bg-success';
-    case 'rejected': return 'bg-danger';
-    case 'pending': return 'bg-warning text-dark';
-    default: return 'bg-secondary';
-  }
-}
-getActivityIcon(action: string): string {
-  switch (action) {
-    case 'created': return 'bi-plus-circle';
-    case 'approved': return 'bi-check-circle';
-    case 'rejected': return 'bi-x-circle';
-    case 'updated': return 'bi-pencil';
-    default: return 'bi-clock-history';
-  }
-}
-
-  // New methods for filtering functionality
-  toggleFilterSidebar() {
-    this.showFilterSidebar = !this.showFilterSidebar;
-  }
-
-
-
- // Replace your existing resetFilters method with this:
-resetFilters() {
-  this.filterForm.reset({
-    employee: '',
-    status: '',
-    leaveType: '',
-    approvalStatus: '',
-    startDate: '',
-    endDate: ''
-  });
-  
-  // Also reset search query
-  this.searchQuery = '';
-  
-  // Reapply filters (which will now show all data)
-  this.applyFilters();
-}
-
-// Replace your existing applyDateFilter method with this:
-
 calculateLeaveDetails(leave: any): any {
-  // Calculate days for this specific leave
+  // Get the leave type details
+  const leaveType = this.leaveTypes.find(t => t.id === leave.leaveTypeId);
+  
+  // Calculate days for this leave
   const daysForThisLeave = this.calculateDaysForLeave(leave);
   
-  // Calculate remaining leave based on maxLeaveCount and this leave's days
-  const maxLeaveCount = leave.maxLeaveCount || 0;
-  const remainingLeave = maxLeaveCount - (leave.status === 'approved' ? daysForThisLeave : 0);
+  // Get max days from leave type if not set
+  const maxDays = leave.maxLeaveCount || leaveType?.maxLeaveCount || 12; // Default to 12 if not found
+  
+  // Calculate remaining leave based on all approved leaves of this type
+  const approvedLeaves = this.leaves.filter(l => 
+    l.leaveTypeId === leave.leaveTypeId && 
+    l.status === 'approved' &&
+    l.id !== leave.id // Exclude current leave
+  );
+  
+  const totalDaysTaken = approvedLeaves.reduce((sum, l) => sum + (l.daysTaken || 0), 0);
+  const remaining = maxDays - totalDaysTaken - (leave.status === 'approved' ? daysForThisLeave : 0);
   
   return {
     ...leave,
-    daysTakenForThisLeave: daysForThisLeave,
-    remainingLeave: Math.max(remainingLeave, 0) // Don't show negative values
+    days: daysForThisLeave,
+    daysTaken: leave.status === 'approved' ? daysForThisLeave : 0,
+    remainingLeave: remaining > 0 ? remaining : 0,
+    maxLeaveCount: maxDays
   };
 }
-private calculateDaysForLeave(leave: any): number {
-  const startDate = new Date(leave.startDate);
-  const endDate = new Date(leave.endDate || leave.startDate);
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-  let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
-  
-  // Adjust for half-day sessions
-  if (leave.session === 'First Half' || leave.session === 'Second Half') {
-    days -= 0.5;
-  }
-  
-  return days;
-}
-  calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
-    if (!startDate || !endDate) return 0;
-    
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    // Calculate difference in days
-    const diffTime = Math.abs(end.getTime() - start.getTime());
-    let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
-    
-    // Adjust for session
-    if (session === 'First Half' || session === 'Second Half') {
-      days = days - 0.5;
-    }
-    
-    return days;
-  }  
+
   formatDisplayDate(dateValue: any): string {
     if (!dateValue) return '';
     
     try {
-      // If already formatted correctly
       if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
         return dateValue;
       }
       
-      // If Date object
       if (dateValue instanceof Date) {
         return format(dateValue, 'yyyy-MM-dd');
       }
       
-      // Try to parse
       const parsed = new Date(dateValue);
       if (!isNaN(parsed.getTime())) {
         return format(parsed, 'yyyy-MM-dd');

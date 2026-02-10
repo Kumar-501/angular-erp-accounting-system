@@ -1,0 +1,189 @@
+.purchase-return-container {
+  padding: 20px;
+}
+
+.filters-section {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.table-controls {
+  gap: 15px;
+}
+
+.search-box {
+  .input-group {
+    .form-control {
+      border-right: none;
+    }
+    
+    .btn {
+      border-left: none;
+      background-color: transparent;
+    }
+  }
+}
+
+.export-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.table {
+  th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+    
+    &[style*="cursor: pointer"] {
+      user-select: none;
+      
+      &:hover {
+        background-color: #e9ecef;
+      }
+    }
+  }
+  
+  tbody tr {
+    &:hover {
+      background-color: #f8f9fa;
+    }
+  }
+}
+
+.badge {
+  font-size: 0.75em;
+  padding: 0.375em 0.75em;
+}
+
+.btn-group {
+  .btn {
+    margin-right: 5px;
+    
+    &:last-child {
+      margin-right: 0;
+    }
+  }
+}
+
+.pagination-section {
+  border-top: 1px solid #dee2e6;
+  padding-top: 15px;
+}
+
+.showing-entries {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.pagination {
+  .page-link {
+    color: #495057;
+    border-color: #dee2e6;
+    
+    &:hover {
+      color: #0056b3;
+      background-color: #e9ecef;
+      border-color: #dee2e6;
+    }
+  }
+  
+  .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+  }
+  
+  .page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #fff;
+    border-color: #dee2e6;
+  }
+}
+
+.table-footer {
+  border-top: 1px solid #dee2e6;
+  padding-top: 15px;
+  margin-top: 15px;
+}
+
+.copyright {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  .table-controls {
+    flex-direction: column;
+    gap: 10px;
+    
+    .show-entries,
+    .search-box,
+    .export-buttons {
+      justify-content: center;
+    }
+  }
+  
+  .pagination-section {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .export-buttons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .btn-text {
+    display: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .purchase-return-container {
+    padding: 10px;
+  }
+  
+  .search-box .input-group {
+    width: 200px !important;
+  }
+  
+  .table-responsive {
+    font-size: 0.875rem;
+  }
+  
+  .btn-group {
+    flex-direction: column;
+    
+    .btn {
+      margin-right: 0;
+      margin-bottom: 2px;
+    }
+  }
+}
+
+// Print styles
+@media print {
+  .table-controls,
+  .pagination-section,
+  .table-footer,
+  .btn-group {
+    display: none !important;
+  }
+  
+  .table {
+    font-size: 12px;
+  }
+  
+  .purchase-return-container {
+    padding: 0;
+  }
+}

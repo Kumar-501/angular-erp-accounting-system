@@ -1,59 +1,152 @@
 <div class="balance-sheet">
+<div class="balance-sheet">
+  <!-- Header Section -->
   <div class="sheet-header">
-    <div class="header-content">
+    <div class="header-top">
       <h1>Balance Sheet</h1>
+      
       <div class="header-controls">
-        <div class="date-control">
-          <label>As on:</label>
-          <input type="date" [(ngModel)]="balanceSheetDate" (change)="generateBalanceSheet()">
-          <button (click)="generateBalanceSheet()" [disabled]="isLoading">
-            {{ isLoading ? 'Generating...' : 'Generate' }}
-          </button>
-        </div>
+        <!-- Date Range & Apply Button Group -->
+<div class="filter-controls">
+  <!-- FROM DATE -->
+  <div class="date-group">
+    <label for="fromDate">From:</label>
+    <div class="date-input-wrapper">
+      <input 
+        id="fromDate" 
+        type="text" 
+        class="form-control date-input" 
+        [value]="getFormattedDate(fromDate)"
+        (blur)="onDateInput($event, 'from')"
+        (keyup.enter)="onDateInput($event, 'from')"
+        placeholder="DD-MM-YYYY"
+        maxlength="10">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('from')">
+        <i class="fas fa-calendar-alt"></i>
+      </button>
+      <!-- Hidden actual date input -->
+      <input 
+        #fromDatePicker
+        type="date" 
+        class="hidden-date-picker" 
+        [(ngModel)]="fromDate">
+    </div>
+  </div>
+  
+  <!-- TO DATE -->
+  <div class="date-group">
+    <label for="toDate">To:</label>
+    <div class="date-input-wrapper">
+      <input 
+        id="toDate" 
+        type="text" 
+        class="form-control date-input" 
+        [value]="getFormattedDate(toDate)"
+        (blur)="onDateInput($event, 'to')"
+        (keyup.enter)="onDateInput($event, 'to')"
+        placeholder="DD-MM-YYYY"
+        maxlength="10">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('to')">
+        <i class="fas fa-calendar-alt"></i>
+      </button>
+      <!-- Hidden actual date input -->
+      <input 
+        #toDatePicker
+        type="date" 
+        class="hidden-date-picker" 
+        [(ngModel)]="toDate">
+    </div>
+  </div>
+
+  <button class="btn btn-primary apply-btn" (click)="generateBalanceSheet(true)" [disabled]="isLoading">
+    <i class="fas fa-filter" *ngIf="!isLoading"></i> 
+    <i class="fas fa-spinner fa-spin" *ngIf="isLoading"></i>
+    {{ isLoading ? 'Generating...' : 'Apply Filter' }}
+  </button>
+</div>
+
+        <!-- Export Actions -->
         <div class="export-controls">
-          <button class="export-btn excel" (click)="exportToExcel()">
-            <i class="fas fa-file-excel"></i> Excel
-          </button>
-          <button class="export-btn pdf" (click)="exportToPDF()">
-            <i class="fas fa-file-pdf"></i> PDF
-          </button>
-          <button class="export-btn print" (click)="printBalanceSheet()">
+          <button class="btn btn-outline" (click)="printBalanceSheet()">
             <i class="fas fa-print"></i> Print
+          </button>
+          <button class="btn btn-outline" (click)="exportToExcel()">
+            <i class="fas fa-file-excel"></i> Excel
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Company & Report Details -->
+    <div class="company-info">
+      <h2>HERBALY TOUCH AYURVEDA HOSPITAL PRIVATE LIMITED</h2>
+      <p class="report-title">Balance Sheet as on {{ toDate | date:'longDate' }}</p>
+      <p class="report-period">
+        (Period: {{ fromDate | date:'mediumDate' }} to {{ toDate | date:'mediumDate' }})
+      </p>
+    </div>
+
+    <div class="summary-info">
+      <span>Closing Stock: <strong>{{ formatCurrency(balanceSheetData.stockData.closingStock) }}</strong></span>
+    </div>
   </div>
 
+  <!-- Loading Indicator -->
   <div *ngIf="isLoading" class="loading-indicator">
     <div class="spinner"></div>
     <span>Generating balance sheet...</span>
   </div>
 
-  <div *ngIf="!isLoading && balanceSheetData.equity.length > 0" class="sheet-content">
-    <div class="company-info">
-      <h2>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h2>
-      <p class="report-title">Balance Sheet as on {{ balanceSheetDate | date:'longDate' }}</p>
-      <p *ngIf="profitLossData" class="report-period">
-        (Profit/Loss period: {{ profitLossData.reportDate.start | date:'mediumDate' }} to {{ profitLossData.reportDate.end | date:'mediumDate' }})
-      </p>
-    </div>
+  <!-- ... Rest of your content (Tables, etc.) ... -->
+  <div *ngIf="isLoading" class="loading-indicator">
+    <div class="spinner"></div>
+    <span>Generating balance sheet...</span>
+  </div>
 
+  <!-- Main Content: Two Columns -->
+  <div *ngIf="!isLoading && balanceSheetData.equity.length > 0" class="sheet-content">
     <div class="financial-sections">
-      <!-- Equity Section -->
-      <div class="financial-section equity">
-        <div class="section-header">
-          <h3>Equity</h3>
-        </div>
-        <div class="section-table">
-          <table>            <thead>
+      <!-- Left Column: Liabilities & Equity -->
+      <div class="financial-column left">
+        <div class="financial-section liabilities">
+          <h3>Liabilities</h3>
+          <table>
+            <thead>
               <tr>
                 <th class="account-name">Account Name</th>
                 <th class="account-number">Account No.</th>
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
-            </thead>            <tbody>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let item of balanceSheetData.liabilities">
+                <tr [class.category-row]="item.isCategory">
+                  <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
+                  <td class="account-number">{{ item.accountNumber }}</td>
+                  <td class="account-head">{{ item.accountHead }}</td>
+                  <td class="amount" [class.category-amount]="item.isCategory">{{ formatCurrency(item.value) }}</td>
+                </tr>
+              </ng-container>
+              <tr class="total-row">
+                <td colspan="3">Total Liabilities</td>
+                <td class="amount">{{ formatCurrency(balanceSheetData.totals.liabilities) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="financial-section equity">
+          <h3>Equity</h3>
+          <table>
+            <thead>
+              <tr>
+                <th class="account-name">Account Name</th>
+                <th class="account-number">Account No.</th>
+                <th class="account-head">Account Head</th>
+                <th class="amount">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
               <tr *ngFor="let item of balanceSheetData.equity" [class.category-row]="item.isCategory">
                 <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
                 <td class="account-number">{{ item.accountNumber }}</td>
@@ -69,41 +162,10 @@
         </div>
       </div>
 
-      <!-- Liabilities Section -->
-      <div class="financial-section liabilities">
-        <div class="section-header">
-          <h3>Liabilities</h3>
-        </div>
-        <div class="section-table">
-          <table>            <thead>
-              <tr>
-                <th class="account-name">Account Name</th>
-                <th class="account-number">Account No.</th>
-                <th class="account-head">Account Head</th>
-                <th class="amount">Amount (₹)</th>
-              </tr>
-            </thead>            <tbody>
-              <tr *ngFor="let item of balanceSheetData.liabilities" [class.category-row]="item.isCategory">
-                <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
-                <td class="account-number">{{ item.accountNumber }}</td>
-                <td class="account-head">{{ item.accountHead }}</td>
-                <td class="amount" [class.category-amount]="item.isCategory">{{ formatCurrency(item.value) }}</td>
-              </tr>
-              <tr class="total-row">
-                <td colspan="3">Total Liabilities</td>
-                <td class="amount">{{ formatCurrency(balanceSheetData.totals.liabilities) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Assets Section -->
-      <div class="financial-section assets">
-        <div class="section-header">
+      <!-- Right Column: Assets -->
+      <div class="financial-column right">
+        <div class="financial-section assets">
           <h3>Assets</h3>
-        </div>
-        <div class="section-table">
           <table>
             <thead>
               <tr>
@@ -112,7 +174,8 @@
                 <th class="account-head">Account Head</th>
                 <th class="amount">Amount (₹)</th>
               </tr>
-            </thead>            <tbody>
+            </thead>
+            <tbody>
               <tr *ngFor="let item of balanceSheetData.assets" [class.category-row]="item.isCategory">
                 <td class="account-name" [class.category-name]="item.isCategory">{{ item.name }}</td>
                 <td class="account-number">{{ item.accountNumber }}</td>
@@ -129,34 +192,61 @@
       </div>
     </div>
 
-    <!-- Summary Section -->
-    <div class="summary-section">
-      <h3>Financial Summary</h3>
-      <table>        <tbody>
-          <tr>
-            <td class="summary-label">Total Equity</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity) }}</td>
-          </tr>
-          <tr>
-            <td class="summary-label">Total Liabilities</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.liabilities) }}</td>
-          </tr>
-          <tr class="summary-total">
-            <td>Total Equity + Liabilities</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.equity + balanceSheetData.totals.liabilities) }}</td>
-          </tr>
-          <tr class="summary-total">
-            <td>Total Assets</td>
-            <td class="summary-amount">{{ formatCurrency(balanceSheetData.totals.assets) }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <!-- Financial Summary Footer -->
+    <div class="financial-summary">
+      <h4>Financial Summary</h4>
+      <div class="summary-details">
+        <div class="summary-item">
+          <span>Equity</span>
+          <span>{{ formatCurrency(balanceSheetData.totals.equity) }}</span>
+        </div>
+        <div class="summary-item">
+          <span>Liabilities</span>
+          <span>{{ formatCurrency(balanceSheetData.totals.liabilities) }}</span>
+        </div>
+        <div class="summary-item">
+          <span>Assets</span>
+          <span>{{ formatCurrency(balanceSheetData.totals.assets) }}</span>
+        </div>
+      </div>
+
+      <!-- Tax Summary Section -->
+      <div class="tax-summary">
+        <h5>Tax Summary</h5>
+        <div class="tax-details">
+          <div class="tax-item">
+            <span>Output Tax Payable:</span>
+            <span>{{ formatCurrency(balanceSheetData.taxData.taxPayable) }}</span>
+          </div>
+          <div class="tax-item">
+            <span>Input Tax Credit:</span>
+            <span>{{ formatCurrency(balanceSheetData.taxData.taxReceivable) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="balance-status" [ngClass]="getBalanceSheetStatus().toLowerCase()">
+        <span class="status-dot"></span>
+        <span class="status-text">{{ getBalanceSheetStatus() }}</span>
+      </div>
+      <div class="balance-totals">
+        <div class="total-line">
+          <span>Assets</span>
+          <span>=</span>
+          <span>Equity + Liabilities</span>
+        </div>
+        <div class="total-line">
+          <strong>{{ formatCurrency(balanceSheetData.totals.assets) }}</strong>
+          <span>=</span>
+          <strong>{{ formatCurrency(balanceSheetData.totals.equity + balanceSheetData.totals.liabilities) }}</strong>
+        </div>
+      </div>
     </div>
   </div>
 
   <div *ngIf="!isLoading && balanceSheetData.equity.length === 0" class="no-data-message">
     <i class="fas fa-file-alt"></i>
-    <p>No balance sheet data available</p>
-    <p>Please select a date and generate the balance sheet</p>
+    <p>No balance sheet data available.</p>
+    <p>Please select a date and click "Generate" to view the report.</p>
   </div>
 </div>

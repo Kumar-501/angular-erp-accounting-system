@@ -3,20 +3,22 @@ import { Firestore, collection, addDoc, query, onSnapshot, doc, updateDoc, delet
 import { Observable, BehaviorSubject, from, of } from 'rxjs';
 import { map, switchMap, take } from 'rxjs/operators';
 
-// Updated Customer interface with consistent property naming and additional fields
+// Updated Customer interface with all form fields
 export interface Customer {
   id?: string;
   contactId?: string;
   businessName?: string;
-    convertedFromLead?: string; // ID of the lead this customer was converted from
+  convertedFromLead?: string;
   isConvertedCustomer?: boolean;
   lifeStage?: string;
   leadCategory?: string;
-  lifestage?: string; // Add this
-  adcode?: string;  firstName?: string;
+  lifestage?: string;
+  adcode?: string;
+  firstName?: string;
   lastName?: string;
+  occupation?: string;
   isIndividual?: boolean;
-  currentState?: string; 
+  currentState?: string;
   email?: string;
   mobile?: string;
   landline?: string;
@@ -31,7 +33,6 @@ export interface Customer {
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
-  
   state?: string;
   country?: string;
   zipCode?: string;
@@ -44,15 +45,106 @@ export interface Customer {
   shippingAddress?: string;
   createdAt?: Date;
   updatedAt?: Date;
-    department?: string;
-  gender?: 'Male' | 'Female' | 'Other' | ''; // Add this
-  age?: number; // Add this
+  department?: string;
+  gender?: 'Male' | 'Female' | 'Other' | '';
+  age?: number;
   lastCallTime?: Date;
   callCount?: number;
   currentAddress?: string;
   currentCity?: string;
   address?: string;
   notes?: string;
+  
+  // New fields from the form
+  customerType?: string; // Individual/Business
+  customerCategory?: string; // Business to Business, Consumer, Retail, etc.
+  tradeName?: string;
+  incorporationDate?: Date;
+  businessCategory?: string;
+  turnover?: number;
+  income?: number;
+  gstNumber?: string;
+  panNumber?: string;
+  aadharNumber?: string;
+  creditLimit?: number;
+  creditDays?: number;
+  priceList?: string;
+  route?: string;
+  salesRepresentative?: string;
+  remarks?: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  branch?: string;
+  website?: string;
+  fax?: string;
+  pincode?: string;
+  landmark?: string;
+  area?: string;
+  taluka?: string;
+  district?: string;
+  territory?: string;
+  region?: string;
+  zone?: string;
+  leadSource?: string;
+  referredBy?: string;
+  anniversary?: Date;
+  spouseName?: string;
+  profession?: string;
+  companyName?: string;
+  designation?: string;
+  workPhone?: string;
+  homePhone?: string;
+  alternateEmail?: string;
+  socialMedia?: string;
+  linkedIn?: string;
+  facebook?: string;
+  twitter?: string;
+  instagram?: string;
+  priority?: string;
+  tags?: string;
+  loyaltyCard?: string;
+  membershipType?: string;
+  membershipExpiry?: Date;
+  preferredLanguage?: string;
+  communicationPreference?: string;
+  marketingConsent?: boolean;
+  dataProtectionConsent?: boolean;
+  lastPurchaseDate?: Date;
+  totalPurchaseValue?: number;
+  averageOrderValue?: number;
+  frequencyOfPurchase?: string;
+  paymentMethod?: string;
+  shippingMethod?: string;
+  deliveryInstructions?: string;
+  specialRequirements?: string;
+  contactOwner?: string;
+  accountManager?: string;
+  industry?: string;
+  subIndustry?: string;
+  companySize?: string;
+  annualRevenue?: number;
+  numberOfEmployees?: number;
+  fiscalYearEnd?: Date;
+  taxExempt?: boolean;
+  taxExemptionNumber?: string;
+  vatNumber?: string;
+  registrationNumber?: string;
+  licenses?: string;
+  certifications?: string;
+  qualityRating?: number;
+  riskRating?: string;
+  blacklisted?: boolean;
+  blacklistReason?: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvalDate?: Date;
+  lastModifiedBy?: string;
+  createdBy?: string;
+  sourceSystem?: string;
+  externalId?: string;
+  syncStatus?: string;
+  lastSyncDate?: Date;
 }
 
 // Updated CallLog interface with all fields used in the component
@@ -64,9 +156,24 @@ export interface CallLog {
   callDuration?: number;
   callOutcome?: string;
   followUpRequired?: boolean;
-  followUpDate?: any; // Added this field to resolve errors
-  createdAt: any; // Firestore Timestamp
+  followUpDate?: any;
+  createdAt: any;
   createdBy: string;
+}
+
+// Customer Activity interface
+export interface CustomerActivity {
+  id?: string;
+  customerId: string;
+  date: Date;
+  action: string;
+  by: string;
+  notes: string;
+  type: 'contact' | 'sale' | 'payment' | 'return' | 'status_change' | 'document' | 'communication';
+  referenceId?: string;
+  createdAt: Date;
+    details?: string; // <-- ADD THIS LINE to allow the details property
+
 }
 
 // New pagination state interface
@@ -83,8 +190,9 @@ export interface PaginationState {
 })
 export class CustomerService {
   private customersCollection = 'customers';
-  private batchSize = 50; // Adjust based on your needs
-  
+  private customerActivitiesCollection = 'customer-activities';
+  private batchSize = 50;
+
   // BehaviorSubjects for real-time pagination
   private paginationState = new BehaviorSubject<PaginationState>({
     loading: false,
@@ -94,28 +202,128 @@ export class CustomerService {
     totalCount: 0
   });
   public paginationState$ = this.paginationState.asObservable();
-  
+
   // BehaviorSubject for the loading state
   private loadingSubject = new BehaviorSubject<boolean>(false);
   public loading$ = this.loadingSubject.asObservable();
-  
+
   // BehaviorSubject for total count
   private totalCountSubject = new BehaviorSubject<number>(0);
   public totalCount$ = this.totalCountSubject.asObservable();
-  private pageSize = 20; // Default page size
+  private pageSize = 20;
   checkMobileExists: any;
 
   constructor(private firestore: Firestore) {
-    // Initialize customer count on service creation
     this.updateTotalCount();
+  }
+
+  // CUSTOMER ACTIVITIES METHODS
+  
+  /**
+   * Get customer activities by customer ID
+   */
+  getCustomerActivities(customerId: string): Observable<CustomerActivity[]> {
+    const activitiesRef = collection(this.firestore, this.customerActivitiesCollection);
+    const q = query(
+      activitiesRef,
+      where('customerId', '==', customerId),
+      orderBy('createdAt', 'desc')
+    );
+
+    return new Observable<CustomerActivity[]>(observer => {
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const activities: CustomerActivity[] = [];
+        querySnapshot.forEach(doc => {
+          const data = doc.data() as Omit<CustomerActivity, 'id'>;
+          activities.push({ 
+            id: doc.id, 
+            ...data,
+            date: this.convertTimestampToDate(data.date),
+            createdAt: this.convertTimestampToDate(data.createdAt)
+          });
+        });
+        observer.next(activities);
+      }, (error) => {
+        console.error('Error fetching customer activities:', error);
+        observer.error(error);
+      });
+
+      return () => unsubscribe();
+    });
+  }
+
+  /**
+   * Add a customer activity
+   */
+  async addCustomerActivity(activity: Omit<CustomerActivity, 'id'>): Promise<string> {
+    try {
+      const activitiesRef = collection(this.firestore, this.customerActivitiesCollection);
+      const docRef = await addDoc(activitiesRef, {
+        ...activity,
+        date: activity.date || new Date(),
+        createdAt: new Date()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding customer activity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a customer activity
+   */
+  async updateCustomerActivity(activityId: string, updates: Partial<CustomerActivity>): Promise<void> {
+    try {
+      const activityDoc = doc(this.firestore, this.customerActivitiesCollection, activityId);
+      await updateDoc(activityDoc, {
+        ...updates,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error updating customer activity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a customer activity
+   */
+  async deleteCustomerActivity(activityId: string): Promise<void> {
+    try {
+      const activityDoc = doc(this.firestore, this.customerActivitiesCollection, activityId);
+      await deleteDoc(activityDoc);
+    } catch (error) {
+      console.error('Error deleting customer activity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper method to convert Firebase timestamp to Date
+   */
+  private convertTimestampToDate(timestamp: any): Date {
+    if (!timestamp) return new Date();
+    
+    if (timestamp instanceof Date) return timestamp;
+    
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      const date = new Date(timestamp);
+      return isNaN(date.getTime()) ? new Date() : date;
+    }
+    
+    return new Date();
   }
 
   // Initialize pagination with first batch
   initPagination(pageSize: number = this.batchSize): void {
     this.loadingSubject.next(true);
     const currentState = this.paginationState.value;
-    
-    // Reset pagination state
+
     this.paginationState.next({
       ...currentState,
       loading: true,
@@ -123,60 +331,54 @@ export class CustomerService {
       lastDoc: null,
       hasMore: true
     });
-    
-    // Get the first batch of customers
+
     this.fetchCustomersPage(pageSize);
-    
-    // Update total count
     this.updateTotalCount();
   }
-  
+
   // Fetch the next page of customers
   loadNextPage(pageSize: number = this.batchSize): void {
     const currentState = this.paginationState.value;
-    
+
     if (!currentState.hasMore || currentState.loading) {
       return;
     }
-    
+
     this.fetchCustomersPage(pageSize, currentState.lastDoc);
   }
-  
+
   // Fetch a page of customers with real-time updates
   private fetchCustomersPage(pageSize: number, startAfterDoc: QueryDocumentSnapshot<DocumentData> | null = null): void {
     const currentState = this.paginationState.value;
     this.loadingSubject.next(true);
-    
-    // Update pagination state to indicate loading
+
     this.paginationState.next({
       ...currentState,
       loading: true
     });
-    
+
     const customersRef = collection(this.firestore, this.customersCollection);
     let q = query(customersRef, orderBy('createdAt', 'desc'), limit(pageSize));
-    
+
     if (startAfterDoc) {
       q = query(customersRef, orderBy('createdAt', 'desc'), startAfter(startAfterDoc), limit(pageSize));
     }
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const newCustomers: Customer[] = [];
       let lastVisible: QueryDocumentSnapshot<DocumentData> | null = null;
-      
+
       snapshot.forEach(doc => {
         newCustomers.push({ id: doc.id, ...doc.data() as Customer });
         lastVisible = doc;
       });
-      
+
       const hasMore = newCustomers.length === pageSize;
-      
-      // If this is the first page, replace data, otherwise append
-      const updatedData = startAfterDoc 
-        ? [...currentState.data, ...newCustomers] 
+
+      const updatedData = startAfterDoc
+        ? [...currentState.data, ...newCustomers]
         : newCustomers;
-      
-      // Update pagination state
+
       this.paginationState.next({
         loading: false,
         data: updatedData,
@@ -184,7 +386,7 @@ export class CustomerService {
         hasMore,
         totalCount: currentState.totalCount
       });
-      
+
       this.loadingSubject.next(false);
     }, (error) => {
       console.error('Error fetching customers page:', error);
@@ -194,19 +396,20 @@ export class CustomerService {
       });
       this.loadingSubject.next(false);
     });
-    
   }
+
   getCurrentPaginationState(): PaginationState {
     return this.paginationState.value;
-}
+  }
+
   // Update total count of customers
   private async updateTotalCount(): Promise<void> {
     try {
       const count = await this.getTotalCustomerCount();
       const currentState = this.paginationState.value;
-      
+
       this.totalCountSubject.next(count);
-      
+
       this.paginationState.next({
         ...currentState,
         totalCount: count
@@ -215,7 +418,7 @@ export class CustomerService {
       console.error('Error updating total count:', error);
     }
   }
-  
+
   // Reset pagination state
   resetPagination(): void {
     this.paginationState.next({
@@ -227,20 +430,28 @@ export class CustomerService {
     });
   }
 
-async convertLeadToCustomer(leadData: any): Promise<any> {
-  const customerData = this.prepareCustomerDataFromLead(leadData);
-  const customersRef = collection(this.firestore, this.customersCollection);
-  const docRef = await addDoc(customersRef, customerData);
-  return { id: docRef.id, ...customerData };
-}
+  async convertLeadToCustomer(leadData: any): Promise<any> {
+    const customerData = this.prepareCustomerDataFromLead(leadData);
+    const customersRef = collection(this.firestore, this.customersCollection);
+    const docRef = await addDoc(customersRef, customerData);
+    return { id: docRef.id, ...customerData };
+  }
+
+// In customer.service.ts
+
+// In customer.service.ts
 
 private prepareCustomerDataFromLead(lead: any): any {
   return {
+    // --- Existing Fields (Verified) ---
     contactId: lead.contactId || this.generateContactId(),
     businessName: lead.businessName || '',
     firstName: lead.firstName || '',
     lastName: lead.lastName || '',
+    middleName: lead.middleName || '',
+    prefix: lead.prefix || '',
     isIndividual: !lead.businessName,
+    occupation: lead.occupation || '',
     email: lead.email || '',
     mobile: lead.mobile || '',
     landline: lead.landline || '',
@@ -249,21 +460,27 @@ private prepareCustomerDataFromLead(lead: any): any {
     status: 'Active',
     addressLine1: lead.addressLine1 || '',
     addressLine2: lead.addressLine2 || '',
-    city: lead.city || '',
     state: lead.state || '',
     country: lead.country || 'India',
     zipCode: lead.zipCode || '',
     contactType: 'Customer',
-    createdAt: new Date(),
+    createdAt: new Date(), // The conversion date
     updatedAt: new Date(),
-    convertedFromLead: lead.convertedFromLead || null, // Reference to original lead
-    // Add any other fields you want to carry over
+    convertedFromLead: lead.id || null,
     notes: lead.notes || '',
     source: lead.source || '',
-    lifeStage: lead.lifeStage || '',
-    leadStatus: lead.leadStatus || ''
+    gender: lead.gender || '',
+    age: lead.age || null,
+    department: lead.department || '',
+
+    // --- COMPLETE MAPPINGS (FIX) ---
+    dob: lead.dateOfBirth || null,  // Maps Lead's "dateOfBirth" to Customer's "dob"
+    district: lead.city || '',        // Maps Lead's "city" field to Customer's "district"
+    adcode: lead.leadStatus || '',  // Maps Lead's "leadStatus" to Customer's "adcode"
+    lifestage: lead.lifeStage || '' // Maps Lead's "lifeStage" to Customer's "lifestage"
   };
 }
+
   getAllCustomers(): Observable<any[]> {
     const customersRef = collection(this.firestore, 'customers');
     return new Observable<any[]>(observer => {
@@ -277,13 +494,14 @@ private prepareCustomerDataFromLead(lead: any): any {
       return { unsubscribe };
     });
   }
-  
+
   async getCustomerByIdPromise(id: string): Promise<Customer | null> {
     try {
-      const snapshot = await getDocs(query(collection(this.firestore, this.customersCollection), where('id', '==', id)));
-      if (!snapshot.empty) {
-        const doc = snapshot.docs[0];
-        return { id: doc.id, ...doc.data() } as Customer;
+      const customerDoc = doc(this.firestore, this.customersCollection, id);
+      const docSnap = await getDoc(customerDoc);
+      
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() } as Customer;
       }
       return null;
     } catch (error) {
@@ -292,17 +510,15 @@ private prepareCustomerDataFromLead(lead: any): any {
     }
   }
 
-
-
   private generateContactId(): string {
     return 'CO' + String(Math.floor(1000 + Math.random() * 9000)).padStart(4, '0');
   }
-  
+
   getCustomersPaginated(limitCount: number, lastDoc?: any): Observable<{customers: Customer[], lastDoc: any}> {
     this.loadingSubject.next(true);
     const customersRef = collection(this.firestore, this.customersCollection);
     let q = query(customersRef, orderBy('createdAt', 'desc'), limit(limitCount));
-    
+
     if (lastDoc) {
       q = query(customersRef, orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(limitCount));
     }
@@ -311,7 +527,7 @@ private prepareCustomerDataFromLead(lead: any): any {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers: Customer[] = [];
         let lastVisible = null;
-        
+
         snapshot.forEach(doc => {
           customers.push({ id: doc.id, ...doc.data() as Customer });
           lastVisible = doc;
@@ -327,59 +543,55 @@ private prepareCustomerDataFromLead(lead: any): any {
       return { unsubscribe };
     });
   }
-  
-// Get all customers
-getCustomers(customerId?: string): Observable<Customer[]> {
-  const customersRef = collection(this.firestore, this.customersCollection);
-  
-  // If a specific customerId is provided and it's not 'all', get only that customer
-  if (customerId && customerId !== 'all') {
-    const customerDoc = doc(this.firestore, `${this.customersCollection}/${customerId}`);
-    
+
+  // Get all customers
+  getCustomers(customerId?: string): Observable<Customer[]> {
+    const customersRef = collection(this.firestore, this.customersCollection);
+
+    if (customerId && customerId !== 'all') {
+      const customerDoc = doc(this.firestore, `${this.customersCollection}/${customerId}`);
+
+      return new Observable<Customer[]>(observer => {
+        const unsubscribe = onSnapshot(customerDoc, (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const data = docSnapshot.data() as Omit<Customer, 'id'>;
+            observer.next([{ id: docSnapshot.id, ...data }]);
+          } else {
+            observer.next([]);
+          }
+        }, (error) => {
+          observer.error(error);
+        });
+
+        return { unsubscribe };
+      });
+    }
+
     return new Observable<Customer[]>(observer => {
-      const unsubscribe = onSnapshot(customerDoc, (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data() as Omit<Customer, 'id'>;
-          observer.next([{ id: docSnapshot.id, ...data }]);
-        } else {
-          observer.next([]);
-        }
+      const unsubscribe = onSnapshot(customersRef, (snapshot) => {
+        const customers: Customer[] = [];
+        snapshot.forEach(doc => {
+          const data = doc.data() as Omit<Customer, 'id'>;
+          customers.push({ id: doc.id, ...data });
+        });
+        observer.next(customers);
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
-  
-  // Otherwise, get all customers
-  return new Observable<Customer[]>(observer => {
-    const unsubscribe = onSnapshot(customersRef, (snapshot) => {
-      const customers: Customer[] = [];
-      snapshot.forEach(doc => {
-        const data = doc.data() as Omit<Customer, 'id'>;
-        customers.push({ id: doc.id, ...data });
-      });
-      observer.next(customers);
-    }, (error) => {
-      observer.error(error);
-    });
-    
-    // Return the unsubscribe function to clean up when observable is unsubscribed
-    return { unsubscribe };
-  });
-}
 
   // Get single customer by ID
   getCustomerById(id: string): Observable<Customer | undefined> {
     const customerDoc = doc(this.firestore, `${this.customersCollection}/${id}`);
-    
+
     return new Observable<Customer | undefined>(observer => {
       const unsubscribe = onSnapshot(customerDoc, (docSnapshot) => {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data() as Omit<Customer, 'id'>;
-          
-          // Map currentstate to currentState if it exists (for backward compatibility)
+
           if (data.hasOwnProperty('currentstate') && !data.hasOwnProperty('currentState')) {
             const { currentstate, ...rest } = data as any;
             observer.next({ id: docSnapshot.id, currentState: currentstate, ...rest });
@@ -392,7 +604,7 @@ getCustomers(customerId?: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
@@ -400,7 +612,7 @@ getCustomers(customerId?: string): Observable<Customer[]> {
   getCustomersByDepartment(department: string): Observable<Customer[]> {
     const customersRef = collection(this.firestore, this.customersCollection);
     const q = query(customersRef, where('department', '==', department));
-    
+
     return new Observable<Customer[]>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers: Customer[] = [];
@@ -412,7 +624,7 @@ getCustomers(customerId?: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
@@ -422,7 +634,7 @@ getCustomers(customerId?: string): Observable<Customer[]> {
     try {
       const customersRef = collection(this.firestore, this.customersCollection);
       const snapshot = await getDocs(customersRef);
-      
+
       const departments = new Set<string>();
       snapshot.forEach(doc => {
         const data = doc.data() as Customer;
@@ -430,28 +642,27 @@ getCustomers(customerId?: string): Observable<Customer[]> {
           departments.add(data.department);
         }
       });
-      
-      // Add default departments if they don't exist
+
       ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'].forEach(dept => {
         departments.add(dept);
       });
-      
+
       return Array.from(departments).sort();
     } catch (error) {
       console.error('Error getting departments:', error);
       return ['PC1', 'PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PC8'];
     }
   }
-  
+
   async getTotalCustomerCount(): Promise<number> {
     const customersRef = collection(this.firestore, this.customersCollection);
     const snapshot = await getCountFromServer(customersRef);
     return snapshot.data().count;
   }
-  
+
   searchCustomersOptimized(searchTerm: string, field: keyof Customer): Observable<Customer[]> {
     const customersRef = collection(this.firestore, this.customersCollection);
-    const q = query(customersRef, 
+    const q = query(customersRef,
       where(field, '>=', searchTerm),
       where(field, '<=', searchTerm + '\uf8ff'),
       limit(50)
@@ -471,57 +682,61 @@ getCustomers(customerId?: string): Observable<Customer[]> {
       return { unsubscribe };
     });
   }
-  
-  // Add this to your CustomerService class
-async bulkDeleteCustomers(customerIds: string[]): Promise<void> {
-  const batch = writeBatch(this.firestore);
-  const leadsToDelete: string[] = [];
-  
-  // First get all customer documents to check for converted leads
-  for (const id of customerIds) {
-    const customerDoc = doc(this.firestore, this.customersCollection, id);
-    const customerSnapshot = await getDoc(customerDoc);
-    
-    if (customerSnapshot.exists()) {
-      const customerData = customerSnapshot.data() as Customer;
-      batch.delete(customerDoc);
-      
-      if (customerData.convertedFromLead) {
-        leadsToDelete.push(customerData.convertedFromLead);
+
+  async bulkDeleteCustomers(customerIds: string[]): Promise<void> {
+    const batch = writeBatch(this.firestore);
+    const leadsToDelete: string[] = [];
+
+    for (const id of customerIds) {
+      const customerDoc = doc(this.firestore, this.customersCollection, id);
+      const customerSnapshot = await getDoc(customerDoc);
+
+      if (customerSnapshot.exists()) {
+        const customerData = customerSnapshot.data() as Customer;
+        batch.delete(customerDoc);
+
+        if (customerData.convertedFromLead) {
+          leadsToDelete.push(customerData.convertedFromLead);
+        }
       }
     }
+
+    leadsToDelete.forEach(leadId => {
+      const leadDoc = doc(this.firestore, 'leads', leadId);
+      batch.delete(leadDoc);
+    });
+
+    await batch.commit();
+    await this.updateTotalCount();
   }
-  
-  // Add lead deletions to the batch
-  leadsToDelete.forEach(leadId => {
-    const leadDoc = doc(this.firestore, 'leads', leadId);
-    batch.delete(leadDoc);
-  });
-  
-  await batch.commit();
-  await this.updateTotalCount();
-}
+
   async addCustomer(customer: Customer): Promise<string> {
-    
     try {
-      
-      // Ensure required fields are present
       const customerData: Customer = {
         ...customer,
         contactId: customer.contactId || this.generateContactId(),
         status: customer.status || 'Active',
-        
         isIndividual: customer.isIndividual !== undefined ? customer.isIndividual : true,
         createdAt: customer.createdAt || new Date(),
         updatedAt: new Date()
       };
-  
+
       const customersRef = collection(this.firestore, this.customersCollection);
       const docRef = await addDoc(customersRef, customerData);
-      
-      // Update total count after adding
+
+      // Add initial activity
+      await this.addCustomerActivity({
+        customerId: docRef.id,
+        action: 'Customer Created',
+        by: 'System',
+        notes: 'Customer record created',
+        type: 'contact',
+        date: new Date(),
+        createdAt: new Date()
+      });
+
       await this.updateTotalCount();
-      
+
       return docRef.id;
     } catch (error) {
       console.error('Error adding customer:', error);
@@ -530,74 +745,139 @@ async bulkDeleteCustomers(customerIds: string[]): Promise<void> {
   }
 
   // Update existing customer
-  async updateCustomer(id: string, customer: Partial<Customer>): Promise<void> {
-    const customerDoc = doc(this.firestore, this.customersCollection, id);
-    
-    // Handle property name conversion for backward compatibility
-    const updateData = { ...customer, updatedAt: new Date() };
-    
-    // If currentState is provided, also update currentstate for backward compatibility
-    if (updateData.currentState !== undefined) {
-      (updateData as any).currentstate = updateData.currentState;
+
+private getFieldDisplayName(field: string): string {
+    const fieldMap: { [key: string]: string } = {
+      'businessName': 'Business Name', 'firstName': 'First Name', 'lastName': 'Last Name',
+      'email': 'Email', 'mobile': 'Mobile', 'landline': 'Landline', 'alternateContact': 'Alternate Contact',
+      'status': 'Status', 'addressLine1': 'Address Line 1', 'addressLine2': 'Address Line 2',
+      'city': 'City', 'state': 'State', 'country': 'Country', 'zipCode': 'Zip Code',
+      'occupation': 'Occupation', 'department': 'Department', 'assignedTo': 'Assigned To',
+      'contactType': 'Contact Type', 'openingBalance': 'Opening Balance', 'creditLimit': 'Credit Limit'
+    };
+    // This makes the field name readable, e.g., "businessName" becomes "Business Name"
+    return fieldMap[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+  }
+ private formatActivityValue(value: any): string {
+    if (value === null || value === undefined) {
+      return 'Empty';
     }
+    // Check for Firebase Timestamp and format it
+    if (value && typeof value.toDate === 'function') {
+      const date = value.toDate();
+      // Return a simple, readable date format
+      return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    // Check for regular JavaScript Date and format it
+    if (value instanceof Date) {
+      return value.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    return String(value);
+  }
+  // ENHANCED updateCustomer method for detailed activity logging
+// ... (keep all existing code and the formatActivityValue helper function) ...
+
+  // REPLACE your updateCustomer method with this corrected version
+  async updateCustomer(id: string, customerUpdates: Partial<Customer>, updatedBy: string = 'System'): Promise<void> {
+    const customerDoc = doc(this.firestore, this.customersCollection, id);
+
+    const oldCustomerData = await this.getCustomerByIdPromise(id);
+    if (!oldCustomerData) {
+      throw new Error(`Customer with ID ${id} not found.`);
+    }
+
+    // Perform the update first, including the new updatedAt timestamp
+    const updateData = { ...customerUpdates, updatedAt: new Date() };
+    await updateDoc(customerDoc, updateData);
     
-    return updateDoc(customerDoc, updateData);
+    // Now, prepare the activity log
+    const changes: string[] = [];
+    const detailedChanges: any[] = [];
+
+    // Loop through the original updates to find what changed
+    for (const key in customerUpdates) {
+      // This check ensures we only process valid keys from the customerUpdates object
+      if (Object.prototype.hasOwnProperty.call(customerUpdates, key)) {
+        // We don't want to log the 'updatedAt' field itself as a change, so we skip it
+        if (key === 'updatedAt') {
+          continue; 
+        }
+
+        // Explicitly tell TypeScript the type of the key
+        const typedKey = key as keyof Customer;
+        const oldValue = oldCustomerData[typedKey];
+        const newValue = customerUpdates[typedKey];
+
+        // Format the values before comparing and logging them
+        const formattedOldValue = this.formatActivityValue(oldValue);
+        const formattedNewValue = this.formatActivityValue(newValue);
+
+        if (formattedOldValue !== formattedNewValue) {
+          const fieldName = this.getFieldDisplayName(key);
+          changes.push(`${fieldName} changed from "${formattedOldValue}" to "${formattedNewValue}"`);
+          detailedChanges.push({ field: fieldName, from: formattedOldValue, to: formattedNewValue });
+        }
+      }
+    }
+
+    if (changes.length > 0) {
+      // Create a cleaner note for the activity log
+      const notes = `The following fields were updated: ${changes.join('; ')}.`;
+      
+      await this.addCustomerActivity({
+        customerId: id,
+        action: 'Customer Updated', // Changed from 'Edited' to be more specific
+        by: updatedBy,
+        notes: notes,
+        type: 'contact',
+        date: new Date(),
+        createdAt: new Date(),
+        details: JSON.stringify(detailedChanges, null, 2)
+      });
+    }
   }
 
-  // New method: updateCustomerObservable - Returns an Observable for the update operation
+// ... (keep all existing code after this point)
+
+
   updateCustomerObservable(id: string, customer: Partial<Customer>): Observable<void> {
     return from(this.updateCustomer(id, customer));
   }
 
-async deleteCustomer(id: string): Promise<void> {
-  try {
-    // First get the customer document
-    const customerDoc = doc(this.firestore, this.customersCollection, id);
-    const customerSnapshot = await getDoc(customerDoc);
-    
-    if (!customerSnapshot.exists()) {
-      throw new Error('Customer not found');
+  async deleteCustomer(id: string): Promise<void> {
+    try {
+      const customerDoc = doc(this.firestore, this.customersCollection, id);
+      const customerSnapshot = await getDoc(customerDoc);
+
+      if (!customerSnapshot.exists()) {
+        throw new Error('Customer not found');
+      }
+
+      const customerData = customerSnapshot.data() as Customer;
+
+      const batch = writeBatch(this.firestore);
+
+      batch.delete(customerDoc);
+
+      if (customerData.convertedFromLead) {
+        const leadDoc = doc(this.firestore, 'leads', customerData.convertedFromLead);
+        batch.delete(leadDoc);
+      }
+
+      await batch.commit();
+
+      await this.updateTotalCount();
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      throw error;
     }
-    
-    const customerData = customerSnapshot.data() as Customer;
-    
-    // Start a batch to handle multiple operations atomically
-    const batch = writeBatch(this.firestore);
-    
-    // Delete the customer
-    batch.delete(customerDoc);
-    
-    // If this was a converted customer, handle the lead
-    if (customerData.convertedFromLead) {
-      const leadDoc = doc(this.firestore, 'leads', customerData.convertedFromLead);
-      
-      // Either delete the lead (option 1)
-      batch.delete(leadDoc);
-      
-      // OR mark it as unconverted (option 2 - choose one)
-      // batch.update(leadDoc, {
-      //   convertedAt: null,
-      //   status: 'New',
-      //   convertedTo: null
-      // });
-    }
-    
-    // Commit the batch
-    await batch.commit();
-    
-    // Update total count after deletion
-    await this.updateTotalCount();
-  } catch (error) {
-    console.error('Error deleting customer:', error);
-    throw error;
   }
-}
 
   // Get customers by contact type
   getCustomersByContactType(contactType: string): Observable<Customer[]> {
     const customersRef = collection(this.firestore, this.customersCollection);
     const q = query(customersRef, where('contactType', '==', contactType));
-    
+
     return new Observable<Customer[]>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers: Customer[] = [];
@@ -609,30 +889,30 @@ async deleteCustomer(id: string): Promise<void> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
-// Search customers by term
-searchCustomers(searchTerm: string): Observable<Customer[]> {
-  // This is a client-side implementation since Firestore doesn't support direct text search
-  return this.getCustomers('all').pipe(
-    map(customers => customers.filter(customer => 
-      (customer.businessName && customer.businessName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.firstName && customer.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.lastName && customer.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.mobile && customer.mobile.includes(searchTerm)) ||
-      (customer.contactId && customer.contactId.includes(searchTerm))
-    ))
-  );
-}
+
+  // Search customers by term
+  searchCustomers(searchTerm: string): Observable<Customer[]> {
+    return this.getCustomers('all').pipe(
+      map(customers => customers.filter(customer =>
+        (customer.businessName && customer.businessName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (customer.firstName && customer.firstName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (customer.lastName && customer.lastName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (customer.mobile && customer.mobile.includes(searchTerm)) ||
+        (customer.contactId && customer.contactId.includes(searchTerm))
+      ))
+    );
+  }
 
   // Get customers sorted by name
   getSortedCustomers(): Observable<Customer[]> {
     const customersRef = collection(this.firestore, this.customersCollection);
     const q = query(customersRef, orderBy('lastName'));
-    
+
     return new Observable<Customer[]>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers: Customer[] = [];
@@ -644,7 +924,7 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
@@ -653,7 +933,7 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
   getActiveCustomers(): Observable<Customer[]> {
     const customersRef = collection(this.firestore, this.customersCollection);
     const q = query(customersRef, where('status', '==', 'Active'));
-    
+
     return new Observable<Customer[]>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const customers: Customer[] = [];
@@ -665,18 +945,17 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
 
   // CALL LOG METHODS
 
-  // Get call logs for a specific customer
   getCallLogsForCustomer(customerId: string): Observable<CallLog[]> {
     const callLogsRef = collection(this.firestore, `${this.customersCollection}/${customerId}/callLogs`);
     const q = query(callLogsRef, orderBy('createdAt', 'desc'));
-    
+
     return new Observable<CallLog[]>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const callLogs: CallLog[] = [];
@@ -688,37 +967,70 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
 
-  // Add a new call log for a customer
   async addCallLog(customerId: string, callLogData: Omit<CallLog, 'id'>): Promise<string> {
     const callLogsRef = collection(this.firestore, `${this.customersCollection}/${customerId}/callLogs`);
     const docRef = await addDoc(callLogsRef, {
       ...callLogData,
       createdAt: callLogData.createdAt || new Date()
     });
+
+    // Add activity for call log
+    await this.addCustomerActivity({
+      customerId,
+      action: 'Call Log Added',
+      by: callLogData.createdBy || 'System',
+      notes: `Call: ${callLogData.subject}`,
+      type: 'communication',
+      referenceId: docRef.id,
+      date: new Date(),
+      createdAt: new Date()
+    });
+
     return docRef.id;
   }
 
-  // Update an existing call log
   async updateCallLog(customerId: string, callLogId: string, callLogData: Partial<CallLog>): Promise<void> {
     const callLogDoc = doc(this.firestore, `${this.customersCollection}/${customerId}/callLogs/${callLogId}`);
-    return updateDoc(callLogDoc, { ...callLogData });
+    await updateDoc(callLogDoc, { ...callLogData });
+
+    // Add activity for call log update
+    await this.addCustomerActivity({
+      customerId,
+      action: 'Call Log Updated',
+      by: 'System',
+      notes: 'Call log updated',
+      type: 'communication',
+      referenceId: callLogId,
+      date: new Date(),
+      createdAt: new Date()
+    });
   }
 
-  // Delete a call log
   async deleteCallLog(customerId: string, callLogId: string): Promise<void> {
     const callLogDoc = doc(this.firestore, `${this.customersCollection}/${customerId}/callLogs/${callLogId}`);
-    return deleteDoc(callLogDoc);
+    await deleteDoc(callLogDoc);
+
+    // Add activity for call log deletion
+    await this.addCustomerActivity({
+      customerId,
+      action: 'Call Log Deleted',
+      by: 'System',
+      notes: 'Call log deleted',
+      type: 'communication',
+      referenceId: callLogId,
+      date: new Date(),
+      createdAt: new Date()
+    });
   }
 
-  // Get a specific call log by ID
   getCallLogById(customerId: string, callLogId: string): Observable<CallLog | undefined> {
     const callLogDoc = doc(this.firestore, `${this.customersCollection}/${customerId}/callLogs/${callLogId}`);
-    
+
     return new Observable<CallLog | undefined>(observer => {
       const unsubscribe = onSnapshot(callLogDoc, (docSnapshot) => {
         if (docSnapshot.exists()) {
@@ -730,49 +1042,45 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
 
-  // Get recent call logs across all customers
   getRecentCallLogs(limitCount: number = 10): Observable<Array<CallLog & { customerId: string }>> {
     const callLogsCollectionGroup = collectionGroup(this.firestore, 'callLogs');
     const q = query(callLogsCollectionGroup, orderBy('createdAt', 'desc'), limit(limitCount));
-    
+
     return new Observable<Array<CallLog & { customerId: string }>>(observer => {
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const callLogs: Array<CallLog & { customerId: string }> = [];
         snapshot.forEach(doc => {
           const data = doc.data() as Omit<CallLog, 'id'>;
-          // Extract the customer ID from the reference path
           const path = doc.ref.path;
           const pathSegments = path.split('/');
-          const customerId = pathSegments[1]; // Should be the customer ID based on path structure
-          
-          callLogs.push({ 
-            id: doc.id, 
-            customerId, 
-            ...data 
+          const customerId = pathSegments[1];
+
+          callLogs.push({
+            id: doc.id,
+            customerId,
+            ...data
           });
         });
         observer.next(callLogs);
       }, (error) => {
         observer.error(error);
       });
-      
+
       return { unsubscribe };
     });
   }
 
-  // Count call logs for a customer
   async getCallLogCount(customerId: string): Promise<number> {
     const callLogsRef = collection(this.firestore, `${this.customersCollection}/${customerId}/callLogs`);
     const snapshot = await getDocs(callLogsRef);
     return snapshot.size;
   }
 
-  // Get customers with recent call logs
   getCustomersWithRecentCallLogs(limitCount: number = 10): Observable<Array<Customer & { recentCallLog: CallLog }>> {
     return this.getRecentCallLogs(limitCount).pipe(
       map(async (callLogs) => {
@@ -793,13 +1101,12 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
     ) as unknown as Observable<Array<Customer & { recentCallLog: CallLog }>>;
   }
 
-  // Check if mobile number exists
   async checkMobileNumberExists(mobile: string): Promise<boolean> {
     try {
       const customersRef = collection(this.firestore, this.customersCollection);
       const q = query(customersRef, where('mobile', '==', mobile));
       const querySnapshot = await getDocs(q);
-      
+
       return !querySnapshot.empty;
     } catch (error) {
       console.error('Error checking mobile number:', error);
@@ -807,13 +1114,12 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
     }
   }
 
-  // Check if alternate contact exists
   async checkAlternateContactExists(contact: string): Promise<boolean> {
     try {
       const customersRef = collection(this.firestore, this.customersCollection);
       const q = query(customersRef, where('alternateContact', '==', contact));
       const querySnapshot = await getDocs(q);
-      
+
       return !querySnapshot.empty;
     } catch (error) {
       console.error('Error checking alternate contact:', error);
@@ -821,36 +1127,70 @@ searchCustomers(searchTerm: string): Observable<Customer[]> {
     }
   }
 
-  // Check if landline exists
   async checkLandlineExists(landline: string): Promise<boolean> {
     try {
       const customersRef = collection(this.firestore, this.customersCollection);
       const q = query(customersRef, where('landline', '==', landline));
       const querySnapshot = await getDocs(q);
-      
+
       return !querySnapshot.empty;
     } catch (error) {
       console.error('Error checking landline:', error);
       throw error;
     }
- 
- }
- 
+  }
 
-async getCustomerByMobile(mobile: string): Promise<any> {
-  try {
-    const customersRef = collection(this.firestore, this.customersCollection);
-    const q = query(customersRef, where('mobile', '==', mobile));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      return { id: doc.id, ...doc.data() };
+  async getCustomersByMobileNumbers(mobileNumbers: string[]): Promise<Customer[]> {
+    if (!mobileNumbers || mobileNumbers.length === 0) {
+      return [];
     }
-    return null;
-  } catch (error) {
-    console.error('Error fetching customer by mobile:', error);
-    return null;
-  }
-}
+
+    const customersRef = collection(this.firestore, this.customersCollection);
+    const allMatchingCustomers: Customer[] = [];
+
+    const chunkSize = 30;
+    const chunks: string[][] = [];
+    for (let i = 0; i < mobileNumbers.length; i += chunkSize) {
+      chunks.push(mobileNumbers.slice(i, i + chunkSize));
+    }
+
+    const fetchPromises = chunks.map(chunk => {
+      const q = query(customersRef, where('mobile', 'in', chunk));
+      return getDocs(q);
+    });
+
+    try {
+      const allSnapshots = await Promise.all(fetchPromises);
+
+      for (const snapshot of allSnapshots) {
+        snapshot.forEach(doc => {
+          allMatchingCustomers.push({ id: doc.id, ...doc.data() } as Customer);
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching customers by mobile numbers:', error);
+      throw error;
+    }
+
+    return allMatchingCustomers;
+  }
+
+  async getCustomerByMobile(mobile: string): Promise<any> {
+    try {
+      const customersRef = collection(this.firestore, this.customersCollection);
+      const q = query(customersRef, where('mobile', '==', mobile));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        return { id: doc.id, ...doc.data() };
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching customer by mobile:', error);
+      return null;
+    }
+  }
+  
+  
 }

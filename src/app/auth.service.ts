@@ -4,6 +4,7 @@ import { Firestore, collection, query, where, getDocs, doc, getDoc } from '@angu
 import { BehaviorSubject, Observable } from 'rxjs';
 
 interface User {
+  userRole?: string;
   uid: string;
   email: string;
   department?: string;
@@ -12,18 +13,19 @@ interface User {
   role?: string;
   permissions?: any;
   businessId?: string;
-  locations?: string[]; // Array of location IDs the user has access to
-  allLocations?: boolean; // Flag indicating if user has access to all locations
+  locations?: string[]; 
+  allLocations?: boolean; 
 }
+
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
- private currentUserSubject = new BehaviorSubject<User | null>(null);
+  private currentUserSubject = new BehaviorSubject<User | null>(null);
+  public authState$: Observable<User | null> = this.currentUserSubject.asObservable(); 
   private isAuthenticated = false;
   private permissionCache = new Map<string, boolean>();
 
-  // Update the rolePermissions in AuthService
   private rolePermissions = {
     admin: {
       all: true,
@@ -40,35 +42,41 @@ export class AuthService {
       sales: { viewOwn: true, create: true, editOwn: true },
       customers: { viewOwn: true, editOwn: true },
       dashboard: { view: true }
-    },
-    // ... other roles
+    }
   };
 
- constructor(private router: Router, private firestore: Firestore) {
+  constructor(private router: Router, private firestore: Firestore) {
     this.loadUserFromStorage();
   }
 
-// In your auth.service.ts
-isAdmin(): boolean {
-  const user = this.currentUserSubject.value;
-  return user?.role?.toLowerCase() === 'admin'; // Make sure your role field matches
-}
+  isAdmin(): boolean {
+    const user = this.currentUserSubject.value;
+    return user?.role?.toLowerCase() === 'admin';
+  }
+
   private async loadUserFromStorage(): Promise<void> {
-    const storedUser = sessionStorage.getItem('currentUser'); // Change from localStorage to sessionStorage
+    // CHANGED: Use localStorage instead of sessionStorage to persist login across tabs
+    const storedUser = localStorage.getItem('currentUser'); 
     if (storedUser) {
       try {
         const user = JSON.parse(storedUser);
         this.currentUserSubject.next(user);
         this.isAuthenticated = true;
       } catch (e) {
-        sessionStorage.removeItem('currentUser'); // Remove invalid session data
+        localStorage.removeItem('currentUser'); 
+        this.currentUserSubject.next(null);
+        this.isAuthenticated = false;
       }
+    } else {
+      this.currentUserSubject.next(null);
     }
   }
 
-  // Updated login method with proper locations handling
   async login(email: string, password: string): Promise<boolean> {
     try {
+      // CHANGED: Clear localStorage
+      localStorage.removeItem('formData');
+      
       const usersRef = collection(this.firestore, 'users');
       const q = query(usersRef, where('email', '==', email), where('password', '==', password));
 
@@ -77,7 +85,6 @@ isAdmin(): boolean {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data();
         
-        // Get permissions from role or role document
         let permissions = {};
         if (userData['role'] && this.rolePermissions[userData['role'] as keyof typeof this.rolePermissions]) {
           permissions = this.rolePermissions[userData['role'] as keyof typeof this.rolePermissions];
@@ -88,7 +95,6 @@ isAdmin(): boolean {
           }
         }
         
-        // Ensure locations are properly set
         const userLocations = userData['locations'] || [];
         const allLocations = userData['allLocations'] || false;
         
@@ -99,18 +105,20 @@ isAdmin(): boolean {
           role: userData['role'] || 'user',
           department: userData['department'] || '',
           permissions: permissions,
-
           businessId: userData['businessId'] || null,
-          locations: userLocations, // Make sure this is set
-          allLocations: allLocations // And this
+          locations: userLocations,
+          allLocations: allLocations,
+          userRole: undefined
         };
 
-        sessionStorage.setItem('currentUser', JSON.stringify(user));
-        this.currentUserSubject.next(user);
+        // CHANGED: Set to localStorage so new tabs can access this data
+        localStorage.setItem('currentUser', JSON.stringify(user));
+        this.currentUserSubject.next(user); 
         this.isAuthenticated = true;
         this.permissionCache.clear();
 
-        // Redirect based on role
+        this.clearFormData();
+
         if (user.role === 'cashier') {
           this.router.navigate(['/add-sale']);
         } else if (user.role === 'accountant') {
@@ -126,17 +134,23 @@ isAdmin(): boolean {
       return false;
     }
   }
+
+  private clearFormData() {
+    // CHANGED: Use localStorage
+    localStorage.removeItem('leaveFormData');
+    localStorage.removeItem('formData');
+  }
   
   logout(): void {
-    sessionStorage.removeItem('currentUser'); // Use sessionStorage here
+    // CHANGED: Use localStorage
+    localStorage.removeItem('currentUser'); 
     this.currentUserSubject.next(null);
     this.isAuthenticated = false;
     this.permissionCache.clear();
     this.router.navigate(['/login']);
   }
 
-
-
+  // Rest of your helper methods remain the same...
   isAccountant(): boolean {
     const user = this.currentUserSubject.value;
     return user?.role === 'accountant';
@@ -153,54 +167,33 @@ isAdmin(): boolean {
   
   hasPermission(permission: string): boolean {
     const user = this.currentUserSubject.value;
-    if (!user || !user.permissions) {
-      return false;
-    }
-  
-    // Admin has all permissions
+    if (!user || !user.permissions) return false;
     if (user.role === 'admin') return true;
   
     const parts = permission.split('.');
     let current = user.permissions;
-  
     for (const part of parts) {
-      if (current[part] === undefined) {
-        return false;
-      }
+      if (current[part] === undefined) return false;
       current = current[part];
     }
-  
     return current === true;
   }
 
-  // Location access methods
   getUserLocations(): string[] {
     const user = this.currentUserSubject.value;
-    if (user?.allLocations) {
-      return ['all']; // Special value indicating access to all locations
-    }
-    return user?.locations || [];
+    return user?.allLocations ? ['all'] : user?.locations || [];
   }
 
-  // Add this method to get the user's allowed locations
   getUserAllowedLocations(): string[] {
     const user = this.currentUserSubject.value;
-    if (!user) return [];
-    
-    // If user has access to all locations, return empty array (no filter needed)
-    if (user.allLocations) return [];
-    
+    if (!user || user.allLocations) return [];
     return user.locations || [];
   }
-hasLocationAccess(locationId: string): boolean {
+
+  hasLocationAccess(locationId: string): boolean {
     const user = this.currentUserSubject.value;
     if (!user) return false;
-    
-    
-    // If user has access to all locations
     if (user.allLocations) return true;
-    
-    // Check if user has access to this specific location
     return user.locations?.includes(locationId) || false;
   }
 
@@ -217,19 +210,16 @@ hasLocationAccess(locationId: string): boolean {
     return this.currentUserSubject.asObservable();
   }
 
-  // Add this method to check user roles
   hasRole(role: string): boolean {
     const user = this.currentUserSubject.value;
     return user?.role?.toLowerCase() === role.toLowerCase();
   }
 
-  // New method to get current user ID
   getCurrentUserId(): string {
     const user = this.currentUserSubject.value;
     return user?.uid || '';
   }
 
-  // New method to get current user name
   getCurrentUserName(): string {
     const user = this.currentUserSubject.value;
     return user?.displayName || '';
@@ -240,7 +230,7 @@ hasLocationAccess(locationId: string): boolean {
   }
 
   isLoggedIn(): boolean {
-    return this.isAuthenticated;
+    return !!this.currentUserSubject.value && this.isAuthenticated;
   }
 
   async getUserById(userId: string): Promise<User | null> {

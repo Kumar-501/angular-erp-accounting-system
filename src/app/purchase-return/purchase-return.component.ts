@@ -1,34 +1,8 @@
-/**
- * Purchase Return Component
- * 
- * This component handles purchase returns with proper location-wise stock management.
- * 
- * Key Features:
- * - Location-aware stock returns using product-stock collection
- * - Stock history tracking for all return transactions
- * - Purchase return logging for audit trail
- * - Validation of return quantities against available stock
- * - Bulk return processing capabilities
- * - Integration with existing purchase return workflow
- * 
- * Stock Management:
- * - Uses product-stock collection with document IDs: {productId}_{locationId}
- * - Creates history entries in product-stock-history collection
- * - Creates log entries in purchase-return-log collection
- * - Validates stock availability before processing returns
- * - Updates stock quantities when returns are marked as 'completed'
- * 
- * Data Structure:
- * - businessLocationId: Required for location-specific stock updates
- * - products: Array with productId, quantity, and other product details
- * - returnStatus: 'pending', 'completed', 'rejected', etc.
- */
-
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { PurchaseReturnService } from '../services/purchase-return.service';
 import { AccountService } from '../services/account.service';
 import { PurchaseService } from '../services/purchase.service';
-import { Subscription } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { Modal } from 'bootstrap';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
@@ -39,7 +13,7 @@ import { COLLECTIONS } from '../../utils/constants';
 
 interface PurchaseReturn {
   id?: string;
-  returnDate: string;
+  returnDate: any; // Allow flexible date types from Firestore
   referenceNo: string;
   parentPurchaseId: string;
   parentPurchaseRef: string;
@@ -51,14 +25,24 @@ interface PurchaseReturn {
   products: any[];
   reason: string;
   grandTotal: number;
-  createdAt: Date;
+  createdAt: any; // Allow flexible date types from Firestore
   createdBy: string;
+}
+
+interface PurchaseProduct {
+  id?: string;
+  productId: string;
+  productName: string;
+  name?: string;
+  price?: number;
+  unitCost?: number;
+  // other product properties...
 }
 
 interface PurchaseReturnProduct {
   productId: string;
   productName: string;
-  sku: string;
+  sku?: string;
   quantity: number;
   unitPrice: number;
   totalCost: number;
@@ -68,6 +52,8 @@ interface PurchaseReturnProduct {
   subtotal?: number;
   name?: string;
   id?: string;
+  price?: number;
+  unitCost?: number;
 }
 
 interface PurchaseReturnLog {
@@ -93,16 +79,31 @@ interface PurchaseReturnLog {
 export class PurchaseReturnComponent implements OnInit, OnDestroy {
   purchaseReturns: PurchaseReturn[] = [];
   sortedPurchaseReturns: PurchaseReturn[] = [];
+  filteredPurchaseReturns: PurchaseReturn[] = [];
+  paginatedPurchaseReturns: PurchaseReturn[] = [];
+  
   isLoading = true;
   isUpdating = false;
   errorMessage: string | null = null;
-  pageSize = 25;
+  
+  // Pagination properties
+  pageSize = 10;
   currentPage = 1;
+  totalPages: number = 1;
+  maxVisiblePages: number = 5;
+  
+  // Search properties
+  searchTerm: string = '';
+  
+  // Sorting properties
   sortColumn: string = 'returnDate';
   sortDirection: 'asc' | 'desc' = 'desc';
-
+  
+  // Properties for the status update modal
   selectedReturn!: PurchaseReturn;
   tempStatus: string = '';
+  tempPaymentStatus: string = ''; // Added for payment status
+  
   private subscription!: Subscription;
 
   constructor(
@@ -117,23 +118,28 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
   }
 
   loadPurchaseReturns(): void {
+    this.isLoading = true;
     this.subscription = this.purchaseReturnService.getPurchaseReturns().subscribe({
-      next: async (data) => {
-        this.purchaseReturns = data;
-        
-        // Fetch product details for each unique parent purchase
-        const uniqueParentPurchaseIds = [...new Set(data.map(item => item.parentPurchaseId))];
-        await Promise.all(
-          uniqueParentPurchaseIds.map(id => this.fetchProductDetailsFromParentPurchase(id))
-        );
-        
-        this.sortData();
+      next: (returns) => {
+        // Immediately parse dates upon loading data
+        this.purchaseReturns = returns.map(r => ({
+            ...r,
+            returnDate: this.parseDate(r.returnDate),
+            createdAt: this.parseDate(r.createdAt)
+        }));
+        this.sortedPurchaseReturns = [...this.purchaseReturns];
         this.isLoading = false;
-        this.errorMessage = null;
+        
+        // Load product details for each return
+        this.loadProductDetails();
+        
+        // Apply initial filtering and pagination
+        this.applyFilter();
       },
       error: (err) => {
-        this.errorMessage = 'Failed to load purchase returns. Please refresh or try again later.';
+        console.error('Error loading returns:', err);
         this.isLoading = false;
+        this.errorMessage = "Failed to load purchase returns. Please try again later.";
       }
     });
   }
@@ -142,69 +148,138 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
     if (this.subscription) this.subscription.unsubscribe();
   }
 
-  get totalRecords(): number {
-    return this.purchaseReturns.length;
+  // START: DATE AND TIME METHODS
+  private parseDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (typeof dateValue.toDate === 'function') return dateValue.toDate();
+    if (typeof dateValue === 'object' && dateValue.seconds) {
+      return new Date(dateValue.seconds * 1000 + (dateValue.nanoseconds || 0) / 1000000);
+    }
+    const parsed = new Date(dateValue);
+    if (!isNaN(parsed.getTime())) return parsed;
+    console.warn('Could not parse date:', dateValue);
+    return new Date();
   }
 
-  get totalGrandTotal(): number {
-    return this.purchaseReturns.reduce((sum, item) => sum + item.grandTotal, 0);
+  formatDate(date: any): string {
+    const d = this.parseDate(date);
+    if (!d) return '-';
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  }
+  // END: DATE AND TIME METHODS
+
+  // START: SEARCH AND FILTER FUNCTIONALITY
+  applyFilter(): void {
+    if (!this.searchTerm.trim()) {
+      this.filteredPurchaseReturns = [...this.sortedPurchaseReturns];
+    } else {
+      const term = this.searchTerm.toLowerCase().trim();
+      this.filteredPurchaseReturns = this.sortedPurchaseReturns.filter(item => 
+        item.referenceNo.toLowerCase().includes(term) ||
+        item.parentPurchaseRef.toLowerCase().includes(term) ||
+        item.supplier.toLowerCase().includes(term) ||
+        item.businessLocation.toLowerCase().includes(term) ||
+        item.returnStatus.toLowerCase().includes(term) ||
+        item.paymentStatus.toLowerCase().includes(term) ||
+        item.reason.toLowerCase().includes(term) ||
+        item.grandTotal.toString().includes(term) ||
+        (item.returnDate && this.formatDate(item.returnDate).toLowerCase().includes(term))
+      );
+    }
+    
+    this.currentPage = 1;
+    this.updatePagination();
   }
 
-  get totalPaymentDue(): number {
-    return this.purchaseReturns.reduce((sum, item) => sum + item.grandTotal, 0);
+  clearSearch(): void {
+    this.searchTerm = '';
+    this.applyFilter();
   }
 
-  async fetchProductDetailsFromParentPurchase(parentPurchaseId: string): Promise<void> {
-    try {
-      // Get the parent purchase
-      const parentPurchase = await this.purchaseService.getPurchaseById(parentPurchaseId);
-      
-      if (!parentPurchase) {
-        console.error('Parent purchase not found');
-        return;
-      }
+  onSearchInput(): void {
+    this.applyFilter();
+  }
+  // END: SEARCH AND FILTER FUNCTIONALITY
 
-      // Update purchase returns with product details
-      this.purchaseReturns = this.purchaseReturns.map(returnItem => {
-        if (returnItem.parentPurchaseId === parentPurchaseId) {
-          // Map products with names and unit prices
-          const productsWithDetails = returnItem.products.map(returnProduct => {
-            // Find matching product in parent purchase
-            const parentProduct = parentPurchase.products?.find(
-              p => p.productId === returnProduct.productId
-            );
-            
-            return {
-              ...returnProduct,
-              productName: parentProduct?.productName || 'Unknown Product',
-              unitPrice: parentProduct?.unitCost || 0
-            };
-          });
+  // START: PAGINATION FUNCTIONALITY
+  updatePagination(): void {
+    this.totalPages = Math.ceil(this.filteredPurchaseReturns.length / this.pageSize);
+    this.updatePaginatedData();
+  }
 
-          return {
-            ...returnItem,
-            products: productsWithDetails
-          };
-        }
-        return returnItem;
-      });
+  updatePaginatedData(): void {
+    const startIndex = (this.currentPage - 1) * this.pageSize;
+    const endIndex = startIndex + this.pageSize;
+    this.paginatedPurchaseReturns = this.filteredPurchaseReturns.slice(startIndex, endIndex);
+  }
 
-      // Update sorted purchase returns
-      this.sortData();
-      
-    } catch (error) {
-      console.error('Error fetching parent purchase details:', error);
+  onPageSizeChange(): void {
+    this.currentPage = 1;
+    this.updatePagination();
+  }
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      this.updatePaginatedData();
     }
   }
 
-  getStatusClass(status: string): string {
-    const statusMap: Record<string, string> = {
-      'completed': 'badge bg-success',
-      'pending': 'badge bg-warning text-dark',
-      'partial': 'badge bg-info',
-      'rejected': 'badge bg-danger',
-    };
-    return statusMap[status.toLowerCase()] || 'badge bg-secondary';
+  getVisiblePages(): number[] {
+    const pages: number[] = [];
+    const start = Math.max(1, this.currentPage - Math.floor(this.maxVisiblePages / 2));
+    const end = Math.min(this.totalPages, start + this.maxVisiblePages - 1);
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.updatePaginatedData();
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.updatePaginatedData();
+    }
+  }
+  // END: PAGINATION FUNCTIONALITY
+
+  // START: DATA LOADING AND SORTING
+  async loadProductDetails(): Promise<void> {
+    for (const returnItem of this.purchaseReturns) {
+      if (returnItem.parentPurchaseId) {
+        try {
+          const purchase = await this.purchaseService.getPurchaseById(returnItem.parentPurchaseId);
+          if (purchase?.products && Array.isArray(purchase.products)) {
+            returnItem.products = returnItem.products.map(returnProduct => {
+              const originalProduct = purchase.products?.find(p => 
+                (p as any).id === returnProduct.productId || p.productId === returnProduct.productId
+              );
+              return {
+                ...returnProduct,
+                productName: originalProduct?.['name'] ?? originalProduct?.productName ?? 'Unknown',
+                unitPrice: originalProduct?.['price'] ?? originalProduct?.unitCost ?? 0
+              };
+            });
+          }
+        } catch (error) {
+          console.error(`Error loading product details for return ${returnItem.referenceNo}:`, error);
+        }
+      }
+    }
+    this.sortData();
   }
 
   sort(column: string): void {
@@ -219,60 +294,116 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
 
   sortData(): void {
     this.sortedPurchaseReturns = [...this.purchaseReturns].sort((a, b) => {
-      const aValue = a[this.sortColumn as keyof PurchaseReturn];
-      const bValue = b[this.sortColumn as keyof PurchaseReturn];
+      let aValue = a[this.sortColumn as keyof PurchaseReturn];
+      let bValue = b[this.sortColumn as keyof PurchaseReturn];
+
+      if (this.sortColumn === 'returnDate' || this.sortColumn === 'createdAt') {
+        aValue = this.parseDate(aValue).getTime();
+        bValue = this.parseDate(bValue).getTime();
+      }
   
-      // Handle undefined/null values
       if (aValue === undefined || aValue === null) return 1;
       if (bValue === undefined || bValue === null) return -1;
-      if (aValue === undefined && bValue === undefined) return 0;
-      if (aValue === null && bValue === null) return 0;
   
-      // For string comparison
       if (typeof aValue === 'string' && typeof bValue === 'string') {
         return this.sortDirection === 'asc' 
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       }
   
-      // For number comparison
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         return this.sortDirection === 'asc' 
           ? aValue - bValue
           : bValue - aValue;
       }
   
-      // Fallback for other types
       return this.sortDirection === 'asc'
         ? String(aValue).localeCompare(String(bValue))
         : String(bValue).localeCompare(String(aValue));
     });
+    this.applyFilter();
+  }
+  // END: DATA LOADING AND SORTING
+
+  // START: MODAL AND STATUS UPDATE LOGIC
+  openStatusModal(returnItem: PurchaseReturn): void {
+    this.selectedReturn = {...returnItem}; // Create a copy to avoid direct modification
+    this.tempStatus = returnItem.returnStatus;
+    this.tempPaymentStatus = returnItem.paymentStatus; // Set payment status
+    this.errorMessage = null; // Clear any previous errors
   }
 
-  /**
-   * Process purchase return and update stock at specific location
-   * Updated to include log creation in both collections
-   */
+  async updateStatuses(): Promise<void> {
+    if (!this.selectedReturn || !this.selectedReturn.id) {
+      this.errorMessage = "No return selected.";
+      return;
+    }
+
+    this.isUpdating = true;
+    this.errorMessage = null;
+
+    const originalStatus = this.selectedReturn.returnStatus;
+    const newStatus = this.tempStatus;
+
+    const updateData = {
+      returnStatus: this.tempStatus,
+      paymentStatus: this.tempPaymentStatus,
+    };
+
+    try {
+      // Step 1: Update statuses in Firestore.
+      await this.purchaseReturnService.updatePurchaseReturn(this.selectedReturn.id, updateData);
+      
+      // Step 2: If the return status is newly 'completed', process the stock and transaction logic.
+      if (newStatus === 'completed' && originalStatus !== 'completed') {
+        // We need the full return item for processing. Let's merge the updates.
+        const fullReturnItem = { ...this.selectedReturn, ...updateData };
+        await this.processPurchaseReturn(fullReturnItem);
+      }
+      
+      // Step 3: Update local state to reflect changes immediately in the UI.
+      const index = this.purchaseReturns.findIndex(item => item.id === this.selectedReturn.id);
+      if (index !== -1) {
+        this.purchaseReturns[index].returnStatus = this.tempStatus;
+        this.purchaseReturns[index].paymentStatus = this.tempPaymentStatus;
+        this.sortData(); // This will re-sort, re-filter, and update the view.
+      }
+      
+      // Step 4: Close the modal.
+      const modalElement = document.getElementById('statusModal');
+      if (modalElement) {
+        const modal = Modal.getInstance(modalElement);
+        modal?.hide();
+      }
+    } catch (error) {
+      console.error('Error updating statuses:', error);
+      this.errorMessage = 'Failed to update statuses. Please check the console and try again.';
+      // Optionally, revert local changes if the update fails
+      // this.openStatusModal(this.selectedReturn); 
+    } finally {
+      this.isUpdating = false;
+    }
+  }
+  // END: MODAL AND STATUS UPDATE LOGIC
+
+  // START: CORE BUSINESS LOGIC (PROCESSING, LOGGING, STOCK)
   async processPurchaseReturn(returnData: PurchaseReturn): Promise<void> {
     try {
+      // Ensure location ID is set
       if (!returnData.businessLocationId && returnData.businessLocation) {
-        // Extract location ID from businessLocation if it's an object
         const location = typeof returnData.businessLocation === 'object' 
           ? (returnData.businessLocation as any).id 
           : returnData.businessLocation;
         returnData.businessLocationId = location;
       }
-
-      // Get the original purchase details for proper logging
-      const originalPurchase = await this.purchaseService.getPurchaseById(returnData.parentPurchaseId);
-      
-      if (!originalPurchase) {
-        throw new Error('Original purchase not found');
+      if (!returnData.businessLocationId) {
+        throw new Error("Business Location ID is missing.");
       }
 
-      // Process each product in the return
+      const originalPurchase = await this.purchaseService.getPurchaseById(returnData.parentPurchaseId);
+      if (!originalPurchase) throw new Error('Original purchase not found');
+
       for (const product of returnData.products) {
-        // Find the original purchased quantity from the parent purchase
         const originalProduct = originalPurchase.products?.find(
           p => p.productId === (product.productId || product.id)
         );
@@ -281,7 +412,9 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         const returnQuantity = product.quantity || product.returnQuantity || 0;
         const subTotal = returnQuantity * (product.unitPrice || originalProduct?.unitCost || 0);
 
-        // Update stock
+        // This function name is misleading. In a return, stock should *increase* as goods come back.
+        // Or if it's a return *to the supplier*, stock should *decrease*.
+        // The implementation adds stock, so it assumes goods are returned to inventory.
         await this.returnProductStock(
           product.productId || product.id,
           returnData.businessLocationId!,
@@ -290,10 +423,9 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
           `Purchase return: ${returnData.reason}`
         );
 
-        // Create individual log entry for each product
         await this.createPurchaseReturnLogEntry({
           purchaseRefNo: returnData.parentPurchaseRef,
-          returnDate: returnData.returnDate,
+          returnDate: this.parseDate(returnData.returnDate),
           purchasedQuantity: purchasedQuantity,
           returnQuantity: returnQuantity,
           subTotal: subTotal,
@@ -306,383 +438,73 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
         });
       }
 
-      // Create transaction record for the purchase return
       await this.createReturnTransaction(returnData);
-
-      // Update return status
-      await this.updateReturnStatus(returnData.id!, 'completed');
-      
+      // Status is already updated by the calling function, no need to do it again here.
     } catch (error) {
       console.error('Error processing purchase return:', error);
+      // Make error visible to the user
+      this.errorMessage = `Error processing the return: ${error}`;
       throw error;
     }
   }
 
-  /**
-   * Create individual log entry for purchase return
-   */
   private async createPurchaseReturnLogEntry(logData: PurchaseReturnLog): Promise<void> {
-    try {
-      const logCollection = collection(this.firestore, 'purchase-return-log');
-      await addDoc(logCollection, logData);
-      console.log('Purchase return log entry created:', logData);
-    } catch (error) {
-      console.error('Error creating purchase return log entry:', error);
-      throw error; // Re-throw to handle in the calling function
-    }
+    const logCollection = collection(this.firestore, 'purchase-return-log');
+    await addDoc(logCollection, logData);
   }
 
-  /**
-   * Return stock to location-specific inventory
-   */
   private async returnProductStock(
-    productId: string,
-    locationId: string,
-    quantity: number,
-    referenceNo: string,
-    notes: string
+    productId: string, locationId: string, quantity: number,
+    referenceNo: string, notes: string
   ): Promise<void> {
-    try {
-      // Get current stock for this product at this location
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      const stockDoc = await getDoc(stockDocRef);
-      
-      let currentStock = 0;
-      if (stockDoc.exists()) {
-        currentStock = stockDoc.data()['quantity'] || 0;
-      }
-      
-      const newStock = currentStock + quantity;
-      
-      // Update stock
-      await setDoc(stockDocRef, {
-        productId: productId,
-        locationId: locationId,
-        quantity: newStock,
-        lastUpdated: new Date(),
-        updatedBy: 'system'
-      }, { merge: true });
-      
-      // Create stock history entry
-      await this.createStockHistoryEntry({
-        productId,
-        locationId,
-        action: 'return',
-        quantity,
-        oldStock: currentStock,
-        newStock,
-        referenceNo,
-        notes,
-        userId: 'system'
-      });
-      
-    } catch (error) {
-      console.error('Error returning product stock:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create stock history entry for returns
-   */
-  private async createStockHistoryEntry(entry: {
-    productId: string;
-    locationId: string;
-    action: string;
-    quantity: number;
-    oldStock: number;
-    newStock: number;
-    referenceNo: string;
-    notes: string;
-    userId: string;
-  }): Promise<void> {
-    try {
-      const historyCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
-      await setDoc(doc(historyCollection), {
-        ...entry,
-        timestamp: new Date()
-      });
-    } catch (error) {
-      console.error('Error creating stock history entry:', error);
-    }
-  }
-
-  /**
-   * Get current stock for a product at a location
-   */
-  async getCurrentStock(productId: string, locationId: string): Promise<number> {
-    try {
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      const stockDoc = await getDoc(stockDocRef);
-      
-      if (stockDoc.exists()) {
-        return stockDoc.data()['quantity'] || 0;
-      }
-      return 0;
-    } catch (error) {
-      console.error('Error getting current stock:', error);
-      return 0;
-    }
-  }
-
-  onDelete(id: string): void {
-    if (confirm('Delete this purchase return? This action cannot be undone.')) {
-      this.purchaseReturnService.deletePurchaseReturn(id)
-        .then(() => {
-          this.purchaseReturns = this.purchaseReturns.filter(item => item.id !== id);
-          this.sortData();
-        })
-        .catch(err => this.errorMessage = 'Delete failed. Please try again.');
-    }
-  }
-
-  onExport(format: string): void {
-    if (format === 'excel') {
-      const worksheet = XLSX.utils.json_to_sheet(this.purchaseReturns);
-      const workbook = { Sheets: { 'PurchaseReturns': worksheet }, SheetNames: ['PurchaseReturns'] };
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      FileSaver.saveAs(new Blob([excelBuffer], { type: 'application/octet-stream' }), 'PurchaseReturns.xlsx');
-    } else if (format === 'csv') {
-      const worksheet = XLSX.utils.json_to_sheet(this.purchaseReturns);
-      const csv = XLSX.utils.sheet_to_csv(worksheet);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      FileSaver.saveAs(blob, 'PurchaseReturns.csv');
-    } else if (format === 'pdf') {
-      const doc = new jsPDF();
-      const headers = [['Return Date', 'Reference No', 'Supplier', 'Status', 'Payment', 'Grand Total']];
-      const rows = this.purchaseReturns.map(item => [
-        item.returnDate,
-        item.referenceNo,
-        item.supplier,
-        item.returnStatus,
-        item.paymentStatus,
-        item.grandTotal.toFixed(2)
-      ]);
-
-      autoTable(doc, {
-        head: headers,
-        body: rows,
-        startY: 20,
-        theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] }
-      });
-
-      doc.save('PurchaseReturns.pdf');
-    } else if (format === 'print') {
-      const printSection = document.getElementById('print-section');
-      if (!printSection) {
-        console.error('Print section not found');
-        return;
-      }
-      
-      const popupWin = window.open('', '_blank', 'width=1000,height=800');
-      if (!popupWin) {
-        alert('Please allow pop-ups for printing');
-        return;
-      }
-      
-      const printContents = printSection.innerHTML;
-      
-      popupWin.document.open();
-      popupWin.document.write(`
-        <html>
-          <head>
-            <title>Purchase Return Print</title>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-              th { background-color: #f4f4f4; }
-              h2 { text-align: center; }
-              p { text-align: right; }
-              tfoot td { font-weight: bold; }
-            </style>
-          </head>
-          <body>
-            ${printContents}
-            <script>
-              window.onload = function() {
-                window.print();
-                window.setTimeout(function() {
-                  window.close();
-                }, 500);
-              }
-            </script>
-          </body>
-        </html>
-      `);
-      popupWin.document.close();
-    }
-  }
-
-  /**
-   * Process multiple returns at once
-   */
-  async processBulkReturns(returnIds: string[]): Promise<void> {
-    this.isUpdating = true;
-    let processedCount = 0;
+    const stockDocId = `${productId}_${locationId}`;
+    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+    const stockDoc = await getDoc(stockDocRef);
     
-    try {
-      for (const id of returnIds) {
-        const returnItem = this.purchaseReturns.find(item => item.id === id);
-        if (returnItem && returnItem.returnStatus !== 'completed') {
-          await this.processPurchaseReturn(returnItem);
-          processedCount++;
-        }
-      }
-      
-      this.errorMessage = null;
-      alert(`Successfully processed ${processedCount} returns.`);
-      
-    } catch (error) {
-      console.error('Error processing bulk returns:', error);
-      this.errorMessage = `Failed to process some returns. ${processedCount} were successful.`;
-    } finally {
-      this.isUpdating = false;
-    }
+    const currentStock = stockDoc.exists() ? stockDoc.data()['quantity'] || 0 : 0;
+    // Assuming return means items are back in our stock.
+    const newStock = currentStock + quantity; 
+    
+    await setDoc(stockDocRef, {
+      productId, locationId, quantity: newStock,
+      lastUpdated: new Date(), updatedBy: 'system' // or a real user ID
+    }, { merge: true });
+    
+    await this.createStockHistoryEntry({
+      productId, locationId, action: 'purchase_return', quantity,
+      oldStock: currentStock, newStock, referenceNo, notes,
+      userId: 'system' // or a real user ID
+    });
   }
 
-  /**
-   * Validate return before processing
-   */
-  validateReturn(returnData: PurchaseReturn): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
-    
-    if (!returnData.businessLocationId && !returnData.businessLocation) {
-      errors.push('Business location is required');
-    }
-    
-    if (!returnData.products || returnData.products.length === 0) {
-      errors.push('At least one product is required');
-    }
-    
-    for (const product of returnData.products) {
-      if (!product.productId && !product.id) {
-        errors.push(`Product ID is missing for ${product.productName || 'unknown product'}`);
-      }
-      
-      if (!product.quantity || product.quantity <= 0) {
-        errors.push(`Invalid quantity for ${product.productName || 'unknown product'}`);
-      }
-    }
-    
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+  private async createStockHistoryEntry(entry: any): Promise<void> {
+    const historyCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
+    await addDoc(historyCollection, { ...entry, timestamp: new Date() });
   }
 
-  /**
-   * Get return impact summary before processing
-   */
-  async getReturnImpactSummary(returnData: PurchaseReturn): Promise<any> {
-    const summary = {
-      locationId: returnData.businessLocationId,
-      products: [] as any[]
-    };
-    
-    for (const product of returnData.products) {
-      const currentStock = await this.getCurrentStock(
-        product.productId || product.id,
-        returnData.businessLocationId!
-      );
-      
-      summary.products.push({
-        productId: product.productId || product.id,
-        productName: product.productName,
-        sku: product.sku,
-        currentStock,
-        returnQuantity: product.quantity,
-        newStock: currentStock + product.quantity
-      });
-    }
-    
-    return summary;
-  }
-
-  openStatusModal(returnItem: PurchaseReturn): void {
-    this.selectedReturn = returnItem;
-    this.tempStatus = returnItem.returnStatus;
-  }
-
-  async updateReturnStatus(id: string, newStatus: string): Promise<void> {
-    this.isUpdating = true;
-    
-    try {
-      // If status is being changed to 'completed', process the stock return
-      if (newStatus === 'completed') {
-        const returnItem = this.purchaseReturns.find(item => item.id === id);
-        if (returnItem && returnItem.returnStatus !== 'completed') {
-          await this.processPurchaseReturn(returnItem);
-        }
-      }
-      
-      // Update the return status
-      await this.purchaseReturnService.updatePurchaseReturn(id, {
-        returnStatus: newStatus
-      });
-      
-      // Update local data
-      const index = this.purchaseReturns.findIndex(item => item.id === id);
-      if (index !== -1) {
-        this.purchaseReturns[index].returnStatus = newStatus;
-        this.sortData();
-      }
-      
-      this.isUpdating = false;
-      const modalElement = document.getElementById('statusModal');
-      if (modalElement) {
-        const modalInstance = Modal.getInstance(modalElement);
-        modalInstance?.hide();
-      }
-      
-    } catch (error) {
-      console.error('Error updating return status:', error);
-      this.errorMessage = 'Failed to update status. Please try again.';
-      this.isUpdating = false;
-    }
-  }
-
-  /**
-   * Create transaction record for purchase return
-   */
   private async createReturnTransaction(returnData: PurchaseReturn): Promise<void> {
     try {
-      // Get the original purchase to find the payment account
       const originalPurchase = await this.purchaseService.getPurchaseById(returnData.parentPurchaseId);
-      
       if (!originalPurchase) {
-        console.warn('Original purchase not found for return:', returnData.parentPurchaseId);
+        console.warn('Original purchase not found for return transaction:', returnData.parentPurchaseId);
         return;
       }
 
-      // For purchase returns, we typically:
-      // - Credit the same account that was debited during the original purchase
-      // - This increases cash (if cash purchase) or reduces accounts payable (if credit purchase)
-      
       const transactionData = {
         amount: returnData.grandTotal,
         type: 'purchase_return',
-        date: new Date(returnData.returnDate),
-        description: `Purchase Return: ${returnData.referenceNo} - ${returnData.reason}`,
-        paymentMethod: originalPurchase.paymentMethod || 'Purchase Return',
-        paymentDetails: returnData.referenceNo,
-        note: `Returned to supplier: ${returnData.supplier}. Reason: ${returnData.reason}`,
+        date: this.parseDate(returnData.returnDate),
+        description: `Purchase Return: ${returnData.referenceNo}`,
+        note: `Reason: ${returnData.reason}`,
         addedBy: returnData.createdBy || 'System',
         reference: returnData.referenceNo,
         relatedDocId: returnData.id || '',
-        source: 'purchase_return',
         supplier: returnData.supplier,
-        returnStatus: returnData.returnStatus,
-        paymentStatus: returnData.paymentStatus,
-        originalPurchaseId: returnData.parentPurchaseId
+        createdAt: new Date()
       };
-
-      // Use the payment account from the original purchase
-      const paymentAccountId = typeof originalPurchase.paymentAccount === 'object' 
-        ? originalPurchase.paymentAccount.id 
+      
+      const paymentAccountId = typeof originalPurchase.paymentAccount === 'object'
+        ? (originalPurchase.paymentAccount as any).id
         : originalPurchase.paymentAccount;
       
       if (paymentAccountId) {
@@ -690,10 +512,87 @@ export class PurchaseReturnComponent implements OnInit, OnDestroy {
       } else {
         console.warn('No payment account found in original purchase:', returnData.parentPurchaseId);
       }
-      
     } catch (error) {
       console.error('Error creating return transaction:', error);
-      // Don't throw here to avoid breaking the return process
     }
   }
+
+  onDelete(id: string): void {
+    if (confirm('Are you sure you want to delete this purchase return? This action cannot be undone.')) {
+      this.purchaseReturnService.deletePurchaseReturn(id)
+        .then(() => {
+          this.purchaseReturns = this.purchaseReturns.filter(item => item.id !== id);
+          this.sortData(); // Refresh the table
+        })
+        .catch(err => {
+            console.error("Delete failed:", err);
+            this.errorMessage = 'Delete failed. Please try again.';
+        });
+    }
+  }
+  // END: CORE BUSINESS LOGIC
+
+  // START: UI HELPERS AND EXPORT
+  getStatusClass(status: string): string {
+    const statusMap: Record<string, string> = {
+      'completed': 'badge bg-success',
+      'pending': 'badge bg-warning text-dark',
+      'partial': 'badge bg-info',
+      'rejected': 'badge bg-danger',
+    };
+    return statusMap[status?.toLowerCase()] || 'badge bg-secondary';
+  }
+
+  get totalRecords(): number {
+    return this.filteredPurchaseReturns.length;
+  }
+
+  get totalGrandTotal(): number {
+    return this.filteredPurchaseReturns.reduce((sum, item) => sum + item.grandTotal, 0);
+  }
+
+  get totalPaymentDue(): number {
+    // This logic might need to be more complex based on payment status
+    return this.filteredPurchaseReturns.reduce((sum, item) => sum + item.grandTotal, 0);
+  }
+
+  get startRecord(): number {
+    return this.filteredPurchaseReturns.length === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+  }
+
+  get endRecord(): number {
+    return Math.min(this.currentPage * this.pageSize, this.filteredPurchaseReturns.length);
+  }
+
+  onExport(format: string): void {
+    const dataToExport = this.filteredPurchaseReturns.map(item => ({
+        'Return Date': this.formatDate(item.returnDate),
+        'Reference No': item.referenceNo,
+        'Parent Purchase': item.parentPurchaseRef,
+        'Location': item.businessLocation,
+        'Supplier': item.supplier,
+        'Return Status': item.returnStatus,
+        'Payment Status': item.paymentStatus,
+        'Grand Total': item.grandTotal,
+        'Reason': item.reason,
+    }));
+    
+    if (format === 'excel') {
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = { Sheets: { 'PurchaseReturns': worksheet }, SheetNames: ['PurchaseReturns'] };
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      FileSaver.saveAs(new Blob([excelBuffer], { type: 'application/octet-stream' }), 'PurchaseReturns.xlsx');
+    } else if (format === 'pdf') {
+      const doc = new jsPDF();
+      autoTable(doc, {
+        head: [Object.keys(dataToExport[0] || {})],
+        body: dataToExport.map(item => Object.values(item)),
+        startY: 20,
+        theme: 'striped',
+        headStyles: { fillColor: [41, 128, 185] }
+      });
+      doc.save('PurchaseReturns.pdf');
+    }
+  }
+  // END: UI HELPERS AND EXPORT
 }

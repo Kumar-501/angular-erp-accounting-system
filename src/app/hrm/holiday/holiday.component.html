@@ -1,6 +1,10 @@
 <div class="holiday-container">
-  <button class="btn-add" (click)="openPopup()">Add +</button>
+  <!-- Add Holiday Button (visible based on role) -->
+  <button *ngIf="showAddButton" class="btn btn-primary" (click)="openAddModal()">
+    <i class="fa fa-plus"></i> Add Holiday
+  </button>  
   
+  <!-- Add/Edit Holiday Popup -->
   <div *ngIf="showPopup" class="popup-overlay">
     <div class="popup">
       <button class="close-button" (click)="closePopup()">
@@ -8,24 +12,33 @@
       </button>
       
       <form [formGroup]="holidayForm" (ngSubmit)="saveHoliday()">
-        <h3>Add Holiday</h3>
+        <h3>{{ isEditMode ? 'Edit Holiday' : 'Add Holiday' }}</h3>
         
         <div class="form-group">
           <label for="name">Holiday Name:*</label>
           <input id="name" formControlName="name" placeholder="Enter holiday name" />
+          <div *ngIf="holidayForm.get('name')?.invalid && holidayForm.get('name')?.touched" class="error-message">
+            Holiday name is required
+          </div>
         </div>
         
         <div class="form-group">
-          <label for="startDate">Start Date:</label>
+          <label for="startDate">Start Date:*</label>
           <input type="date" id="startDate" formControlName="startDate" />
+          <div *ngIf="holidayForm.get('startDate')?.invalid && holidayForm.get('startDate')?.touched" class="error-message">
+            Start date is required
+          </div>
         </div>
         
         <div class="form-group">
-          <label for="endDate">End Date:</label>
+          <label for="endDate">End Date:*</label>
           <input type="date" id="endDate" formControlName="endDate" />
+          <div *ngIf="holidayForm.get('endDate')?.invalid && holidayForm.get('endDate')?.touched" class="error-message">
+            End date is required
+          </div>
         </div>
         
-        <!-- <div class="form-group">
+        <div class="form-group">
           <label for="businessLocation">Business Location:*</label>
           <select id="businessLocation" formControlName="businessLocation">
             <option value="" disabled>Select a location</option>
@@ -33,7 +46,10 @@
               {{ location.name }}
             </option>
           </select>
-        </div> -->
+          <div *ngIf="holidayForm.get('businessLocation')?.invalid && holidayForm.get('businessLocation')?.touched" class="error-message">
+            Location is required
+          </div>
+        </div>
         
         <div class="form-group">
           <label for="note">Note:</label>
@@ -41,13 +57,16 @@
         </div>
         
         <div class="form-actions">
-          <button type="submit" class="btn-save">Save</button>
+          <button type="submit" class="btn-save" [disabled]="holidayForm.invalid">
+            {{ isEditMode ? 'Update' : 'Save' }}
+          </button>
           <button type="button" class="btn-close" (click)="closePopup()">Close</button>
         </div>
       </form>
     </div>
   </div>
   
+  <!-- Holidays List -->
   <div class="holidays-list">
     <h2>Holidays List</h2>
     <table>
@@ -56,9 +75,9 @@
           <th>Name</th>
           <th>Start Date</th>
           <th>End Date</th>
-          <!-- <th>Location</th> -->
+          <th>Location</th>
           <th>Note</th>
-          <th>Actions</th>
+          <th *ngIf="showEditDeleteButtons">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -66,9 +85,9 @@
           <td>{{ holiday.name }}</td>
           <td>{{ holiday.startDate | date }}</td>
           <td>{{ holiday.endDate | date }}</td>
-          <!-- <td>{{ getLocationName(holiday.businessLocation) }}</td> -->
+          <td>{{ getLocationName(holiday.businessLocation) }}</td>
           <td>{{ holiday.note }}</td>
-          <td>
+          <td *ngIf="showEditDeleteButtons">
             <button class="btn-edit" (click)="editHoliday(holiday)">
               <i class="fas fa-edit"></i> Edit
             </button>

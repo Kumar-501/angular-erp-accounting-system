@@ -1,23 +1,46 @@
-<!-- sidebar.component.html -->
 <aside class="sidebar" [class.open]="isOpen" [class.closed]="!isOpen">
   <div class="sidebar-content">
     <ul class="main-menu">
-      <li *ngFor="let item of filteredMenuItems" class="menu-item" [class.active]="isActive(item.route) || hasActiveChild(item)">
-        <div class="menu-header" (click)="handleMenuItemClick(item)">
+      <li *ngFor="let item of filteredMenuItems; trackBy: trackByName" 
+          class="menu-item" 
+          [class.active]="isActive(item.route) || hasActiveChild(item)">
+        
+        <!-- Case 1: Item WITH Sub-items (Keep as div/click for toggling) -->
+        <div *ngIf="item.subItems?.length" 
+             class="menu-header" 
+             (click)="handleMenuItemClick(item, $event)" 
+             style="cursor: pointer; user-select: none;">
           <mat-icon class="menu-icon">{{item.icon}}</mat-icon>
           <span class="menu-text">{{item.name}}</span>
-          <mat-icon class="toggle-icon" *ngIf="item.subItems?.length">
+          <mat-icon class="toggle-icon">
             {{item.isExpanded ? 'expand_less' : 'expand_more'}}
           </mat-icon>
         </div>
+
+        <!-- Case 2: Item WITHOUT Sub-items (Convert to Anchor for New Tab support) -->
+        <!-- Note: [routerLink] enables standard browser link behavior -->
+        <a *ngIf="!item.subItems?.length && item.route" 
+             class="menu-header" 
+             [routerLink]="[item.route]"
+             [class.active]="isActive(item.route)"
+             style="cursor: pointer; user-select: none; text-decoration: none; color: inherit; display: flex; align-items: center; width: 100%;">
+          <mat-icon class="menu-icon">{{item.icon}}</mat-icon>
+          <span class="menu-text">{{item.name}}</span>
+        </a>
+
+        <!-- Submenu List -->
         <ul class="submenu" *ngIf="item.isExpanded && item.subItems?.length">
-          <li *ngFor="let subItem of item.subItems" 
-              class="submenu-item"
-              [class.active]="isActive(subItem.route)"
-              (click)="navigateTo(subItem.route)">
-            {{subItem.name}}
+          <!-- Case 3: Submenu Item (Convert to Anchor for New Tab support) -->
+          <li *ngFor="let subItem of item.subItems; trackBy: trackByRoute">
+             <a class="submenu-item"
+                [routerLink]="[subItem.route]"
+                [class.active]="isActive(subItem.route)"
+                style="cursor: pointer; user-select: none; text-decoration: none; color: inherit; display: block; width: 100%;">
+              <span>{{subItem.name}}</span>
+            </a>
           </li>
         </ul>
+
       </li>
     </ul>
   </div>

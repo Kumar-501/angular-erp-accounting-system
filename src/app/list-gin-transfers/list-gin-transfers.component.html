@@ -21,22 +21,37 @@
     </div>
 
     <div class="export-buttons">
-      <button class="export-btn" (click)="exportToExcel()" title="Export to Excel">
-        <i class="fa fa-file-excel-o"></i> Export to Excel
+      <button class="export-btn" (click)="exportToExcel()">
+        <i class="fa fa-file-excel"></i> Excel
       </button>
-      <button class="export-btn" (click)="exportToCsv()" title="Export to CSV">
-        <i class="fa fa-file-text"></i> Export to CSV
+      <button class="print-btn" (click)="printTable()">
+        <i class="fa fa-print"></i> Print
       </button>
-      <button class="export-btn" (click)="exportToPdf()" title="Export to PDF">
-        <i class="fa fa-file-pdf-o"></i> Export to PDF
-      </button>
-       <button class="export-btn" (click)="printGinTransfers()" title="Print">
-    <i class="fa fa-print"></i> Print
-  </button>
+      
+      <!-- Custom Column Visibility Dropdown -->
+      <div class="custom-dropdown">
+        <button class="visibility-btn" type="button" (click)="toggleColumnVisibilityDropdown()">
+          <i class="fa fa-eye"></i> Column Visibility
+          <i class="fa fa-chevron-down dropdown-arrow" [ngClass]="{'rotated': showColumnVisibilityDropdown}"></i>
+        </button>
+        
+        <div class="custom-dropdown-menu" [ngClass]="{'show': showColumnVisibilityDropdown}" (click)="$event.stopPropagation()">
+          <div class="dropdown-item" *ngFor="let col of (columnVisibility | keyvalue)">
+            <label class="checkbox-label">
+              <input 
+                type="checkbox" 
+                [checked]="col.value" 
+                (change)="onColumnVisibilityChange(col.key)"
+                class="checkbox-input">
+              <span class="checkbox-text">{{ getColumnDisplayName(col.key) }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="search-box">
-      <input type="text" [(ngModel)]="searchTerm" placeholder="Search...">
+      <input type="text" [(ngModel)]="searchTerm" placeholder="Search..." (input)="onSearch()">
       <button class="search-btn" (click)="onSearch()">Search</button>
       <button class="clear-btn" (click)="clearFilters()">Clear</button>
     </div>
@@ -46,80 +61,81 @@
     <table class="gin-transfers-table">
       <thead>
         <tr>
-          <th (click)="sortData('date')">
-            Date
-            <span class="sort-icon" *ngIf="currentSortColumn === 'date'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
+          <th *ngIf="columnVisibility.date" (click)="sortData('date')">
+            Date <span class="sort-icon" *ngIf="currentSortColumn === 'date'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
           </th>
-          <th (click)="sortData('referenceNo')">
-            Reference No
-            <span class="sort-icon" *ngIf="currentSortColumn === 'referenceNo'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
+          <th *ngIf="columnVisibility.referenceNo" (click)="sortData('referenceNo')">
+            Reference No <span class="sort-icon" *ngIf="currentSortColumn === 'referenceNo'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
           </th>
-          <th (click)="sortData('locationFrom')">
-            Location (From)
-            <span class="sort-icon" *ngIf="currentSortColumn === 'locationFrom'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
+          <th *ngIf="columnVisibility.locationFrom" (click)="sortData('locationFrom')">
+            Location (From) <span class="sort-icon" *ngIf="currentSortColumn === 'locationFrom'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
           </th>
-          <th (click)="sortData('locationTo')">
-            Location (To)
-            <span class="sort-icon" *ngIf="currentSortColumn === 'locationTo'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
+          <th *ngIf="columnVisibility.locationTo" (click)="sortData('locationTo')">
+            Location (To) <span class="sort-icon" *ngIf="currentSortColumn === 'locationTo'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
           </th>
-              <th>Products</th> <!-- New column for products -->
-
-          <th (click)="sortData('status')">
-            Status
-            <span class="sort-icon" *ngIf="currentSortColumn === 'status'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
+          <th *ngIf="columnVisibility.products">Products</th>
+          <th *ngIf="columnVisibility.status" (click)="sortData('status')">
+            Status <span class="sort-icon" *ngIf="currentSortColumn === 'status'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
           </th>
-      
-          <!-- <th (click)="sortData('totalAmount')">
-            Total Amount
-            <span class="sort-icon" *ngIf="currentSortColumn === 'totalAmount'">
-              <i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i>
-            </span>
-          </th> -->
-          <th>Action</th>
+          <th *ngIf="columnVisibility.shippingCharges" (click)="sortData('shippingCharges')">
+            Shipping <span class="sort-icon" *ngIf="currentSortColumn === 'shippingCharges'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
+          </th>
+          <th *ngIf="columnVisibility.totalAmount" (click)="sortData('totalAmount')">
+            Total Amount <span class="sort-icon" *ngIf="currentSortColumn === 'totalAmount'"><i class="fa" [ngClass]="isAscending ? 'fa-sort-asc' : 'fa-sort-desc'"></i></span>
+          </th>
+          <th *ngIf="columnVisibility.additionalNotes">Notes</th>
+          <th *ngIf="columnVisibility.action" class="action-column">Action</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let transfer of getCurrentPageItems()">
-          <td>{{ transfer.date }}</td>
-          <td>{{ transfer.referenceNo }}</td>
-          <td>{{ getLocationName(transfer.locationFrom) }}</td>
-          <td>{{ getLocationName(transfer.locationTo) }}</td>
-           <td>
-      <div class="product-list">
-        <div *ngFor="let item of transfer.items" class="product-item">
-          {{ item.productName }} ({{ item.quantity }} {{ item.unit }})
-        </div>
-      </div>
-    </td>
-          <td>
+          <td *ngIf="columnVisibility.date">{{ transfer.date | date:'dd-MM-yyyy HH:mm' }}</td>
+          <td *ngIf="columnVisibility.referenceNo">{{ transfer.referenceNo }}</td>
+          <td *ngIf="columnVisibility.locationFrom">{{ getLocationName(transfer.locationFrom) }}</td>
+          <td *ngIf="columnVisibility.locationTo">
+            <div class="destination-locations">
+                <ng-container *ngIf="transfer.transfers && transfer.transfers.length > 0; else legacyLocationTo">
+                    <div *ngFor="let locationTransfer of transfer.transfers" class="location-item">
+                        {{ locationTransfer.locationName || getLocationName(locationTransfer.locationId) }}
+                    </div>
+                </ng-container>
+                <ng-template #legacyLocationTo>
+                    {{ getLocationName(transfer.locationTo) }}
+                </ng-template>
+            </div>
+          </td>
+          <td *ngIf="columnVisibility.products">
+            <div class="product-list">
+              <div *ngFor="let product of getAllProducts(transfer)" class="product-item">
+                {{ product.productName }} ({{ product.quantity }} {{ product.unit }})
+              </div>
+            </div>
+          </td>
+          <td *ngIf="columnVisibility.status">
             <span class="status-badge" [ngClass]="transfer.status.toLowerCase()" (click)="openStatusModal(transfer)">
               {{ transfer.status }}
             </span>
           </td>
-          <!-- <td>₹ {{ transfer.totalAmount.toFixed(2) }}</td> -->
-          <td>
+          <td *ngIf="columnVisibility.shippingCharges">{{ transfer.shippingCharges | currency:'INR' }}</td>
+          <td *ngIf="columnVisibility.totalAmount">{{ transfer.totalAmount | currency:'INR' }}</td>
+          <td *ngIf="columnVisibility.additionalNotes">
+            <span [title]="transfer.additionalNotes" class="notes-cell">
+              {{ (transfer.additionalNotes && transfer.additionalNotes.length > 30) ? (transfer.additionalNotes | slice:0:30) + '...' : transfer.additionalNotes }}
+            </span>
+          </td>
+          <td *ngIf="columnVisibility.action" class="action-column">
             <div class="action-buttons">
-             <button class="view-btn" (click)="viewGinTransfer(transfer)" title="View">
-      <i class="fa fa-eye"></i> View
-    </button>
+              <button class="view-btn" (click)="viewGinTransfer(transfer)" title="View">
+                <i class="fa fa-eye"></i>
+              </button>
               <button class="delete-btn" (click)="deleteGinTransfer(transfer.id!)" title="Delete">
-                <i class="fa fa-trash"></i> Delete
+                <i class="fa fa-trash"></i>
               </button>
             </div>
           </td>
         </tr>
         <tr *ngIf="filteredGinTransfers.length === 0">
-          <td colspan="9" class="no-data">No GIN transfers found</td>
+          <td [attr.colspan]="getVisibleColumnsCount()" class="no-data">No GIN transfers found</td>
         </tr>
       </tbody>
     </table>
@@ -163,32 +179,35 @@
     </div>
   </div>
 
-<!-- Status Update Modal -->
-<div class="status-update-modal" *ngIf="showStatusModal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h4>Update Status</h4>
-      <button class="close-btn" (click)="closeStatusModal()">×</button>
-    </div>
-    <div class="modal-body">
-      <p>Reference No: <strong>{{ selectedTransfer?.referenceNo }}</strong></p>
-      
-      <div class="form-group">
-        <label for="status">Status:</label>
-        <select id="status" [(ngModel)]="selectedStatus" class="form-control">
-          <option value="Pending">Pending</option>
-          <option value="Delivered">Delivered</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
+  <!-- Status Update Modal -->
+  <div class="status-update-modal" *ngIf="showStatusModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4>Update Status</h4>
+        <button class="close-btn" (click)="closeStatusModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p>Reference No: <strong>{{ selectedTransfer?.referenceNo }}</strong></p>
+        
+        <div class="form-group">
+          <label for="status">Status:</label>
+          <select id="status" [(ngModel)]="selectedStatus" class="form-control">
+            <option value="Draft">Draft</option>
+            <option value="Pending">Pending</option>
+            <option value="Completed">Completed</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="cancel-btn" (click)="closeStatusModal()">Cancel</button>
+        <button class="save-btn" (click)="updateStatus()">Save</button>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="cancel-btn" (click)="closeStatusModal()">Cancel</button>
-      <button class="save-btn" (click)="updateStatus()">Save</button>
-    </div>
   </div>
-</div>
 
-<!-- Modal Backdrop -->
-<div class="modal-backdrop" *ngIf="showStatusModal" (click)="closeStatusModal()"></div>
+  <!-- Modal Backdrop -->
+  <div class="modal-backdrop" *ngIf="showStatusModal" (click)="closeStatusModal()"></div>
+
+  <!-- Dropdown backdrop to close when clicking outside -->
+  <div class="dropdown-backdrop" *ngIf="showColumnVisibilityDropdown" (click)="closeColumnVisibilityDropdown()"></div>
 </div>

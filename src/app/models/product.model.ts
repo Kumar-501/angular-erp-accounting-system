@@ -1,5 +1,11 @@
 // src/app/models/product.model.ts
 export interface Product {
+  priceBeforeTax?: number;  // Changed to optional
+  discount?: number;        // Changed to optional
+  cgstAmount?: number;      // Changed to optional
+  sgstAmount?: number; 
+    [key: string]: any;
+
   id?: string; // Make id optional
     productName: string;
     sku: string;
@@ -24,6 +30,7 @@ export interface Product {
     enableProductDescription: boolean;
     notForSelling: boolean;
     weight: number | null;
+    
     preparationTime: number | null;
     applicableTax: string;
     taxPercentage: number;

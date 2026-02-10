@@ -2,22 +2,22 @@
   <h1>Purchase Order</h1>
   
   <div class="filter-controls">
-    <div class="entries-control">
-      <span>Show</span>
-      <select [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
-        <option value="25">25</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-      <span>entries</span>
-    </div>
+ <div class="d-flex align-items-center mb-2 mb-md-0">
+  <div class="me-3">
+    <label class="form-label mb-0">Show</label>
+    <select class="form-select form-select-sm" [(ngModel)]="entriesPerPage" (change)="onEntriesChange()">
+      <option value="10">10</option>
+      <option value="25">25</option>
+      <option value="50">50</option>
+    </select>
+  </div>
     
     <div class="export-buttons">
       <button class="export-button" (click)="exportCSV()">Export CSV</button>
       <button class="export-button" (click)="exportExcel()">Export Excel</button>
       <button class="export-button" (click)="print()">Print</button>
       <button class="export-button" (click)="exportPDF()">Export PDF</button>
-      <button class="export-button" (click)="toggleColumnVisibility()">Column Visibility</button>
+      <!-- <button class="export-button" (click)="toggleColumnVisibility()">Column Visibility</button> -->
       <button class="add-order-button" (click)="addPurchaseOrder()">+ Add Purchase Order</button>
       <button class="filter-toggle-button" (click)="toggleFilterSidebar()">
         <i class="fa fa-filter"></i> Filters
@@ -208,9 +208,9 @@
  
       </tr>
     </thead>
+    
     <tbody>
-      <tr *ngFor="let order of filteredOrders.slice((currentPage - 1) * entriesPerPage, currentPage * entriesPerPage); trackBy: trackByFn">
-        <td>
+<tr *ngFor="let order of filteredOrders | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage; trackBy: trackByFn">        <td>
       <!-- Replace the existing dropdown with this button -->
 <button class="action-button" (click)="openActionPopup(order, $event)">Actions</button>
 
@@ -233,15 +233,13 @@
         <span>Edit</span>
       </div>
       
-      <div class="action-item" (click)="printOrder(order); closeActionPopup()">
-        <i class="fas fa-print text-secondary"></i>
+
+         <div class="action-item" (click)="printOrder(order); closeActionPopup()">
+        <i class="fas fa-print text-primary"></i>
         <span>Print</span>
       </div>
       
-      <div class="action-item" (click)="downloadPdf(order); closeActionPopup()">
-        <i class="fas fa-file-pdf text-danger"></i>
-        <span>Download PDF</span>
-      </div>
+  
       
 
       
@@ -319,6 +317,22 @@
     </tbody>
   </table>
 </div>
+  <div class="btn-group ms-3">
+    <button class="btn btn-sm btn-outline-secondary" 
+            (click)="previousPage()" 
+            [disabled]="currentPage === 1">
+      <i class="fas fa-chevron-left"></i> Previous
+    </button>
+    <button class="btn btn-sm btn-outline-secondary disabled">
+      Page {{currentPage}} of {{totalPages}}
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" 
+            (click)="nextPage()" 
+            [disabled]="currentPage === totalPages">
+      Next <i class="fas fa-chevron-right"></i>
+    </button>
+  </div>
+</div>
   <!-- Status Modal -->
   <div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -371,14 +385,11 @@
                     placeholder="Enter business location">
             </div>
             
-            <div class="mb-3">
-              <label for="deliveryPerson" class="form-label">Delivery Person:</label>
-              <select class="form-select" id="deliveryPerson" [(ngModel)]="selectedDeliveryPerson">
-                <option value="">Please Select</option>
-                <option *ngFor="let person of deliveryPersons" [value]="person">{{person}}</option>
-              </select>
-            </div>
-            
+     <div class="mb-3">
+  <label for="deliveryPerson" classz="form-label">Delivery Person:</label>
+  <input type="text" class="form-control" id="deliveryPerson" [(ngModel)]="selectedDeliveryPerson">
+</div>
+
             <div class="mb-3">
               <label for="shippingNote" class="form-label">Shipping note:</label>
               <textarea class="form-control" id="shippingNote" rows="3" [(ngModel)]="shippingNote"></textarea>

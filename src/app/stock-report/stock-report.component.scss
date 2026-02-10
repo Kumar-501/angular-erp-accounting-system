@@ -447,4 +447,15 @@
 .last-updated-data {
   font-size: 0.85em;
   color: #666;
+}/* In stock-report.component.scss */
+
+.total-sold-column {
+  min-width: 100px;
+  text-align: center;
+  background-color: #f8f9fa;
+}
+
+.total-sold-data {
+  text-align: center;
+  font-weight: 500;
 }

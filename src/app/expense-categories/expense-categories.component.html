@@ -154,14 +154,12 @@
             <ng-container *ngIf="categoryForm.get('type')?.value === 'expense'">
               <option value="Expense|Indirect Expense">Indirect Expense</option>
               <option value="Expense|Direct Expense">Direct Expense</option>
-              <option value="Expense|Cost of Goods Sold">Cost of Goods Sold</option>
-              <option value="Expense|GST Deposit">GST Deposit</option>
-              <option value="Expense|TDS Deposit">TDS Deposit</option>
+              <option value="Expense|Operational Expense">Operational Expense</option>
             </ng-container>
 
             <!-- Income Options -->
             <ng-container *ngIf="categoryForm.get('type')?.value === 'income'">
-              <option value="Income|Sales">Sales</option>
+              <!-- <option value="Income|Sales">Sales</option> -->
               <option value="Income|Direct Income">Direct Income</option>
               <option value="Income|Indirect Income">Indirect Income</option>
             </ng-container>

@@ -279,17 +279,40 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="startsAt">Starts At:</label>
-          <input type="datetime-local" id="startsAt" formControlName="startsAt" />
-        </div>
+<div class="form-row">
+  <!-- Starts At Field -->
+  <div class="form-group">
+    <label for="startsAt">Starts At:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(discountForm.get('startsAt')?.value)"
+             (blur)="onManualDateInput($event, 'startsAt')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #startsAtPicker type="date" formControlName="startsAt" class="hidden-date-picker">
+    </div>
+  </div>
 
-        <div class="form-group">
-          <label for="endsAt">Ends At:</label>
-          <input type="datetime-local" id="endsAt" formControlName="endsAt" />
-        </div>
-      </div>
+  <!-- Ends At Field -->
+  <div class="form-group">
+    <label for="endsAt">Ends At:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(discountForm.get('endsAt')?.value)"
+             (blur)="onManualDateInput($event, 'endsAt')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #endsAtPicker type="date" formControlName="endsAt" class="hidden-date-picker">
+    </div>
+  </div>
+</div>
+
 
       <div class="form-row">
         <div class="form-group checkbox-group">

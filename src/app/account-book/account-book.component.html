@@ -4,56 +4,112 @@
       <h2>{{accountDetails.name}}</h2>
       <p>Account Type: {{accountDetails.type}}</p>
       <p *ngIf="accountDetails.number">Account Number: {{accountDetails.number}}</p>
-      <p>Opening Balance: ₹{{accountDetails.balance | number:'1.2-2'}}</p>
+      <p>Opening Balance: ₹{{openingBalance | number:'1.2-2'}}</p>
+      <p>Current Balance: ₹{{accountDetails.balance | number:'1.2-2'}}</p>
     </div>
     
     <div class="action-buttons">
-      <!-- New Download Button -->
-     <button class="btn btn-success" (click)="downloadTransactionData()">
-    <i class="fa fa-download"></i> Download
-  </button>
-  
-      <!-- Other action buttons as needed -->
-    </div>
-  </div>
-  
-  <div class="filters-section">    <div class="date-filter">
-      <label>From:</label>
-      <input type="date" [ngModel]="dateRange.from | date:'yyyy-MM-dd'" 
-             (ngModelChange)="onDateFromChange($event)">
-      
-      <label>To:</label>
-      <input type="date" [ngModel]="dateRange.to | date:'yyyy-MM-dd'" 
-             (ngModelChange)="onDateToChange($event)">
-    </div>
-      <div class="transaction-type-filter">
-      <label>Type:</label>
-      <select [(ngModel)]="transactionType" (change)="onTransactionTypeChange()">
-        <option value="All">All</option>
-        <option value="Debit">Debit</option>
-        <option value="Credit">Credit</option>
-        <option value="Transfer">Transfer</option>
-        <option value="Expense">Expense</option>
-        <option value="Income">Income</option>
-        <option value="Sale">Sale</option>
-        <option value="Purchase Return">Purchase Return</option>
-      </select>
-    </div>
-    
-    <div class="search-filter">
-      <input type="text" [(ngModel)]="searchQuery" placeholder="Search..." 
-             (input)="onSearchChange()">
-    </div>
-    
-    <div class="view-toggle">
-      <button [class.active]="viewMode === 'table'" (click)="viewMode = 'table'">
-        <i class="fa fa-table"></i> Table
-      </button>
-      <button [class.active]="viewMode === 'card'" (click)="viewMode = 'card'">
-        <i class="fa fa-th-large"></i> Card
+      <button class="btn btn-success" (click)="downloadTransactionData()">
+        <i class="fa fa-download"></i> Download
       </button>
     </div>
   </div>
+  
+  <!-- ✅ UPDATED: Filters Section with Apply and Reset Buttons -->
+  <div class="filters-section">
+    <div class="row">
+<!-- FROM DATE -->
+<div class="col-md-3">
+    <div class="date-filter">
+        <label>From:</label>
+        <div class="date-input-wrapper">
+            <input 
+                type="text" 
+                class="form-control date-input" 
+                [value]="getFormattedDate(tempDateRange.from)"
+                (blur)="onDateInput($event, 'from')"
+                (keyup.enter)="onDateInput($event, 'from')"
+                placeholder="DD-MM-YYYY"
+                maxlength="10">
+            <button type="button" class="calendar-btn" (click)="openDatePicker('from')">
+                <i class="fa fa-calendar"></i>
+            </button>
+            <input 
+                #fromDatePicker
+                type="date" 
+                class="hidden-date-picker" 
+                [(ngModel)]="tempDateRange.from">
+        </div>
+    </div>
+</div>
+
+<!-- TO DATE -->
+<div class="col-md-3">
+    <div class="date-filter">
+        <label>To:</label>
+        <div class="date-input-wrapper">
+            <input 
+                type="text" 
+                class="form-control date-input" 
+                [value]="getFormattedDate(tempDateRange.to)"
+                (blur)="onDateInput($event, 'to')"
+                (keyup.enter)="onDateInput($event, 'to')"
+                placeholder="DD-MM-YYYY"
+                maxlength="10">
+            <button type="button" class="calendar-btn" (click)="openDatePicker('to')">
+                <i class="fa fa-calendar"></i>
+            </button>
+            <input 
+                #toDatePicker
+                type="date" 
+                class="hidden-date-picker" 
+                [(ngModel)]="tempDateRange.to">
+        </div>
+    </div>
+</div>
+        
+        
+        <div class="col-md-2">
+            <div class="transaction-type-filter">
+                <label>Type:</label>
+                <select [(ngModel)]="transactionType" class="form-control">
+                    <option value="All">All</option>
+                    <option value="Debit">Debit</option>
+                    <option value="Credit">Credit</option>
+                    <option value="Transfer">Transfer</option>
+                    <option value="Expense">Expense</option>
+                    <option value="Income">Income</option>
+                    <option value="Sale">Sale</option>
+                    <option value="Sales Return">Sales Return</option>
+                    <option value="Purchase Return">Purchase Return</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="col-md-2">
+            <div class="search-filter">
+                <label>Search:</label>
+                <input type="text" [(ngModel)]="searchQuery" 
+                       placeholder="Search transactions..." 
+                       class="form-control">
+            </div>
+        </div>
+
+        <!-- ✅ NEW: Action Buttons Column -->
+        <div class="col-md-2">
+            <label class="d-block">&nbsp;</label>
+            <div class="filter-actions d-flex gap-2">
+                <button class="btn btn-primary flex-fill" (click)="applyDateFilters()">
+                    <i class="fa fa-filter"></i> Apply
+                </button>
+                <button class="btn btn-secondary flex-fill" (click)="resetFilters()">
+                    <i class="fa fa-sync"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+  </div>
+
   
   <div class="entries-per-page">
     <label>Show</label>
@@ -75,144 +131,251 @@
     <p>No transactions found for this account.</p>
   </div>
   
-<!-- Table View -->   
 <div class="transactions-table" *ngIf="viewMode === 'table' && !loading && !isEmpty">     
   <table class="table">       
     <thead>         
       <tr>           
-        <th>Date</th>           
-        <th>Type</th>           
-        <th>Description</th>           
-        <th>Payment Method</th>           
-        <th>Payment Details</th>           
-        <th>Note</th>           
-        <th>Debit</th>           
-        <th>Credit</th>           
-        <th>Balance</th>           
-        <th>Action</th>         
+        <th class="col-date">Date</th>
+        <th class="col-time">Time</th>           
+        <th class="col-type">Type</th>           
+        <th class="col-desc">Description</th>           
+        <th class="col-method">Payment Method</th>           
+        <th class="col-details">Payment Details</th>           
+        <th class="col-note">Note</th>           
+        <th class="text-end col-amount">Debit</th>           
+        <th class="text-end col-amount">Credit</th>           
+        <th class="text-end col-balance">Balance</th>           
       </tr>       
     </thead>       
-    <tbody>         
-      <tr *ngFor="let transaction of pagedTransactions">           
-        <!-- Consistent date formatting with MM/dd/yyyy HH:mm format --> 
-        <td>{{(transaction.date | date:'MM/dd/yyyy') || 'N/A'}}</td>             <td>             
-          <span class="badge" [ngClass]="{               
-            'badge-success': transaction.type === 'income' || transaction.type === 'sale',               
-            'badge-danger': transaction.type === 'expense',               
-            'badge-info': transaction.type === 'transfer' || transaction.type === 'transfer_in' || transaction.type === 'transfer_out',               
-            'badge-warning': transaction.type === 'deposit'             
-          }">               
-            {{getTransactionTypeDisplay(transaction.type)}}             
-          </span>           
-        </td>           
-        <td>             
-          <span *ngIf="transaction.source === 'sale'">               
-            <a [routerLink]="['/sales', transaction.saleId]"                   
-               class="sale-link"                   
-               title="View Sale Details">                 
-              {{transaction.invoiceNo}}               
-            </a>             
-          </span>             
-          <span *ngIf="transaction.source !== 'sale'">               
-            {{transaction.description}}             
-          </span>           
+    <tbody>
+      <tr *ngFor="let transaction of pagedTransactions">
+        <!-- Date -->
+        <td class="col-date">{{formatTransactionDate(transaction)}}</td>
+        
+        <!-- Time -->
+        <td class="col-time time-column">{{formatTransactionTime(transaction) | date:'HH:mm:ss'}}</td>
+        
+        <!-- Type -->
+        <td class="col-type">
+            <span class="badge" [ngClass]="{
+                'badge-success': transaction.source === 'sale',
+                'badge-danger': transaction.source === 'sales_return',
+                'badge-info': transaction.type === 'transfer' || transaction.type?.includes('transfer'),
+                'badge-warning': transaction.type === 'deposit',
+                'badge-primary': transaction.source === 'purchase' || transaction.type === 'purchase_payment',
+                'badge-secondary': transaction.source === 'expense'
+            }">
+                {{getTransactionTypeDisplay(transaction.type)}}
+            </span>
+            <span *ngIf="transaction.source === 'sales_return' && transaction.roundingAdjustment && Math.abs(transaction.roundingAdjustment) > 0.01" 
+                  class="badge badge-secondary ms-1 mt-1">
+                Rounded
+            </span>
         </td>
-        <td>{{transaction.paymentMethod}}</td>           
-        <td>{{transaction.paymentDetails}}</td>           
-        <td>{{transaction.note}}</td>           
         
-        <!-- FIXED: Debit column should show debit values -->
-        <td class="text-right">             
-          <span *ngIf="transaction.debit && transaction.debit > 0" class="debit-amount">
-            ₹{{transaction.debit | number:'1.2-2'}}
-          </span>
-          <span *ngIf="!transaction.debit || transaction.debit <= 0">-</span>           
-        </td>           
+        <!-- Description -->
+        <td class="col-desc">
+             <!-- Sale Description -->
+             <div *ngIf="transaction.source === 'sale'" class="transaction-description">
+                <a [routerLink]="['/sales', transaction.saleId]" class="fw-bold text-decoration-none">
+                    Sale: {{transaction.paymentDetails}}
+                </a>
+                <div class="text-muted small">Customer: {{transaction.customerName}}</div>
+                <div *ngIf="transaction.hasReturns" class="text-warning small">
+                    <i class="fa fa-exclamation-circle"></i> Has Returns
+                </div>
+            </div>
+            
+            <!-- Return Description -->
+            <div *ngIf="transaction.source === 'sales_return'" class="transaction-description">
+                <div class="fw-bold text-danger">{{transaction.description}}</div>
+                <div class="text-muted small">Customer: {{transaction.customerName}}</div>
+                <div class="text-muted small">(Ref: {{transaction.originalSaleId}})</div>
+            </div>
         
-        <!-- FIXED: Credit column should show credit values -->
-        <td class="text-right">             
-          <span *ngIf="transaction.credit && transaction.credit > 0" class="credit-amount">
-            ₹{{transaction.credit | number:'1.2-2'}}
-          </span>
-          <span *ngIf="!transaction.credit || transaction.credit <= 0">-</span>           
-        </td>           
+            <!-- General Description -->
+            <div *ngIf="transaction.source !== 'sale' && transaction.source !== 'sales_return'" class="transaction-description">
+                {{transaction.description}}
+                
+                <!-- Journal Details with Eye Icon -->
+                <div *ngIf="transaction.source === 'journal' && transaction.journalDetails" class="journal-contra-details mt-1 d-flex align-items-center">
+                    <i class="fa fa-exchange text-muted me-1"></i> 
+                    <span class="text-info small fst-italic">{{ transaction.journalDetails }}</span>
+                    <button class="btn-icon-small ms-2" (click)="viewJournalDetails(transaction.relatedDocId)" title="View Journal Details">
+                        <i class="fa fa-eye"></i>
+                    </button>
+                </div>
+
+                <div *ngIf="transaction.customerName" class="text-muted small">
+                    <i class="fa fa-user"></i> {{transaction.customerName}}
+                </div>
+                <div *ngIf="transaction.supplier" class="text-muted small">
+                    <i class="fa fa-truck"></i> {{transaction.supplier}}
+                </div>
+            </div>
+        </td>
         
-        <td class="text-right" [ngClass]="{'negative-balance': transaction.balance < 0}">
-          ₹{{transaction.balance | number:'1.2-2'}}
-        </td>           
-        <td>             
-          <button class="btn btn-sm btn-edit" (click)="editTransaction(transaction)">Edit</button>             
-          <button class="btn btn-sm btn-delete" (click)="deleteTransaction(transaction.id)">Delete</button>                   
-        </td>         
-      </tr>       
-    </tbody> 
-    
+        <!-- Payment Method -->
+        <td class="col-method">{{transaction.paymentMethod}}</td>
+        
+        <!-- Payment Details -->
+        <td class="col-details" title="{{transaction.paymentDetails}}">{{transaction.paymentDetails}}</td>
+        
+        <!-- Note -->
+        <td class="col-note" title="{{transaction.note}}">{{transaction.note}}</td>
+             <td class="text-end col-amount">
+            <span *ngIf="getDisplayCredit(transaction) > 0" class="text-success fw-bold">
+                ₹{{getDisplayCredit(transaction) | number:'1.2-2'}}
+            </span>
+            <span *ngIf="!getDisplayCredit(transaction) || getDisplayCredit(transaction) <= 0">-</span>
+        </td>
+        <!-- Debit -->
+        <td class="text-end col-amount">
+            <span *ngIf="getDisplayDebit(transaction) > 0" class="text-danger fw-bold">
+                ₹{{getDisplayDebit(transaction) | number:'1.2-2'}}
+            </span>
+            <span *ngIf="!getDisplayDebit(transaction) || getDisplayDebit(transaction) <= 0">-</span>
+        </td>
+
+        <!-- Credit -->
+   
+        
+        <!-- Balance -->
+        <td class="text-end fw-bold col-balance" 
+            [ngClass]="{'text-danger': transaction.balance < 0, 'text-success': transaction.balance >= 0}">
+            ₹{{transaction.balance | number:'1.2-2'}}
+        </td>
+      </tr>
+    </tbody>
     <tfoot>   
-      <tr>     
-        <td colspan="6" class="text-right"><strong>Total:</strong></td>     
-        <td class="text-right"><strong>₹{{totalDebit | number:'1.2-2'}}</strong></td>     
-        <td class="text-right"><strong>₹{{totalCredit | number:'1.2-2'}}</strong></td>     
-        <td colspan="2"></td>   
-      </tr> 
-    </tfoot>     
+        <tr>     
+          <td colspan="7" class="text-end"><strong>Total:</strong></td>     
+          <td class="text-end text-success"><strong>₹{{totalCredit | number:'1.2-2'}}</strong></td>
+                    <td class="text-end text-danger"><strong>₹{{totalDebit | number:'1.2-2'}}</strong></td>
+
+          <td class="text-end"><strong>Net: ₹{{accountDetails.balance | number:'1.2-2'}}</strong></td>
+        </tr> 
+      </tfoot>     
   </table>   
 </div>
   
-  <!-- Card View -->
-  <div class="transactions-cards" *ngIf="viewMode === 'card' && !loading && !isEmpty">
-    <div class="card" *ngFor="let transaction of pagedTransactions">
-      <div class="card-header">
-        <!-- Consistent date formatting with MM/dd/yyyy HH:mm format -->
-<div class="transaction-date">{{(transaction.date | date:'MM/dd/yyyy HH:mm') || 'N/A'}}</div>
-        <div class="transaction-type" 
-             [ngClass]="{'debit': transaction.debit > 0, 'credit': transaction.credit > 0}">
-          {{transaction.debit > 0 ? 'Debit' : 'Credit'}}
+<div class="transactions-cards" *ngIf="viewMode === 'card' && !loading && !isEmpty">
+    <div class="card mb-3" *ngFor="let transaction of pagedTransactions">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="transaction-datetime">
+                <div class="transaction-date fw-bold">{{formatTransactionDate(transaction)}}</div>
+                <div class="transaction-time text-muted">{{formatTransactionTime(transaction) | date:'HH:mm:ss'}}</div>
+            </div>
+            
+            <div class="d-flex gap-2">
+                <span class="badge" [ngClass]="{
+                    'bg-success': transaction.source === 'sale',
+                    'bg-danger': transaction.source === 'sales_return',
+                    'bg-info': transaction.type?.includes('transfer'),
+                    'bg-warning': transaction.type === 'deposit',
+                    'bg-secondary': transaction.source === 'expense'
+                }">
+                    {{getTransactionTypeDisplay(transaction.type)}}
+                </span>
+                
+                <span *ngIf="transaction.source === 'sale' && transaction.hasReturns" 
+                      class="badge bg-warning">
+                    Has Returns
+                </span>
+
+                <span *ngIf="transaction.source === 'sales_return' && transaction.roundingAdjustment && Math.abs(transaction.roundingAdjustment) > 0.01" 
+                      class="badge bg-secondary">
+                    Rounded
+                </span>
+            </div>
         </div>
-      </div>
-      <div class="card-body">
-        <h4 class="card-title">          <span *ngIf="transaction.source === 'sale'">
-            <a [routerLink]="['/sales', transaction.saleId]" 
-               class="sale-link" 
-               title="View Sale Details">
-              {{transaction.invoiceNo}}
-            </a>
-          </span>
-          <span *ngIf="transaction.source !== 'sale'">
-            {{transaction.description}}
-          </span>
-        </h4>
-        <div class="card-details">
-          <p *ngIf="transaction.source === 'sale'"><strong>Customer:</strong> {{transaction.customerName || 'N/A'}}</p>
-          <p><strong>Payment Method:</strong> {{transaction.paymentMethod}}</p>
-          <p *ngIf="transaction.paymentDetails"><strong>Payment Details:</strong> {{transaction.paymentDetails}}</p>
-          <p *ngIf="transaction.note"><strong>Note:</strong> {{transaction.note}}</p>
-          <p class="card-amount debit" *ngIf="transaction.debit > 0">
-            <strong>Debit:</strong> ₹{{transaction.debit | number:'1.2-2'}}
-          </p>
-          <p class="card-amount credit" *ngIf="transaction.credit > 0">
-            <strong>Credit:</strong> ₹{{transaction.credit | number:'1.2-2'}}
-          </p>
-          <p class="card-balance"><strong>Balance:</strong> ₹{{transaction.balance | number:'1.2-2'}}</p>
+        
+        <div class="card-body">
+            <div *ngIf="transaction.source === 'sale'">
+                <h5 class="card-title text-success">
+                    <a [routerLink]="['/sales', transaction.saleId]" 
+                       class="text-decoration-none">
+                        Sale: {{transaction.paymentDetails}}
+                    </a>
+                </h5>
+                <p class="card-text">
+                    <strong>Customer:</strong> {{transaction.customerName}}<br>
+                    <strong>Amount:</strong> <span class="text-success">₹{{getDisplayCredit(transaction) | number:'1.2-2'}}</span><br>
+                    <strong>Payment Method:</strong> {{transaction.paymentMethod}}<br>
+                    <span *ngIf="transaction.hasReturns" class="text-warning">
+                        <i class="fa fa-warning"></i> This sale has return transactions
+                    </span>
+                </p>
+            </div>
+            
+            <div *ngIf="transaction.source === 'sales_return'">
+                <h5 class="card-title text-danger">
+                    Sales Return: {{transaction.paymentDetails}}
+                </h5>
+                <p class="card-text">
+                    <strong>Customer:</strong> {{transaction.customerName}}<br>
+                    <strong>Refund Amount:</strong> <span class="text-danger">₹{{getDisplayDebit(transaction) | number:'1.0-0'}}</span><br>
+                    <span *ngIf="transaction.exactRefund && transaction.roundedRefund && Math.abs((transaction.roundedRefund - transaction.exactRefund)) > 0.01" class="small text-muted">
+                        (Exact: ₹{{transaction.exactRefund | number:'1.2-2'}} → Rounded: ₹{{transaction.roundedRefund | number:'1.0-0'}})<br>
+                    </span>
+                    <strong>Original Sale:</strong> {{transaction.originalSaleId}}<br>
+                    <strong>Reason:</strong> {{transaction.note}}<br>
+                </p>
+            </div>
+            
+            <div *ngIf="transaction.source !== 'sale' && transaction.source !== 'sales_return'">
+                <h5 class="card-title">{{transaction.description}}</h5>
+                
+                <!-- Journal Details in Card View -->
+                <div *ngIf="transaction.source === 'journal' && transaction.journalDetails" class="mb-2 d-flex align-items-center">
+                    <i class="fa fa-exchange text-muted me-1"></i> 
+                    <span class="text-info small fst-italic me-2">{{ transaction.journalDetails }}</span>
+                    <button class="btn-icon-small" (click)="viewJournalDetails(transaction.relatedDocId)" title="View Journal Details">
+                        <i class="fa fa-eye"></i>
+                    </button>
+                </div>
+
+                <p class="card-text">
+                    <strong>Payment Method:</strong> {{transaction.paymentMethod}}<br>
+                    <strong *ngIf="getDisplayDebit(transaction) > 0">Debit:</strong> 
+                    <span *ngIf="getDisplayDebit(transaction) > 0" class="text-danger">₹{{getDisplayDebit(transaction) | number:'1.2-2'}}</span><br>
+                    <strong *ngIf="getDisplayCredit(transaction) > 0">Credit:</strong> 
+                    <span *ngIf="getDisplayCredit(transaction) > 0" class="text-success">₹{{getDisplayCredit(transaction) | number:'1.2-2'}}</span><br>
+                </p>
+            </div>
+            
+            <div class="mt-2">
+                <strong>Current Balance:</strong> 
+                <span [ngClass]="{'text-danger': transaction.balance < 0, 'text-success': transaction.balance >= 0}">
+                    ₹{{transaction.balance | number:'1.2-2'}}
+                </span>
+            </div>
         </div>
-      </div>
-      <div class="card-footer">
-        <button class="btn btn-sm btn-edit" (click)="editTransaction(transaction)">Edit</button>
-        <button class="btn btn-sm btn-delete" (click)="deleteTransaction(transaction.id)">Delete</button>
-        <button *ngIf="transaction.hasDocument" class="btn btn-sm btn-download" 
-                (click)="downloadDocument(transaction.attachmentUrl)">
-          Download
-        </button>
-      </div>
+        
+        <div class="card-footer">
+            <div class="btn-group btn-group-sm">
+                <button *ngIf="transaction.source === 'account'" 
+                        class="btn btn-outline-primary btn-sm" 
+                        (click)="editTransaction(transaction)">
+                    <i class="fa fa-edit"></i> Edit
+                </button>
+                
+                <button *ngIf="transaction.source === 'sale'" 
+                        class="btn btn-outline-info btn-sm" 
+                        [routerLink]="['/sales', transaction.saleId]">
+                    <i class="fa fa-eye"></i> View Sale
+                </button>
+                
+                <button *ngIf="transaction.hasDocument" 
+                        class="btn btn-outline-success btn-sm" 
+                        (click)="downloadDocument(transaction.attachmentUrl)">
+                    <i class="fa fa-download"></i> Document
+                </button>
+            </div>
+        </div>
     </div>
-    
-    <div class="totals-card">
-      <div class="totals-header">Totals</div>
-      <div class="totals-body">
-        <p><strong>Total Debit:</strong> ₹{{totalDebit | number:'1.2-2'}}</p>
-        <p><strong>Total Credit:</strong> ₹{{totalCredit | number:'1.2-2'}}</p>
-      </div>
-    </div>
-  </div>
+</div>
+
   
   <!-- Pagination Controls -->
   <div class="pagination-controls" *ngIf="!loading && !isEmpty">
@@ -238,9 +401,12 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>Date</label>
-          <!-- Consistent datetime-local input for editing -->
-          <input type="datetime-local" [(ngModel)]="editingTransaction.dateString" class="form-control">
+          <label>Date & Time</label>
+          <input type="datetime-local" 
+                 [(ngModel)]="editingTransaction.dateString" 
+                 class="form-control"
+                 step="1">
+          <small class="form-text">Set the exact date and time for this transaction</small>
         </div>
         <div class="form-group">
           <label>Description</label>
@@ -346,4 +512,336 @@
       </form>
     </div>
   </div>
+
+  <!-- View Journal Details Modal -->
+  <div class="modal-overlay" *ngIf="showJournalViewModal">
+    <div class="modal-content large" *ngIf="selectedJournalForView">
+        <header class="modal-header">
+            <h2>Journal Details</h2>
+            <button class="close-button" (click)="closeJournalViewModal()">&times;</button>
+        </header>
+        <div class="view-details-body">
+            <fieldset class="transaction-details">
+                <legend>Transaction Details</legend>
+                <div class="details-grid">
+                    <div><strong>Date:</strong> {{ convertToDate(selectedJournalForView.date) | date:'longDate' }}</div>
+                    <div><strong>Reference:</strong> {{ selectedJournalForView.reference }}</div>
+                    <div class="description-view"><strong>Description:</strong> {{ selectedJournalForView.description }}</div>
+                    <div *ngIf="selectedJournalForView?.isCapitalTransaction"><strong>Type:</strong> Capital Transaction</div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Journal Entries</legend>
+                <div class="journal-items-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Account</th>
+                                <th class="text-right">Debit</th>
+                                <th class="text-right">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let item of selectedJournalForView.items">
+                                <td>{{ item.accountName }} {{ item.accountHead ? '(' + item.accountHead + ')' : '' }}</td>
+                                <td class="text-right">{{ item.debit | currency:'INR' }}</td>
+                                <td class="text-right">{{ item.credit | currency:'INR' }}</td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td class="text-right"><strong>Totals:</strong></td>
+                                <td class="text-right"><strong>{{ getJournalTotalDebit(selectedJournalForView.items) | currency:'INR' }}</strong></td>
+                                <td class="text-right"><strong>{{ getJournalTotalCredit(selectedJournalForView.items) | currency:'INR' }}</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </fieldset>
+        </div>
+        <footer class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeJournalViewModal()">Close</button>
+        </footer>
+    </div>
+  </div>
+
 </div>
+<style>
+/* =========================================
+   1. TIME & DATE DISPLAY STYLES
+   ========================================= */
+.time-column {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.transaction-datetime {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.transaction-date {
+  font-weight: bold;
+  color: #333;
+}
+
+.transaction-time {
+  font-size: 0.85em;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.card-entry-time {
+  font-size: 0.9em;
+  color: #666;
+  font-style: italic;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.form-text {
+  font-size: 0.875em;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+/* =========================================
+   2. BADGES & INDICATORS
+   ========================================= */
+.rounding-indicator {
+  background-color: rgba(0, 123, 255, 0.1);
+  border-left: 3px solid #007bff;
+  padding: 4px 8px;
+  margin: 4px 0;
+  font-size: 0.85em;
+}
+
+.rounding-info {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.badge.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+.text-calculation {
+  font-family: 'Courier New', monospace;
+  color: #495057;
+  font-size: 0.9em;
+}
+
+/* =========================================
+   3. JOURNAL DETAILS IN ROW
+   ========================================= */
+.journal-contra-details {
+  border-left: 2px solid #17a2b8;
+  padding-left: 8px;
+  margin-top: 4px;
+  font-size: 0.85em;
+  color: #555;
+  background-color: rgba(23, 162, 184, 0.05);
+  border-radius: 0 4px 4px 0;
+  padding: 2px 8px;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.btn-icon-small {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #17a2b8;
+  font-size: 1rem;
+  padding: 0 4px;
+  vertical-align: middle;
+}
+
+.btn-icon-small:hover {
+  color: #138496;
+}
+
+/* =========================================
+   4. MODAL STYLES (FIXED TRANSPARENCY)
+   ========================================= */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Dimmed background */
+    z-index: 1050; /* High Z-index to sit on top */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+}
+
+/* Generic Modal Content Box */
+.modal-box {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Specific Style for large modals (like Journal View) */
+.modal-content.large {
+    background-color: #ffffff; /* ✅ Fix: White background */
+    width: 80%;
+    max-width: 900px;
+    min-width: 320px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh; /* Prevent overflowing screen */
+    position: relative;
+}
+
+.modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #fff;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+.modal-header h2, .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #333;
+}
+
+.close-button, .close-btn-icon {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #000;
+    opacity: 0.5;
+    cursor: pointer;
+}
+
+.close-button:hover, .close-btn-icon:hover {
+    opacity: 0.75;
+}
+
+.view-details-body, .modal-body {
+    padding: 20px;
+    overflow-y: auto; /* Allow scrolling content */
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #e9ecef;
+    background-color: #f8f9fa; /* Light gray footer */
+    text-align: right;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* =========================================
+   5. JOURNAL VIEW SPECIFIC STYLES
+   ========================================= */
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.journal-items-table {
+    margin-top: 15px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.journal-items-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.journal-items-table th {
+    background-color: #f8f9fa;
+    color: #495057;
+    font-weight: 600;
+    padding: 12px;
+    border-bottom: 2px solid #dee2e6;
+    text-align: left;
+}
+
+.journal-items-table td {
+    padding: 12px;
+    border-bottom: 1px solid #dee2e6;
+    color: #212529;
+}
+
+.journal-items-table th.text-right, 
+.journal-items-table td.text-right {
+    text-align: right;
+}
+
+/* Capital Transaction Indicators */
+.badge-credit {
+  background-color: #28a745 !important;
+  color: white !important;
+}
+
+.credit-indicator {
+  font-size: 0.7em;
+  margin-left: 4px;
+  padding: 1px 3px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  font-weight: bold;
+}
+
+.transaction-credit-amount {
+  color: #28a745 !important;
+  font-weight: 600;
+}
+
+.transaction-type.transaction-credit {
+  background-color: #28a745;
+  color: white;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+/* Form Group overrides */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+</style>

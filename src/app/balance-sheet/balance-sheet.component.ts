@@ -1,17 +1,21 @@
-// balance-sheet.component.ts
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy ,ViewChild, ElementRef} from '@angular/core';
 import { AccountService } from '../services/account.service';
+
 import { ProfitLossService } from '../services/profit-loss.service';
 import { ExpenseService } from '../services/expense.service';
 import { SaleService } from '../services/sale.service';
 import { PurchaseService } from '../services/purchase.service';
 import { StockService } from '../services/stock.service';
+import { AccountDataService } from '../services/account-data.service'; // <-- This can be removed if not used elsewhere
+
 import { DailyStockService } from '../services/daily-stock.service';
-import { Firestore, collection, getDocs, query, where, orderBy } from '@angular/fire/firestore';
+import { JournalService } from '../services/journal.service';
+import { Firestore, collection, getDocs, query, where, orderBy, limit, onSnapshot, Timestamp, doc, getDoc } from '@angular/fire/firestore';
 import { Subscription, interval } from 'rxjs';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+import { PurchaseReturnService } from '../services/purchase-return.service';
 
 interface BalanceSheetItem {
   name: string;
@@ -34,6 +38,27 @@ interface BalanceSheetData {
   equity: BalanceSheetItem[];
   liabilities: BalanceSheetItem[];
   assets: BalanceSheetItem[];
+  stockData: {
+    openingStock: number;
+    closingStock: number;
+  };
+tradeData: {
+  sundryCreditors: {
+    total: number;
+    details: { supplierName: string; dueAmount: number }[];
+  };
+  supplierAdvances: {
+    total: number;
+    details: { supplierName: string; advanceAmount: number }[];
+  };
+  sundryDebtors: number;
+  expenseDues: number;
+};
+
+  taxData: {
+    taxPayable: number;
+    taxReceivable: number;
+  };
   totals: {
     equity: number;
     liabilities: number;
@@ -49,25 +74,49 @@ interface BalanceSheetData {
   styleUrls: ['./balance-sheet.component.scss']
 })
 export class BalanceSheetComponent implements OnInit, OnDestroy {
-  balanceSheetDate: string = new Date().toISOString().split('T')[0];
+  fromDate: string = '';
+    @ViewChild('fromDatePicker') fromDatePicker!: ElementRef;
+  @ViewChild('toDatePicker') toDatePicker!: ElementRef;
+  toDate: string = new Date().toISOString().split('T')[0];
   balanceSheetData: BalanceSheetData = {
     equity: [],
     liabilities: [],
     assets: [],
     totals: {
       equity: 0,
+      
       liabilities: 0,
       assets: 0
+    },
+    stockData: {
+      openingStock: 0,
+      closingStock: 0
+    },
+tradeData: {
+  sundryCreditors: { total: 0, details: [] },
+  supplierAdvances: { total: 0, details: [] }, // ✅ ADD THIS
+  sundryDebtors: 0,
+  expenseDues: 0
+},
+
+    taxData: {
+      taxPayable: 0,
+      taxReceivable: 0,
     }
   };
   profitLossData: any = null;
+// balanceSheetDate: string = this.formatDateToDDMMYYYY(new Date());
+
   isLoading = false;
   errorMessage = '';
   autoRefreshEnabled = true;
   refreshInterval = 5; // minutes
-  
+
   private refreshSubscription?: Subscription;
-  private readonly COMPANY_NAME = 'HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED';  constructor(
+
+  private readonly COMPANY_NAME = 'HERBALY TOUCH AYURVEDA HOSPITAL PRIVATE LIMITED';
+
+  constructor(
     private accountService: AccountService,
     private profitLossService: ProfitLossService,
     private expenseService: ExpenseService,
@@ -75,21 +124,220 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
     private purchaseService: PurchaseService,
     private stockService: StockService,
     private dailyStockService: DailyStockService,
-    private firestore: Firestore
+    private firestore: Firestore,
+    private journalService: JournalService,
+    private purchaseReturnService: PurchaseReturnService
   ) {}
 
-  async ngOnInit(): Promise<void> {
-    await this.generateBalanceSheet();
-    this.startAutoRefresh();
+async ngOnInit(): Promise<void> {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  
+  // If current month is Jan-Mar (0, 1, 2), FY started April of the previous year
+  const startYear = today.getMonth() < 3 ? currentYear - 1 : currentYear;
+  
+  // Create April 1st date string manually to avoid TimeZone shifting
+  // Format: YYYY-MM-DD
+  this.fromDate = `${startYear}-04-01`; 
+  
+  // For To Date, we can use the current local date
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0'); 
+  const yyyy = today.getFullYear();
+  this.toDate = `${yyyy}-${mm}-${dd}`;
+
+  await this.generateBalanceSheet();
+  this.startAutoRefresh();
+}
+ private getInitialBalanceSheetData(): BalanceSheetData {
+    return {
+      equity: [],
+      liabilities: [],
+      assets: [],
+      stockData: { openingStock: 0, closingStock: 0 },
+tradeData: {
+  sundryCreditors: { total: 0, details: [] },
+  supplierAdvances: { total: 0, details: [] }, // ✅ ADD THIS
+  sundryDebtors: 0,
+  expenseDues: 0
+},
+      taxData: { taxPayable: 0, taxReceivable: 0 },
+      totals: { equity: 0, liabilities: 0, assets: 0 },
+    };
+  }
+  // Inside BalanceSheetComponent class
+
+async generateBalanceSheet(forceRefresh = false): Promise<void> {
+  this.isLoading = true;
+  this.errorMessage = '';
+  this.balanceSheetData = { ...this.getInitialBalanceSheetData(), lastUpdated: new Date() };
+
+  try {
+    // ✅ FIX: Safe Date Parsing (Prevents the March 31st shift)
+    const [fYear, fMonth, fDay] = this.fromDate.split('-').map(Number);
+    const startDate = new Date(fYear, fMonth - 1, fDay, 0, 0, 0, 0);
+
+    const [tYear, tMonth, tDay] = this.toDate.split('-').map(Number);
+    const reportDate = new Date(tYear, tMonth - 1, tDay, 23, 59, 59, 999);
+
+    if (startDate > reportDate) {
+      throw new Error('From Date cannot be later than To Date.');
+    }
+
+    const accounts = await this.getAllAccounts();
+
+    // 1. All existing functionality preserved in Promise.all
+    const [taxCredits, stockData, tradeData, plReport, pendingSales, netShip, netServ, pendingRefunds] = await Promise.all([
+      this.calculateTaxCredits(startDate, reportDate),
+      this.loadStockData(reportDate),
+      this.loadTradeData(reportDate),
+      this.loadExactProfitLoss2Data(startDate, reportDate, forceRefresh),
+      this.saleService.getTotalPendingSalesValueByDateRange(new Date(0), reportDate),
+      this.saleService.getNetShippingIncomeForProfitLoss(startDate, reportDate),
+      this.saleService.getTotalServiceChargesByDateRange(startDate, reportDate),
+      this.saleService.getTotalPendingRefundsByDateRange(startDate, reportDate) 
+    ]);
+
+    // ✅ Use Stock Data from P&L if available (Existing Logic)
+    if (plReport && plReport.closingStock !== undefined) {
+      stockData.closingStock = plReport.closingStock;
+      stockData.openingStock = plReport.openingStock;
+    }
+
+    this.balanceSheetData.stockData = stockData;
+    this.balanceSheetData.tradeData = tradeData;
+
+    this.balanceSheetData.taxData = {
+      taxPayable: taxCredits.finalOutputTax,
+      taxReceivable: taxCredits.finalInputTax
+    };
+
+    // Categorize and add data to sections (Existing Logic)
+    this.categorizeAccounts(accounts);
+    this.addTradeDataToSections(tradeData);
+    this.addTaxDataToSections(taxCredits);
+    this.addStockToAssets(stockData);
+    this.addPendingSalesToLiabilities(pendingSales);
+
+    // 2. Add Pending Refunds to Liabilities (Existing Logic)
+    if (pendingRefunds > 0) {
+      this.addAccountToSection('liabilities', {
+        name: 'Refunds Due to Customers',
+        accountNumber: '',
+        value: pendingRefunds,
+        accountHead: 'Current Liabilities',
+        isRealtimeData: true
+      });
+    }
+
+    // Profit & Loss Handling (Existing Logic)
+    if (plReport) {
+      const adjustedNetProfit = (plReport.netProfit || 0) + netShip + netServ;
+      this.addExactProfitLossToEquity({ ...plReport, netProfit: adjustedNetProfit });
+    }
+
+    this.validateBalanceSheet();
+  } catch (error: any) {
+    console.error('Error generating balance sheet:', error);
+    this.errorMessage = error.message || 'Failed to generate balance sheet.';
+  } finally {
+    this.isLoading = false;
+  }
+}
+// FIXED: Accepts startDate and endDate arguments
+  private async calculateTaxCredits(startDate: Date, endDate: Date): Promise<{ finalInputTax: number, finalOutputTax: number }> {
+    try {
+      const [
+        grossOutputTax,
+        totalSalesReturnTax,
+        grossPurchaseTax,
+        totalPurchaseReturnTax,
+        journalTaxes
+      ] = await Promise.all([
+        this.saleService.getGrossOutputTaxByDateRange(startDate, endDate),
+        this.saleService.getTotalSalesReturnTaxByDateRange(startDate, endDate),
+        this.purchaseService.getGrossPurchaseTaxByDateRange(startDate, endDate),
+        this.purchaseReturnService.getTotalPurchaseReturnTaxByDateRange(startDate, endDate),
+        this.journalService.getJournalTaxAggregatesByDateRange(startDate, endDate)
+      ]);
+
+      // Debugging log to see the values
+      console.log('Tax Credits Calculation:', {
+        grossOutputTax,
+        totalSalesReturnTax,
+        netOutputTax: grossOutputTax - totalSalesReturnTax
+      });
+
+      return {
+        // Input Tax = Purchase Tax - Purchase Return Tax + Journal Input Tax
+        finalInputTax: this.roundCurrency(Math.max(0, grossPurchaseTax - totalPurchaseReturnTax + journalTaxes.journalInputTax)),
+
+        // Output Tax = Sales Tax - Sales Return Tax + Journal Output Tax
+        // FIX: We subtract 'totalSalesReturnTax' here so liability decreases when a return is created
+        finalOutputTax: this.roundCurrency(Math.max(0, (grossOutputTax - totalSalesReturnTax) + journalTaxes.journalOutputTax))
+      };
+    } catch (error) {
+      console.error('Error calculating tax credits:', error);
+      return { finalInputTax: 0, finalOutputTax: 0 };
+    }
   }
 
+  // FIXED: Accepts closingDate argument
+  private async loadStockData(closingDate: Date): Promise<{ openingStock: number, closingStock: number }> {
+    try {
+      const openingDate = new Date(closingDate);
+      openingDate.setDate(openingDate.getDate() - 1);
+      openingDate.setHours(23, 59, 59, 999);
+
+      const [openingStock, closingStock] = await Promise.all([
+        this.stockService.getClosingStockValue(openingDate),
+        this.stockService.getClosingStockValue(closingDate)
+      ]);
+
+      return { openingStock, closingStock };
+    } catch (error) {
+      console.error('Error loading stock data:', error);
+      return { openingStock: 0, closingStock: 0 };
+    }
+  }
+
+  // FIXED: Accepts explicit range arguments
+  private async loadExactProfitLoss2Data(startDate: Date, endDate: Date, forceRefresh = false): Promise<any> {
+    try {
+      console.log(`BS: Requesting P/L from ${startDate.toDateString()} to ${endDate.toDateString()}`);
+
+      const exactReport = await this.profitLossService.getProfitLoss2Report(startDate, endDate, forceRefresh);
+
+      if (!exactReport) {
+        console.warn('BS: ProfitLossService returned null/undefined report.');
+        return null;
+      }
+
+      this.profitLossData = {
+        ...exactReport,
+        reportDate: { start: startDate, end: endDate },
+        isRealtimeData: true,
+        lastUpdated: new Date()
+      };
+
+      return this.profitLossData;
+    } catch (error) {
+      console.error('Error loading P&L for Balance Sheet:', error);
+      return null;
+    }
+  }
   ngOnDestroy(): void {
     this.stopAutoRefresh();
   }
+getTodayDDMMYYYY(): string {
+    const date = new Date();
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+}
 
-  /**
-   * Start auto-refresh timer
-   */
+
   private startAutoRefresh(): void {
     if (this.autoRefreshEnabled && this.refreshInterval > 0) {
       this.refreshSubscription = interval(this.refreshInterval * 60 * 1000)
@@ -101,10 +349,180 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
         });
     }
   }
+    getFormattedDate(dateString: string): string {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}-${month}-${year}`;
+  }
 
-  /**
-   * Stop auto-refresh timer
-   */
+  // Opens the hidden native date picker when clicking the calendar icon
+  openDatePicker(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.fromDatePicker.nativeElement.showPicker();
+    } else {
+      this.toDatePicker.nativeElement.showPicker();
+    }
+  }
+
+  // Handles manual typing in DD-MM-YYYY format
+  onDateInput(event: any, type: 'from' | 'to'): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        const formattedDate = `${year}-${month}-${day}`; // Internal format YYYY-MM-DD
+        if (type === 'from') this.fromDate = formattedDate;
+        else this.toDate = formattedDate;
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        event.target.value = type === 'from' ? this.getFormattedDate(this.fromDate) : this.getFormattedDate(this.toDate);
+      }
+    }
+  }
+  private formatDateDDMMYYYY(dateInput: any): string {
+  const date = new Date(dateInput);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// src/app/balance-sheet/balance-sheet.component.ts
+
+// ... existing code ...
+
+
+
+private addExactProfitLossToEquity(profitLossReport: any): void {
+    // FIX: More robust check. Even if netProfit is 0, we want to show it.
+    if (!profitLossReport || typeof profitLossReport.netProfit !== 'number') {
+        console.warn('BS: Cannot add P&L to Equity, netProfit is missing:', profitLossReport);
+        return;
+    }
+    
+    const netProfitValue = Number(profitLossReport.netProfit) || 0;
+    
+    console.log(`BS: Adding Net Profit to Equity: ${netProfitValue}`);
+
+    const index = this.balanceSheetData.equity.findIndex(item => item.name.includes('Net Profit') || item.name.includes('Net Loss'));
+    
+    const itemName = netProfitValue >= 0 ? 'Net Profit (Year to Date)' : 'Net Loss (Year to Date)';
+    
+    const newItem = {
+        name: itemName,
+        accountNumber: '',
+        value: netProfitValue,
+        accountHead: 'Profit & Loss',
+        isRealtimeData: true
+    };
+
+    if (index > -1) {
+        this.balanceSheetData.equity[index] = newItem;
+    } else {
+        this.balanceSheetData.equity.push(newItem);
+    }
+}
+
+// ... existing code ...
+// When clicked, switch to 'date' type to show calendar
+
+
+// When moving away, switch back to 'text' and format the display
+
+// ✅ FIXED: getSundryCreditorsAndAdvances in balance-sheet.component.ts
+// This method now correctly reads the supplier balance field which is updated by payments
+
+private async getSundryCreditorsAndAdvances(): Promise<{
+  sundryCreditors: { total: number; details: any[] };
+  supplierAdvances: { total: number; details: any[] };
+}> {
+  try {
+    const suppliersRef = collection(this.firestore, 'suppliers');
+    const supplierSnapshot = await getDocs(suppliersRef);
+
+    let creditorsTotal = 0;
+    let advancesTotal = 0;
+    
+    const creditorsDetails: any[] = [];
+    const advancesDetails: any[] = [];
+
+    supplierSnapshot.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      
+      // ✅ Read the balance field (which is now properly updated by payments)
+      // Positive = We owe them (Liability)
+      // Negative = We paid in advance (Asset)
+      const rawBalance = Number(data['balance']) || 0;
+      
+      // Get a display name
+      const name = data['businessName'] || 
+                   `${data['firstName'] || ''} ${data['lastName'] || ''}`.trim() || 
+                   'Unknown Supplier';
+
+      // Threshold to ignore tiny floating point differences
+      if (rawBalance > 1) {
+        // LIABILITY: Sundry Creditor (We owe money)
+        creditorsTotal += rawBalance;
+        creditorsDetails.push({
+          supplierName: name,
+          dueAmount: rawBalance
+        });
+      } else if (rawBalance < -1) {
+        // ASSET: Advance to Supplier (We overpaid)
+        const advanceAmt = Math.abs(rawBalance);
+        advancesTotal += advanceAmt;
+        advancesDetails.push({
+          supplierName: name,
+          advanceAmount: advanceAmt
+        });
+      }
+    });
+
+    console.log('✅ Balance Sheet Supplier Totals:', {
+      creditorsTotal,
+      advancesTotal,
+      creditors: creditorsDetails.length,
+      advances: advancesDetails.length
+    });
+
+    return {
+      sundryCreditors: {
+        total: this.roundCurrency(creditorsTotal),
+        details: creditorsDetails
+      },
+      supplierAdvances: {
+        total: this.roundCurrency(advancesTotal),
+        details: advancesDetails
+      }
+    };
+
+  } catch (error) {
+    console.error('Error calculating Sundry Creditors/Advances:', error);
+    return {
+      sundryCreditors: { total: 0, details: [] },
+      supplierAdvances: { total: 0, details: [] }
+    };
+  }
+}
+
+// ✅ This helper is already defined in the component, keeping for reference
+private roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+// Triggered when the date is picked
+onDateStringChange() {
+    this.generateBalanceSheet();
+}
+
   private stopAutoRefresh(): void {
     if (this.refreshSubscription) {
       this.refreshSubscription.unsubscribe();
@@ -112,12 +530,9 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Toggle auto-refresh
-   */
   toggleAutoRefresh(): void {
     this.autoRefreshEnabled = !this.autoRefreshEnabled;
-    
+
     if (this.autoRefreshEnabled) {
       this.startAutoRefresh();
     } else {
@@ -125,1054 +540,465 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Manual refresh
-   */
+  private async getIncomeDues(): Promise<number> {
+    try {
+      const incomesCollection = collection(this.firestore, 'incomes');
+      const q = query(
+        incomesCollection,
+        where('paymentStatus', 'in', ['Partial', 'Due', 'Unpaid'])
+      );
+
+      const querySnapshot = await getDocs(q);
+
+      let totalDues = 0;
+      querySnapshot.docs.forEach(doc => {
+        const incomeData = doc.data();
+        const outstandingAmount = Number(incomeData['balanceAmount']) || 0;
+
+        if (outstandingAmount > 0) {
+          totalDues += outstandingAmount;
+        }
+      });
+      return totalDues;
+    } catch (error) {
+      console.error('Error calculating income dues:', error);
+      return 0;
+    }
+  }
+
   async manualRefresh(): Promise<void> {
     await this.generateBalanceSheet(true);
   }
 
-  /**
-   * Generate balance sheet with real-time profit/loss data
-   */
-  async generateBalanceSheet(forceRefresh = false): Promise<void> {
-    this.isLoading = true;
-    this.errorMessage = '';
-    
-    // Reset balance sheet data
-    this.balanceSheetData = {
-      equity: [],
-      liabilities: [],
-      assets: [],
-      totals: {
-        equity: 0,
-        liabilities: 0,
-        assets: 0
-      },
-      lastUpdated: new Date()
-    };
 
-    try {
-      console.log('Generating balance sheet with real-time data...');
 
-      // Load accounts and profit/loss data in parallel
-      const [accounts, profitLossData] = await Promise.all([
-        this.getAllAccounts(),
-        this.loadRealtimeProfitLossData(forceRefresh)
-      ]);
-        // Categorize accounts into balance sheet sections
-      await this.categorizeAccounts(accounts);// Add real-time profit/loss to equity
-      if (profitLossData && profitLossData.netProfit !== undefined) {
-        this.addProfitLossToEquity(profitLossData);
-        this.balanceSheetData.profitLossLastUpdated = profitLossData.lastUpdated;
-      }
-      
-      // Always try to add calculated profit/loss to balance the sheet if needed
-      // (the method now checks internally if real-time P&L was already added)
-      this.addCalculatedProfitLoss();
 
-      // Validate balance sheet
-      this.validateBalanceSheet();
+  
+  // [REMOVED] The getAllTransactions, synthesizeSaleTransactions, and calculateSalesPaymentAmount
+  // methods are no longer needed in this component.
 
-      console.log('Balance sheet generated successfully:', this.balanceSheetData);
-    } catch (error) {
-      console.error('Error generating balance sheet:', error);
-      this.errorMessage = `Failed to generate balance sheet: ${error instanceof Error ? error.message : 'Unknown error'}`;
-    } finally {
-      this.isLoading = false;
-    }
-  }  /**
-   * Load real-time profit/loss data using the same calculation as ProfitLossComponent
-   */
-  private async loadRealtimeProfitLossData(forceRefresh = false): Promise<any> {
-    try {
-      const endDate = new Date(this.balanceSheetDate);
-      const startDate = new Date(endDate.getFullYear(), 0, 1); // Fiscal year start
-      
-      console.log('Loading real-time profit/loss data for period:', {
-        start: startDate.toDateString(),
-        end: endDate.toDateString(),
-        forceRefresh
+  private addPendingSalesToLiabilities(pendingSalesValue: number): void {
+    if (pendingSalesValue > 0) {
+      this.addAccountToSection('liabilities', {
+        name: 'Advances from Customers (Pending Sales)',
+        accountNumber: '',
+        value: pendingSalesValue,
+        accountHead: 'Current Liabilities',
+        isRealtimeData: true
       });
-      
-      // Use the same calculation approach as ProfitLossComponent
-      const profitLossData = await this.calculateProfitLossData(startDate, endDate);
-      
-      console.log('Real-time profit/loss data loaded using direct calculation:', {
-        netProfit: profitLossData.netProfit,
-        grossProfit: profitLossData.grossProfit,
-        isRealtimeData: profitLossData.isRealtimeData,
-        lastUpdated: profitLossData.lastUpdated
-      });
-      
-      this.profitLossData = profitLossData;
-      return profitLossData;
-    } catch (error) {
-      console.error('Error loading real-time profit/loss data:', error);
-      this.profitLossData = null;
-      return null;
     }
   }
 
-  /**
-   * Calculate profit/loss data using the same method as ProfitLossComponent
-   */
-  private async calculateProfitLossData(startDate: Date, endDate: Date): Promise<any> {
-    try {
-      // Initialize profit loss data structure
-      const profitLossData = {
-        openingStock: 0,
-        purchases: 0,
-        purchaseReturns: 0,
-        directExpenses: 0,
-        closingStock: 0,
-        sales: 0,
-        salesReturns: 0,
-        directIncome: 0,
-        indirectExpenses: 0,
-        indirectIncome: 0
-      };
+// src/app/balance-sheet/balance-sheet.component.ts
 
-      // Load data using the same methods as ProfitLossComponent
-      await Promise.all([
-        this.loadStockDataForPL(startDate, endDate, profitLossData),
-        this.loadTransactionDataForPL(startDate, endDate, profitLossData),
-        this.loadExpenseDataForPL(startDate, endDate, profitLossData)
-      ]);      // Calculate gross and net profit using same formulas as ProfitLossComponent
-      const netSales = profitLossData.sales - profitLossData.salesReturns;
-      const netPurchases = profitLossData.purchases - profitLossData.purchaseReturns;
-      const costOfGoodsSold = profitLossData.openingStock + netPurchases + profitLossData.directExpenses - profitLossData.closingStock;
-      const totalDirectIncome = netSales + profitLossData.directIncome;
-      
-      const grossProfit = totalDirectIncome - costOfGoodsSold;
-      const netProfit = grossProfit + profitLossData.indirectIncome - profitLossData.indirectExpenses;
 
-      // Debug logging
-      console.log('Balance Sheet P&L Calculation Debug:', {
-        netSales,
-        netPurchases,
-        costOfGoodsSold,
-        totalDirectIncome,
-        grossProfit,
-        indirectIncome: profitLossData.indirectIncome,
-        indirectExpenses: profitLossData.indirectExpenses,
-        netProfit
-      });
 
-      return {
-        netProfit: netProfit,
-        grossProfit: grossProfit,
-        sales: netSales,
-        purchases: netPurchases,
-        directExpenses: profitLossData.directExpenses,
-        indirectExpenses: profitLossData.indirectExpenses,
-        directIncome: profitLossData.directIncome,
-        indirectIncome: profitLossData.indirectIncome,
-        openingStock: profitLossData.openingStock,
-        closingStock: profitLossData.closingStock,
-        reportDate: {
-          start: startDate,
-          end: endDate
-        },
-        isRealtimeData: true,
-        lastUpdated: new Date()
-      };
-    } catch (error) {
-      console.error('Error calculating profit/loss data:', error);
-      throw error;
-    }
+  getPendingSalesTotal(): number {
+    if (!this.balanceSheetData.liabilities) return 0;
+
+    const pendingSalesItem = this.balanceSheetData.liabilities.find(item =>
+      item.name === 'Advances from Customers (Pending Sales)'
+    );
+
+    return pendingSalesItem ? pendingSalesItem.value : 0;
   }
 
-  private async loadStockDataForPL(startDate: Date, endDate: Date, profitLossData: any): Promise<void> {
-    try {
-      // Get opening stock (end of day before start date)
-      const openingDate = new Date(startDate);
-      openingDate.setDate(openingDate.getDate() - 1);
-      openingDate.setHours(23, 59, 59, 999);
-      
-      // Get closing stock (end of end date)
-      const closingDate = new Date(endDate);
-      closingDate.setHours(23, 59, 59, 999);
-      
-      const [openingStock, closingStock] = await Promise.all([
-        this.getStockValueForPL(openingDate, 'opening'),
-        this.getStockValueForPL(closingDate, 'closing')
-      ]);
-
-      profitLossData.openingStock = openingStock;
-      profitLossData.closingStock = closingStock;
-    } catch (error) {
-      console.error('Error loading stock data for P&L:', error);
-      profitLossData.openingStock = 0;
-      profitLossData.closingStock = 0;
-    }
-  }
-  private async getStockValueForPL(date: Date, type: 'opening'|'closing'): Promise<number> {
-    try {
-      const businessDate = this.formatDateForSnapshot(date);
-      console.log(`Balance Sheet - Getting ${type} stock value for date: ${businessDate}`);
-      
-      // Get daily snapshots for the date
-      const snapshotsCollection = collection(this.firestore, 'dailyStockSnapshots');
-      const q = query(
-        snapshotsCollection,
-        where('date', '==', businessDate)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        console.log(`Balance Sheet - No dailyStockSnapshots found for ${businessDate}`);
-        return 0;
-      }
-
-      // Get all products for cost price reference (excluding tax)
-      const productsCollection = collection(this.firestore, 'products');
-      const productsSnapshot = await getDocs(productsCollection);
-      const productsMap = new Map();
-      
-      productsSnapshot.docs.forEach(doc => {
-        const product = doc.data();
-        // Use defaultPurchasePriceExcTax to exclude tax from cost calculations
-        const costPrice = product['defaultPurchasePriceExcTax'] || 0;
-        productsMap.set(doc.id, {
-          ...product,
-          costPrice: costPrice
-        });
-      });
-
-      // Calculate total stock value
-      let totalStockValue = 0;
-      let processedSnapshots = 0;
-
-      querySnapshot.docs.forEach(doc => {
-        const snapshot = doc.data();
-        const productId = snapshot['productId'];
-        const stockQuantity = type === 'opening' ? 
-          (snapshot['openingStock'] || 0) : 
-          (snapshot['closingStock'] || 0);
-        
-        const product = productsMap.get(productId);
-        if (product && stockQuantity > 0) {
-          const stockValue = stockQuantity * product.costPrice;
-          totalStockValue += stockValue;
-          processedSnapshots++;
-          
-          console.log(`Balance Sheet - Product ${productId}: Quantity=${stockQuantity}, Cost=${product.costPrice}, Value=${stockValue}`);
-        } else if (!product) {
-          console.warn(`Balance Sheet - Product not found for productId: ${productId}`);
-        }
-      });
-
-      console.log(`Balance Sheet - Processed ${processedSnapshots} snapshots, Total ${type} stock value: ${totalStockValue}`);
-      return totalStockValue;
-      
-    } catch (error) {
-      console.error(`Balance Sheet - Error getting ${type} stock value:`, error);
-      return 0;
-    }
-  }
-
-  /**
-   * Format date for dailyStockSnapshot collection (YYYY-MM-DD format)
-   */
-  private formatDateForSnapshot(date: Date): string {
-    return date.toISOString().split('T')[0];
-  }
-
-  private async loadTransactionDataForPL(startDate: Date, endDate: Date, profitLossData: any): Promise<void> {
-    try {
-      const adjustedStartDate = new Date(startDate);
-      adjustedStartDate.setHours(0, 0, 0, 0);
-      
-      const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setHours(23, 59, 59, 999);
-
-      const [purchases, sales] = await Promise.all([
-        this.getPurchasesForPL(adjustedStartDate, adjustedEndDate),
-        this.getSalesForPL(adjustedStartDate, adjustedEndDate)
-      ]);
-      
-      profitLossData.purchases = purchases;
-      profitLossData.sales = sales;
-
-      const [purchaseReturns, salesReturns] = await Promise.all([
-        this.getPurchaseReturnsForPL(adjustedStartDate, adjustedEndDate),
-        this.getSalesReturnsForPL(adjustedStartDate, adjustedEndDate)
-      ]);
-      
-      profitLossData.purchaseReturns = purchaseReturns;
-      profitLossData.salesReturns = salesReturns;
-    } catch (error) {
-      console.error('Error loading transaction data for P&L:', error);
-    }
-  }
-  private async getSalesForPL(startDate: Date, endDate: Date): Promise<number> {
-    try {
-      const salesCollection = collection(this.firestore, 'sales');
-      const q = query(
-        salesCollection,
-        where('createdAt', '>=', startDate),
-        where('createdAt', '<=', endDate),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      let totalSales = 0;
-      
-      querySnapshot.docs.forEach(doc => {
-        const saleData = doc.data();
-        let saleAmount = 0;
-        
-        // Calculate from products array if available (more accurate, excluding tax)
-        if (saleData['products'] && Array.isArray(saleData['products'])) {
-          saleAmount = saleData['products'].reduce((sum: number, product: any) => {
-            const quantity = product['quantity'] || 1;
-            // Use selling price excluding tax
-            const unitPrice = product['sellingPriceExcTax'] || product['unitPriceExcTax'] || product['unitPrice'] || 0;
-            const discount = product['discount'] || 0;
-            return sum + ((unitPrice * quantity) - discount);
-          }, 0);
-        }
-        
-        // If no products or amount is 0, try other fields but subtract tax
-        if (saleAmount === 0) {
-          const totalAmount = saleData['paymentAmount'] || saleData['itemsTotal'] || saleData['totalAmount'] || saleData['total'] || 0;
-          const totalTax = saleData['totalTax'] || 
-                          (saleData['cgst'] || 0) + 
-                          (saleData['sgst'] || 0) + 
-                          (saleData['igst'] || 0);
-          
-          saleAmount = totalAmount - totalTax;
-        }
-        
-        // Ensure amount is positive
-        saleAmount = Math.max(0, saleAmount || 0);
-        totalSales += saleAmount;
-      });
-      
-      console.log('Balance Sheet - Total sales (excluding tax):', totalSales);
-      return totalSales;
-    } catch (error) {
-      console.error('Error getting sales for P&L:', error);
-      return 0;
-    }
-  }private async getPurchasesForPL(startDate: Date, endDate: Date): Promise<number> {
-    try {
-      const purchasesCollection = collection(this.firestore, 'purchases');
-      const q = query(
-        purchasesCollection,
-        where('createdAt', '>=', startDate),
-        where('createdAt', '<=', endDate),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      let totalPurchases = 0;
-      
-      querySnapshot.docs.forEach(doc => {
-        const purchaseData = doc.data();
-        
-        // Use productsSubtotal (excludes tax) as first preference
-        let purchaseAmount = purchaseData['productsSubtotal'];
-        
-        // If productsSubtotal not available, calculate from products array
-        if (!purchaseAmount && purchaseData['products'] && Array.isArray(purchaseData['products'])) {
-          purchaseAmount = purchaseData['products'].reduce((sum: number, product: any) => {
-            // Use netCost or unitCost (which should be excluding tax)
-            const costExcTax = product['netCost'] || product['unitCost'] || 0;
-            const quantity = product['quantity'] || 1;
-            return sum + (costExcTax * quantity);
-          }, 0);
-        }
-        
-        // If still no amount, try other fields but subtract tax
-        if (!purchaseAmount) {
-          const totalAmount = purchaseData['purchaseTotal'] || purchaseData['grandTotal'] || 0;
-          const totalTax = purchaseData['totalTax'] || 
-                          (purchaseData['cgst'] || 0) + 
-                          (purchaseData['sgst'] || 0) + 
-                          (purchaseData['igst'] || 0);
-          
-          purchaseAmount = totalAmount - totalTax;
-        }
-        
-        // Ensure amount is positive
-        purchaseAmount = Math.max(0, purchaseAmount || 0);
-        totalPurchases += purchaseAmount;
-        
-        console.log('Balance Sheet - Purchase (excl. tax):', {
-          reference: purchaseData['referenceNo'] || purchaseData['invoiceNo'],
-          amount: purchaseAmount,
-          originalTotal: purchaseData['grandTotal'],
-          tax: purchaseData['totalTax']
-        });
-      });
-      
-      console.log('Balance Sheet - Total purchases (excluding tax):', totalPurchases);
-      return totalPurchases;
-    } catch (error) {
-      console.error('Error getting purchases for P&L:', error);
-      return 0;
-    }
-  }
-
-  private async getSalesReturnsForPL(startDate: Date, endDate: Date): Promise<number> {
-    try {
-      // Add sales returns logic here if needed
-      return 0;
-    } catch (error) {
-      console.error('Error getting sales returns for P&L:', error);
-      return 0;
-    }
-  }
-
-  private async getPurchaseReturnsForPL(startDate: Date, endDate: Date): Promise<number> {
-    try {
-      // Add purchase returns logic here if needed
-      return 0;
-    } catch (error) {
-      console.error('Error getting purchase returns for P&L:', error);
-      return 0;
-    }
-  }
-  private async loadExpenseDataForPL(startDate: Date, endDate: Date, profitLossData: any): Promise<void> {
-    try {
-      const adjustedStartDate = new Date(startDate);
-      adjustedStartDate.setHours(0, 0, 0, 0);
-      
-      const adjustedEndDate = new Date(endDate);
-      adjustedEndDate.setHours(23, 59, 59, 999);
-
-      const [transactionIncome, expensesData] = await Promise.all([
-        this.getIncomeFromTransactionsForPL(adjustedStartDate, adjustedEndDate),
-        this.getExpensesDataForPL(adjustedStartDate, adjustedEndDate)
-      ]);
-
-      profitLossData.directIncome = transactionIncome;
-      profitLossData.directExpenses = expensesData.directExpenses;
-      profitLossData.indirectExpenses = expensesData.indirectExpenses;
-      profitLossData.indirectIncome = 0; // For now, treat all income as direct
-
-      console.log('Balance Sheet Expense/Income Data Loaded:', {
-        directIncome: profitLossData.directIncome,
-        directExpenses: profitLossData.directExpenses,
-        indirectExpenses: profitLossData.indirectExpenses,
-        indirectIncome: profitLossData.indirectIncome
-      });
-    } catch (error) {
-      console.error('Error loading expense data for P&L:', error);
-    }
-  }
-
-  private async getIncomeFromTransactionsForPL(startDate: Date, endDate: Date): Promise<number> {
-    try {
-      const transactionsCollection = collection(this.firestore, 'transactions');
-      const q = query(
-        transactionsCollection,
-        where('date', '>=', startDate),
-        where('date', '<=', endDate)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      let totalIncome = 0;
-      
-      querySnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const type = data['type'] || '';
-        const description = data['description'] || '';
-        const credit = data['credit'] || 0;
-        
-        const isIncome = (type === 'income' || 
-                         description.toLowerCase().includes('income:') ||
-                         (credit > 0 && !description.toLowerCase().includes('expense'))) &&
-                         !description.toLowerCase().includes('expense');
-        
-        if (isIncome) {
-          totalIncome += Number(credit) || 0;
-        }
-      });
-      
-      return totalIncome;
-    } catch (error) {
-      console.error('Error getting income from transactions for P&L:', error);
-      return 0;
-    }
-  }
-  private async getExpensesDataForPL(startDate: Date, endDate: Date): Promise<{directExpenses: number, indirectExpenses: number}> {
-    try {
-      // Get expenses from both collections and transactions, similar to ProfitLossComponent
-      const [transactionExpenses, expensesCollectionData] = await Promise.all([
-        this.getExpensesFromTransactionsForPL(startDate, endDate),
-        this.getExpensesFromCollectionForPL(startDate, endDate)
-      ]);
-
-      // Combine all expenses avoiding duplicates
-      const allExpenses = [...transactionExpenses];
-      
-      // Add expenses from the expenses collection that don't appear to be duplicated in transactions
-      for (const expense of expensesCollectionData) {
-        const referenceNo = expense.referenceNo || '';
-        const isDuplicate = transactionExpenses.some(txExpense => {
-          const txReference = txExpense.reference || txExpense.referenceNo || '';
-          return txReference && referenceNo && txReference === referenceNo;
-        });
-        
-        if (!isDuplicate) {
-          allExpenses.push(expense);
-        }
-      }
-
-      let directExpenses = 0;
-      let indirectExpenses = 0;
-      
-      allExpenses.forEach(expense => {
-        const amount = expense.totalAmount || expense.amount || 0;
-        const accountHead = expense.accountHead || '';
-        const categoryName = expense.categoryName || expense.expenseFor || '';
-        
-        // Check if it's a direct expense
-        if (accountHead.includes('Direct') || this.isDirectExpenseForPL(categoryName)) {
-          directExpenses += Number(amount) || 0;
-        } else {
-          indirectExpenses += Number(amount) || 0;
-        }
-      });
-
-      console.log('Balance Sheet Expense Data:', {
-        transactionExpenses: transactionExpenses.length,
-        expensesCollectionData: expensesCollectionData.length,
-        totalCombined: allExpenses.length,
-        directExpenses,
-        indirectExpenses
-      });
-      
-      return { directExpenses, indirectExpenses };
-    } catch (error) {
-      console.error('Error getting expenses data for P&L:', error);
-      return { directExpenses: 0, indirectExpenses: 0 };
-    }
-  }
-
-  private async getExpensesFromTransactionsForPL(startDate: Date, endDate: Date): Promise<any[]> {
-    try {
-      const transactionsCollection = collection(this.firestore, 'transactions');
-      const q = query(
-        transactionsCollection,
-        where('date', '>=', startDate),
-        where('date', '<=', endDate)
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const expenses: any[] = [];
-      
-      querySnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const type = data['type'] || '';
-        const description = data['description'] || '';
-        const debit = data['debit'] || 0;
-        const credit = data['credit'] || 0;
-        
-        // Check if this is an expense transaction (but NOT a purchase)
-        const isExpense = type === 'expense' && 
-                         !description.toLowerCase().includes('purchase') &&
-                         !description.toLowerCase().includes('pur-') &&
-                         !description.toLowerCase().includes('payment for purchase');
-        
-        if (isExpense) {
-          const amount = debit > 0 ? debit : credit;
-          expenses.push({
-            id: doc.id,
-            ...data,
-            amount: Number(amount) || 0,
-            totalAmount: Number(amount) || 0,
-            entryType: 'expense',
-            source: 'transactions'
-          });
-        }
-      });
-      
-      return expenses;
-    } catch (error) {
-      console.error('Error getting expenses from transactions for P&L:', error);
-      return [];
-    }
-  }
-
-  private async getExpensesFromCollectionForPL(startDate: Date, endDate: Date): Promise<any[]> {
-    try {
-      const expensesCollection = collection(this.firestore, 'expenses');
-      const q = query(
-        expensesCollection,
-        where('date', '>=', startDate),
-        where('date', '<=', endDate),
-        where('entryType', '==', 'expense')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const expenses: any[] = [];
-      
-      querySnapshot.docs.forEach(doc => {
-        const data = doc.data();
-        const amount = data['totalAmount'] || data['paymentAmount'] || 0;
-        
-        expenses.push({
-          id: doc.id,
-          ...data,
-          amount: Number(amount) || 0,
-          totalAmount: Number(amount) || 0,
-          source: 'expenses-collection'
-        });
-      });
-      
-      return expenses;
-    } catch (error) {
-      console.error('Error getting expenses from collection for P&L:', error);
-      return [];
-    }
-  }
-
-  private isDirectExpenseForPL(categoryName: string): boolean {
-    const directCategories = [
-      'cost of goods sold',
-      'cogs',
-      'raw materials',
-      'manufacturing',
-      'production',
-      'direct labor',
-      'direct materials',
-      'purchase',
-      'inventory'
-    ];
-    
-    const category = categoryName.toLowerCase();
-    return directCategories.some(direct => category.includes(direct));
-  }
-
-  /**
-   * Helper method to format date for input
-   */
-  private formatDateForInput(date: Date): string {
-    return date.toISOString().split('T')[0];
-  }  /**
-   * Get all possible account head types
-   */
   private getAllAccountHeadTypes() {
     return {
       'Asset': [
-        'Asset|fixed_assets',
-        'Asset|deposits_assets',
-        'Asset|investments',
-        'Asset|loans_advances',
-        'Asset|sundry_debtors',
-        'Asset|suspense_account',
-        'Asset|income_receivables',
-        'Asset|input_tax_credits',
-        'Asset|prepaid_advances',
-        'Asset|bank_accounts',
-        'Asset|current_assets'
+        'Asset|fixed_assets', 'Asset|deposits_assets', 'Asset|investments', 'Asset|loans_advances',
+        'Asset|sundry_debtors', 'Asset|suspense_account', 'Asset|income_receivables', 'Asset|input_tax_credits',
+        'Asset|prepaid_advances', 'Asset|bank_accounts', 'Asset|current_assets'
       ],
       'Equity': [
         'Equity|capital_account'
       ],
       'Liabilities': [
-        'Liabilities|current_liabilities',
-        'Liabilities|duties_taxes',
-        'Liabilities|loans_liabilities',
-        'Liabilities|secured_loans',
-        'Liabilities|sundry_creditors',
-        'Liabilities|expenses_payable',
-        'Liabilities|advance_earned',
-        'Liabilities|tax_payable',
-        'Liabilities|tds_payable'
+        'Liabilities|current_liabilities', 'Liabilities|duties_taxes', 'Liabilities|loans_liabilities',
+        'Liabilities|secured_loans', 'Liabilities|sundry_creditors', 'Liabilities|expenses_payable',
+        'Liabilities|advance_earned', 'Liabilities|tax_payable', 'Liabilities|tds_payable'
       ]
     };
   }
 
-  /**
-   * Get account head display name
-   */
   private getAccountHeadDisplayName(accountHeadValue: string): string {
     const accountHeadMap: { [key: string]: string } = {
-      'Asset|fixed_assets': 'Fixed Assets',
-      'Asset|deposits_assets': 'Deposits (Assets)',
-      'Asset|investments': 'Investments',
-      'Asset|loans_advances': 'Loans and Advances',
-      'Asset|sundry_debtors': 'Sundry Debtors',
-      'Asset|suspense_account': 'Suspense A/C',
-      'Asset|income_receivables': 'Income Receivables',
-      'Asset|input_tax_credits': 'Input Tax Credits',
-      'Asset|prepaid_advances': 'Prepaid Advances',
-      'Asset|bank_accounts': 'Banks',
-      'Asset|current_assets': 'Current Assets',
-      'Equity|capital_account': 'Capital Account',
-      'Liabilities|current_liabilities': 'Current Liabilities',
-      'Liabilities|duties_taxes': 'Duties and Taxes',
-      'Liabilities|loans_liabilities': 'Loans (Liabilities)',
-      'Liabilities|secured_loans': 'Secured Loans',
-      'Liabilities|sundry_creditors': 'Sundry Creditors',
-      'Liabilities|expenses_payable': 'Expense Payable',
-      'Liabilities|advance_earned': 'Advance Earned',
-      'Liabilities|tax_payable': 'Tax Payable',
+      'Asset|fixed_assets': 'Fixed Assets', 'Asset|deposits_assets': 'Deposits (Assets)',
+      'Asset|investments': 'Investments', 'Asset|loans_advances': 'Loans and Advances',
+      'Asset|sundry_debtors': 'Sundry Debtors', 'Asset|suspense_account': 'Suspense A/C',
+      'Asset|income_receivables': 'Income Receivables', 'Asset|input_tax_credits': 'Input Tax Credits',
+      'Asset|prepaid_advances': 'Prepaid Advances', 'Asset|bank_accounts': 'Banks',
+      'Asset|current_assets': 'Current Assets', 'Equity|capital_account': 'Capital Account',
+      'Liabilities|current_liabilities': 'Current Liabilities', 'Liabilities|duties_taxes': 'Duties and Taxes',
+      'Liabilities|loans_liabilities': 'Loans (Liabilities)', 'Liabilities|secured_loans': 'Secured Loans',
+      'Liabilities|sundry_creditors': 'Sundry Creditors', 'Liabilities|expenses_payable': 'Expense Payable',
+      'Liabilities|advance_earned': 'Advance Earned', 'Liabilities|tax_payable': 'Tax Payable',
       'Liabilities|tds_payable': 'TDS Payable'
     };
-    
     return accountHeadMap[accountHeadValue] || accountHeadValue;
-  }  /**
-   * Calculate current balance for an account using the exact same logic as list-accounts component
-   */
-  private async calculateAccountCurrentBalance(accountId: string, openingBalance: number): Promise<number> {
-    try {
-      // Get all transactions and sales data
-      const [transactions, salesData] = await Promise.all([
-        this.getTransactionsForAccount(accountId),
-        this.getSalesForAccount(accountId)
-      ]);
-      
-      let currentBalance = openingBalance;
-      
-      // Process all transactions chronologically (same as list-accounts)
-      transactions.sort((a: any, b: any) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      ).forEach((transaction: any) => {
-        const amount = Number(transaction.amount || 0);
-        
-        // Calculate debit/credit based on transaction type and amount (same logic as list-accounts)
-        let balanceChange = 0;
-        
-        // If transaction already has debit/credit fields, use them
-        if (transaction.debit !== undefined && transaction.credit !== undefined) {
-          const debit = Number(transaction.debit || 0);
-          const credit = Number(transaction.credit || 0);
-          balanceChange = credit - debit;
-        } else {
-          // Calculate debit/credit from amount and type (exact same logic as list-accounts)
-          switch (transaction.type) {
-            case 'expense':
-            case 'transfer_out':
-            case 'purchase_payment':
-              balanceChange = -amount; // Debit decreases balance
-              break;
-            case 'income':
-            case 'transfer_in':
-            case 'deposit':
-            case 'sale':
-            case 'purchase_return':
-              balanceChange = amount; // Credit increases balance
-              break;
-            default:
-              // For unknown types, assume expense types decrease balance
-              if (transaction.type?.includes('expense') || transaction.type?.includes('payment')) {
-                balanceChange = -amount;
-              } else {
-                balanceChange = amount;
-              }
-          }
-        }
-        
-        currentBalance += balanceChange;
-      });
-      
-      // Also process sales data for balance calculation (same as list-accounts)
-      salesData.forEach((sale: any) => {
-        const paymentAmount = Number(sale.paymentAmount) || 0;
-        if (paymentAmount > 0) {
-          currentBalance += paymentAmount;
-        }
-      });
-      
-      console.log(`Balance Sheet - Account ${accountId}: Opening: ${openingBalance}, Final: ${currentBalance}`);
-      
-      return currentBalance;
-    } catch (error) {
-      console.error(`Error calculating current balance for account ${accountId}:`, error);
-      return openingBalance; // Fallback to opening balance
-    }
   }
-
-  /**
-   * Get all transactions for a specific account
-   */
-  private async getTransactionsForAccount(accountId: string): Promise<any[]> {
-    try {
-      const transactionsRef = collection(this.firestore, 'transactions');
-      const accountTransactionsQuery = query(
-        transactionsRef,
-        where('accountId', '==', accountId)
-      );
-      
-      const snapshot = await getDocs(accountTransactionsQuery);
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-    } catch (error) {
-      console.error(`Error getting transactions for account ${accountId}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * Get sales data for a specific account (same logic as list-accounts)
-   */
-  private async getSalesForAccount(accountId: string): Promise<any[]> {
-    try {
-      const salesRef = collection(this.firestore, 'sales');
-      
-      // Query both paymentAccountId and paymentAccount fields (same as list-accounts)
-      const salesQuery1 = query(
-        salesRef,
-        where('paymentAccountId', '==', accountId)
-      );
-      
-      const salesQuery2 = query(
-        salesRef,
-        where('paymentAccount', '==', accountId)
-      );
-      
-      const [snapshot1, snapshot2] = await Promise.all([
-        getDocs(salesQuery1),
-        getDocs(salesQuery2)
-      ]);
-      
-      const sales: any[] = [];
-      
-      // Add sales from paymentAccountId
-      snapshot1.docs.forEach(doc => {
-        sales.push({ id: doc.id, ...doc.data() });
-      });
-      
-      // Add sales from paymentAccount (avoiding duplicates)
-      snapshot2.docs.forEach(doc => {
-        const data = { id: doc.id, ...doc.data() };
-        if (!sales.find(sale => sale.id === data.id)) {
-          sales.push(data);
-        }
-      });
-      
-      return sales;
-    } catch (error) {
-      console.error(`Error getting sales for account ${accountId}:`, error);
-      return [];
-    }
-  }
-  /**
-   * Categorize accounts into balance sheet sections and show all account types
-   */
-  private async categorizeAccounts(accounts: any[]): Promise<void> {
+  // [REVISED] This method now trusts the `currentBalance` field from the fetched account data.
+  // MODIFIED: Uses Math.abs() for Liabilities to ensure they display as positive values.
+  private categorizeAccounts(accounts: any[]): void {
     const allAccountHeadTypes = this.getAllAccountHeadTypes();
-    const accountsByType: { [key: string]: any[] } = {};
-    
-    // Group accounts by their account head value
+    const accountsByHead: { [key: string]: any[] } = {};
+
     accounts.forEach(account => {
-      if (account.accountHead?.value) {
-        const accountHeadValue = account.accountHead.value;
-        if (!accountsByType[accountHeadValue]) {
-          accountsByType[accountHeadValue] = [];
+        const headValue = account.accountHead?.value;
+        if (headValue) {
+            if (!accountsByHead[headValue]) accountsByHead[headValue] = [];
+            accountsByHead[headValue].push(account);
         }
-        accountsByType[accountHeadValue].push(account);
-      }
-    });    // Process each account group
-    for (const [group, accountHeadTypes] of Object.entries(allAccountHeadTypes)) {
-      for (const accountHeadValue of accountHeadTypes) {
-        const accountsForType = accountsByType[accountHeadValue] || [];
-        const accountHeadDisplayName = this.getAccountHeadDisplayName(accountHeadValue);
-        let categoryTotal = 0;
-        
-        if (accountsForType.length > 0) {
-          // Add category header first
-          const categoryHeaderItem: BalanceSheetItem = {
-            name: accountHeadDisplayName,
-            accountNumber: group === 'Asset' ? `${accountsForType.length} accounts` : '',
-            value: 0, // Will be updated after processing individual accounts
-            accountHead: accountHeadDisplayName,
-            isCategory: true
-          };
-          
-          // Add individual accounts for this category
-          const individualAccounts: BalanceSheetItem[] = [];
-          for (const account of accountsForType) {
-            // Skip profit/loss related accounts as they will be handled separately
-            const accountName = account.name.toLowerCase();
-            if (accountName.includes('profit') || 
-                accountName.includes('loss') || 
-                accountName.includes('retained earnings') || 
-                accountName.includes('accumulated')) {
-              console.log(`Skipping profit/loss account from categorization: ${account.name}`);
-              continue;
-            }
-            
-            const openingBalance = Number(account.openingBalance || 0);
-            const currentBalance = await this.calculateAccountCurrentBalance(account.id, openingBalance);
-            categoryTotal += currentBalance;
-            
-            const balanceSheetItem: BalanceSheetItem = {
-              name: `  ${account.name}`, // Indent individual accounts
-              accountNumber: group === 'Asset' ? (account.accountNumber || '') : '',
-              value: currentBalance,
-              accountHead: accountHeadDisplayName,
-              isCategory: false
+    });
+
+    for (const [group, headTypes] of Object.entries(allAccountHeadTypes)) {
+        for (const headValue of headTypes) {
+            const accountsForThisHead = accountsByHead[headValue] || [];
+            const displayName = this.getAccountHeadDisplayName(headValue);
+
+            const isLiability = group.toLowerCase() === 'liabilities';
+
+            // Use 'currentBalance' for the category total.
+            const categoryTotal = accountsForThisHead.reduce((sum, account) =>
+                sum + (account.currentBalance ?? account.openingBalance ?? 0), 0);
+
+            const categoryHeaderItem: BalanceSheetItem = {
+                name: displayName,
+                accountNumber: '',
+                // FIX: Use Math.abs for liabilities to treat debt as positive value
+                value: isLiability ? Math.abs(categoryTotal) : categoryTotal,
+                accountHead: displayName,
+                isCategory: true,
             };
-            
-            individualAccounts.push(balanceSheetItem);
-            console.log(`Adding individual ${group} account: ${balanceSheetItem.name} = ${currentBalance}`);
-          }
-          
-          // Update category total
-          categoryHeaderItem.value = categoryTotal;
-          
-          // Add category header first, then individual accounts
-          switch (group.toLowerCase()) {
-            case 'equity':
-              this.addAccountToSection('equity', categoryHeaderItem);
-              individualAccounts.forEach(item => this.addAccountToSection('equity', item));
-              break;
-            case 'liabilities':
-              this.addAccountToSection('liabilities', categoryHeaderItem);
-              individualAccounts.forEach(item => this.addAccountToSection('liabilities', item));
-              break;
-            case 'asset':
-              this.addAccountToSection('assets', categoryHeaderItem);
-              individualAccounts.forEach(item => this.addAccountToSection('assets', item));
-              break;
-            default:
-              console.warn(`Unknown account group: ${group}`);
-          }
-        } else {
-          // Add empty category to show structure
-          const balanceSheetItem: BalanceSheetItem = {
-            name: accountHeadDisplayName,
-            accountNumber: group === 'Asset' ? 'No accounts' : '',
-            value: 0,
-            accountHead: accountHeadDisplayName,
-            isCategory: true
-          };
-          
-          console.log(`Adding empty ${group} category: ${balanceSheetItem.name} = 0`);
-          
-          // Add to appropriate section
-          switch (group.toLowerCase()) {
-            case 'equity':
-              this.addAccountToSection('equity', balanceSheetItem);
-              break;
-            case 'liabilities':
-              this.addAccountToSection('liabilities', balanceSheetItem);
-              break;
-            case 'asset':
-              this.addAccountToSection('assets', balanceSheetItem);
-              break;
-            default:
-              console.warn(`Unknown account group: ${group}`);
-          }
+
+            // Use 'currentBalance' for each individual account item.
+            const individualAccountItems: BalanceSheetItem[] = accountsForThisHead.map(account => ({
+                name: `  ${account.name}`,
+                accountNumber: account.accountNumber || '',
+                // FIX: Use Math.abs for liabilities to treat debt as positive value
+                value: isLiability ? Math.abs(account.currentBalance ?? 0) : (account.currentBalance ?? 0),
+                accountHead: displayName,
+                isCategory: false,
+            }));
+
+            let targetSection: keyof Pick<BalanceSheetData, 'equity' | 'liabilities' | 'assets'>;
+            const groupLower = group.toLowerCase();
+
+            if (groupLower === 'asset') {
+                targetSection = 'assets';
+            } else if (groupLower === 'equity') {
+                targetSection = 'equity';
+            } else {
+                targetSection = 'liabilities';
+            }
+
+            if (this.balanceSheetData[targetSection]) {
+                this.balanceSheetData[targetSection].push(categoryHeaderItem);
+                individualAccountItems.forEach(item => {
+                    this.balanceSheetData[targetSection].push(item);
+                });
+            }
         }
-      }
     }
   }
-  /**
-   * Add account to specific section
-   */
+
+private async loadTradeData(
+  reportDate: Date
+): Promise<{
+  sundryCreditors: { total: number; details: any[] };
+  supplierAdvances: { total: number; details: any[] };
+  sundryDebtors: number;
+  expenseDues: number;
+}> {
+  try {
+    const [
+      supplierTrade,
+      debtorsFromSales,
+      debtorsFromIncome,
+      expenseDues
+    ] = await Promise.all([
+      this.getSundryCreditorsAndAdvances(), // 👈 NEW unified logic
+      this.getSundryDebtors(),
+      this.getIncomeDues(),
+      this.getExpenseDues()
+    ]);
+
+    const totalSundryDebtors = debtorsFromSales + debtorsFromIncome;
+
+    return {
+      sundryCreditors: supplierTrade.sundryCreditors,
+      supplierAdvances: supplierTrade.supplierAdvances,
+      sundryDebtors: totalSundryDebtors,
+      expenseDues: expenseDues
+    };
+  } catch (error) {
+    console.error('Error loading trade data:', error);
+    return {
+      sundryCreditors: { total: 0, details: [] },
+      supplierAdvances: { total: 0, details: [] },
+      sundryDebtors: 0,
+      expenseDues: 0
+    };
+  }
+}
+
+
+
+
+
+// 3. Update the Tax Data visibility method
+private addTaxDataToSections(taxCredits: { finalInputTax: number, finalOutputTax: number }): void {
+    // Show Output Tax Payable if there is a liability
+    if (taxCredits.finalOutputTax > 0) {
+        this.addAccountToSection('liabilities', {
+            name: 'Output Tax Payable',
+            accountNumber: '',
+            value: taxCredits.finalOutputTax,
+            accountHead: 'Duties and Taxes',
+            isRealtimeData: true
+        });
+    }
+
+    // Show ITC if there is a credit
+    if (taxCredits.finalInputTax > 0) {
+        this.addAccountToSection('assets', {
+            name: 'Input Tax Credit',
+            accountNumber: '',
+            value: taxCredits.finalInputTax,
+            accountHead: 'Current Assets',
+            isRealtimeData: true
+        });
+    }
+}
+  private addStockToAssets(stockData: {openingStock: number, closingStock: number}): void {
+    this.addAccountToSection('assets', {
+      name: 'Inventory (Closing Stock)',
+      accountNumber: '',
+      value: stockData.closingStock,
+      accountHead: 'Current Assets',
+      isRealtimeData: true
+    });
+  }
+
+  private async getExpenseDues(): Promise<number> {
+    try {
+      const expensesCollection = collection(this.firestore, 'expenses');
+      const q = query(expensesCollection, where('paymentStatus', 'in', ['Partial', 'Due', 'Unpaid']));
+      const querySnapshot = await getDocs(q);
+
+      return querySnapshot.docs.reduce((sum, doc) =>
+        sum + (Number(doc.data()['balanceAmount']) || 0), 0);
+    } catch (error) {
+      console.error('Error calculating expense dues:', error);
+      return 0;
+    }
+  }
+
+  getBalanceSheetStatus(): string {
+    if (this.isLoading) return 'Loading...';
+    if (this.errorMessage) return 'Error';
+    if (!this.balanceSheetData) return 'No Data';
+
+    const totalEquityAndLiabilities = this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities;
+    const totalAssets = this.balanceSheetData.totals.assets;
+    const difference = Math.abs(totalAssets - totalEquityAndLiabilities);
+
+    return difference < 1 ? 'Balanced' : 'Unbalanced';
+  }
+
   private addAccountToSection(section: keyof Pick<BalanceSheetData, 'equity' | 'liabilities' | 'assets'>, item: BalanceSheetItem): void {
     this.balanceSheetData[section].push(item);
-    // Only add to totals if it's not a category header (to avoid double counting)
-    if (!item.isCategory) {
-      this.balanceSheetData.totals[section] += item.value;
-    }
-  }/**
-   * Add real-time profit/loss to equity section
-   */
-  private addProfitLossToEquity(profitLossData: any): void {
-    const profitLossValue = profitLossData.netProfit || 0;
-    
-    console.log('Adding profit/loss to equity:', {
-      profitLossData,
-      netProfit: profitLossData.netProfit,
-      grossProfit: profitLossData.grossProfit,
-      profitLossValue
-    });
-    
-    if (profitLossValue !== 0) {
-      const profitLossItem: BalanceSheetItem = {
-        name: profitLossValue >= 0 ? 'Retained Earnings (Profit)' : 'Accumulated Loss',
-        accountNumber: '',
-        value: profitLossValue,
-        accountHead: 'Profit & Loss',
-        isRealtimeData: profitLossData.isRealtimeData
-      };
-      
-      this.addAccountToSection('equity', profitLossItem);
-      console.log(`Added ${profitLossValue >= 0 ? 'profit' : 'loss'} to equity: ${this.formatCurrency(profitLossValue)}`);
-    }
-  }
-  /**
-   * Add calculated profit/loss to balance the sheet (only if no real-time P&L was added)
-   */
-  private addCalculatedProfitLoss(): void {
-    // Check if we already have any profit/loss entry 
-    const hasProfitLossEntry = this.balanceSheetData.equity.some(item => 
-      item.accountHead === 'Profit & Loss' || 
-      item.name.toLowerCase().includes('profit') || 
-      item.name.toLowerCase().includes('loss') ||
-      item.name.toLowerCase().includes('retained earnings') ||
-      item.name.toLowerCase().includes('accumulated')
-    );
-    
-    if (hasProfitLossEntry) {
-      console.log('Profit/loss entry already exists, skipping calculated profit/loss');
-      return;
-    }
-    
-    const profitLoss = this.balanceSheetData.totals.assets - 
-                      (this.balanceSheetData.totals.liabilities + this.balanceSheetData.totals.equity);
-    
-    if (Math.abs(profitLoss) > 0.01) { // Only add if significant difference
-      const calculatedItem: BalanceSheetItem = {
-        name: profitLoss >= 0 ? 'Profit & Loss (Calculated)' : 'Accumulated Loss (Calculated)',
-        accountNumber: '',
-        value: profitLoss,
-        accountHead: 'Calculated P&L'
-      };
-      
-      this.addAccountToSection('equity', calculatedItem);
-      console.warn(`Added calculated profit/loss to balance sheet: ${this.formatCurrency(profitLoss)}`);
-    }
   }
 
-  /**
-   * Validate that the balance sheet balances
-   */
+
+
+  private convertToDate(dateValue: any): Date {
+      if (!dateValue) return new Date();
+      if (dateValue instanceof Date) return dateValue;
+      if (dateValue?.toDate && typeof dateValue.toDate === 'function') return dateValue.toDate();
+      if (typeof dateValue === 'string') {
+        const date = new Date(dateValue);
+        if (!isNaN(date.getTime())) return date;
+        try {
+          const cleanedDate = dateValue.replace(/\s+at\s+.*$/, '');
+          return new Date(cleanedDate);
+        } catch {
+          return new Date();
+        }
+      }
+      if (typeof dateValue === 'number') return new Date(dateValue);
+      return new Date();
+  }
+
   private validateBalanceSheet(): void {
+    if (!this.balanceSheetData) {
+        this.errorMessage = 'Balance sheet data not available';
+        return;
+    }
+    const sumSection = (section: BalanceSheetItem[]) =>
+        section.filter(item => !item.isCategory).reduce((sum, item) => sum + item.value, 0);
+
+    this.balanceSheetData.totals = {
+        equity: this.roundCurrency(sumSection(this.balanceSheetData.equity)),
+        liabilities: this.roundCurrency(sumSection(this.balanceSheetData.liabilities)),
+        assets: this.roundCurrency(sumSection(this.balanceSheetData.assets))
+    };
     const totalEquityAndLiabilities = this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities;
     const totalAssets = this.balanceSheetData.totals.assets;
     const difference = Math.abs(totalAssets - totalEquityAndLiabilities);
     
-    if (difference > 0.01) {
-      console.warn(`Balance sheet does not balance! Difference: ${this.formatCurrency(difference)}`);
-      this.errorMessage = `Warning: Balance sheet does not balance. Difference: ${this.formatCurrency(difference)}`;
-    } else {
-      console.log('Balance sheet validates successfully');
-    }
+    this.errorMessage = '';
+  }
+private addTradeDataToSections(tradeData: {
+  sundryCreditors: {
+    total: number;
+    details: { supplierName: string; dueAmount: number }[];
+  };
+  supplierAdvances: {
+    total: number;
+    details: { supplierName: string; advanceAmount: number }[];
+  };
+  sundryDebtors: number;
+  expenseDues: number;
+}): void {
+
+  // ---------------------------
+  // SUNDRY CREDITORS (PAYABLE)
+  // ---------------------------
+  if (tradeData.sundryCreditors.total > 0) {
+    this.addAccountToSection('liabilities', {
+      name: 'Sundry Creditors (Purchase Dues)',
+      accountNumber: '',
+      value: tradeData.sundryCreditors.total,
+      accountHead: 'Sundry Creditors',
+      isCategory: true,
+      isRealtimeData: true
+    });
+
+    tradeData.sundryCreditors.details.forEach(supplierDue => {
+      this.addAccountToSection('liabilities', {
+        name: `  ${supplierDue.supplierName}`,
+        accountNumber: '',
+        value: supplierDue.dueAmount,
+        accountHead: 'Sundry Creditors',
+        isRealtimeData: true
+      });
+    });
   }
 
-  /**
-   * Get all accounts from Firestore
-   */
+  // ---------------------------
+  // SUPPLIER ADVANCES (ASSET)
+  // ---------------------------
+  if (tradeData.supplierAdvances?.total > 0) {
+    this.addAccountToSection('assets', {
+      name: 'Advance to Suppliers',
+      accountNumber: '',
+      value: tradeData.supplierAdvances.total,
+      accountHead: 'Current Assets',
+      isCategory: true,
+      isRealtimeData: true
+    });
+
+    tradeData.supplierAdvances.details.forEach(adv => {
+      this.addAccountToSection('assets', {
+        name: `  ${adv.supplierName}`,
+        accountNumber: '',
+        value: adv.advanceAmount,
+        accountHead: 'Current Assets',
+        isRealtimeData: true
+      });
+    });
+  }
+
+  // ---------------------------
+  // EXPENSE DUES
+  // ---------------------------
+  if (tradeData.expenseDues > 0) {
+    this.addAccountToSection('liabilities', {
+      name: 'Expense Dues',
+      accountNumber: '',
+      value: tradeData.expenseDues,
+      accountHead: 'Expense Payable',
+      isRealtimeData: true
+    });
+  }
+
+  // ---------------------------
+  // SUNDRY DEBTORS
+  // ---------------------------
+  if (tradeData.sundryDebtors > 0) {
+    this.addAccountToSection('assets', {
+      name: 'Sundry Debtors (Sales & Income Dues)',
+      accountNumber: '',
+      value: tradeData.sundryDebtors,
+      accountHead: 'Sundry Debtors',
+      isRealtimeData: true
+    });
+  }
+}
+
+
+// src/app/balance-sheet/balance-sheet.component.ts
+
+private async getSundryDebtors(): Promise<number> {
+  try {
+    const salesCollection = collection(this.firestore, 'sales');
+    
+    // We fetch all active sales that aren't fully returned or cancelled
+    const q = query(
+      salesCollection,
+      where('status', 'in', ['Completed', 'Partial Return'])
+    );
+    
+    const querySnapshot = await getDocs(q);
+
+    const totalDebtors = querySnapshot.docs.reduce((sum, doc) => {
+      const data = doc.data();
+      
+      // Calculate real-time debt:
+      // Total Payable (MRP + Tax + Shipping) 
+      const totalPayable = Number(data['totalPayable'] || data['totalAmount'] || 0);
+      
+      // Amount already paid by customer
+      const paidAmount = Number(data['paymentAmount'] || 0);
+      
+      // Value of items returned (Must be tracked on the sale doc or calculated)
+      // If you don't have a 'totalReturned' field, we calculate it from products
+      let totalReturned = Number(data['totalReturned']) || 0;
+      
+      if (!totalReturned && data['products']) {
+        totalReturned = data['products'].reduce((pSum: number, p: any) => {
+          const qtyRet = Number(p.quantityReturned) || 0;
+          const price = Number(p.unitPrice) || Number(p.price) || 0;
+          return pSum + (qtyRet * price);
+        }, 0);
+      }
+
+      // Net Debt = Original Total - Amount Paid - Value of Returned Goods
+      const currentDebt = totalPayable - paidAmount - totalReturned;
+      
+      return sum + Math.max(0, currentDebt);
+    }, 0);
+
+    return totalDebtors;
+  } catch (error) {
+    console.error('Error calculating sundry debtors:', error);
+    return 0;
+  }
+}
+
+  // [NEW] A helper method to get a one-time snapshot of all accounts.
   private async getAllAccounts(): Promise<any[]> {
     try {
       const accountsRef = collection(this.firestore, 'accounts');
       const snapshot = await getDocs(accountsRef);
-      const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      console.log(`Fetched ${accounts.length} accounts`);
-      return accounts;
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (error) {
       console.error('Error fetching accounts:', error);
       throw new Error(`Failed to fetch accounts: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  /**
-   * Format currency value
-   */
   formatCurrency(value: number): string {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -1181,363 +1007,103 @@ export class BalanceSheetComponent implements OnInit, OnDestroy {
     }).format(value);
   }
 
-  /**
-   * Get balance sheet status
-   */
-  getBalanceSheetStatus(): string {
-    if (this.isLoading) return 'Loading...';
-    if (this.errorMessage) return 'Error';
-    
-    const totalEquityAndLiabilities = this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities;
-    const totalAssets = this.balanceSheetData.totals.assets;
-    const difference = Math.abs(totalAssets - totalEquityAndLiabilities);
-    
-    if (difference > 0.01) return 'Unbalanced';
-    return 'Balanced';
+exportToExcel(): void {
+  try {
+    const excelData = [
+      [this.COMPANY_NAME],
+      ['Balance Sheet'],
+      [`From: ${this.fromDate} To: ${this.toDate}`], // Updated Date Usage
+      [],
+      ['Liabilities & Equity', '', '', 'Amount (₹)'],
+      ...this.balanceSheetData.equity.map(item => [item.name, item.accountNumber, item.accountHead, item.value]),
+      ['Total Equity', '', '', this.balanceSheetData.totals.equity],
+      [],
+      ...this.balanceSheetData.liabilities.map(item => [item.name, item.accountNumber, item.accountHead, item.value]),
+      ['Total Liabilities', '', '', this.balanceSheetData.totals.liabilities],
+      [],
+      ['TOTAL LIABILITIES & EQUITY', '', '', this.balanceSheetData.totals.liabilities + this.balanceSheetData.totals.equity],
+      [],
+      ['Assets', '', '', 'Amount (₹)'],
+      ...this.balanceSheetData.assets.map(item => [item.name, item.accountNumber, item.accountHead, item.value]),
+      ['Total Assets', '', '', this.balanceSheetData.totals.assets]
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Balance Sheet');
+    XLSX.writeFile(workbook, `Balance_Sheet_${this.toDate}.xlsx`); // Updated Filename
+  } catch (error) {
+    console.error('Error exporting to Excel:', error);
   }
+}
 
-  exportToExcel(): void {
-    try {
-      // Prepare data for Excel
-      const excelData = [
-        ['HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED', '', '', ''],
-        ['Balance Sheet', '', '', ''],
-        [`As on ${new Date(this.balanceSheetDate).toLocaleDateString()}`, '', '', ''],
-        ['', '', '', ''],
-        ['Equity', '', '', ''],
-        ...this.balanceSheetData.equity.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-          item.name, 
-          item.accountNumber, 
-          item.accountHead, 
-          this.formatCurrency(item.value)
-        ]),
-        ['Total Equity', '', '', this.formatCurrency(this.balanceSheetData.totals.equity)],
-        ['', '', '', ''],
-        ['Liabilities', '', '', ''],
-        ...this.balanceSheetData.liabilities.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-          item.name, 
-          item.accountNumber, 
-          item.accountHead, 
-          this.formatCurrency(item.value)
-        ]),
-        ['Total Liabilities', '', '', this.formatCurrency(this.balanceSheetData.totals.liabilities)],
-        ['', '', '', ''],
-        ['Assets', '', '', ''],
-        ...this.balanceSheetData.assets.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-          item.name, 
-          item.accountNumber, 
-          item.accountHead, 
-          this.formatCurrency(item.value)
-        ]),
-        ['Total Assets', '', '', this.formatCurrency(this.balanceSheetData.totals.assets)]
-      ];
+printBalanceSheet(): void {
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  
+  const tableRows = (items: BalanceSheetItem[]) => items.map(item => `
+    <tr class="${item.isCategory ? 'category-row' : ''}">
+      <td>${item.name}</td>
+      <td class="text-right">${this.formatCurrency(item.value)}</td>
+    </tr>`).join('');
 
-      // Create worksheet
-      const worksheet = XLSX.utils.aoa_to_sheet(excelData);
-      
-      // Create workbook
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Balance Sheet');
-      
-      // Generate file name
-      const fileName = `Herbaly_Touch_Balance_Sheet_${this.balanceSheetDate}.xlsx`;
-      
-      // Export to Excel
-      XLSX.writeFile(workbook, fileName);
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Error exporting to Excel. Please try again.');
-    }
-  }
-
-  exportToPDF(): void {
-    try {
-      // Create new PDF document in portrait mode
-      const doc = new jsPDF('p', 'pt');
-      
-      // Add title
-      doc.setFontSize(16);
-      doc.setTextColor(40, 40, 40);
-      doc.text('HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED', 40, 40);
-      doc.setFontSize(14);
-      doc.text('Balance Sheet', 40, 60);
-      doc.setFontSize(12);
-      doc.text(`As on ${new Date(this.balanceSheetDate).toLocaleDateString()}`, 40, 80);
-      
-      // Add Equity section
-      doc.setFontSize(14);
-      doc.text('Equity', 40, 120);
-      doc.setFontSize(10);
-      
-      const equityData = this.balanceSheetData.equity.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-        item.name,
-        item.accountNumber,
-        item.accountHead,
-        this.formatCurrency(item.value)
-      ]);
-      
-      equityData.push([
-        'Total Equity', '', '', this.formatCurrency(this.balanceSheetData.totals.equity)
-      ]);
-      
-      (doc as any).autoTable({
-        startY: 130,
-        head: [['Account Name', 'Account Number', 'Account Head', 'Amount']],
-        body: equityData,
-        styles: {
-          fontSize: 8,
-          cellPadding: 5
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontStyle: 'bold'
-        }
-      });
-      
-      // Add Liabilities section
-      doc.setFontSize(14);
-      (doc as any).lastAutoTable.finalY || 130;
-      doc.text('Liabilities', 40, (doc as any).lastAutoTable.finalY + 30);
-      doc.setFontSize(10);
-      
-      const liabilitiesData = this.balanceSheetData.liabilities.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-        item.name,
-        item.accountNumber,
-        item.accountHead,
-        this.formatCurrency(item.value)
-      ]);
-      
-      liabilitiesData.push([
-        'Total Liabilities', '', '', this.formatCurrency(this.balanceSheetData.totals.liabilities)
-      ]);
-      
-      (doc as any).autoTable({
-        startY: (doc as any).lastAutoTable.finalY + 40,
-        head: [['Account Name', 'Account Number', 'Account Head', 'Amount']],
-        body: liabilitiesData,
-        styles: {
-          fontSize: 8,
-          cellPadding: 5
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontStyle: 'bold'
-        }
-      });
-      
-      // Add Assets section
-      doc.setFontSize(14);
-      doc.text('Assets', 40, (doc as any).lastAutoTable.finalY + 30);
-      doc.setFontSize(10);
-      
-      const assetsData = this.balanceSheetData.assets.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => [
-        item.name,
-        item.accountNumber,
-        item.accountHead,
-        this.formatCurrency(item.value)
-      ]);
-      
-      assetsData.push([
-        'Total Assets', '', '', this.formatCurrency(this.balanceSheetData.totals.assets)
-      ]);
-      
-      (doc as any).autoTable({
-        startY: (doc as any).lastAutoTable.finalY + 40,
-        head: [['Account Name', 'Account Number', 'Account Head', 'Amount']],
-        body: assetsData,
-        styles: {
-          fontSize: 8,
-          cellPadding: 5
-        },
-        headStyles: {
-          fillColor: [41, 128, 185],
-          textColor: 255,
-          fontStyle: 'bold'
-        }
-      });
-      
-      // Add summary
-      doc.setFontSize(12);
-      doc.text('Summary', 40, (doc as any).lastAutoTable.finalY + 30);
-      
-      const summaryData = [
-        ['Total Equity', this.formatCurrency(this.balanceSheetData.totals.equity)],
-        ['Total Liabilities', this.formatCurrency(this.balanceSheetData.totals.liabilities)],
-        ['Total Equity + Liabilities', this.formatCurrency(this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities)],
-        ['Total Assets', this.formatCurrency(this.balanceSheetData.totals.assets)]
-      ];
-      
-      (doc as any).autoTable({
-        startY: (doc as any).lastAutoTable.finalY + 40,
-        body: summaryData,
-        styles: {
-          fontSize: 10,
-          cellPadding: 5
-        },
-        columnStyles: {
-          1: { fontStyle: 'bold' }
-        }
-      });
-      
-      // Save the PDF
-      doc.save(`Herbaly_Touch_Balance_Sheet_${this.balanceSheetDate}.pdf`);
-    } catch (error) {
-      console.error('Error exporting to PDF:', error);
-      alert('Error exporting to PDF. Please try again.');
-    }
-  }
-
-  printBalanceSheet(): void {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Popup was blocked. Please allow popups for this site to print.');
-      return;
-    }
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
+  printWindow.document.write(`
+    <html>
       <head>
-        <title>Balance Sheet - HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</title>
+        <title>Balance Sheet - ${this.COMPANY_NAME}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
-          h1, h2 { color: #333; }
           .header { text-align: center; margin-bottom: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .sheet-content { display: flex; justify-content: space-between; gap: 20px; }
+          .financial-column { width: 48%; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 10pt; }
+          th, td { border: 1px solid #ccc; padding: 6px; text-align: left; }
           th { background-color: #f2f2f2; }
-          .total-row { font-weight: bold; }
-          .section-title { margin-top: 20px; font-weight: bold; }
+          .total-row td { font-weight: bold; background-color: #f2f2f2; }
+          h3 { font-size: 14pt; margin-top: 20px; border-bottom: 2px solid #333; padding-bottom: 5px; }
           .text-right { text-align: right; }
-          @media print {
-            @page { size: portrait; margin: 10mm; }
-            body { margin: 0; }
-          }
+          .category-row { font-weight: bold; }
+          .summary { margin-top: 30px; border-top: 2px double #333; padding-top: 15px; }
+          @media print { @page { size: portrait; margin: 10mm; } body { margin: 0; } }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h1>
+          <h1>${this.COMPANY_NAME}</h1>
           <h2>Balance Sheet</h2>
-          <p>As on ${new Date(this.balanceSheetDate).toLocaleDateString()}</p>
+          <p>As on ${new Date(this.toDate).toLocaleDateString('en-GB')}</p> <!-- Updated Date Usage -->
         </div>
-        
-        <div class="section-title">Equity</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Account Name</th>
-              <th>Account Number</th>
-              <th>Account Head</th>
-              <th class="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${this.balanceSheetData.equity.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => `
-              <tr>
-                <td>${item.name}</td>
-                <td>${item.accountNumber}</td>
-                <td>${item.accountHead}</td>
-                <td class="text-right">${this.formatCurrency(item.value)}</td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td colspan="3">Total Equity</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.equity)}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div class="section-title">Liabilities</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Account Name</th>
-              <th>Account Number</th>
-              <th>Account Head</th>
-              <th class="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${this.balanceSheetData.liabilities.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => `
-              <tr>
-                <td>${item.name}</td>
-                <td>${item.accountNumber}</td>
-                <td>${item.accountHead}</td>
-                <td class="text-right">${this.formatCurrency(item.value)}</td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td colspan="3">Total Liabilities</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.liabilities)}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div class="section-title">Assets</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Account Name</th>
-              <th>Account Number</th>
-              <th>Account Head</th>
-              <th class="text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${this.balanceSheetData.assets.map((item: { name: any; accountNumber: any; accountHead: any; value: number; }) => `
-              <tr>
-                <td>${item.name}</td>
-                <td>${item.accountNumber}</td>
-                <td>${item.accountHead}</td>
-                <td class="text-right">${this.formatCurrency(item.value)}</td>
-              </tr>
-            `).join('')}
-            <tr class="total-row">
-              <td colspan="3">Total Assets</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.assets)}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <div class="section-title">Summary</div>
-        <table>
-          <tbody>
-            <tr>
-              <td>Total Equity</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.equity)}</td>
-            </tr>
-            <tr>
-              <td>Total Liabilities</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.liabilities)}</td>
-            </tr>
-            <tr class="total-row">
-              <td>Total Equity + Liabilities</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities)}</td>
-            </tr>
-            <tr class="total-row">
-              <td>Total Assets</td>
-              <td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.assets)}</td>
-            </tr>
-          </tbody>
-        </table>
-        
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 200);
-          }
-        </script>
+        <div class="sheet-content">
+          <div class="financial-column">
+            <h3>Liabilities & Equity</h3>
+            <table><thead><tr><th>Account</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>
+              ${tableRows(this.balanceSheetData.equity)}
+              <tr class="total-row"><td>Total Equity</td><td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.equity)}</td></tr>
+              ${tableRows(this.balanceSheetData.liabilities)}
+              <tr class="total-row"><td>Total Liabilities</td><td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.liabilities)}</td></tr>
+            </tbody></table>
+          </div>
+          <div class="financial-column">
+            <h3>Assets</h3>
+            <table><thead><tr><th>Account</th><th class="text-right">Amount (₹)</th></tr></thead><tbody>
+              ${tableRows(this.balanceSheetData.assets)}
+              <tr class="total-row"><td>Total Assets</td><td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.assets)}</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div class="summary">
+          <table>
+            <tr class="total-row"><td>Total Liabilities & Equity</td><td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.equity + this.balanceSheetData.totals.liabilities)}</td></tr>
+            <tr class="total-row"><td>Total Assets</td><td class="text-right">${this.formatCurrency(this.balanceSheetData.totals.assets)}</td></tr>
+          </table>
+        </div>
+        <script>setTimeout(() => { window.print(); window.close(); }, 250);</script>
       </body>
-      </html>
-    `;
+    </html>
+  `);
+  printWindow.document.close();
+}
 
-    printWindow.document.open();
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-  }
+
+
 }

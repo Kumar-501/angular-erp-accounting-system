@@ -123,4 +123,45 @@ select.ng-invalid.ng-touched:not(form) {
 
 .list-group-item small {
   font-size: 0.8rem;
+}.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .date-input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    flex: 1;
+  }
+
+  .calendar-btn {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-left: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    color: #495057;
+    height: 38px; // Bootstrap default height
+
+    &:hover {
+      background-color: darken(#e9ecef, 5%);
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+// Ensure error state highlights correctly if you use validation
+input.ng-invalid.ng-touched {
+  border-color: #dc3545;
 }

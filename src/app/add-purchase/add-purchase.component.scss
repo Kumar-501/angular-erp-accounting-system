@@ -4,7 +4,95 @@
     padding: 20px;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+/* Date Input Wrapper Styling */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
 
+  .date-input {
+    padding-right: 40px !important; /* Make room for the calendar icon */
+    width: 100%;
+    cursor: text;
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #555;
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease-in-out;
+    z-index: 2;
+
+    &:hover {
+      color: #007bff; /* Primary color highlight */
+    }
+
+    i {
+      font-size: 16px;
+    }
+  }
+
+  /* The actual native date picker is hidden but stays in the DOM 
+     so the .showPicker() method can be called on it */
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none; /* Prevents it from blocking clicks to the button */
+  }
+}
+
+/* Helper text for date format */
+.form-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+}
+
+/* Specific styling for the Filter Sidebar date inputs */
+.filter-sidebar {
+  .date-range-section {
+    .custom-date-inputs {
+      margin-top: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 4px;
+
+      .date-input-group {
+        margin-bottom: 12px;
+        
+        label {
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 4px;
+          display: block;
+        }
+      }
+    }
+  }
+}
+
+/* Bootstrap integration (for Add Purchase) */
+.form-control.date-input {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    height: 38px;
+}
 .page-title {
     color: #2c3e50;
     margin-bottom: 25px;
@@ -278,7 +366,7 @@ input[type="date"].form-control-sm {
 
 /* Buttons */
 .btn-sm {
-  padding: 4px 8px;
+  padding: 8px 8px;
   font-size: 12px;
   border-radius: 4px;
   transition: all 0.2s ease;

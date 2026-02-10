@@ -32,19 +32,23 @@ export class TaxService {
     return addDoc(collRef, newRate).then(() => {});
   }
 
-  getTaxRates(): Observable<TaxRate[]> {
-    return new Observable((observer) => {
-      const collRef: CollectionReference<DocumentData> = collection(this.firestore, 'taxRates');
-      const unsubscribe = onSnapshot(collRef, (snapshot) => {
-        const taxRates = snapshot.docs.map((doc) => ({
+getTaxRates(): Observable<TaxRate[]> {
+  return new Observable((observer) => {
+    const collRef: CollectionReference<DocumentData> = collection(this.firestore, 'taxRates');
+    const unsubscribe = onSnapshot(collRef, (snapshot) => {
+      const taxRates = snapshot.docs.map((doc) => {
+        const data = doc.data() as TaxRate;
+        const { id: _, ...rest } = data; // Remove id if it exists
+        return {
           id: doc.id,
-          ...(doc.data() as TaxRate)
-        }));
-        observer.next(taxRates);
+          ...rest
+        } as TaxRate;
       });
-      return () => unsubscribe();
+      observer.next(taxRates);
     });
-  }
+    return () => unsubscribe();
+  });
+}
 
   updateTaxRate(id: string, rate: Partial<TaxRate>): Promise<void> {
     const rateRef = doc(this.firestore, 'taxRates', id);
@@ -72,19 +76,19 @@ export class TaxService {
     return addDoc(collRef, newGroup).then(() => {});
   }
 
-  getTaxGroups(): Observable<TaxGroup[]> {
-    return new Observable((observer) => {
-      const collRef: CollectionReference<DocumentData> = collection(this.firestore, 'taxGroups');
-      const unsubscribe = onSnapshot(collRef, (snapshot) => {
-        const taxGroups = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as TaxGroup)
-        }));
-        observer.next(taxGroups);
-      });
-      return () => unsubscribe();
+getTaxGroups(): Observable<TaxGroup[]> {
+  return new Observable((observer) => {
+    const collRef: CollectionReference<DocumentData> = collection(this.firestore, 'taxGroups');
+    const unsubscribe = onSnapshot(collRef, (snapshot) => {
+      const taxGroups = snapshot.docs.map((doc) => ({
+        ...doc.data(),
+        id: doc.id
+      }) as TaxGroup);
+      observer.next(taxGroups);
     });
-  }
+    return () => unsubscribe();
+  });
+}
 
   updateTaxGroup(id: string, group: Partial<TaxGroup>): Promise<void> {
     const groupRef = doc(this.firestore, 'taxGroups', id);

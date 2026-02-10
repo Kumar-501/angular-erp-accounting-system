@@ -1,10 +1,13 @@
 <div class="container">
     <h2>Edit Purchase</h2>
-    <div *ngIf="isLoading" class="alert alert-info">
-      Loading purchase data...
+    <div *ngIf="isLoading" class="text-center p-5">
+        <div class="spinner-border" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p class="mt-2">Loading purchase data...</p>
     </div>
   
-    <form [formGroup]="purchaseForm" (ngSubmit)="updatePurchase()">
+    <form *ngIf="!isLoading" [formGroup]="purchaseForm" (ngSubmit)="updatePurchase()">
         <!-- Card 1: Purchase Order -->
         <div class="card mb-3">
             <div class="card-header">Purchase Order</div>
@@ -14,30 +17,53 @@
                         <div class="form-group">
                             <label>Supplier *</label>
                             <div class="d-flex align-items-center">
-                              <select formControlName="supplierId" class="form-control" required
-                                      (change)="onSupplierChange($any($event.target).value)">
-                                <option value="" disabled selected>Select Supplier</option>
-                                <option *ngFor="let supplier of suppliers" [value]="supplier.id">
-                                  {{ getSupplierDisplayName(supplier) }}
-                                </option>
-                              </select>
-                              <button type="button" class="btn btn-sm btn-primary ml-2" (click)="navigateToAddSupplier()">
-                                <i class="fa fa-plus"></i>
-                              </button>
+                                <div class="dropdown" style="width: 100%;">
+                                    <input type="text" 
+                                        class="form-control dropdown-toggle" 
+                                        placeholder="Search supplier..."
+                                        (input)="filterSuppliers($event)"
+                                        data-bs-toggle="dropdown"
+                                        [value]="selectedSupplier ? getSupplierDisplayName(selectedSupplier) : ''">
+                                    
+                                    <ul class="dropdown-menu" style="width: 100%; max-height: 300px; overflow-y: auto;">
+                                        <li *ngFor="let supplier of filteredSuppliers">
+                                        <a class="dropdown-item" 
+                                            href="javascript:void(0)" 
+                                            (click)="selectSupplier(supplier)">
+                                            {{ getSupplierDisplayName(supplier) }}
+                                            <small *ngIf="supplier.email" class="text-muted d-block">{{ supplier.email }}</small>
+                                            <small *ngIf="supplier.mobile" class="text-muted d-block">{{ supplier.mobile }}</small>
+                                        </a>
+                                        </li>
+                                        <li *ngIf="filteredSuppliers.length === 0">
+                                        <a class="dropdown-item disabled">No suppliers found</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-primary ml-2" (click)="navigateToAddSupplier()">
+                                    <i class="fa fa-plus"></i>
+                                </button>
                             </div>
+                            <input type="hidden" formControlName="supplierId">
                             <input type="hidden" formControlName="supplierName">
-                          </div>
+                        </div>
                     </div>
-                    <!-- <div class="col-md-6">
+                    <div class="col-md-6">
                         <div class="form-group">
                             <label>Address:</label>
-                            <input type="text" formControlName="address" class="form-control" />
+                            <input type="text" formControlName="address" class="form-control" readonly/>
                         </div>
-                    </div> -->
+                    </div>
                     <div class="col-md-6">
-                      <div class="form-group">
-                          <label>Reference No:</label>
-                          <input type="text" formControlName="referenceNo" class="form-control" required  />
+                        <div class="form-group">
+                            <label>Reference No:</label>
+                            <input type="text" formControlName="referenceNo" class="form-control" required readonly/>
+                        </div>
+                    </div>
+                     <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Linked Purchase Order:</label>
+                            <input type="text" formControlName="purchaseOrderId" class="form-control" readonly/>
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -58,6 +84,16 @@
                       </div>
                     </div>
                     <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Payment Status:</label>
+                            <select formControlName="paymentStatus" class="form-control" required>
+                            <option value="due">Due</option>
+                            <option value="partial">Partial</option>
+                            <option value="paid">Paid</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
                       <div class="form-group">
                         <label>Business Location:</label>
                         <select formControlName="businessLocation" class="form-control" required>
@@ -68,17 +104,12 @@
                         </select>
                       </div>
                     </div>
-                    <div class="col-md-6">
+
+                     <div class="col-md-6" formGroupName="addedBy">
                         <div class="form-group">
-                            <label>Pay Term *</label>
-                            <select formControlName="payTerm" class="form-control" required>
-                              <option value="" disabled selected>Select Payment Term</option>
-                              <option value="15 days">15 days</option>
-                              <option value="30 days">30 days</option>
-                              <option value="6 months">6 months</option>
-                              <option value="1 year">1 year</option>
-                            </select>
-                          </div>
+                            <label>Added By:</label>
+                            <input type="text" formControlName="name" class="form-control" readonly />
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
@@ -86,7 +117,6 @@
                             <input type="file" (change)="onFileSelected($event)" class="form-control" />
                         </div>
                     </div>
-                    <!-- New fields -->
                     <div class="col-md-6">
                       <div class="form-group">
                           <label>Invoice No:</label>
@@ -100,301 +130,300 @@
                       </div>
                     </div>
                     <div class="col-md-6">
-                      <div class="form-group">
-                          <label>Received Date:</label>
-                          <input type="date" formControlName="receivedDate" class="form-control" />
-                      </div>
-                    </div>
-                    <!-- End new fields -->
-                    <div class="col-md-6" formGroupName="addedBy">
-                        
+                        <div class="form-group">
+                            <label>Required Date:</label>
+                            <input type="date" formControlName="receivedDate" class="form-control" />
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Card 2: Product Table -->
-      <!-- Card 2: Product Table -->
-<div class="card mb-3">
-  <div class="card-header">Product Details</div>
-  <div class="card-body">
-    <!-- Add the search input -->
-    <div class="row mb-3">
-      <div class="col-md-12">
-        <div class="position-relative">
-          <input type="text" 
-                 class="form-control form-control-lg" 
-                 placeholder="Enter Product name / SKU / Scan bar code"
-                 (keyup)="onSearchInput($event)"
-                 (keydown)="handleKeyDown($event)"
-                 (focus)="onSearchFocus()"
-                 (blur)="onSearchBlur()"
-                 [(ngModel)]="searchTerm"
-                 [ngModelOptions]="{standalone: true}"/>
-          
-          <div *ngIf="showSearchResults" 
-               class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm mt-1" 
-               style="z-index: 1050; max-height: 300px; overflow-y: auto;">
-            <div class="list-group">
-              <button type="button" 
-                      class="list-group-item list-group-item-action text-start py-2"
-                      *ngFor="let product of searchResults"
-                      (mousedown)="addProductFromSearch(product); $event.preventDefault()"
-                      (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
-                      tabindex="0">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div class="text-truncate pe-2">
-                    <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
-                    <small *ngIf="product.sku" class="text-muted ms-2">
-                      SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
-                    </small>
-                  </div>
-                  <div class="text-nowrap">
-                    <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
-                    <span class="badge bg-success">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2'}}</span>
-                  </div>
-                </div>
-                <small *ngIf="product.barcode" class="text-muted d-block text-truncate">
-                  Barcode: {{ product.barcode }}
-                </small>
-              </button>
-              <div *ngIf="searchResults.length === 0" class="list-group-item text-muted py-2">
-                No products found matching "{{ searchTerm }}"
-              </div>
+        <!-- GRN Summary Section -->
+        <div class="card mb-3" *ngIf="showGrnSummary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-clipboard-list"></i> Previous Goods Received Information</span>
+                <span class="badge badge-info">{{ grnData.length }} GRN(s)</span>
             </div>
-          </div>
+            <div class="card-body">
+                <div *ngIf="isLoadingGrnData" class="text-center"><div class="spinner-border" role="status"></div></div>
+                <div *ngIf="!isLoadingGrnData && grnData.length > 0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>GRN Reference</th>
+                                    <th>Received Date</th>
+                                    <th>Products Count</th>
+                                    <th>Total Received Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let grn of grnData">
+                                    <td><strong>{{ grn.referenceNo }}</strong></td>
+                                    <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
+                                    <td><span class="badge badge-secondary">{{ grn.products.length }}</span></td>
+                                    <td><span class="badge badge-success">{{ getTotalReceivedQuantityForGrn(grn) }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
 
-  <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-      <table class="table table-hover mb-0" style="min-width: 1200px;">
-        <thead class="table-success">
-          <tr>
-            <th class="align-middle">
-              <input type="checkbox" class="form-check-input" (change)="toggleSelectAll($event)" />
-            </th>
-            <th class="text-center">S.NO</th>
-            <th>Product Name</th>
-            <th class="text-center">Qty</th>
-            <th class="text-end">Unit Price</th>
-            <th class="text-center d-none d-md-table-cell">Discount %</th>
-            <th class="text-end d-none d-lg-table-cell">Unit Cost</th>
-            <th class="text-center d-none d-md-table-cell">Tax Rate</th>
-            <th class="text-end d-none d-lg-table-cell">Tax Amt</th>
-            <th class="text-end">Net Cost</th>
-            <th class="d-none d-sm-table-cell">Batch No</th>
-            <th class="d-none d-sm-table-cell">Expiry</th>
-            <th class="text-end d-none d-md-table-cell">Subtotal</th>
-            <th class="text-end">Total</th>
-            <th class="text-center">
-              <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteSelectedProducts()" title="Delete Selected">
-                <i class="fas fa-trash"></i>
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody formArrayName="products">
-          <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i" class="align-middle">
-            <td>
-              <input type="checkbox" class="form-check-input" [checked]="isProductSelected(i)" (change)="toggleProductSelection(i)" />
-            </td>
-            <td class="text-center">{{ i + 1 }}</td>
-            <td>
-<select formControlName="productId" class="form-control form-control-sm" (change)="onProductSelect(i, $event)" required>                <option value="">Select Product</option>
-                <option *ngFor="let product of productsList" [value]="product.id">
-                  {{ product.productName }} 
-                  <span *ngIf="product.currentStock !== undefined">
-                    (Stock: {{ product.currentStock }})
-                  </span>
-                </option>
-              </select>
-            </td>
-            <td>
-              <input type="number" formControlName="quantity" class="form-control form-control-sm text-center" 
-                     min="1" step="1" (input)="calculateLineTotal(i)" required>
-            </td>
-            <td>
-              <input type="number" formControlName="unitCost" class="form-control form-control-sm text-end" 
-                     min="0" step="0.01" (input)="calculateLineTotal(i)" required>
-            </td>
-            <td class="d-none d-md-table-cell">
-              <input type="number" formControlName="discountPercent" class="form-control form-control-sm text-center" 
-                     min="0" max="100" step="1" (input)="calculateLineTotal(i)">
-            </td>
-            <td class="d-none d-lg-table-cell">
-              <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" >
-            </td>
-            <td class="d-none d-md-table-cell">
-              <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
-                <option value="0">No Tax</option>
-                <option *ngFor="let tax of taxRates" [value]="tax.rate" [selected]="tax.rate === item.get('taxRate')?.value">
-                  {{ tax.name }} ({{ tax.rate }}%)
-                </option>
-              </select>
-            </td>
-            <td class="d-none d-lg-table-cell">
-              <input type="number" formControlName="taxAmount" class="form-control form-control-sm text-end" >
-            </td>
-            <td class="text-end">
-              <div>₹{{ productsFormArray.at(i).get('netCost')?.value | number:'1.2-2' }}</div>
-              <small class="text-muted d-none d-sm-inline">
-                ({{ productsFormArray.at(i).get('quantity')?.value }} × 
-                {{ productsFormArray.at(i).get('unitCost')?.value | number:'1.2-2' }})
-              </small>
-            </td>
-            <td class="d-none d-sm-table-cell">
-              <input type="text" formControlName="batchNumber" class="form-control form-control-sm" 
-                     placeholder="Batch no">
-            </td>
-            <td class="d-none d-sm-table-cell">
-              <input type="date" formControlName="expiryDate" class="form-control form-control-sm">
-            </td>
-            <td class="d-none d-md-table-cell">
-              <input type="number" formControlName="subtotal" class="form-control form-control-sm text-end" r>
-            </td>
-            <td class="text-end">
-              <div class="fw-bold">₹{{ productsFormArray.at(i).get('lineTotal')?.value | number:'1.2-2' }}</div>
-            </td>
-            <td class="text-center">
-              <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeProduct(i)" title="Remove">
-                <i class="fas fa-trash"></i>
-              </button>
-            </td>
-          </tr>
-        </tbody>
-        <tfoot class="table-light">
-          <tr>
-            <td colspan="12" class="text-end fw-semibold">Grand Total:</td>
-            <td class="text-end fw-bold">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <div class="d-flex justify-content-between align-items-center p-3 border-top">
-      <tr *ngIf="productsFormArray.length === 0" class="empty-row">
-        <td colspan="15" class="text-center py-4">
-          <div class="d-flex flex-column align-items-center">
-            <i class="fas fa-box-open fa-3x text-muted mb-2"></i>
-            <p class="mb-0">No products added yet</p>
-            <button type="button" class="btn btn-sm btn-primary mt-2" (click)="addProduct()">
-              <i class="fas fa-plus me-1"></i> Add Product
-            </button>
-          </div>
-        </td>
-      </tr>
-      
-    
-    <div class="row mt-3">
-      <div class="col-md-6">
-        <div class="form-group">
-          <label>Total Items:</label>
-          <input type="number" class="form-control" [value]="totalItems" >
+        <!-- Product Information Table -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Product Information</span>
+                <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteSelectedProducts()" [disabled]="selectedProducts.size === 0">
+                    <i class="fas fa-trash"></i> Delete Selected
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="position-relative">
+                            <input type="text" 
+                                   class="form-control form-control-lg" 
+                                   placeholder="Enter Product name / SKU / Scan bar code"
+                                   (keyup)="onSearchInput($event)"
+                                   (focus)="onSearchFocus()"
+                                   (blur)="onSearchBlur()"
+                                   [(ngModel)]="searchTerm"
+                                   [ngModelOptions]="{standalone: true}"/>
+                            <div *ngIf="showSearchResults" class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm mt-1" style="z-index: 1050; max-height: 300px; overflow-y: auto;">
+                                <div class="list-group">
+                                    <button type="button" 
+                                            class="list-group-item list-group-item-action text-start py-2"
+                                            *ngFor="let product of searchResults"
+                                            (mousedown)="addProductFromSearch(product); $event.preventDefault()">
+                                        <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
+                                        <small *ngIf="product.sku" class="text-muted ms-2"> SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span></small>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                    <table class="table table-hover mb-0" style="min-width: 1500px;">
+                        <thead class="table-success">
+                             <tr>
+                                <th class="align-middle"><input type="checkbox" class="form-check-input" (change)="toggleSelectAll($event)" /></th>
+                                <th class="text-center">S.NO</th>
+                                <th>Product Name</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">UnitPrice Before Tax</th>
+                                <th class="text-end">UnitPrice After Tax</th>
+                                <th class="text-center">Discount %</th>
+                                <th class="text-end">Selling Price</th>
+                                <th class="text-center">Margin %</th>
+                                <th class="text-center">Tax Rate</th>
+                                <th class="text-end">Tax Amt</th>
+                                <th class="text-end">Net Cost</th>
+                                <th>Batch No</th>
+                                <th>Expiry</th>
+                                <th class="text-end">Subtotal Before Tax</th>
+                                <th class="text-end">Line Total</th>
+                                <th class="text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody formArrayName="products">
+                            <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i" class="align-middle">
+                                <td><input type="checkbox" class="form-check-input" [checked]="isProductSelected(i)" (change)="toggleProductSelection(i)" /></td>
+                                <td class="text-center">{{ i + 1 }}</td>
+                                <td>
+                                    <select formControlName="productId" class="form-control form-control-sm" (change)="onProductSelect(i)" required>
+                                        <option value="">Select Product</option>
+                                        <option *ngFor="let product of productsList" [value]="product.id">{{ product.productName }}</option>
+                                    </select>
+                                </td>
+                                <td><input type="number" formControlName="quantity" class="form-control form-control-sm text-center" (input)="calculateLineTotal(i)" required></td>
+                                <td><input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" (input)="calculateLineTotal(i); calculateMargin(i)" required></td>
+                                <td class="text-end align-middle">
+                                    <span class="fw-bold">₹{{ getUnitPriceAfterTax(i) | number:'1.2-2' }}</span>
+                                </td>
+                                <td><input type="number" formControlName="discountPercent" class="form-control form-control-sm text-center" (input)="calculateLineTotal(i)"></td>
+                                <td><input type="number" formControlName="sellingPrice" class="form-control form-control-sm text-end" (input)="calculateMargin(i)"></td>
+                                <td><input type="number" formControlName="marginPercentage" class="form-control form-control-sm text-center" readonly></td>
+                                <td>
+                                    <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
+                                        <option value="0">No Tax</option>
+                                        <option *ngFor="let tax of taxRates" [value]="tax.rate">{{ tax.name }} ({{ tax.rate }}%)</option>
+                                    </select>
+                                </td>
+                                <td><input type="number" formControlName="taxAmount" class="form-control form-control-sm text-end" readonly></td>
+                                <td class="text-end">{{ productsFormArray.at(i).get('netCost')?.value | number:'1.2-2' }}</td>
+                                <td><input type="text" formControlName="batchNumber" class="form-control form-control-sm" placeholder="Batch no"></td>
+                                <td><input type="date" formControlName="expiryDate" class="form-control form-control-sm"></td>
+                                <td><input type="number" formControlName="subtotal" class="form-control form-control-sm text-end" readonly></td>
+                                <td class="text-end fw-bold">₹{{ productsFormArray.at(i).get('lineTotal')?.value | number:'1.2-2' }}</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="removeProduct(i)" title="Remove"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr *ngIf="productsFormArray.length === 0">
+                                <td colspan="17" class="text-center py-4">No products added.</td>
+                            </tr>
+                        </tbody>
+                  <tfoot class="table-light">
+    <tr>
+        <td colspan="15" class="text-end fw-semibold">Grand Total (Products Only):</td>
+        <td class="text-end fw-bold" colspan="2">₹{{ productsOnlyTotal | number:'1.2-2' }}</td>
+    </tr>
+</tfoot>
+                    </table>
+                </div>
+
+                <!-- Net Total Amount Display -->
+          <div class="d-flex justify-content-end p-3 border-top">
+    <div class="text-end">
+        
+        <div>
+            <span class="fw-semibold me-2">Net Total:</span>
+            <span class="fw-bold fs-5">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
         </div>
-      </div>
-      <div class="col-md-6">
-        <div class="form-group">
-          <label>Net Total Amount:</label>
-          <input type="number" class="form-control" [value]="netTotalAmount" >
-        </div>
-      </div>
     </div>
-  </div>
 </div>
 
-        <!-- Card 4: Shipping Details -->
+            </div>
+        </div>
+
+        <!-- Notes and Shipping -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="card mb-3">
+                    <div class="card-header">Additional Notes</div>
+                    <div class="card-body">
+                        <textarea formControlName="additionalNotes" class="form-control" rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+           <div class="col-lg-6">
+    <div class="card mb-3">
+        <div class="card-header">Shipping & Totals</div>
+        <div class="card-body">
+            <!-- New Shipping Details Section -->
+            <div class="card mb-3 border-secondary">
+                <div class="card-header bg-light">Shipping Details</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Shipping Charges (Before Tax):</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" 
+                                           formControlName="shippingChargesBeforeTax" 
+                                           class="form-control" 
+                                           (input)="calculateTotals()" 
+                                           min="0"
+                                           step="0.01" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Shipping Tax:</label>
+                                <div class="input-group">
+                                    <select formControlName="shippingTaxRate" 
+                                            class="form-control" 
+                                            (change)="calculateTotals()">
+                                        <option value="0">No Tax</option>
+                                        <option *ngFor="let tax of taxRates" [value]="tax.rate">
+                                            {{ tax.name }} ({{ tax.rate }}%)
+                                        </option>
+                                    </select>
+                                </div>
+                                <small class="text-muted">Tax Amount: ₹{{ purchaseForm.get('shippingTaxAmount')?.value | number:'1.2-2' }}</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Shipping Charges (After Tax):</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+                                    <input type="number" 
+                                           formControlName="shippingCharges" 
+                                           class="form-control" 
+                                           readonly
+                                           style="background-color: #f8f9fa;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Rounded Total -->
+            <div class="form-group">
+                <label>Rounded Total:</label>
+                <input type="number" formControlName="roundedTotal" class="form-control" readonly />
+            </div>
+        </div>
+    </div>
+</div>
+        </div>
+
+
+        <!-- Payment Details -->
         <div class="card mb-3">
-            <div class="card-header">Shipping Details</div>
+            <div class="card-header">Add Payment</div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Additional Shipping Charges:</label>
-                            <input type="number" formControlName="shippingCharges" class="form-control" (change)="calculateTotals()" />
-                        </div>
+                    <div class="col-md-6 form-group">
+                        <label>Amount *</label>
+                        <input type="number" formControlName="paymentAmount" class="form-control" required (input)="calculatePaymentBalance()"/>
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Round Off Amount:</label>
-                            <input type="number" formControlName="roundOffAmount" class="form-control"  />
-                        </div>
+                    <div class="col-md-6 form-group">
+                        <label>Paid On *</label>
+                        <input type="date" formControlName="paidOn" class="form-control" required />
                     </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Rounded Total:</label>
-                            <input type="number" formControlName="roundedTotal" class="form-control"  />
-                        </div>
+                    <div class="col-md-6 form-group">
+                        <label>Payment Method *</label>
+                        <select formControlName="paymentMethod" class="form-control" required>
+                             <option value="">Select Payment Method</option>
+                            <option>Cash</option>
+                            <option>Credit/Debit Card</option>
+                            <option>Bank Transfer</option>
+                            <option>Mobile Payment</option>
+                            <option>Digital Wallet</option>
+                        </select>
+                    </div>
+                     <div class="col-md-6 form-group">
+                        <label>Payment Account *</label>
+                        <select formControlName="paymentAccount" class="form-control" required>
+                           <option value="">Select Payment Account</option>
+                            <option *ngFor="let account of paymentAccounts" [value]="account.id">
+                                {{account.name}} 
+                                <span *ngIf="account.accountNumber">({{account.accountNumber}})</span>
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 form-group">
+                        <label>Payment Note:</label>
+                        <textarea formControlName="paymentNote" class="form-control"></textarea>
                     </div>
                 </div>
-            </div>
-        </div>
-</div>
- 
-        <!-- Card 5: Payment Details -->
-        <div class="card mb-3">
-            <div class="card-header">Payment Details</div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Amount:</label>
-                            <input type="number" formControlName="paymentAmount" class="form-control" required 
-                                   (change)="calculatePaymentBalance()"/>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Paid On:</label>
-                            <input type="date" formControlName="paidOn" class="form-control" required />
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Payment Method:</label>
-                            <select formControlName="paymentMethod" class="form-control" required>
-                                <option value="">Select Payment Method</option>
-                                <option value="Cash">Cash</option>
-                                <option value="Credit/Debit Card">Credit/Debit Card</option>
-                                <option value="Bank Transfer">Bank Transfer</option>
-                                <option value="Mobile Payment">Mobile Payment</option>
-                                <option value="Digital Wallet">Digital Wallet</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Payment Note:</label>
-                            <textarea formControlName="paymentNote" class="form-control"></textarea>
-                        </div>
-                    </div>
-                    <!-- New Balance Field -->
-<!-- In your edit-purchase.component.html -->
-<div class="col-md-6">
-  <div class="form-group">
-    <label>Payment Due:</label>
-    <input type="number" formControlName="paymentDue" class="form-control" readonly />
-  </div>
-</div>
-
-<div class="col-md-6">
-  <div class="form-group">
-    <label>Balance:</label>
-    <input type="number" formControlName="balance" class="form-control" readonly />
-  </div>
-</div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Total Payable:</label>
-                            <input type="number" formControlName="totalPayable" class="form-control"  />
-                        </div>
-                    </div>
+                 <hr/>
+                <div class="row fw-bold">
+                    <div class="col-md-6">Purchase Total: {{ purchaseForm.get('purchaseTotal')?.value | number:'1.2-2' }}</div>
+                    <div class="col-md-6">Balance: {{ purchaseForm.get('balance')?.value | number:'1.2-2' }}</div>
                 </div>
             </div>
         </div>
         
-        <!-- Save Button -->
-        <button type="submit" class="btn btn-success mt-3">Update Purchase</button>
-        <button type="button" class="btn btn-secondary mt-3 ms-2" (click)="router.navigate(['/list-purchase'])">Cancel</button>
+        <!-- Action Buttons -->
+        <div class="mt-3">
+            <button type="submit" class="btn btn-success" [disabled]="isSaving || purchaseForm.invalid">
+                <span *ngIf="isSaving" class="spinner-border spinner-border-sm mr-1"></span>
+                <span *ngIf="isSaving">Updating...</span>
+                <span *ngIf="!isSaving">Update Purchase</span>
+            </button>
+            <button type="button" class="btn btn-secondary ms-2" (click)="router.navigate(['/list-purchase'])">Cancel</button>
+        </div>
     </form>
-</div>
+</div>```
+
+

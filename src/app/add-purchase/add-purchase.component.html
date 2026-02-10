@@ -92,10 +92,20 @@
 </div>
 </div>
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Purchase Date:</label>
-                            <input type="date" formControlName="purchaseDate" class="form-control" required />
-                        </div>
+<div class="form-group">
+    <label>Purchase Date *</label>
+    <div class="date-input-wrapper">
+        <input type="text" 
+               class="form-control date-input" 
+               [value]="getFormattedDateForInput(purchaseForm.get('purchaseDate')?.value)"
+               (blur)="onManualDateInput($event, 'purchaseDate')"
+               placeholder="DD-MM-YYYY">
+        <button type="button" class="calendar-btn" (click)="openDatePicker('purchase')">
+            <i class="far fa-calendar-alt"></i>
+        </button>
+        <input #purchaseDatePicker type="date" formControlName="purchaseDate" class="hidden-date-picker">
+    </div>
+</div>
                     </div>
                     <div class="col-md-6">
                       <div class="form-group">
@@ -158,17 +168,36 @@
                       </div>
                     </div>
                     <div class="col-md-6">
-                      <div class="form-group">
-                          <label>Invoiced Date:</label>
-                          <input type="date" formControlName="invoicedDate" class="form-control" />
-                      </div>
+<div class="form-group">
+    <label>Invoiced Date:</label>
+    <div class="date-input-wrapper">
+        <input type="text" 
+               class="form-control date-input" 
+               [value]="getFormattedDateForInput(purchaseForm.get('invoicedDate')?.value)"
+               (blur)="onManualDateInput($event, 'invoicedDate')"
+               placeholder="DD-MM-YYYY">
+        <button type="button" class="calendar-btn" (click)="openDatePicker('invoiced')">
+            <i class="far fa-calendar-alt"></i>
+        </button>
+        <input #invoicedDatePicker type="date" formControlName="invoicedDate" class="hidden-date-picker">
+    </div>
+</div>
                     </div>
         <div class="col-md-6">
-    <div class="form-group">
-        <label>Required Date:</label>
-        <input type="date" formControlName="receivedDate" class="form-control" 
-               [value]="purchaseOrderData?.requiredByDate || requisitionData?.requiredDate || ''" />
+<div class="form-group">
+    <label>Required Date:</label>
+    <div class="date-input-wrapper">
+        <input type="text" 
+               class="form-control date-input" 
+               [value]="getFormattedDateForInput(purchaseForm.get('receivedDate')?.value)"
+               (blur)="onManualDateInput($event, 'receivedDate')"
+               placeholder="DD-MM-YYYY">
+        <button type="button" class="calendar-btn" (click)="openDatePicker('received')">
+            <i class="far fa-calendar-alt"></i>
+        </button>
+        <input #receivedDatePicker type="date" formControlName="receivedDate" class="hidden-date-picker">
     </div>
+</div>
 </div>
                     <!-- End new fields -->
                     <div class="col-md-6" formGroupName="addedBy">
@@ -188,6 +217,66 @@
                         <input type="text" [value]="purchaseOrderId" class="form-control" readonly />
                       </div>
                     </div> -->
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: GRN Summary Section -->
+        <div class="card mb-3" *ngIf="showGrnSummary">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fas fa-clipboard-list"></i> 
+                    Previous Goods Received Information
+                </span>
+                <div class="grn-summary-stats">
+                    <span class="badge badge-info">{{ grnData.length }} GRN(s)</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div *ngIf="isLoadingGrnData" class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading GRN data...</span>
+                    </div>
+                </div>
+                
+                <div *ngIf="!isLoadingGrnData && grnData.length > 0" class="grn-summary-content">
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle"></i> 
+                        This purchase order has previously received goods. Review the information below to avoid duplicate entries.
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>GRN Reference</th>
+                                    <th>Received Date</th>
+                                    <th>Products Count</th>
+                                    <th>Total Received Qty</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr *ngFor="let grn of grnData">
+                                    <td>
+                                        <strong>{{ grn.referenceNo }}</strong>
+                                    </td>
+                                    <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
+                                    <td>
+                                        <span class="badge badge-secondary">{{ grn.products.length }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-success">
+                                            {{ getTotalReceivedQuantityForGrn(grn) }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ grn.supplierName }}</small>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -226,9 +315,9 @@
                                                     SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
                                                 </small>
                                             </div>
-                                            <div class="text-nowrap">
-                                                <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
-                                            </div>
+                                           <div class="text-nowrap">
+    <span class="badge bg-primary me-1">Stock: {{ product.currentStock || product.totalQuantity || 0 }}</span>
+</div>
                                         </div>
                                         <small *ngIf="product.barcode" class="text-muted d-block text-truncate">
                                             Barcode: {{ product.barcode }}
@@ -243,8 +332,8 @@
                     </div>
                 </div>
 
-           <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-    <table class="table table-hover mb-0" style="min-width: 1200px;">
+<div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+    <table class="table table-hover mb-0" style="min-width: 1500px;">
         <thead class="table-success">
             <tr>
                 <th class="align-middle">
@@ -253,20 +342,20 @@
                 <th class="text-center">S.NO</th>
                 <th>Product Name</th>
                 <th class="text-center">Qty</th>
-                <th class="text-end">Unit Price</th>
+                <th class="text-end">UnitPrice Before Tax</th>
+                <th class="text-end">UnitPrice After Tax</th>
                 <th class="text-center">Discount %</th>
-                <th class="text-end">Unit Cost</th>
+                <th class="text-end">Selling Price</th>
+                <th class="text-center">Margin %</th>
                 <th class="text-center">Tax Rate</th>
                 <th class="text-end">Tax Amt</th>
                 <th class="text-end">Net Cost</th>
                 <th>Batch No</th>
                 <th>Expiry</th>
-                <th class="text-end">Subtotal</th>
-                <th class="text-end">Total</th>
+                <th class="text-end">Subtotal Before Tax</th>
+                <th class="text-end">Line Total</th>
                 <th class="text-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="deleteSelectedProducts()" title="Delete Selected">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                  
                 </th>
             </tr>
         </thead>
@@ -286,21 +375,105 @@
                             </span>
                         </option>
                     </select>
+                    
+                    <!-- NEW: GRN Received Quantity Display -->
+                    <div *ngIf="item.get('productId')?.value && showGrnSummary" class="grn-received-info mt-2">
+                        <div class="grn-quantity-summary p-2 border rounded" [ngClass]="getProductDeliveryStatusClass(item.get('productId')?.value)">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="fas fa-box"></i> GRN Status:
+                                </small>
+                                <span class="badge" [ngClass]="getProductDeliveryStatusClass(item.get('productId')?.value)">
+                                    {{ getProductDeliveryStatus(item.get('productId')?.value) }}
+                                </span>
+                            </div>
+                            
+                            <div class="row mt-1">
+                                <div class="col-4">
+                                    <small class="text-muted">Ordered:</small>
+                                    <div class="fw-bold">{{ getProductOrderedQuantity(item.get('productId')?.value) }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Received:</small>
+                                    <div class="fw-bold text-success">{{ getProductReceivedQuantity(item.get('productId')?.value) }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Pending:</small>
+                                    <div class="fw-bold text-warning">{{ getProductPendingQuantity(item.get('productId')?.value) }}</div>
+                                </div>
+                            </div>
+                            
+                            <!-- GRN Entries Details -->
+                <div *ngIf="hasReceivedQuantities(item.get('productId')?.value)" class="mt-2">
+  <div class="grn-entries-accordion">
+    <div class="accordion-header" 
+         (click)="toggleGrnDetails(item.get('productId')?.value)"
+         style="cursor: pointer;">
+      <small class="text-primary">
+        <i class="fas fa-chevron-down"></i> View GRN Details
+      </small>
+    </div>  <div class="grn-entries-details mt-2" 
+         *ngIf="showGrnDetails.get(item.get('productId')?.value)">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped">
+                                                <thead>
+                                                    <tr>
+                                                        <th>GRN Ref</th>
+                                                        <th>Received Qty</th>
+                                                        <th>Batch</th>
+                                                        <th>Expiry</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr *ngFor="let grnEntry of getProductGrnEntries(item.get('productId')?.value)">
+                                                        <td>
+                                                            <small class="text-muted">
+                                                                {{ getGrnReferenceForEntry(grnEntry) }}
+                                                            </small>
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge badge-success">
+                                                                {{ grnEntry.receivedQuantity || grnEntry.quantity || 0 }}
+                                                            </span>
+                                                        </td>
+                                                        <td>
+                                                            <small>{{ grnEntry.batchNumber || '-' }}</small>
+                                                        </td>
+                                                        <td>
+                                                            <small>{{ grnEntry.expiryDate || '-' }}</small>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </td>
                 <td>
                     <input type="number" formControlName="quantity" class="form-control form-control-sm text-center" 
                            min="1" step="1" (input)="calculateLineTotal(i)" required>
                 </td>
                 <td>
-                    <input type="number" formControlName="unitCost" class="form-control form-control-sm text-end" 
-                           min="0" step="0.01" (input)="calculateLineTotal(i)" required>
+                    <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" 
+                           min="0" step="0.01" (input)="calculateLineTotal(i); calculateMargin(i)" required>
+                </td>
+                <td class="text-end align-middle">
+                    <span class="fw-bold">₹{{ getUnitPriceAfterTax(i) | number:'1.2-2' }}</span>
                 </td>
                 <td>
                     <input type="number" formControlName="discountPercent" class="form-control form-control-sm text-center" 
                            min="0" max="100" step="1" (input)="calculateLineTotal(i)">
                 </td>
                 <td>
-                    <input type="number" formControlName="unitCostBeforeTax" class="form-control form-control-sm text-end" readonly>
+                    <input type="number" formControlName="sellingPrice" class="form-control form-control-sm text-end" 
+                           min="0" step="0.01" (input)="calculateMargin(i)">
+                </td>
+                <td>
+                    <input type="number" formControlName="marginPercentage" class="form-control form-control-sm text-center" 
+                           min="0" step="0.01" (input)="calculateSellingPriceFromMargin(i)" readonly>
                 </td>
                 <td>
                     <select formControlName="taxRate" class="form-control form-control-sm" (change)="calculateLineTotal(i)">
@@ -317,7 +490,7 @@
                     <div>₹{{ productsFormArray.at(i).get('netCost')?.value | number:'1.2-2' }}</div>
                     <small class="text-muted">
                         ({{ productsFormArray.at(i).get('quantity')?.value }} × 
-                        {{ productsFormArray.at(i).get('unitCost')?.value | number:'1.2-2' }})
+                        {{ productsFormArray.at(i).get('unitCostBeforeTax')?.value | number:'1.2-2' }})
                     </small>
                 </td>
                 <td>
@@ -327,7 +500,7 @@
                 <td>
                     <input type="date" formControlName="expiryDate" class="form-control form-control-sm">
                 </td>
-                <td>
+                  <td>
                     <input type="number" formControlName="subtotal" class="form-control form-control-sm text-end" readonly>
                 </td>
                 <td class="text-end">
@@ -340,45 +513,35 @@
                 </td>
             </tr>
             <tr *ngIf="productsFormArray.length === 0" class="empty-row">
-                <td colspan="15" class="text-center py-4">
+                <td colspan="18" class="text-center py-4">
                     <div class="d-flex flex-column align-items-center">
                         <i class="fas fa-box-open fa-3x text-muted mb-2"></i>
-                        <p class="mb-0">No products added yet</p>
-                        <button type="button" class="btn btn-sm btn-primary mt-2" (click)="addProduct()">
-                            <i class="fas fa-plus me-1"></i> Add Product
-                        </button>
+                        <p class="mb-0">No products added yet. Start by searching for a product above.</p>
                     </div>
                 </td>
             </tr>
         </tbody>
-        <tfoot class="table-light">
-            <tr>
-                <td colspan="12" class="text-end fw-semibold">Grand Total:</td>
-                <td class="text-end fw-bold">₹{{ netTotalAmount | number:'1.2-2' }}</td>
-                <td></td>
-            </tr>
-        </tfoot>
+       <tfoot class="table-light">
+    <tr>
+        <td colspan="15" class="text-end fw-semibold">Grand Total (Products Only):</td>
+        <td class="text-end fw-bold" colspan="2">₹{{ productsOnlyTotal | number:'1.2-2' }}</td>
+        <td></td>
+    </tr>
+</tfoot>
     </table>
 </div>
 
-                <div class="d-flex justify-content-between align-items-center p-3 border-top">
-                    <div class="d-flex flex-column text-end">
-                        <div class="mb-1">
-                            <span class="fw-semibold me-2">Total Items:</span>
-                            <span class="fw-bold">{{ totalItems }}</span>
-                        </div>
-                        <div>
-                            <span class="fw-semibold me-2">Net Total Amount:</span>
-                            <span class="fw-bold fs-5">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
-                        </div>
-                    </div>
-                </div>
+               <div class="d-flex justify-content-between align-items-center p-3 border-top">
+    <div class="d-flex flex-column text-end">
+     
+        <div>
+            <span class="fw-semibold me-2">Net Total:</span>
+            <span class="fw-bold fs-5">{{ netTotalAmount | currency:'INR':'symbol':'1.2-2' }}</span>
+        </div>
+    </div>
+</div>
             </div>
         </div>
-
-
-
-
 
         
         <!-- Card 3: Additional Notes -->
@@ -391,27 +554,61 @@
             </div>
         </div>
 
-        <!-- Card 4: Shipping Details -->
-        <div class="card mb-3">
-            <div class="card-header">Shipping Details</div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Additional Shipping Charges:</label>
-                            <input type="number" formControlName="shippingCharges" class="form-control" (change)="calculateTotals()" />
-                        </div>
-                    </div>
-              
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Rounded Total:</label>
-                            <input type="number" formControlName="roundedTotal" class="form-control" readonly />
-                        </div>
+<!-- Card 4: Shipping Details -->
+<div class="card mb-3">
+    <div class="card-header">Shipping Details</div>
+    <div class="card-body">
+        <div class="row">
+            <!-- Shipping Charges (Before Tax) Input -->
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label>Shipping Charges (Before Tax):</label>
+                    <div class="input-group">
+                        <span class="input-group-text">₹</span>
+                        <input type="number" formControlName="shippingChargesBeforeTax" class="form-control" (input)="calculateTotals()" />
                     </div>
                 </div>
             </div>
+
+            <!-- Shipping Tax Selection and Display -->
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label>Shipping Tax:</label>
+                    <div class="input-group">
+                        <select formControlName="shippingTaxRate" class="form-select" (change)="calculateTotals()">
+                            <option value="0">No Tax</option>
+                            <option *ngFor="let tax of taxRates" [value]="tax.rate">
+                                {{ tax.name }} ({{ tax.rate }}%)
+                            </option>
+                        </select>
+                        <span class="input-group-text">₹</span>
+                        <input type="number" formControlName="shippingTaxAmount" class="form-control" readonly />
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ MODIFICATION: Shipping Charges (After Tax) is now an editable field -->
+            <div class="col-md-4">
+                <div class="form-group">
+                    <label>Shipping Charges (After Tax):</label>
+                    <div class="input-group">
+                         <span class="input-group-text">₹</span>
+                        <!-- Removed readonly and added the new event handler -->
+                        <input type="number" formControlName="shippingCharges" class="form-control" (input)="calculateBeforeTaxFromAfterTax()" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- This field is still used for the final payment calculation -->
+             <div class="col-md-6">
+                <div class="form-group">
+                    <label>Rounded Total (For Payment):</label>
+                    <input type="number" formControlName="roundedTotal" class="form-control" readonly />
+                </div>
+            </div>
         </div>
+    </div>
+</div>
   
        <!-- Card 5: Payment Details -->
         <div class="card mb-3">
@@ -431,10 +628,20 @@
 </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="form-group">
-                            <label>Paid On:</label>
-                            <input type="date" formControlName="paidOn" class="form-control" required />
-                        </div>
+          <div class="form-group">
+    <label>Paid On:</label>
+    <div class="date-input-wrapper">
+        <input type="text" 
+               class="form-control date-input" 
+               [value]="getFormattedDateForInput(purchaseForm.get('paidOn')?.value)"
+               (blur)="onManualDateInput($event, 'paidOn')"
+               placeholder="DD-MM-YYYY">
+        <button type="button" class="calendar-btn" (click)="openDatePicker('paidOn')">
+            <i class="far fa-calendar-alt"></i>
+        </button>
+        <input #paidOnDatePicker type="date" formControlName="paidOn" class="hidden-date-picker">
+    </div>
+</div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
@@ -485,8 +692,13 @@
             </div>
         </div>
         <!-- Save Button -->
-        <button type="submit" class="btn btn-success mt-3">Save</button>
-    </form>
+<!-- Change your save button to this: -->
+<button type="submit" class="btn btn-success mt-3" [disabled]="isSaving || purchaseForm.invalid">
+  <span *ngIf="!isSaving">Save</span>
+  <span *ngIf="isSaving">
+    <i class="fas fa-spinner fa-spin"></i> Saving...
+  </span>
+</button>    </form>
 </div>
 <div *ngIf="purchaseForm.invalid && (purchaseForm.touched || purchaseForm.dirty)" class="alert alert-danger">
   Please fill all required fields correctly. Missing or invalid fields:

@@ -1,0 +1,147 @@
+<div class="container gst-summary-page">
+  <header class="page-header">
+    <h1>GST Summary Report</h1>
+    <p>Review your tax liability and input tax credit for a selected period.</p>
+  </header>
+
+<!-- Date Filter Bar -->
+<form [formGroup]="filterForm" (ngSubmit)="generateSummary()" class="filter-bar">
+  
+  <!-- Start Date -->
+  <div class="form-group">
+    <label for="start-date">Start Date:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('startDate')?.value)"
+             (blur)="onManualDateInput($event, 'startDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #startDatePicker type="date" formControlName="startDate" class="hidden-date-picker">
+    </div>
+  </div>
+
+  <!-- End Date -->
+  <div class="form-group">
+    <label for="end-date">End Date:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('endDate')?.value)"
+             (blur)="onManualDateInput($event, 'endDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #endDatePicker type="date" formControlName="endDate" class="hidden-date-picker">
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn" [disabled]="isLoading">
+    <i class="fas fa-sync-alt"></i> {{ isLoading ? 'Generating...' : 'Generate' }}
+  </button>
+</form>
+
+  <!-- Loading Indicator -->
+  <div *ngIf="isLoading" class="loading-indicator">
+    <div class="spinner"></div>
+    <span>Calculating GST Summary...</span>
+  </div>
+
+  <!-- Report Content -->
+  <div *ngIf="!isLoading">
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="card payable">
+        <div class="card-icon"><i class="fas fa-arrow-down"></i></div>
+        <div class="card-content">
+          <span>Total Tax Payable (Output GST)</span>
+          <strong>{{ totalPayable | currency:'INR' }}</strong>
+        </div>
+      </div>
+      <div class="card receivable">
+        <div class="card-icon"><i class="fas fa-arrow-up"></i></div>
+        <div class="card-content">
+          <span>Total Tax Receivable (Input Credit)</span>
+          <strong>{{ totalReceivable | currency:'INR' }}</strong>
+        </div>
+      </div>
+      <div class="card net-gst" [ngClass]="{'positive-net': netGst >= 0, 'negative-net': netGst < 0}">
+        <div class="card-icon"><i class="fas fa-balance-scale"></i></div>
+        <div class="card-content">
+          <span>Net GST {{ netGst >= 0 ? 'Payable' : 'Refundable' }}</span>
+          <strong>{{ netGst | currency:'INR' }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detailed Breakdowns -->
+    <div class="details-container">
+      <!-- Tax Payable Breakdown -->
+      <div class="details-table">
+        <h3>Tax Payable Breakdown</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Source</th>
+              <th>Reference</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of payableBreakdown">
+              <td>{{ item.date | date:'dd-MM-yyyy' }}</td>
+              <td>{{ item.source }}</td>
+              <td>{{ item.reference }}</td>
+              <td class="text-right">{{ item.amount | currency:'INR' }}</td>
+            </tr>
+            <tr *ngIf="payableBreakdown.length === 0">
+              <td colspan="4" class="text-center">No payable tax entries for this period.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-right"><strong>Total Payable</strong></td>
+              <td class="text-right"><strong>{{ totalPayable | currency:'INR' }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Tax Receivable Breakdown -->
+      <div class="details-table">
+        <h3>Tax Receivable (ITC) Breakdown</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Source</th>
+              <th>Reference</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of receivableBreakdown">
+              <td>{{ item.date | date:'dd-MM-yyyy' }}</td>
+              <td>{{ item.source }}</td>
+              <td>{{ item.reference }}</td>
+              <td class="text-right">{{ item.amount | currency:'INR' }}</td>
+            </tr>
+            <tr *ngIf="receivableBreakdown.length === 0">
+              <td colspan="4" class="text-center">No receivable tax entries for this period.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="text-right"><strong>Total Receivable</strong></td>
+              <td class="text-right"><strong>{{ totalReceivable | currency:'INR' }}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

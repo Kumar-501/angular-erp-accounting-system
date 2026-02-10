@@ -1,0 +1,135 @@
+/* src/app/balance-sheet-2/balance-sheet-2.component.scss */
+
+:host {
+  display: block;
+  background-color: #f8f9fa;
+  padding: 2rem;
+}
+
+.page-container {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.report-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  h1 {
+    margin: 0;
+    color: #34495e;
+  }
+  p {
+    margin: 0.25rem 0 0 0;
+    color: #7f8c8d;
+  }
+}
+
+.loading-message {
+  text-align: center;
+  padding: 4rem;
+  font-size: 1.2rem;
+  color: #7f8c8d;
+}
+
+.balance-sheet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  background-color: #ffffff;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.sheet-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.column-header {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #ecf0f1;
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #34495e;
+    text-align: center;
+  }
+}
+
+.column-content {
+  flex-grow: 1;
+}
+
+.report-group {
+  margin-bottom: 2rem;
+}
+
+.group-header {
+  margin-bottom: 1rem;
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #34495e;
+    text-transform: uppercase;
+  }
+}
+
+.report-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0.5rem;
+  font-size: 0.95rem;
+
+  span:first-child {
+    color: #555;
+  }
+  span:last-child {
+    color: #2c3e50;
+    font-family: 'Courier New', Courier, monospace;
+  }
+}
+
+.group-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.8rem 0.5rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid #ecf0f1;
+  font-weight: bold;
+}
+
+.column-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 0.5rem;
+  border-top: 2px solid #34495e;
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.balance-check-footer {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.1rem;
+
+  &.unbalanced {
+    border: 2px solid #e74c3c;
+    background-color: #f9e6e6;
+    color: #c0392b;
+    strong {
+      margin-right: 1rem;
+    }
+  }
+  &.balanced {
+    border: 2px solid #27ae60;
+    background-color: #eaf7f0;
+    color: #229954;
+  }
+}

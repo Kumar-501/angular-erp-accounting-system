@@ -3,7 +3,7 @@ import { Component, EventEmitter, Input, OnInit, Output, OnDestroy } from '@angu
 import { FollowUpService } from '../services/follow-up.service';
 import { LeadService } from '../services/leads.service';
 import { UserService } from '../services/user.service';
-import { FollowupCategoryService } from '../services/followup-category.service';
+import { FollowupCategory, FollowupCategoryService } from '../services/followup-category.service';
 import { FollowUp } from '../models/follow-up.model';
 import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router'; // Import Router
@@ -89,15 +89,17 @@ export class FollowFormComponent implements OnInit, OnDestroy {
     if (this.followupCategoriesSubscription) this.followupCategoriesSubscription.unsubscribe();
   }
 
-  loadFollowupCategories(): void {
-    this.followupCategoryService.getFollowupCategories()
-      .then((categories: any[]) => {
-        this.followupCategoryOptions = categories.map((category: any) => category.name);
-      })
-      .catch((err: any) => {
+loadFollowupCategories(): void {
+  this.followupCategoryService.getFollowupCategories()
+    .subscribe({
+      next: (categories: FollowupCategory[]) => {
+        this.followupCategoryOptions = categories.map((category: FollowupCategory) => category.name);
+      },
+      error: (err: any) => {
         console.error('Error loading followup categories:', err);
-      });
-  }
+      }
+    });
+}
 
   loadLeads(): void {
     this.leadsSubscription = this.leadService.getLeads().subscribe({

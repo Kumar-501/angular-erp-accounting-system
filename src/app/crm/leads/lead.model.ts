@@ -6,6 +6,8 @@ export interface Lead {
     prefix?: string;
     firstName?: string;
     middleName?: string;
+        occupation?: string;
+
     lastName?: string;
     mobile: string;
     alternateContact?: string;

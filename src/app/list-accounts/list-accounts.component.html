@@ -5,16 +5,16 @@
   </div>
 
   <!-- Tabs Section -->
-  <div class="tabs-container">
+ <div class="tabs-container">
     <ul class="tabs">
-      <li [class.active]="activeTab === 'Accounts'" (click)="changeTab('Accounts')">
+      <li class="active">
         <i class="fas fa-wallet"></i> Accounts
       </li>
     </ul>
   </div>
 
   <!-- Filter and Add Button Section -->
-  <div class="filter-container">
+ <div class="filter-container">
     <div class="filter-dropdown">
       <select class="select-status">
         <option>Active</option>
@@ -30,7 +30,7 @@
   </div>
 
   <!-- Table Controls Section -->
-  <div class="table-controls">
+    <div class="table-controls">
     <div class="entries-selector">
       Show 
       <select [(ngModel)]="entriesPerPage">
@@ -40,6 +40,7 @@
       </select>
       entries
     </div>
+    
     
     <div class="export-buttons">
       <button class="btn btn-export" (click)="exportCSV()">
@@ -70,93 +71,60 @@
   <!-- Accounts Table Section -->
   <div class="table-wrapper">
     <table class="accounts-table">
-      <!-- Table Header with Sorting -->
- <thead>
-  <tr>
-    <th (click)="sortData('name')">
-      Account Name
-      <i class="fas" [ngClass]="getSortIcon('name')"></i>
-    </th>
-    <th (click)="sortData('accountHead')">
-      Account Head
-      <i class="fas" [ngClass]="getSortIcon('accountHead')"></i>
-    </th>
-    <th (click)="sortData('accountNumber')">
-      Account Number
-      <i class="fas" [ngClass]="getSortIcon('accountNumber')"></i>
-    </th>
-    <th>Debit (₹)</th>
-    <th>Credit (₹)</th>
-    <th (click)="sortData('openingBalance')">
-      Balance (₹)
-      <i class="fas" [ngClass]="getSortIcon('openingBalance')"></i>
-    </th>
-    <th>Recent Transactions</th>
-    <th>Action</th>
-  </tr>
-</thead>
-
-<tbody>
-  <tr *ngFor="let acc of filteredAccounts | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage">
-    <td>{{ acc.name }}</td>
+      <thead>
+        <tr>
+          <th (click)="sortData('name')">
+            Account Name
+            <i class="fas" [ngClass]="getSortIcon('name')"></i>
+          </th>
+          <th (click)="sortData('accountHead')">
+            Account Head
+            <i class="fas" [ngClass]="getSortIcon('accountHead')"></i>
+          </th>
+          <th (click)="sortData('accountNumber')">
+            Account Number
+            <i class="fas" [ngClass]="getSortIcon('accountNumber')"></i>
+          </th>
+          <th (click)="sortData('balance')">
+            Balance (₹)
+            <i class="fas" [ngClass]="getSortIcon('balance')"></i>
+          </th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let acc of filteredAccounts | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage">
+          <td>{{ acc.name }}</td>
     <td>
-      <span *ngIf="acc.accountHead?.group">{{acc.accountHead.group}} - </span>
-      {{acc.accountHead?.value || acc.accountHeadValue || ''}}
-    </td>
-    <td>{{ acc.accountNumber }}</td>
-    <td class="debit-amount">{{ getAccountDebitTotal(acc.id) | number:'1.2-2' }}</td>
-    <td class="credit-amount">{{ getAccountCreditTotal(acc.id) | number:'1.2-2' }}</td>    <td [class.negative-balance]="(acc.calculatedBalance || acc.openingBalance || 0) < 0">
-      {{ (acc.calculatedBalance || acc.openingBalance || 0) | number:'1.2-2' }}
-    </td><td class="recent-transactions">
-      <div *ngFor="let tx of getAccountTransactions(acc.id) | slice:0:3" class="transaction-item">
-        <span class="tx-date">{{ tx.date | date:'M/d/yy' }}</span>
-        <span class="tx-desc">{{ tx.description || 'Transaction' }}</span>
-        <span class="tx-amount" [class.debit]="tx.debit > 0" [class.credit]="tx.credit > 0">
-          <ng-container *ngIf="tx.debit > 0; else creditAmount">
-            -{{ tx.debit | number:'1.2-2' }}
-          </ng-container>
-          <ng-template #creditAmount>
-            <ng-container *ngIf="tx.credit > 0">
-              +{{ tx.credit | number:'1.2-2' }}
-            </ng-container>
-            <ng-container *ngIf="tx.credit <= 0">
-              0.00
-            </ng-container>
-          </ng-template>
-        </span>
-      </div>
-      <div *ngIf="getAccountTransactions(acc.id).length === 0" class="no-transactions">
-        No recent transactions
-      </div>
-    </td>
- <td class="action-buttons">
-          <button class="btn btn-edit" (click)="editAccount(acc)">
-            <i class="fas fa-edit"></i> Edit
-          </button>
-          <button class="btn btn-delete" (click)="close(acc)">
-            <i class="fas fa-trash"></i> Delete
-          </button>
-          <button class="btn btn-book" (click)="accountBook(acc)">
-            <i class="fas fa-book"></i> Book
-          </button>
-          <button class="btn btn-transfer" (click)="fundTransfer(acc)">
-            <i class="fas fa-exchange-alt"></i> Transfer
-          </button>
-          <button class="btn btn-deposit" (click)="deposit(acc)">
-            <i class="fas fa-piggy-bank"></i> Deposit
-          </button>
-        </td>
-  </tr>
-</tbody>
-<tfoot>
-  <tr>
-    <td colspan="3">Total:</td>
-    <td>{{ getTotalDebit() | number:'1.2-2' }}</td>
-    <td>{{ getTotalCredit() | number:'1.2-2' }}</td>
-    <td>{{ totalBalance | number:'1.2-2' }}</td>
-    <td colspan="2"></td>
-  </tr>
-</tfoot>
+    {{ getAccountHeadDisplay(acc) }}
+</td>
+          <td>{{ acc.accountNumber }}</td>
+          <td [class.negative-balance]="getAccountCurrentBalance(acc) < 0">
+            ₹{{ getAccountCurrentBalance(acc) | number:'1.2-2' }}
+          </td>
+          <td class="action-buttons">
+            <button class="btn btn-edit" (click)="editAccount(acc)">
+              <i class="fas fa-edit"></i> Edit
+            </button>
+            <button class="btn btn-delete" (click)="close(acc)">
+              <i class="fas fa-trash"></i> Delete
+            </button>
+            <button class="btn btn-book" (click)="accountBook(acc)">
+              <i class="fas fa-book"></i> Book
+            </button>
+            <button class="btn btn-deposit" (click)="deposit(acc)">
+              <i class="fas fa-piggy-bank"></i> Deposit
+            </button>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">Total:</td>
+          <td>{{ totalBalance | number:'1.2-2' }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
 
@@ -267,13 +235,13 @@
           </select>
         </div>
 
-        <div class="form-group">
+        <!-- <div class="form-group">
           <label>Opening Balance:*</label>
           <input formControlName="openingBalance" type="number" class="form-control" step="0.01" />
           <div *ngIf="accountForm.get('openingBalance')?.invalid && accountForm.get('openingBalance')?.touched" class="error-message">
             Opening balance is required
           </div>
-        </div>
+        </div> -->
 
         <div formArrayName="accountDetails" class="form-group">
           <label>Account Details:</label>
@@ -286,9 +254,7 @@
               </button>
             </div>
           </div>
-          <button type="button" class="btn btn-add-detail" (click)="addAccountDetail()">
-            <i class="fas fa-plus"></i> Add Detail
-          </button>
+ 
         </div>
         
         <div class="form-group">
@@ -349,7 +315,8 @@
       <div class="form-group">
         <label>Transfer from:*</label>
         <select formControlName="fromAccount" class="form-control">
-          <option value="">-- Select Account --</option>          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('toAccount')?.value">
+          <option value="">-- Select Account --</option>          
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('toAccount')?.value">
             {{acc.name}} (Balance: ₹{{calculateAccountCurrentBalance(acc).toFixed(2)}})
           </option>
         </select>
@@ -361,7 +328,8 @@
       <div class="form-group">
         <label>Transfer To:*</label>
         <select formControlName="toAccount" class="form-control">
-          <option value="">-- Select Account --</option>          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('fromAccount')?.value">
+          <option value="">-- Select Account --</option>          
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === fundTransferForm.get('fromAccount')?.value">
             {{acc.name}} (Balance: ₹{{calculateAccountCurrentBalance(acc).toFixed(2)}})
           </option>
         </select>
@@ -425,7 +393,8 @@
       <div class="form-group">
         <label>Deposit to:*</label>
         <select formControlName="depositTo" class="form-control">
-          <option value="">-- Select Account --</option>          <option *ngFor="let acc of accounts" [value]="acc.id" [selected]="acc.id === selectedAccount?.id">
+          <option value="">-- Select Account --</option>          
+          <option *ngFor="let acc of accounts" [value]="acc.id" [selected]="acc.id === selectedAccount?.id">
             {{acc.name}} (Balance: ₹{{calculateAccountCurrentBalance(acc).toFixed(2)}})
           </option>
         </select>
@@ -445,7 +414,8 @@
       <div class="form-group">
         <label>Deposit From:*</label>
         <select formControlName="depositFrom" class="form-control">
-          <option value="">Please Select</option>          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === depositForm.get('depositTo')?.value">
+          <option value="">Please Select</option>          
+          <option *ngFor="let acc of accounts" [value]="acc.id" [disabled]="acc.id === depositForm.get('depositTo')?.value">
             {{acc.name}} (Balance: ₹{{calculateAccountCurrentBalance(acc).toFixed(2)}})
           </option>
         </select>

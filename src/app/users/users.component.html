@@ -26,9 +26,7 @@
         <button class="btn btn-outline" (click)="exportExcel()">
           <i class="fas fa-file-excel"></i> Export Excel
         </button>
-        <button class="btn btn-outline" (click)="print()">
-          <i class="fas fa-print"></i> Print
-        </button>
+ 
       
         <button class="btn btn-outline" (click)="toggleColumnVisibilityDropdown()">
           <i class="fas fa-columns"></i> Columns
@@ -208,14 +206,6 @@
         </select>
       </div>
   
-      <!-- Branch Filter (Dropdown) -->
-      <div class="filter-section">
-        <h5>Branch</h5>
-        <select class="form-select" [(ngModel)]="selectedBranch" (change)="onFilterChange()">
-          <option value="">All Branches</option>
-          <option *ngFor="let branch of branches" [value]="branch">{{branch}}</option>
-        </select>
-      </div>
     </div>
     
     <div class="sidebar-footer">

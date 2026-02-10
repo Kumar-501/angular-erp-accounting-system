@@ -6,6 +6,7 @@ export interface Expense {
     subCategory: string;
     referenceNo: string;
     date: string;
+    
     expenseFor: string;
     expenseForContact: string;
     document?: string;

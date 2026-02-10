@@ -28,23 +28,22 @@
   <div class="filter-section">
     <div class="filter-controls">
     
-     <div class="header-actions" style="  margin-left: 200px;">
+<div class="header-actions" style="margin-left: 200px;">
   <button *ngIf="currentUserRole !== 'Executive'" 
           class="bulk-select-btn" 
           (click)="selectAllFilteredLeads()" 
           [disabled]="filteredLeads.length === 0">
     Bulk Select Leads
   </button>
-
 <div style="display: none;">Current Role: {{currentUserRole}}</div>
 
-<button *ngIf="currentUserRole  !== 'Executive'" 
-        class="random-assign-btn" 
-        (click)="openAssignModal(false)" 
-        [disabled]="selectedLeads.size === 0">
-  Random Assign Leads
-</button>
-     <button *ngIf="currentUserRole !== 'Executive'" 
+ <button *ngIf="currentUserRole !== 'Executive'" 
+          class="random-assign-btn" 
+          (click)="openAssignModal(true)" 
+          [disabled]="selectedLeads.size === 0">
+    Random Assign Leads
+  </button>
+<button *ngIf="currentUserRole !== 'Executive'" 
           class="assign-btn" 
           (click)="openAssignModal(false)" 
           [disabled]="selectedLeads.size === 0">
@@ -88,7 +87,6 @@
     
     <div class="export-controls">
       <button class="export-btn" (click)="exportExcel()">Export Excel</button>
-      <button class="export-btn" (click)="printTable()">Print</button>
       <!-- Add the column visibility toggle button -->
       <div class="column-visibility-container">
         <button class="export-btn" (click)="toggleColumnDropdown()">Columns ▼</button>
@@ -216,28 +214,52 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let lead of filteredLeads">
+        <tr *ngFor="let lead of paginatedLeads">
           <td *ngIf="isColumnVisible('select')">
             <input type="checkbox" [checked]="isSelected(lead.id)" (change)="toggleLeadSelection(lead.id)">
           </td>
-          <td *ngIf="isColumnVisible('action')" class="action-cell">
-            <div class="dropdown">
-              <button class="dropdown-btn">Actions</button>
-              <div class="dropdown-content">
-                <a (click)="editLead(lead)">Edit</a>
-                <a (click)="viewLead(lead)">View</a>
-                <a *ngIf="lead.isDuplicate" (click)="mergeDuplicate(lead.id, true)">Merge into Original</a>
-                <a *ngIf="lead.isDuplicate" (click)="mergeDuplicate(lead.id, false)">Keep This as Original</a>
-                <a 
-                  [routerLink]="lead.mobileExists ? '/add-sale' : 'javascript:void(0)'" 
-                  (click)="!lead.mobileExists && convertToCustomer(lead); lead.mobileExists && prepareForSalesOrder(lead)"
-                  class="convert-btn">
-                  {{ lead.mobileExists ? 'Create Sales Order' : 'Convert to Customer' }}
-                </a>
-                <a (click)="addFollowUp(lead)">Add Follow Up</a>
-              </div>
-            </div>
-          </td>
+              <td *ngIf="isColumnVisible('action')" class="action-cell">
+            <button class="btn btn-primary" (click)="openActionPopup(lead)">Actions</button>
+          </td><!-- Action Popup Modal -->
+<!-- Popup Overlay -->
+<!-- Action Popup Modal -->
+<div *ngIf="showActionPopup" class="popup-overlay" (click)="closeActionPopup()">
+  <div class="popup-container" (click)="$event.stopPropagation()">
+
+    <!-- ======================= THE FIX ======================= -->
+    <!-- The header now only contains the title. The button has been removed. -->
+    <div class="popup-header">
+      <h4>Lead #{{ selectedLeadForAction?.contactId || 'N/A' }}</h4>
+    </div>
+    <!-- ===================== END OF THE FIX ==================== -->
+
+    <!-- Body (This part remains unchanged) -->
+    <div class="popup-body">
+      <div class="action-item" (click)="editLead(selectedLeadForAction); closeActionPopup();">
+        <i class="fas fa-edit text-primary"></i>
+        <span>Edit Lead</span>
+      </div>
+      <div class="action-item" (click)="viewLeadDetails(selectedLeadForAction.id); closeActionPopup();">
+        <i class="fas fa-eye text-info"></i>
+        <span>View Details</span>
+      </div>
+      <div class="action-item" (click)="addFollowUp(selectedLeadForAction); closeActionPopup();">
+        <i class="fas fa-calendar-plus text-secondary"></i>
+        <span>Add Follow Up</span>
+      </div>
+     <div class="action-item" (click)="handleConversion(selectedLeadForAction); closeActionPopup();">
+    <i class="fas text-success" [ngClass]="{'fa-user-plus': !selectedLeadForAction?.mobileExists, 'fa-shopping-cart': selectedLeadForAction?.mobileExists}"></i>
+    <span>{{ selectedLeadForAction?.mobileExists ? 'Create Sales Order' : 'Convert to Customer' }}</span>
+  </div>
+      <div class="action-item text-danger" (click)="deleteLead(selectedLeadForAction.id); closeActionPopup();">
+        <i class="fas fa-trash-alt"></i>
+        <span>Delete</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
           <td *ngIf="isColumnVisible('createdAt')">{{ lead.createdAt | date:'short' }}</td>
           <td *ngIf="isColumnVisible('contactId')">{{ lead.contactId || '-' }}</td>
      <td *ngIf="isColumnVisible('fullName')" class="name-cell">
@@ -334,7 +356,32 @@
 </div>
 
   
+<div class="pagination-container">
+  <div class="pagination-info">
+    Showing {{ getFirstEntryIndex() }} to {{ getLastEntryIndex() }} of {{ totalItems }} entries
+  </div>
+
+  <div class="pagination-controls">
  
+    <div class="page-numbers">
+      <button *ngFor="let page of getVisiblePages()" 
+              (click)="goToPage(page)"
+              [class.active]="page === currentPage">
+        {{ page }}
+      </button>
+    </div>
+
+  </div>
+
+  <!-- <div class="page-size-selector">
+    <label>Items per page:
+      <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+        <option *ngFor="let size of pageSizeOptions" [value]="size">{{ size }}</option>
+      </select>
+    </label>
+  </div> -->
+</div>
+
  
 <div class="filter-section">
   <div class="filter-controls">
@@ -1093,35 +1140,19 @@ Add this to show the department of selected user -->
 
 
 <!-- Lead Assignment Modal HTML -->
-<!-- Update the assign modal -->
+<!-- Update this section in your template -->
 <div class="lead-assignment-modal" *ngIf="showAssignModal">
   <div class="modal-overlay"></div>
   <div class="modal-container">
     <div class="modal-content">
       <h3 class="modal-title">{{ randomAssignMode ? 'Randomly Assign Leads' : 'Assign Leads' }}</h3>
       
-      <div class="form-group" *ngIf="selectedUserDepartment">
-        <label>Department:</label>
-        <input type="text" class="form-control" [value]="selectedUserDepartment" readonly>
-      </div>
-
-      <div class="form-group">
+      <div *ngIf="!randomAssignMode" class="form-group">
         <label for="userSelect">Select User to Assign:</label>
-        <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control" 
-            (change)="onUserSelectionChange($event)">
+        <select id="userSelect" [(ngModel)]="selectedUserId" class="form-control">
           <option value="">Select User</option>
           <option *ngFor="let user of availableUsers" [value]="user.id">
-            {{ user.name || user.email }} ({{ user.department || 'No Dept' }})
-          </option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label for="lifeStageSelect">Select Life Stage:</label>
-        <select id="lifeStageSelect" [(ngModel)]="selectedLifeStage" class="form-control">
-          <option value="">Select Life Stage</option>
-          <option *ngFor="let stage of lifeStages" [value]="stage.name">
-            {{ stage.name }}
+            {{ user.name }} ({{ user.department || 'No Dept' }})
           </option>
         </select>
       </div>
@@ -1142,7 +1173,6 @@ Add this to show the department of selected user -->
     </div>
   </div>
 </div>
-
     
     <div class="modal-actions">
  
@@ -1224,6 +1254,9 @@ Add this to show the department of selected user -->
     </div>
   </div>
 </div>
+<!-- ==================================================================== -->
+<!-- == REPLACE your existing Lead Details popup with this entire block == -->
+<!-- ==================================================================== -->
 
 <div class="modal-overlay" *ngIf="showLeadDetailsPopup" (click)="closeLeadDetailsPopup()">
   <div class="modal-content" (click)="$event.stopPropagation()">
@@ -1232,68 +1265,83 @@ Add this to show the department of selected user -->
       <button class="close-btn" (click)="closeLeadDetailsPopup()">&times;</button>
     </div>
     <div class="modal-body">
-<div class="container">
-  <div class="lead-details-container" *ngIf="selectedLeadDetails">
-  <div class="detail-row">
-    <span class="detail-label">Contact ID:</span>
-    <span class="detail-value">{{selectedLeadDetails.contactId || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Name:</span>
-    <span class="detail-value">
-      {{ (selectedLeadDetails.businessName || 
-          (selectedLeadDetails.firstName + ' ' + (selectedLeadDetails.lastName || ''))) || 'Not available' }}
-    </span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Product Interested:</span>
-    <span class="detail-value">{{getProductNames(selectedLeadDetails.productInterested) || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Added By:</span>
-    <span class="detail-value">{{selectedLeadDetails.addedBy?.userName || selectedLeadDetails.addedBy || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Mobile:</span>
-    <span class="detail-value">{{selectedLeadDetails.mobile || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Email:</span>
-    <span class="detail-value">{{selectedLeadDetails.email || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Life Stage:</span>
-    <span class="detail-value">{{selectedLeadDetails.lifeStage || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Deal Status:</span>
-    <span class="detail-value">{{selectedLeadDetails.dealStatus || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Source:</span>
-    <span class="detail-value">{{selectedLeadDetails.source || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Priority:</span>
-    <span class="detail-value">{{selectedLeadDetails.priority || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Assigned To:</span>
-    <span class="detail-value">{{selectedLeadDetails.assignedTo || 'Not available'}}</span>
-  </div>
-  <div class="detail-row">
-    <span class="detail-label">Created Date:</span>
-    <span class="detail-value">
-      {{(selectedLeadDetails.createdAt | date:'mediumDate') || 'Not available'}}
-    </span>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" (click)="closeLeadDetailsPopup()">Close</button>
-  </div>
-</div>
+      <div class="lead-details-view" *ngIf="selectedLeadDetails">
+
+        <!-- Lead Information Section -->
+        <div class="detail-section">
+          <h4>Lead Information</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Contact ID:</span>
+              <span class="detail-value">{{ selectedLeadDetails.contactId || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Name:</span>
+              <span class="detail-value">{{ selectedLeadDetails.businessName || (selectedLeadDetails.firstName + ' ' + (selectedLeadDetails.lastName || '')) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Product Interested:</span>
+              <span class="detail-value">{{ getProductNames(selectedLeadDetails.productInterested) || 'Not available' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Added By:</span>
+              <span class="detail-value">{{ selectedLeadDetails.addedBy?.userName || selectedLeadDetails.addedBy || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Details Section -->
+        <div class="detail-section">
+          <h4>Contact Details</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Mobile:</span>
+              <span class="detail-value">{{ selectedLeadDetails.mobile || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Email:</span>
+              <span class="detail-value">{{ selectedLeadDetails.email || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- CRM Status Section -->
+        <div class="detail-section">
+          <h4>CRM Status</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Life Stage:</span>
+              <span class="detail-value">{{ selectedLeadDetails.lifeStage || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Deal Status:</span>
+              <span class="detail-value">{{ selectedLeadDetails.dealStatus || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Source:</span>
+              <span class="detail-value">{{ selectedLeadDetails.source || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Priority:</span>
+              <span class="detail-value">{{ selectedLeadDetails.priority || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Assigned To:</span>
+              <span class="detail-value">{{ selectedLeadDetails.assignedTo || 'N/A' }}</span>
+            </div>
+             <div class="detail-item">
+              <span class="detail-label">Created Date:</span>
+              <span class="detail-value">{{ (selectedLeadDetails.createdAt | date:'mediumDate') || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeLeadDetailsPopup()">Close</button>
     </div>
   </div>
-  </div>
 </div>
 
 <!-- <div class="search-container">

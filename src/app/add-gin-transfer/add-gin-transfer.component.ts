@@ -1,17 +1,17 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Component, HostListener, OnInit, ViewChild, ElementRef } from '@angular/core';import { FormBuilder, FormGroup, Validators, FormArray, AbstractControl, FormControl, ValidatorFn } from '@angular/forms';
 import { ProductsService } from '../services/products.service';
 import { LocationService } from '../services/location.service';
 import { formatDate } from '@angular/common';
-import { GinTransferService, GinTransfer, GinTransferItem } from '../services/gin-transfer.service';
-import { Firestore, collection, doc, setDoc, getDoc, getDocs, increment, QueryDocumentSnapshot, DocumentData } from '@angular/fire/firestore';
+import { GinTransferService, GinTransfer, LocationTransfer, TransferProduct } from '../services/gin-transfer.service';
+import { Firestore, collection, doc, setDoc, getDoc, getDocs } from '@angular/fire/firestore';
+import { Router } from '@angular/router';
+import { StockService } from '../services/stock.service';
 
-// Constants for Firestore collections
 const COLLECTIONS = {
   PRODUCT_STOCK: 'product-stock',
   PRODUCTS: 'products',
   LOCATIONS: 'locations',
-  GIN_STOCK_LOG: 'gin-stock-log' // Added new collection constant
+  GIN_STOCK_LOG: 'gin-stock-log'
 };
 
 interface Product {
@@ -34,40 +34,92 @@ interface Product {
 })
 export class AddGinTransferComponent implements OnInit {
   ginTransferForm: FormGroup;
+  
   locations: any[] = [];
   products: Product[] = [];
   filteredProducts: Product[] = [];
-  selectedProducts: GinTransferItem[] = [];
+  @ViewChild('datePicker') datePicker!: ElementRef;
+
   searchTerm: string = '';
   currentDate: string;
+  isSaving: boolean = false;
   showSearchResults: boolean = false;
+  stockDisplayMap = new Map<string, number>();
+  
+  grandTotal: number = 0;
+  submitError: string | null = null;
+  stockValidationErrors: { [key: number]: string | null } = {};
+  
+  debugMode: boolean = false;
+  lastError: string = '';
 
-  constructor(
-    private fb: FormBuilder,
-    private productsService: ProductsService,
-    private locationService: LocationService,
-    private ginTransferService: GinTransferService,
-    private firestore: Firestore
-  ) {
-    // Initialize current date
-    this.currentDate = formatDate(new Date(), 'dd-MM-yyyy HH:mm', 'en');
-    
-    // Initialize form with auto-generated reference number
-    this.ginTransferForm = this.fb.group({
-      date: [this.currentDate, Validators.required],
-      referenceNo: [this.generateReferenceNumber()],
-      locationFrom: ['', Validators.required],
-      locationTo: ['', Validators.required],
-      locationTo2: [''], // Secondary location - optional
-      status: ['', Validators.required],
-      shippingCharges: [0],
-      additionalNotes: ['']
-    });
+
+
+  @HostListener('window:beforeunload', ['$event'])
+  handleBeforeUnload(event: BeforeUnloadEvent) {
+    if (this.hasProductsToTransfer() && !this.isSaving) {
+      event.preventDefault();
+      event.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return event.returnValue;
+    }
+    return;
   }
 
   ngOnInit(): void {
     this.loadLocations();
     this.loadProducts();
+  }
+
+  get locationTransfers(): FormArray {
+    return this.ginTransferForm.get('locationTransfers') as FormArray;
+  }
+
+  createLocationTransfer(): FormGroup {
+    return this.fb.group({
+      locationTo: ['', Validators.required],
+      products: this.fb.array([], this.atLeastOneProductValidator())
+    });
+  }
+
+  addLocationTransfer(): void {
+    this.locationTransfers.push(this.createLocationTransfer());
+    this.calculateTotal();
+  }
+
+  removeLocationTransfer(index: number): void {
+    if (this.locationTransfers.length > 1) {
+      this.locationTransfers.removeAt(index);
+      this.calculateTotal();
+    }
+  }
+
+  getProductsArray(transfer: AbstractControl): FormArray {
+    return transfer.get('products') as FormArray;
+  }
+
+  createProduct(): FormGroup {
+    return this.fb.group({
+      productId: ['', Validators.required],
+      productName: [''],
+      sku: [''],
+      barcode: [''],
+      quantity: [1, [Validators.required, Validators.min(1)]],
+      unitPrice: [0, [Validators.required, Validators.min(0.01)]],
+      subtotal: [0],
+      unit: [''],
+      currentStock: [0]
+    });
+  }
+
+  addProduct(transferIndex: number): void {
+    const productsArray = this.getProductsArray(this.locationTransfers.at(transferIndex));
+    productsArray.push(this.createProduct());
+  }
+
+  removeProduct(transferIndex: number, productIndex: number): void {
+    const productsArray = this.getProductsArray(this.locationTransfers.at(transferIndex));
+    productsArray.removeAt(productIndex);
+    this.calculateTotal();
   }
 
   generateReferenceNumber(): string {
@@ -82,14 +134,41 @@ export class AddGinTransferComponent implements OnInit {
   loadLocations() {
     this.locationService.getLocations().subscribe(locations => {
       this.locations = locations;
+      this.debugLog('Locations loaded:', locations.length);
     });
   }
 
   loadProducts() {
     this.productsService.getProductsRealTime().subscribe(products => {
       this.products = products;
-      console.log('Loaded products:', products.length);
+      this.debugLog('Products loaded:', products.length);
     });
+  }
+
+  debugLog(message: string, data?: any) {
+    if (this.debugMode) {
+      console.log(`[GIN Transfer Debug] ${message}`, data || '');
+    }
+  }
+
+  getFilteredToLocations(transferIndex: number): any[] {
+    const currentFromLocation = this.ginTransferForm.get('locationFrom')?.value;
+    return this.locations.filter(location => 
+      location.id !== currentFromLocation && 
+      !this.isLocationUsedInOtherTransfers(location.id, transferIndex)
+    );
+  }
+
+  isLocationUsedInOtherTransfers(locationId: string, excludeIndex: number): boolean {
+    for (let i = 0; i < this.locationTransfers.length; i++) {
+      if (i !== excludeIndex) {
+        const transfer = this.locationTransfers.at(i);
+        if (transfer.get('locationTo')?.value === locationId) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   async searchProducts() {
@@ -101,7 +180,7 @@ export class AddGinTransferComponent implements OnInit {
       return;
     }
 
-    console.log(`Searching for products at location: ${this.getLocationName(locationFrom)} (${locationFrom})`);
+    this.debugLog('Searching products at location:', this.getLocationName(locationFrom));
 
     const availableProducts = await this.getProductsWithStockAtLocation(locationFrom);
 
@@ -116,202 +195,133 @@ export class AddGinTransferComponent implements OnInit {
       ).slice(0, 10);
     }
 
-    console.log(`Found ${this.filteredProducts.length} products with stock at location ${this.getLocationName(locationFrom)}`);
+    this.debugLog('Filtered products found:', this.filteredProducts.length);
     this.preloadStockForProducts();
   }
 
-  addProduct(product: Product) {
-    const existingIndex = this.selectedProducts.findIndex(p => p.productId === product.id);
+  onSearchInput(event: any): void {
+    this.searchTerm = event.target.value;
+    this.searchProducts();
+  }
+
+  onSearchFocus() {
+    this.showSearchResults = true;
+  }
+
+  onSearchBlur() {
+    setTimeout(() => {
+      this.showSearchResults = false;
+    }, 200);
+  }
+
+  async addProductFromSearch(transferIndex: number, product: any) {
+    const transfer = this.locationTransfers.at(transferIndex);
+    const productsArray = this.getProductsArray(transfer);
+    
+    const existingIndex = productsArray.controls.findIndex(
+      control => control.get('productId')?.value === product.id
+    );
     
     if (existingIndex >= 0) {
-      this.selectedProducts[existingIndex].quantity += 1;
-      this.selectedProducts[existingIndex].subtotal = 
-        this.selectedProducts[existingIndex].quantity * this.selectedProducts[existingIndex].unitPrice;
+      const currentQty = productsArray.at(existingIndex).get('quantity')?.value || 0;
+      productsArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
+      this.calculateSubtotal(transferIndex, existingIndex);
     } else {
-      this.selectedProducts.push({
+      const productDetails = await this.productsService.getProductById(product.id);
+      
+      const productFormGroup = this.createProduct();
+      productFormGroup.patchValue({
         productId: product.id,
         productName: product.productName,
         sku: product.sku,
-        barcode: product.barcode,
+        barcode: product.barcode || '',
+        unitPrice: productDetails?.defaultSellingPriceExcTax || 0,
         quantity: 1,
-        secondaryQuantity: 0,
-        unitPrice: product.defaultSellingPriceExcTax || 0,
-        subtotal: product.defaultSellingPriceExcTax || 0,
         unit: product.unit,
-        locationFrom: ''
+        currentStock: await this.getAndCacheStock(product.id)
       });
+      
+      productsArray.push(productFormGroup);
+      this.calculateSubtotal(transferIndex, productsArray.length - 1);
     }
     
+    this.clearSearch();
+  }
+
+  clearSearch() {
     this.searchTerm = '';
+    this.filteredProducts = [];
     this.showSearchResults = false;
-    this.calculateTotal();
-  }
-  
-  updateQuantity(index: number, value: any) {
-    const quantity = parseInt(value);
-    
-    if (quantity > 0) {
-      this.selectedProducts[index].quantity = quantity;
-      this.selectedProducts[index].subtotal = quantity * this.selectedProducts[index].unitPrice;
-      this.calculateTotal();
-    }
   }
 
-  updateSecondaryQuantity(index: number, value: any) {
-    const quantity = parseInt(value);
+  calculateSubtotal(transferIndex: number, productIndex: number): void {
+    const productsArray = this.getProductsArray(this.locationTransfers.at(transferIndex));
+    const productGroup = productsArray.at(productIndex) as FormGroup;
     
-    if (quantity >= 0) {
-      this.selectedProducts[index].secondaryQuantity = quantity;
-    }
-  }
-  
-  removeProduct(index: number) {
-    this.selectedProducts.splice(index, 1);
+    const quantity = productGroup.get('quantity')?.value || 0;
+    const unitPrice = productGroup.get('unitPrice')?.value || 0;
+    const subtotal = quantity * unitPrice;
+
+    productGroup.patchValue({ subtotal });
     this.calculateTotal();
   }
 
-  calculateTotal(): number {
-    const subtotal = this.selectedProducts.reduce((sum, product) => sum + product.subtotal, 0);
+  getSubtotal(transferIndex: number, productIndex: number): number {
+    const productsArray = this.getProductsArray(this.locationTransfers.at(transferIndex));
+    const productGroup = productsArray.at(productIndex) as FormGroup;
+    return productGroup.get('subtotal')?.value || 0;
+  }
+
+  getTransferSubtotal(transferIndex: number): number {
+    const productsArray = this.getProductsArray(this.locationTransfers.at(transferIndex));
+    return productsArray.controls.reduce((sum, productGroup) => {
+      return sum + (productGroup.get('subtotal')?.value || 0);
+    }, 0);
+  }
+
+  calculateTotal(): void {
+    this.grandTotal = this.locationTransfers.controls.reduce((sum, transfer) => {
+      return sum + this.getTransferSubtotal(this.locationTransfers.controls.indexOf(transfer));
+    }, 0);
+    
     const shippingCharges = parseFloat(this.ginTransferForm.get('shippingCharges')?.value || 0);
-    return subtotal + shippingCharges;
+    this.grandTotal += shippingCharges;
   }
 
-  resetForm() {
-    this.ginTransferForm.reset({
-      date: this.currentDate,
-      referenceNo: this.generateReferenceNumber(),
-      locationFrom: '',
-      locationTo: '',
-      locationTo2: '',
-      status: '',
-      shippingCharges: 0,
-      additionalNotes: ''
-    });
-    this.selectedProducts = [];
-    this.searchTerm = '';
-    this.showSearchResults = false;
-  }
+  async validateStockQuantities(): Promise<boolean> {
+    this.stockValidationErrors = {};
+    let isValid = true;
 
-  async saveGinTransfer() {
-    if (this.ginTransferForm.valid && this.ginTransferForm.value.locationFrom && this.selectedProducts.length > 0) {
-      // First check for duplicate products in the transfer
-      const productIds = this.selectedProducts.map(p => p.productId);
-      const hasDuplicates = new Set(productIds).size !== productIds.length;
-      
-      if (hasDuplicates) {
-        alert('Error: The same product appears multiple times in this transfer. Please combine quantities for each product.');
-        return;
-      }
+    for (let i = 0; i < this.locationTransfers.length; i++) {
+      const transfer = this.locationTransfers.at(i);
+      const productsArray = this.getProductsArray(transfer);
+      const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
 
-      const formData = this.ginTransferForm.value;
-      const hasSecondaryLocation = !!formData.locationTo2;
-
-      // Only validate stock availability if status is "Completed"
-      if (formData.status === 'Completed') {
-        const stockValid = await this.validateStockAvailability();
-        if (!stockValid) {
-          return;
+      for (let j = 0; j < productsArray.length; j++) {
+        const productGroup = productsArray.at(j) as FormGroup;
+        const productId = productGroup.get('productId')?.value;
+        const requestedQuantity = productGroup.get('quantity')?.value || 0;
+        
+        if (productId && requestedQuantity > 0) {
+          try {
+            const currentStock = await this.getCurrentStockAtLocation(productId, locationFrom);
+            
+            if (requestedQuantity > currentStock) {
+              const productName = productGroup.get('productName')?.value || 'Product';
+              this.stockValidationErrors[i] = `Insufficient stock for ${productName}. Available: ${currentStock}, Requested: ${requestedQuantity}`;
+              isValid = false;
+              productGroup.get('quantity')?.setErrors({ insufficientStock: true });
+            }
+          } catch (error) {
+            console.error(`Error validating stock for product ${productId}:`, error);
+            this.stockValidationErrors[i] = `Error validating stock for product`;
+            isValid = false;
+          }
         }
-      }
-
-      // Validate all items have required fields
-      const invalidItems = this.selectedProducts.filter(item => 
-        !item.productId || !item.productName || !item.sku || !item.unit
-      );
-
-      if (invalidItems.length > 0) {
-        alert('Error: Some products are missing required information. Please check all products have SKU and unit.');
-        return;
-      }
-
-      // Prepare transfer items with all required fields
-      const transferItems = this.selectedProducts.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        sku: item.sku,
-        unit: item.unit,
-        locationFrom: formData.locationFrom,
-        quantity: item.quantity,
-        secondaryQuantity: item.secondaryQuantity || 0,
-        unitPrice: item.unitPrice || 0,
-        subtotal: item.subtotal || 0,
-        barcode: item.barcode || '',
-        currentStock: item.currentStock || 0
-      }));
-      
-      const ginTransfer: GinTransfer = {
-        date: formData.date,
-        referenceNo: formData.referenceNo,
-        locationFrom: formData.locationFrom,
-        locationTo: formData.locationTo,
-        locationTo2: formData.locationTo2 || null,
-        status: formData.status,
-        items: transferItems,
-        shippingCharges: formData.shippingCharges || 0,
-        additionalNotes: formData.additionalNotes || '',
-        totalAmount: this.calculateTotal(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      try {
-        // The service will now handle both gin-transfers and gin-stock-log collections
-        const docId = await this.ginTransferService.addGinTransfer(ginTransfer);
-        console.log('GIN Transfer and stock logs saved with ID:', docId);
-        
-        // Only process stock movements if status is "Completed"
-        if (formData.status === 'Completed') {
-          await this.processStockMovements(ginTransfer, hasSecondaryLocation);
-        } else {
-          console.log(`GIN Transfer saved with status: ${formData.status}. Stock movements will be processed when status is set to "Completed".`);
-        }
-        
-        this.resetForm();
-        alert('GIN Transfer and stock logs saved successfully!');
-        
-      } catch (error) {
-        console.error('Error saving GIN transfer:', error);
-        alert('Error saving GIN transfer. Please try again.');
-      }
-    } else {
-      Object.keys(this.ginTransferForm.controls).forEach(key => {
-        this.ginTransferForm.get(key)?.markAsTouched();
-      });
-      
-      if (this.selectedProducts.length === 0) {
-        alert('Please add at least one product to the transfer.');
-      }
-      
-      if (!this.ginTransferForm.value.locationFrom) {
-        alert('Please select a source location (Location From).');
-      }
-    }
-  }
-
-  async validateStockAvailability(): Promise<boolean> {
-    const formData = this.ginTransferForm.value;
-    const hasSecondaryLocation = !!formData.locationTo2;
-    
-    for (const item of this.selectedProducts) {
-      const requiredQuantity = item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0);
-      
-      try {
-        const availableStock = await this.getCurrentStockAtLocation(item.productId, formData.locationFrom);
-        
-        if (availableStock < requiredQuantity) {
-          alert(`Insufficient stock for product "${item.productName}". Available: ${availableStock}, Required: ${requiredQuantity}`);
-          return false;
-        }
-        
-        console.log(`Stock check passed for ${item.productName}: Available=${availableStock}, Required=${requiredQuantity}`);
-      } catch (error) {
-        console.error(`Error checking stock for product ${item.productName}:`, error);
-        alert(`Error checking stock availability for product "${item.productName}"`);
-        return false;
       }
     }
     
-    return true;
+    return isValid;
   }
 
   private async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
@@ -327,131 +337,7 @@ export class AddGinTransferComponent implements OnInit {
       
       return 0;
     } catch (error) {
-      console.error('Error getting stock at location:', error);
-      return 0;
-    }
-  }
-
-  private async updateProductStockAtLocation(
-    productId: string,
-    productName: string,
-    sku: string,
-    locationId: string,
-    locationName: string,
-    quantityChange: number,
-    operation: 'increase' | 'decrease'
-  ): Promise<void> {
-    try {
-      if (!productId || !locationId || quantityChange === 0) {
-        throw new Error(`Invalid parameters for stock update`);
-      }
-
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      
-      console.log(`${operation === 'increase' ? 'Adding' : 'Removing'} ${Math.abs(quantityChange)} units of ${sku} ${operation === 'increase' ? 'to' : 'from'} ${locationName}`);
-      
-      const stockDoc = await getDoc(stockDocRef);
-      
-      if (stockDoc.exists()) {
-        const currentData = stockDoc.data();
-        const currentQuantity = currentData?.['quantity'] || 0;
-        
-        if (operation === 'decrease' && currentQuantity < Math.abs(quantityChange)) {
-          throw new Error(`Insufficient stock for ${productName}. Available: ${currentQuantity}, Required: ${Math.abs(quantityChange)}`);
-        }
-        
-        const newQuantity = operation === 'increase' 
-          ? currentQuantity + quantityChange 
-          : currentQuantity - Math.abs(quantityChange);
-        
-        await setDoc(stockDocRef, {
-          quantity: newQuantity,
-          updatedAt: new Date()
-        }, { merge: true });
-        
-        console.log(`✓ Updated stock for ${sku} at ${locationName}: ${currentQuantity} → ${newQuantity}`);
-      } else {
-        if (operation === 'decrease') {
-          throw new Error(`No stock found for ${productName} at ${locationName}`);
-        }
-        
-        await setDoc(stockDocRef, {
-          productId: productId,
-          productName: productName,
-          sku: sku,
-          locationId: locationId,
-          locationName: locationName,
-          quantity: quantityChange,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        
-        console.log(`✓ Created new stock entry for ${sku} at ${locationName}: 0 → ${quantityChange}`);
-      }
-    } catch (error) {
-      console.error(`✗ Error updating stock for ${productName} at location ${locationId}:`, error);
-      throw error;
-    }
-  }
-
-  async getCurrentStockDisplay(productId: string): Promise<string> {
-    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
-    if (!locationFrom || !productId) return '0';
-    
-    try {
-      const stock = await this.getCurrentStockAtLocation(productId, locationFrom);
-      return stock.toString();
-    } catch (error) {
-      console.error('Error getting stock display:', error);
-      return 'Error';
-    }
-  }
-
-  async checkStockAvailability(productId: string, requiredQuantity: number): Promise<boolean> {
-    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
-    if (!locationFrom || !productId) return false;
-    
-    try {
-      const currentStock = await this.getCurrentStockAtLocation(productId, locationFrom);
-      return currentStock >= requiredQuantity;
-    } catch (error) {
-      console.error('Error checking stock availability:', error);
-      return false;
-    }
-  }
-
-  async getStockForDisplayAsync(productId: string): Promise<number> {
-    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
-    if (!locationFrom || !productId) return 0;
-
-    try {
-      return await this.getCurrentStockAtLocation(productId, locationFrom);
-    } catch (error) {
-      console.error('Error fetching stock:', error);
-      return 0;
-    }
-  }
-
-  stockDisplayMap = new Map<string, number>();
-
-  async getAndCacheStock(productId: string): Promise<number> {
-    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
-    if (!locationFrom || !productId) return 0;
-
-    const cacheKey = `${productId}_${locationFrom}`;
-    
-    if (this.stockDisplayMap.has(cacheKey)) {
-      return this.stockDisplayMap.get(cacheKey) || 0;
-    }
-
-    try {
-      const stock = await this.getCurrentStockAtLocation(productId, locationFrom);
-      this.stockDisplayMap.set(cacheKey, stock);
-      return stock;
-    } catch (error) {
-      console.error('Error fetching stock:', error);
-      this.stockDisplayMap.set(cacheKey, 0);
+      this.debugLog('Error getting stock at location:', error);
       return 0;
     }
   }
@@ -471,6 +357,27 @@ export class AddGinTransferComponent implements OnInit {
     return 'Loading...';
   }
 
+  async getAndCacheStock(productId: string): Promise<number> {
+    const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
+    if (!locationFrom || !productId) return 0;
+
+    const cacheKey = `${productId}_${locationFrom}`;
+    
+    if (this.stockDisplayMap.has(cacheKey)) {
+      return this.stockDisplayMap.get(cacheKey) || 0;
+    }
+
+    try {
+      const stock = await this.getCurrentStockAtLocation(productId, locationFrom);
+      this.stockDisplayMap.set(cacheKey, stock);
+      return stock;
+    } catch (error) {
+      this.debugLog('Error fetching stock:', error);
+      this.stockDisplayMap.set(cacheKey, 0);
+      return 0;
+    }
+  }
+
   onLocationFromChange(): void {
     this.stockDisplayMap.clear();
     if (this.searchTerm || this.showSearchResults) {
@@ -488,26 +395,19 @@ export class AddGinTransferComponent implements OnInit {
     const locationFrom = this.ginTransferForm.get('locationFrom')?.value;
     if (!locationFrom || !this.filteredProducts.length) return;
 
-    console.log(`Pre-loading stock for ${this.filteredProducts.length} products at location ${this.getLocationName(locationFrom)}`);
+    this.debugLog(`Pre-loading stock for ${this.filteredProducts.length} products at location ${this.getLocationName(locationFrom)}`);
     
     const stockPromises = this.filteredProducts.map(product => 
       this.getAndCacheStock(product.id)
     );
     
     await Promise.all(stockPromises);
-    console.log('Stock pre-loading completed');
-  }
-
-  refreshStockDisplay(): void {
-    this.stockDisplayMap.clear();
-    if (this.filteredProducts.length > 0) {
-      this.preloadStockForProducts();
-    }
+    this.debugLog('Stock pre-loading completed');
   }
 
   private async getProductsWithStockAtLocation(locationId: string): Promise<Product[]> {
     try {
-      console.log(`Checking product-stock collection for location: ${locationId}`);
+      this.debugLog(`Checking product-stock collection for location: ${locationId}`);
       
       const stockQuery = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK);
       const stockSnapshot = await getDocs(stockQuery);
@@ -520,90 +420,351 @@ export class AddGinTransferComponent implements OnInit {
           if (stockData['quantity'] && stockData['quantity'] > 0) {
             const productId = docId.replace(`_${locationId}`, '');
             productIdsWithStock.add(productId);
-            console.log(`Found stock for product ${productId}: ${stockData['quantity']} units`);
           }
         }
       });
       
-      console.log(`Found ${productIdsWithStock.size} products with stock at this location`);
+      this.debugLog(`Found ${productIdsWithStock.size} products with stock at this location`);
       
       const availableProducts = this.products.filter(product => 
         productIdsWithStock.has(product.id)
       );
       
-      console.log(`Filtered to ${availableProducts.length} products that exist in products collection`);
+      this.debugLog(`Filtered to ${availableProducts.length} products that exist in products collection`);
       return availableProducts;
       
     } catch (error) {
-      console.error('Error getting products with stock at location:', error);
+      this.debugLog('Error getting products with stock at location:', error);
       return [];
     }
   }
 
-  private async processStockMovements(ginTransfer: GinTransfer, hasSecondaryLocation: boolean): Promise<void> {
-    console.log('=== STARTING STOCK MOVEMENTS ===');
-    
-    const sourceLocation = this.locations.find(l => l.id === ginTransfer.locationFrom);
-    const destinationLocation = this.locations.find(l => l.id === ginTransfer.locationTo);
-    const secondaryLocation = ginTransfer.locationTo2 ? this.locations.find(l => l.id === ginTransfer.locationTo2) : null;
-    
-    for (const item of ginTransfer.items) {
-      const totalQuantityFromSource = item.quantity + (hasSecondaryLocation && item.secondaryQuantity ? item.secondaryQuantity : 0);
-      
-      console.log(`Processing transfer for ${item.productName} (${item.sku})`);
-      console.log(`  From: ${sourceLocation?.name || ginTransfer.locationFrom} - Quantity: ${totalQuantityFromSource}`);
-      console.log(`  To: ${destinationLocation?.name || ginTransfer.locationTo} - Quantity: ${item.quantity}`);
+  hasProductsToTransfer(): boolean {
+    return this.locationTransfers.controls.some(transfer => {
+      const productsArray = this.getProductsArray(transfer);
+      return productsArray.length > 0;
+    });
+  }
 
-      if (hasSecondaryLocation && item.secondaryQuantity && item.secondaryQuantity > 0) {
-        console.log(`  To Secondary: ${secondaryLocation?.name || ginTransfer.locationTo2} - Quantity: ${item.secondaryQuantity}`);
+  private atLeastOneTransferValidator(): ValidatorFn {
+    return (control: AbstractControl): { [key: string]: boolean } | null => {
+      const transfersArray = control as FormArray;
+      if (!transfersArray || !transfersArray.controls) {
+        return { noValidTransfers: true };
       }
-      
-      try {
-        // Step 1: Deduct from source location
-        await this.updateProductStockAtLocation(
-          item.productId, 
-          item.productName,
-          item.sku,
-          ginTransfer.locationFrom, 
-          sourceLocation?.name || 'Unknown Location',
-          totalQuantityFromSource,
-          'decrease'
-        );
-        
-        // Step 2: Add to primary destination
-        await this.updateProductStockAtLocation(
-          item.productId, 
-          item.productName,
-          item.sku,
-          ginTransfer.locationTo, 
-          destinationLocation?.name || 'Unknown Location',
-          item.quantity,
-          'increase'
-        );
 
-        // Step 3: Add to secondary destination if specified
-        if (hasSecondaryLocation && item.secondaryQuantity && item.secondaryQuantity > 0 && ginTransfer.locationTo2) {
-          await this.updateProductStockAtLocation(
-            item.productId, 
-            item.productName,
-            item.sku,
-            ginTransfer.locationTo2, 
-            secondaryLocation?.name || 'Unknown Location',
-            item.secondaryQuantity,
-            'increase'
-          );
+      const hasValidTransfers = transfersArray.controls.some(transferGroup => {
+        if (!(transferGroup instanceof FormGroup)) return false;
+        
+        const locationTo = transferGroup.get('locationTo')?.value;
+        const products = transferGroup.get('products') as FormArray;
+        
+        return locationTo && products && products.length > 0;
+      });
+
+      return hasValidTransfers ? null : { noValidTransfers: true };
+    };
+  }
+
+  private atLeastOneProductValidator(): ValidatorFn {
+    return (control: AbstractControl): { [key: string]: boolean } | null => {
+      const productsArray = control as FormArray;
+      if (!productsArray || !productsArray.controls) {
+        return { noValidProducts: true };
+      }
+
+      const hasValidProducts = productsArray.controls.some(productGroup => {
+        if (!(productGroup instanceof FormGroup)) return false;
+        
+        const productId = productGroup.get('productId')?.value;
+        const quantity = productGroup.get('quantity')?.value;
+        const unitPrice = productGroup.get('unitPrice')?.value;
+        return productId && quantity > 0 && unitPrice > 0;
+      });
+
+      return hasValidProducts ? null : { noValidProducts: true };
+    };
+  }
+
+  async saveGinTransfer() {
+    this.debugLog('Save button clicked');
+    this.lastError = '';
+    
+    try {
+      this.markAllAsTouched();
+
+      if (!this.ginTransferForm.valid) {
+        this.debugLog('Form validation failed', this.getFormErrors());
+        this.submitError = 'Please fill in all required fields';
+        return;
+      }
+
+      const formData = this.ginTransferForm.value;
+      this.debugLog('Form data:', formData);
+
+      const hasProducts = this.hasProductsToTransfer();
+      this.debugLog('Has products to transfer:', hasProducts);
+      
+      if (!hasProducts) {
+        this.submitError = 'No products to transfer';
+        alert('Please add at least one product to the transfer.');
+        return;
+      }
+
+      const invalidTransfers = this.locationTransfers.controls.filter((transfer, index) => {
+        const productsArray = this.getProductsArray(transfer);
+        return productsArray.length > 0 && !transfer.get('locationTo')?.value;
+      });
+      
+      if (invalidTransfers.length > 0) {
+        this.submitError = 'Invalid transfer destinations';
+        alert('Please ensure all transfers have a destination location.');
+        return;
+      }
+
+      this.isSaving = true;
+      this.debugLog('Starting save process...');
+
+      if (formData.status === 'Completed') {
+        this.debugLog('Validating stock availability...');
+        const stockValid = await this.validateStockQuantities();
+        if (!stockValid) {
+          this.submitError = 'Some products have insufficient stock. Please check the quantities.';
+          this.isSaving = false;
+          return;
         }
-        
-        console.log(`✓ Stock transfer completed for ${item.productName}`);
-        
-      } catch (error) {
-        console.error(`✗ Error in stock movement for product ${item.productName}:`, error);
-        alert(`Error: ${error instanceof Error ? error.message : 'Failed to transfer stock'} for product ${item.productName}`);
-        
-        throw error;
       }
+
+      const sourceLocation = this.locations.find(l => l.id === formData.locationFrom);
+      
+      const transfersWithNames: LocationTransfer[] = [];
+      
+      for (let i = 0; i < this.locationTransfers.length; i++) {
+        const transfer = this.locationTransfers.at(i);
+        const productsArray = this.getProductsArray(transfer);
+        
+        if (productsArray.length > 0) {
+          const locationTo = transfer.get('locationTo')?.value;
+          const locationToName = this.getLocationName(locationTo);
+          
+          const products: TransferProduct[] = [];
+          for (let j = 0; j < productsArray.length; j++) {
+            const productGroup = productsArray.at(j) as FormGroup;
+            products.push({
+              productId: productGroup.get('productId')?.value || '',
+              productName: productGroup.get('productName')?.value || '',
+              sku: productGroup.get('sku')?.value || '',
+              barcode: productGroup.get('barcode')?.value || '',
+              quantity: productGroup.get('quantity')?.value || 0,
+              unitPrice: productGroup.get('unitPrice')?.value || 0,
+              subtotal: productGroup.get('subtotal')?.value || 0,
+              unit: productGroup.get('unit')?.value || '',
+              currentStock: productGroup.get('currentStock')?.value || 0
+            });
+          }
+          
+          transfersWithNames.push({
+            locationId: locationTo,
+            locationName: locationToName,
+            products: products
+          });
+        }
+      }
+
+      const ginTransfer: GinTransfer = {
+        date: formData.date || this.currentDate,
+        referenceNo: formData.referenceNo || this.generateReferenceNumber(),
+        locationFrom: formData.locationFrom || '',
+        locationFromName: sourceLocation?.name || 'Unknown Location',
+        status: formData.status || 'Draft',
+        transfers: transfersWithNames,
+        shippingCharges: formData.shippingCharges || 0,
+        additionalNotes: formData.additionalNotes || '',
+        totalAmount: this.grandTotal,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      const sanitizedGinTransfer = this.sanitizeForFirestore(ginTransfer);
+      this.debugLog('Prepared GIN transfer data:', sanitizedGinTransfer);
+
+      const docId = await this.ginTransferService.addGinTransfer(sanitizedGinTransfer);
+      this.debugLog('GIN Transfer saved with ID:', docId);
+
+      const finalGinTransfer = { ...sanitizedGinTransfer, id: docId };
+      
+      if (finalGinTransfer.status === 'Completed') {
+        await this.stockService.processGinTransfer(finalGinTransfer);
+        this.debugLog('Stock movements processed via StockService.');
+      } else {
+        this.debugLog(`GIN Transfer saved with status: ${finalGinTransfer.status}. Stock movements will be processed when status is set to "Completed".`);
+      }
+      
+      this.resetForm();
+      alert('GIN Transfer saved successfully!');
+      this.router.navigate(['/gin-transfers']);
+      
+    } catch (error) {
+      this.debugLog('Error saving GIN transfer:', error);
+      this.lastError = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.submitError = `Error saving GIN transfer: ${this.lastError}`;
+      alert(this.submitError);
+    } finally {
+      this.isSaving = false;
+    }
+  }
+
+  private markAllAsTouched(): void {
+    Object.values(this.ginTransferForm.controls).forEach(control => {
+      if (control instanceof FormControl) {
+        control.markAsTouched();
+      } else if (control instanceof FormArray) {
+        control.controls.forEach(group => {
+          if (group instanceof FormGroup) {
+            Object.values(group.controls).forEach(c => {
+              if (c instanceof FormControl) {
+                c.markAsTouched();
+              } else if (c instanceof FormArray) {
+                c.controls.forEach(productGroup => {
+                  if (productGroup instanceof FormGroup) {
+                    Object.values(productGroup.controls).forEach(pc => pc.markAsTouched());
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  private getFormErrors(): any {
+    const errors: any = {};
+    Object.keys(this.ginTransferForm.controls).forEach(key => {
+      const control = this.ginTransferForm.get(key);
+      if (control && control.errors) {
+        errors[key] = control.errors;
+      }
+    });
+    return errors;
+  }
+
+  private sanitizeForFirestore(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return null;
     }
     
-    console.log('=== STOCK MOVEMENTS COMPLETED ===');
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizeForFirestore(item));
+    }
+    
+    if (typeof obj === 'object' && obj.constructor === Object) {
+      const sanitized: any = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key];
+          if (value !== undefined) {
+            sanitized[key] = this.sanitizeForFirestore(value);
+          }
+        }
+      }
+      return sanitized;
+    }
+    
+    return obj;
+  }
+// 1. Helper to convert YYYY-MM-DD (internal) to DD-MM-YYYY (display)
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// 2. Trigger the hidden native date picker
+openDatePicker(): void {
+  this.datePicker.nativeElement.showPicker();
+}
+
+// 3. Handle manual typing in DD-MM-YYYY format
+onManualDateInput(event: any, controlName: string): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    if (dateObj && dateObj.getDate() === parseInt(day) && 
+        dateObj.getMonth() + 1 === parseInt(month)) {
+      
+      // Store as YYYY-MM-DD internally so Firestore and the native picker understand it
+      const isoDate = `${year}-${month}-${day}`;
+      this.ginTransferForm.get(controlName)?.setValue(isoDate);
+    } else {
+      alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+      this.resetVisibleInput(event, controlName);
+    }
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    this.resetVisibleInput(event, controlName);
+  }
+}
+
+private resetVisibleInput(event: any, controlName: string): void {
+  event.target.value = this.getFormattedDateForInput(this.ginTransferForm.get(controlName)?.value);
+}
+
+// 4. Update the constructor initialization to use YYYY-MM-DD (compatible with input type="date")
+constructor(
+  private fb: FormBuilder,
+  private productsService: ProductsService,
+  private locationService: LocationService,
+  private ginTransferService: GinTransferService,
+  private stockService: StockService,
+  private firestore: Firestore,
+  private router: Router
+) {
+  // Use YYYY-MM-DD for internal reactive form value
+  this.currentDate = formatDate(new Date(), 'yyyy-MM-dd', 'en');
+  
+  this.ginTransferForm = this.fb.group({
+    date: [this.currentDate, Validators.required],
+    referenceNo: [this.generateReferenceNumber()],
+    locationFrom: ['', Validators.required],
+    status: ['', Validators.required],
+    shippingCharges: [0],
+    additionalNotes: [''],
+    locationTransfers: this.fb.array([this.createLocationTransfer()], this.atLeastOneTransferValidator())
+  });
+}
+  resetForm() {
+    this.ginTransferForm.reset({
+      date: this.currentDate,
+      referenceNo: this.generateReferenceNumber(),
+      locationFrom: '',
+      status: '',
+      shippingCharges: 0,
+      additionalNotes: ''
+    });
+    
+    const transfersArray = this.ginTransferForm.get('locationTransfers') as FormArray;
+    transfersArray.clear();
+    transfersArray.push(this.createLocationTransfer());
+    
+    this.searchTerm = '';
+    this.showSearchResults = false;
+    this.lastError = '';
+    this.submitError = null;
+    this.stockValidationErrors = {};
+    this.grandTotal = 0;
+    this.stockDisplayMap.clear();
+    this.debugLog('Form reset');
   }
 }

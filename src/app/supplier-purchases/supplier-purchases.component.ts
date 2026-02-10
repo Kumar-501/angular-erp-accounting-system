@@ -1,20 +1,30 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { increment } from '@angular/fire/firestore'; // Make sure to import increment
+
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { forkJoin, Observable } from 'rxjs';
+
+import { 
+  Firestore, collection, onSnapshot, Unsubscribe, query, 
+  where, getDocs, addDoc, Timestamp, doc, updateDoc, 
+  writeBatch, getDoc  
+} from '@angular/fire/firestore';
+
+// Services
 import { SupplierDocument, SupplierNote, SupplierService } from '../services/supplier.service';
 import { PaymentService } from '../services/payment.service';
 import { PurchaseService } from '../services/purchase.service';
 import { AuthService } from '../auth.service';
+import { LocationService } from '../services/location.service';
+import { AccountService } from '../services/account.service';
+
+// Models & Libraries
+import { Purchase } from '../models/purchase.model';
+import { AccountSummaryData } from '../account-summary/account-summary.component';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { Firestore, collection, onSnapshot, Unsubscribe, query, where, getDocs } from '@angular/fire/firestore';
-import { LocationService } from '../services/location.service';
-import { ListPurchaseComponent } from '../list-purchase/list-purchase.component';
-import { PurchaseItem } from '../models/purchase-item.model';
-import { Purchase } from '../models/purchase.model'; // Adjust path as needed
-import { Router } from '@angular/router';
-import { forkJoin, Observable } from 'rxjs';
-import { doc } from 'firebase/firestore';
 
 interface LedgerEntry {
   date: Date;
@@ -25,21 +35,21 @@ interface LedgerEntry {
   amount: number;
   balance: number;
   status: string;
-  purchase?: any; // Original purchase data (if this is a purchase entry)
-  payment?: any;  // Original payment data (if this is a payment entry)
-  isImmutable: boolean; 
+  purchase?: any;
+  payment?: any;
 }
-
 
 interface Payment {
   id?: string;
   amount: number;
   date: Date | string | any;
+  paymentDate?: Date | string | any;
   referenceNo?: string;
   reference?: string;
   status?: string;
   supplier?: string;
-  // Add other payment fields as needed
+  paymentMethod?: string;
+  notes?: string;
 }
 
 @Component({
@@ -50,46 +60,58 @@ interface Payment {
 export class SupplierPurchasesComponent implements OnInit, OnDestroy {
   selectedFiles: File[] = [];
   isUploading: boolean = false;
+  showReceiptModal: boolean = false;
+  selectedPayment: any = null;
+
   uploadProgress: number | null = null;
   private paymentsUnsubscribe: Unsubscribe | null = null;
+  private purchasesUnsubscribe: Unsubscribe | null = null;
   private ledgerUnsubscribe: Unsubscribe | null = null;
 
-  viewMode: 'purchases' | 'ledger' = 'purchases';
-  ledgerEntries: any[] = [];
-  // Add this method to your component class
-viewPurchaseDetails(purchase: any): void {
-  if (!purchase?.id) return;
-  this.router.navigate(['/view-purchase', purchase.id]);
-}
+  viewMode: 'purchases' | 'ledger' | 'payments' | 'documents' = 'purchases';
+  ledgerEntries: LedgerEntry[] = [];
+  
+  // Account Summary Data
+  accountSummaryData: AccountSummaryData = {
+    openingBalance: 0,
+    totalPurchase: 0,
+    totalExpense: 0,
+    totalPaid: 0,
+    advanceBalance: 0,
+    balanceDue: 0,
+    dateRange: {
+      from: '',
+      to: ''
+    },
+    supplierDetails: {},
+    companyDetails: {
+      name: 'HERBALY TOUCH AYURVEDA HOSPITAL PRIVATE LIMITED',
+      address: 'Your Company Address, City, State, Country - ZIP'
+    }
+  };
+
   invoiceNo?: string;
   selectedQuickFilter: string = '';
   showCustomDateRange: boolean = false;
   financialYearStartMonth: number = 4; 
   purchaseDate: Date | string | any; 
   payments: any[] = [];
-paymentLoading = false;
+  dateRangeOption: string = 'all';
+  paymentLoading = false;
   supplierId: string = '';
-  supplierName: string = ''; // Added to fix compile error
+  supplierName: string = '';
   supplierDetails: any = {};
   locations: any[] = [];
   filteredPurchases: Purchase[] = [];
   purchases: Purchase[] = [];
-filteredLedgerEntries: LedgerEntry[] = [];
-  // Add these properties to the component class
-customFromDate: string = '';
-customToDate: string = '';
-public supplierDisplayName: string = '';
-updateLedgerView(): void {
-  this.ledgerEntries = this.generateLedgerEntries(
-    this.purchases, 
-    this.payments, // Pass payments array instead of openingBalance
-    this.accountSummary.openingBalance
-  );
-}
+  filteredLedgerEntries: LedgerEntry[] = [];
+  customFromDate: string = '';
+  customToDate: string = '';
+  public supplierDisplayName: string = '';
   searchTerm: string = '';
   currentPage: number = 1;
-  subtotal?: number;         // Add this
-  totalTax?: number;         // Add this
+  subtotal?: number;
+  totalTax?: number;
   shippingCharges?: number; 
   isLoadingPurchases = true;
   itemsPerPage: number = 10;
@@ -104,10 +126,7 @@ updateLedgerView(): void {
     { label: 'Custom Date Range', value: 'custom' }
   ];
   selectedDateFilter: string = 'thisMonth';
-
   selectedLocation: string = 'all';
-  purchasesUnsubscribe: Unsubscribe | null = null;
-  
   isLoading = true;
   activeTab: string = 'purchases';
   documents: SupplierDocument[] = [];
@@ -119,16 +138,13 @@ updateLedgerView(): void {
     createdBy: '', 
     isPrivate: false
   };
-  
   currentUserId: string = '';
   currentUserName: string = '';
-  
   transactions: any[] = [];
   filteredTransactions: any[] = [];
-  
   ledgerLoading = true;
-  fromDate: string = this.getFormattedDate(new Date(new Date().setMonth(new Date().getMonth() - 1)));
-  toDate: string = this.getFormattedDate(new Date());
+  fromDate: string = '';
+  toDate: string = '';
   accountSummary = {
     openingBalance: 0,
     totalPurchase: 0,
@@ -136,7 +152,6 @@ updateLedgerView(): void {
     balanceDue: 0
   };
   currentBalance = 0;
-
   stockReport: any[] = [];
   filteredStockReport: any[] = [];
   stockReportLoading = true;
@@ -144,424 +159,532 @@ updateLedgerView(): void {
   stockReportToDate: string = '';
   selectedStockLocation: string = 'all';
   stockLocations: string[] = [];
-purchase: Purchase | undefined;
-  router: any;
+  purchase: Purchase | undefined;
+
+  // NEW PROPERTIES FOR PAY CASH MODAL
+  showPaymentModal: boolean = false;
+  paymentForm: FormGroup;
+  paymentAccounts: any[] = [];
+  isSavingPayment: boolean = false;
+  currentPaymentPurchase: Purchase | null = null;
 
   constructor(
-     private route: ActivatedRoute,
+    private route: ActivatedRoute,
     private purchaseService: PurchaseService,
     private supplierService: SupplierService,
     private paymentService: PaymentService,
     private authService: AuthService,
     private firestore: Firestore,
     private locationService: LocationService,
-    
-  ) { }
+    private router: Router,
+    private fb: FormBuilder,
+    private accountService: AccountService
+  ) { 
+    // INITIALIZE PAYMENT FORM
+    this.paymentForm = this.fb.group({
+      amount: [0, [Validators.required, Validators.min(0.01)]],
+      paymentDate: [new Date().toISOString().split('T')[0], Validators.required],
+      paymentMethod: ['Cash', Validators.required],
+      paymentAccountId: [null, Validators.required],
+      referenceNo: [''],
+      notes: ['']
+    });
+  }
 
-ngOnInit(): void {
-  this.supplierId = this.route.snapshot.params['id'];
-  this.currentUserId = this.authService.getCurrentUserId();
-      this.supplierName = this.route.snapshot.params['name']; // Get supplier name from route
+  ngOnInit(): void {
+    this.supplierId = this.route.snapshot.params['id'];
+    this.currentUserId = this.authService.getCurrentUserId();
+    this.supplierName = this.route.snapshot.params['name'];
 
     this.currentUserName = this.authService.getCurrentUserName();
     this.newNote.createdBy = this.currentUserName || this.currentUserId;
   
-  // Initialize dates with default range (last 30 days)
- const today = new Date();
+    const today = new Date();
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(today.getDate() - 30);
     
-  
- this.fromDate = this.formatDate(thirtyDaysAgo);
+    this.fromDate = this.formatDate(thirtyDaysAgo);
     this.toDate = this.formatDate(today);
     this.stockReportFromDate = this.fromDate;
     this.stockReportToDate = this.toDate;
 
-  // Load all required data
-  this.loadSupplierDetails();
-  this.loadPurchases();
-  this.loadLedgerData();
-  this.loadPurchaseOrderStockData();
-  this.loadDocumentsAndNotes();
-  this.loadStockReport();
-  this.loadLocations();
-   this.loadSupplierDetails();
+    // Initialize account summary date range
+    this.updateAccountSummaryDateRange();
+
+    this.loadSupplierDetails();
+    this.loadPurchases();
+    this.loadLedgerData();
+    this.loadPurchaseOrderStockData();
+    this.loadDocumentsAndNotes();
+    this.loadStockReport();
     this.loadLocations();
     this.setupRealtimeListeners();
-  
-  // Initialize supplier data for "Add Purchase" button
-  this.initializeSupplierForAddPurchase();
+    this.initializeSupplierForAddPurchase();
   }
 
-  // Add the missing loadLedgerData method
-  loadLedgerData(): void {
-    // Generate ledger entries from current purchases and payments
-    this.ledgerEntries = this.generateLedgerEntries(
-      this.purchases,
-      this.payments,
-      this.accountSummary.openingBalance
-    );
-    this.filterLedger();
-    this.ledgerLoading = false;
-  }
-  // Shared method (could be in a service)
-standardizePurchase(purchase: any): any {
-  // Calculate products total and taxes
-  let productsTotal = 0;
-  let totalTax = 0;
-  let cgst = 0;
-  let sgst = 0;
-  let igst = 0;
-  let taxRate = 0;
-  const isInterState = purchase.isInterState || false;
-
-  if (purchase.products?.length) {
-    const taxCalculations = purchase.products.reduce((acc: any, product: any) => {
-      const quantity = product.quantity || 0;
-      const price = product.unitCost || product.price || 0;
-      const productTotal = quantity * price;
-      const productTaxRate = product.taxRate || 0;
-      let taxAmount = product.taxAmount || 0;
-      
-      if (taxAmount === 0 && productTaxRate > 0) {
-        taxAmount = productTotal * (productTaxRate / 100);
-      }
-
-      acc.totalTax += taxAmount;
-      acc.productsTotal += productTotal;
-      
-      if (productTaxRate > 0 && acc.taxRate === 0) {
-        acc.taxRate = productTaxRate;
-      }
-      
-      return acc;
-    }, { totalTax: 0, productsTotal: 0, taxRate: 0 });
-
-    totalTax = taxCalculations.totalTax;
-    productsTotal = taxCalculations.productsTotal;
-    taxRate = taxCalculations.taxRate;
-
-    // Split tax for CGST/SGST or IGST
-    if (isInterState) {
-      igst = totalTax;
-    } else {
-      cgst = totalTax / 2;
-      sgst = totalTax / 2;
-    }
-  }
-
-  const shippingCharges = purchase.shippingCharges || 0;
-  const grandTotal = productsTotal + totalTax + shippingCharges;
-
-  return {
-    ...purchase,
-    productsTotal,
-    totalTax,
-    cgst,
-    sgst,
-    igst,
-    taxRate,
-    isInterState,
-    shippingCharges,
-    grandTotal,
-    supplier: purchase.supplier || this.getSupplierDisplayName(purchase.supplierDetails),
-    purchaseStatus: this.getStatusText(purchase.purchaseStatus),
-    purchaseDate: purchase.purchaseDate?.toDate?.() || purchase.purchaseDate || new Date()
-  };
-}
-  getSafeGrandTotal(purchase: any): number {
-  return purchase?.grandTotal || 0;
-}
-  getStatusText(status: string): string {
-  if (!status) return '';
-  
-  const lowerStatus = status.toLowerCase();
-  
-  if (lowerStatus === 'received') return 'Received';
-  if (lowerStatus === 'pending') return 'Pending';
-  if (lowerStatus === 'cancelled') return 'Cancelled';
-  if (lowerStatus === 'paid' || lowerStatus === 'completed') return 'Paid';
-  if (lowerStatus === 'partial') return 'Partial Payment';
-  if (lowerStatus === 'due') return 'Payment Due';
-  
-  return status.charAt(0).toUpperCase() + status.slice(1);
-  }
-private syncPurchasesWithLedger(): void {
-  this.purchases = this.purchases.map(purchase => {
-    const ledgerEntry = this.ledgerEntries.find(entry => 
-      entry.purchase?.id === purchase.id || 
-      entry.referenceNo === purchase.referenceNo
-    );
+  // =========================================================================
+  // CORE UTILITY: Safe Date Converter
+  // =========================================================================
+  private getSafeDate(val: any): Date {
+    if (!val) return new Date();
     
-    return ledgerEntry ? {
-      ...purchase,
-      grandTotal: ledgerEntry.amount,
-      subtotal: ledgerEntry.subtotal || purchase.subtotal,
-      totalTax: ledgerEntry.totalTax || purchase.totalTax,
-      shippingCharges: ledgerEntry.shippingCharges || purchase.shippingCharges
-    } : purchase;
-  });
+    // 1. Is it already a Date object?
+    if (val instanceof Date) return val;
+
+    // 2. Is it a Firestore Timestamp object (with toDate)?
+    if (typeof val.toDate === 'function') {
+      return val.toDate();
+    }
+
+    // 3. Is it a raw Firestore object (seconds/nanoseconds)?
+    if (val && typeof val.seconds === 'number') {
+      return new Date(val.seconds * 1000);
+    }
+
+    // 4. Is it a string?
+    if (typeof val === 'string') {
+      return new Date(val);
+    }
+
+    // 5. Is it a number (ms)?
+    if (typeof val === 'number') {
+      return new Date(val);
+    }
+
+    return new Date();
   }
 
-generateLedgerEntries(purchases: any[], payments: any[], openingBalance: number = 0): LedgerEntry[] {
-  const entries: LedgerEntry[] = [];
-  let runningBalance = openingBalance;
+  // =========================================================================
+  // PAY CASH FUNCTIONALITY
+  // =========================================================================
 
-  // Add opening balance if exists
-  if (openingBalance !== 0) {
-    entries.push({
-      date: new Date(),
-      referenceNo: 'OPENING',
-      supplier: this.supplierDetails?.businessName || 'Opening Balance',
-      description: 'Opening Balance',
-      type: openingBalance > 0 ? 'credit' : 'debit',
-      amount: Math.abs(openingBalance),
-      balance: runningBalance,
-      status: 'Balance',
-      purchase: null,
-      payment: null,
-      isImmutable: false
+  openPaymentModal(): void {
+    this.showPaymentModal = true;
+    document.body.classList.add('modal-open');
+    
+    // Reset form
+    this.paymentForm.reset({
+      amount: 0,
+      paymentDate: new Date().toISOString().split('T')[0],
+      paymentMethod: 'Cash',
+      paymentAccountId: null,
+      referenceNo: '',
+      notes: ''
+    });
+
+    // Load Accounts
+    this.accountService.getPaymentAccounts().subscribe(accounts => {
+      this.paymentAccounts = accounts;
     });
   }
 
-  // Process purchases (debits) - these should never be deleted
-  purchases.forEach(purchase => {
-    const purchaseDate = purchase.purchaseDate?.toDate?.() || purchase.purchaseDate || new Date();
-    const entry: LedgerEntry = {
-      date: purchaseDate,
-      referenceNo: purchase.referenceNo || `PR-${purchase.id.substring(0, 5)}`,
-      supplier: purchase.supplierName || this.supplierDetails?.businessName || 'N/A',
-      description: `Purchase ${purchase.referenceNo || ''}`.trim(),
-      type: 'debit',
-      amount: purchase.grandTotal || purchase.purchaseTotal || 0,
-      balance: runningBalance + (purchase.grandTotal || purchase.purchaseTotal || 0),
-      status: purchase.purchaseStatus || purchase.status || 'Pending',
-      purchase: purchase,
-      payment: null,
-      isImmutable: false
-    };
-    entries.push(entry);
-    runningBalance += purchase.grandTotal || purchase.purchaseTotal || 0;
-  });
-
-  // Process payments (credits) - these should be additional entries, not replacements
-  payments.forEach(payment => {
-    const paymentDate = payment.date?.toDate?.() || payment.date || new Date();
-    const entry: LedgerEntry = {
-      date: paymentDate,
-      referenceNo: payment.referenceNo || `PAY-${payment.id.substring(0, 5)}`,
-      supplier: payment.supplier || this.supplierDetails?.businessName || 'N/A',
-      description: payment.notes || 'Payment',
-      type: 'credit',
-      amount: payment.amount || 0,
-      balance: runningBalance - (payment.amount || 0),
-      status: payment.status || 'Paid',
-      purchase: null,
-      payment: payment,
-      isImmutable: false
-    };
-    entries.push(entry);
-    runningBalance -= payment.amount || 0;
-  });
-
-  // Sort by date while preserving original entries
-  return entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-}
-
-private calculateRunningBalance(): void {
-  let balance = this.supplierDetails?.openingBalance || 0;
-  
-  this.ledgerEntries.forEach(entry => {
-    if (entry.type === 'debit') {
-      balance += entry.amount;
-    } else {
-      balance -= entry.amount;
-    }
-    entry.balance = balance;
-  });
-}
-
-  recalculateGrandTotal(purchase: any): number {
-  const subtotal = purchase.subtotal || 
-    (purchase.products?.reduce((sum: number, p: any) => 
-      sum + ((p.quantity || 0) * (p.price || p.unitCost || 0)), 0) || 0);
-  
-  const totalTax = purchase.totalTax || 
-    (purchase.products?.reduce((sum: number, p: any) => 
-      sum + (p.taxAmount || 0), 0) || 0);
-  
-  const shippingCharges = purchase.shippingCharges || 0;
-  
-  return subtotal + totalTax + shippingCharges;
-}debugPurchaseCalculation(purchase: any): void {
-  const subtotal = purchase.subtotal || 
-    (purchase.products?.reduce((sum: number, p: any) => 
-      sum + ((p.quantity || 0) * (p.price || p.unitCost || 0)), 0) || 0);
-  
-  const totalTax = purchase.totalTax || 
-    (purchase.products?.reduce((sum: number, p: any) => 
-      sum + (p.taxAmount || 0), 0) || 0);
-  
-  const shippingCharges = purchase.shippingCharges || 0;
-  
-  console.log('Purchase Debug:', {
-    id: purchase.id,
-    referenceNo: purchase.referenceNo,
-    subtotal: subtotal,
-    totalTax: totalTax,
-    shippingCharges: shippingCharges,
-    calculatedTotal: subtotal + totalTax + shippingCharges,
-    originalGrandTotal: purchase.grandTotal,
-    products: purchase.products?.map((p: { productName: any; quantity: any; price: any; unitCost: any; taxAmount: any; }) => ({
-      name: p.productName,
-      quantity: p.quantity,
-      price: p.price || p.unitCost,
-      tax: p.taxAmount
-    }))
-  });
-}
-// Update your existing getStatusClass method or add this if it doesn't exist
-getStatusClass(status?: string): string {
-  if (!status) return 'bg-secondary';
-  
-  status = status.toLowerCase();
-  if (status === 'received' || status === 'paid' || status === 'completed') {
-    return 'bg-success';
-  } else if (status === 'pending' || status === 'partial') {
-    return 'bg-warning';
-  } else if (status === 'cancelled' || status === 'due') {
-    return 'bg-danger';
-  } else if (status === 'purchase') {
-    return 'bg-info';
-  } else if (status === 'balance') {
-    return 'bg-primary';
+  closePaymentModal(): void {
+    this.showPaymentModal = false;
+    this.isSavingPayment = false;
+    document.body.classList.remove('modal-open');
   }
-  return 'bg-secondary';
-}
-private initializeSupplierForAddPurchase(): void {
-  this.supplierService.getSupplierById(this.supplierId).subscribe(supplier => {
-    this.supplierDetails = supplier;
-    
-    // Store the formatted address for the "Add Purchase" button
-    this.supplierDetails.formattedAddress = this.formatSupplierAddress(supplier);
-    
-    // Initialize account summary if needed
-    if (this.supplierDetails) {
-      this.accountSummary.openingBalance = this.supplierDetails.openingBalance || 0;
-      this.currentBalance = this.supplierDetails.openingBalance || 0;
-    }
-  });
-}
+// ... existing imports
 
-private formatSupplierAddress(supplier: any): string {
-  if (!supplier) return '';
-  const addressParts = [
-    supplier.addressLine1,
-    supplier.addressLine2,
-    `${supplier.city}, ${supplier.state}`,
-    `${supplier.country} - ${supplier.zipCode}`
-  ].filter(part => part && part.trim() !== '');
-  return addressParts.join(', ');
-}
+  // =========================================================================
+  // LEDGER LOGIC
+  // =========================================================================
 
-private formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
+// =========================================================================
+// FIX: Updated submitPayment - Ensure payment date reflects in Account Book
+// =========================================================================
 
-applyDateFilter(): void {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
 
-  switch (this.selectedDateFilter) {
-    case 'today':
-      this.fromDate = this.formatDate(today);
-      this.toDate = this.formatDate(today);
-      break;
-    case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      this.fromDate = this.formatDate(yesterday);
-      this.toDate = this.formatDate(yesterday);
-      break;
-    case 'thisWeek':
-      const weekStart = new Date(today);
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
-      this.fromDate = this.formatDate(weekStart);
-      this.toDate = this.formatDate(today);
-      break;
-    case 'thisMonth':
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-      this.fromDate = this.formatDate(monthStart);
-      this.toDate = this.formatDate(today);
-      break;
-    case 'thisFinancialYear':
-      const financialYear = this.getFinancialYear(today);
-      this.fromDate = this.formatDate(financialYear.start);
-      this.toDate = this.formatDate(financialYear.end);
-      break;
-    case 'previousYear':
-      const prevYear = new Date(today.getFullYear() - 1, 0, 1);
-      const prevYearEnd = new Date(today.getFullYear() - 1, 11, 31);
-      this.fromDate = this.formatDate(prevYear);
-      this.toDate = this.formatDate(prevYearEnd);
-      break;
-    case 'custom':
-      // Custom dates are already set by the user
-      break;
-  }
-
-  // Apply the same date range to stock report
-  this.stockReportFromDate = this.fromDate;
-  this.stockReportToDate = this.toDate;
-
-  // Apply the filters to all tabs
-  this.filterPurchases();
-  this.filterLedger();
-  this.filterStockReport();
-}
-
-// Update the stock report filter to use the same date range
-filterStockReport(): void {
-  if (!this.stockReport) return;
-
-  this.filteredStockReport = this.stockReport.filter(item => {
-    // Check if item has purchases in the date range
-    const hasPurchaseInRange = item.purchases.some((p: any) => {
-      const purchaseDate = new Date(p.date).toISOString().split('T')[0];
-      return purchaseDate >= this.fromDate && purchaseDate <= this.toDate;
-    });
-    
-    if (!hasPurchaseInRange) return false;
-    
-    // Location filter
-    if (this.selectedLocation !== 'all') {
-      const hasPurchaseInLocation = item.purchases.some((p: any) => 
-        p.location === this.selectedLocation
+// =========================================================================
+// FIX 1: Update loadPayments to exclude advance adjustments
+// =========================================================================
+loadPayments(): void {
+  this.paymentLoading = true;
+  this.paymentService.getSupplierPayments(this.supplierId).subscribe({
+    next: (payments: any[]) => {
+      // ✅ FILTER OUT advance adjustments - they should only show in Ledger View
+      const actualPayments = payments.filter(payment => 
+        payment.paymentMethod !== 'Advance Adjustment' && 
+        payment.type !== 'advance_adjustment'
       );
-      if (!hasPurchaseInLocation) return false;
+      this.processPaymentData(actualPayments);
+    },
+    error: (error) => {
+      console.error('Error loading payments:', error);
+      setTimeout(() => { if (this.paymentLoading) this.paymentLoading = false; }, 2000);
     }
-    
-    return true;
   });
 }
-  // Add this new method to load purchases
-loadPurchases(supplierId?: string, supplierDisplayName?: string): void {
-  this.isLoadingPurchases = true;
+// =========================================================================
+// distributeAndUpdatePayment - Handles payment distribution to purchases
+// =========================================================================
+private async distributeAndUpdatePayment(paymentAmount: number, paymentId: string): Promise<void> {
+  try {
+    // Get all purchases for this supplier
+    const purchasesQuery = query(
+      collection(this.firestore, 'purchases'),
+      where('supplierId', '==', this.supplierId)
+    );
+    
+    const purchasesSnapshot = await getDocs(purchasesQuery);
+    
+    // Collect unpaid/partially paid purchases
+    const unpaidPurchases: Array<{
+      id: string;
+      grandTotal: number;
+      paymentAmount: number;
+      remainingDue: number;
+    }> = [];
+
+    purchasesSnapshot.docs.forEach(purchaseDoc => {
+      const purchaseData = purchaseDoc.data();
+      
+      // Calculate grand total
+      const grandTotal = Number(purchaseData['roundedTotal']) || 
+                        Number(purchaseData['grandTotal']) || 
+                        Number(purchaseData['purchaseTotal']) || 0;
+      
+      // Get existing paid amount (trust the database value)
+      const existingPaidAmount = Number(purchaseData['paymentAmount']) || 0;
+      
+      // Calculate remaining due
+      const remainingDue = grandTotal - existingPaidAmount;
+      
+      // Only include if there's money left to pay (with tolerance for floating point)
+      if (remainingDue > 0.50) { 
+        unpaidPurchases.push({
+          id: purchaseDoc.id,
+          grandTotal: grandTotal,
+          paymentAmount: existingPaidAmount,
+          remainingDue: remainingDue
+        });
+      }
+    });
+
+    // Sort by oldest first (FIFO - First In First Out)
+    unpaidPurchases.sort((a, b) => a.id.localeCompare(b.id));
+
+    // Distribute payment across purchases
+    let remainingPayment = paymentAmount;
+    const paymentDistribution: Array<{ purchaseId: string; amount: number }> = [];
+
+    for (const purchase of unpaidPurchases) {
+      if (remainingPayment <= 0) break;
+      
+      // Pay up to what is due, or what we have left
+      const amountToApply = Math.min(remainingPayment, purchase.remainingDue);
+      
+      // Round to 2 decimals to avoid floating point errors
+      const roundedAmountToApply = Math.round(amountToApply * 100) / 100;
+
+      if (roundedAmountToApply > 0) {
+        paymentDistribution.push({
+          purchaseId: purchase.id,
+          amount: roundedAmountToApply
+        });
+        
+        remainingPayment -= roundedAmountToApply;
+      }
+    }
+
+    // Update the payment document with distribution info
+    const paymentRef = doc(this.firestore, 'payments', paymentId);
+    await updateDoc(paymentRef, {
+      distribution: paymentDistribution,
+      fullyDistributed: remainingPayment <= 0.01 // True if we used all the money
+    });
+
+    // Update each affected purchase document
+    const updatePromises = paymentDistribution.map(async (distItem) => {
+      const purchase = unpaidPurchases.find(p => p.id === distItem.purchaseId);
+      if (purchase) {
+        const purchaseRef = doc(this.firestore, 'purchases', purchase.id);
+        
+        // Calculate new totals
+        const newTotalPaid = purchase.paymentAmount + distItem.amount;
+        const newPaymentDue = Math.max(0, purchase.grandTotal - newTotalPaid);
+        
+        // Determine payment status
+        const paymentStatus = newPaymentDue <= 1.0 ? 'Paid' : 'Partial';
+
+        // Update Firestore
+        await updateDoc(purchaseRef, {
+          paymentAmount: Number(newTotalPaid.toFixed(2)),
+          paymentDue: Number(newPaymentDue.toFixed(2)),
+          paymentStatus: paymentStatus,
+          updatedAt: Timestamp.now()
+        });
+      }
+    });
+
+    await Promise.all(updatePromises);
+    
+    console.log('✅ Payment distributed successfully:', {
+      totalAmount: paymentAmount,
+      distributedTo: paymentDistribution.length + ' purchases',
+      remainingUnallocated: remainingPayment
+    });
+    
+  } catch (error) {
+    console.error('❌ Error distributing payment:', error);
+    throw error;
+  }
+}
+
+// =========================================================================
+// FIX 3: Update getTotalPaid to only count actual payments
+// =========================================================================
+getTotalPaid(): number {
+  // Only count actual cash payments, not advance adjustments
+  return this.payments
+    .filter(payment => 
+      payment.paymentMethod !== 'Advance Adjustment' && 
+      payment.type !== 'advance_adjustment'
+    )
+    .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+}
+
+
+// Find the submitPayment() method and replace it with this:
+
+async submitPayment(): Promise<void> {
+  // FIX: Removed "!this.currentPaymentPurchase" check so general payments work
+  if (this.paymentForm.invalid) {
+    this.paymentForm.markAllAsTouched();
+    alert('Please fill all required fields correctly.');
+    return;
+  }
+
+  this.isSavingPayment = true;
+  const formVal = this.paymentForm.value;
+
+  try {
+    const selectedAccount = this.paymentAccounts.find(acc => acc.id === formVal.paymentAccountId);
+    if (!selectedAccount) throw new Error('Selected account not found');
+
+    // Create proper date object
+    const selectedDate = new Date(formVal.paymentDate);
+    const now = new Date();
+    selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    
+    const timestamp = Timestamp.fromDate(selectedDate);
+    const paymentAmount = Number(formVal.amount);
+
+    // Prepare payment data
+    const paymentData = {
+      supplierId: this.supplierId,
+      supplier: this.supplierDetails.businessName || this.supplierDetails.firstName || 'Unknown Supplier',
+      amount: paymentAmount,
+      paymentDate: timestamp,
+      date: timestamp, 
+      paymentMethod: formVal.paymentMethod,
+      accountId: selectedAccount.id,
+      accountName: selectedAccount.name,
+      referenceNo: formVal.referenceNo || `PAY-${Date.now()}`,
+      notes: formVal.notes || '',
+      createdAt: Timestamp.now(),
+      createdBy: this.currentUserName,
+      status: 'Paid',
+      type: 'supplier_payment'
+    };
+
+    // STEP 1: Add record to 'payments' collection
+    const paymentsRef = collection(this.firestore, 'payments');
+    const docRef = await addDoc(paymentsRef, paymentData);
+
+    // STEP 2: Add to Account Book (Cash/Bank ledger)
+    const accountTransaction = {
+      accountId: selectedAccount.id,
+      accountName: selectedAccount.name,
+      date: selectedDate,
+      transactionTime: selectedDate,
+      description: `Payment to Supplier: ${paymentData.supplier}`,
+      debit: paymentAmount,
+      credit: 0,
+      reference: paymentData.referenceNo,
+      paymentDetails: paymentData.referenceNo,
+      relatedDocId: docRef.id,
+      source: 'payment',     
+      type: 'expense',
+      paymentMethod: paymentData.paymentMethod,
+      note: formVal.notes || '',
+      supplier: paymentData.supplier,
+      supplierId: this.supplierId
+    };
+    
+    await this.accountService.addAccountBookTransaction(accountTransaction);
+
+    // STEP 3: Update Supplier Balance
+    const supplierRef = doc(this.firestore, 'suppliers', this.supplierId);
+    await updateDoc(supplierRef, {
+      balance: increment(-paymentAmount),
+      updatedAt: Timestamp.now()
+    });
+
+    console.log(`✅ Supplier balance reduced by ₹${paymentAmount}`);
+
+    // STEP 4: Distribute payment across unpaid purchases
+    await this.distributeAndUpdatePayment(paymentAmount, docRef.id);
+
+    alert('Payment recorded successfully!');
+    this.closePaymentModal();
+
+    // STEP 5: Reload all data to reflect changes
+    this.loadSupplierDetails(); 
+    this.loadPurchases();
+    this.loadPayments();
+    this.loadLedgerData();
+
+  } catch (error) {
+    console.error('❌ Error recording payment:', error);
+    alert('Failed to record payment. Please try again.');
+  } finally {
+    this.isSavingPayment = false;
+  }
+}
+generateLedgerEntries(purchases: any[], payments: any[]): LedgerEntry[] {
+  const entries: LedgerEntry[] = [];
+  const supplierName = this.getSupplierDisplayName(this.supplierDetails);
+  const allTransactions: any[] = [];
+
+  // Add all purchases
+  purchases.forEach(purchase => {
+    allTransactions.push({
+      date: this.getSafeDate(purchase.purchaseDate),
+      type: 'purchase',
+      data: purchase
+    });
+  });
+
+  // ✅ Add ALL payments (including advance adjustments) to ledger
+  payments.forEach(payment => {
+    allTransactions.push({
+      date: this.getSafeDate(payment.paymentDate),
+      type: 'payment',
+      data: payment
+    });
+  });
+
+  // Sort by date
+  allTransactions.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  let runningBalance = 0;
+
+  allTransactions.forEach(transaction => {
+    if (transaction.type === 'purchase') {
+      const purchase = transaction.data;
+      const amount = this.getSafeGrandTotal(purchase);
+      runningBalance += amount;
+
+      entries.push({
+        date: transaction.date,
+        referenceNo: purchase.referenceNo || `PUR-${purchase.id?.substring(0, 6) || 'XXXX'}`,
+        supplier: supplierName,
+        description: `Purchase ${purchase.referenceNo || ''}`.trim(),
+        type: 'credit',
+        amount: amount,
+        balance: runningBalance,
+        status: this.getStatusText(purchase.purchaseStatus),
+        purchase: purchase,
+        payment: null
+      });
+
+    } else {
+      const payment = transaction.data;
+      const amount = payment.amount || 0;
+      runningBalance -= amount;
+
+      entries.push({
+        date: transaction.date,
+        referenceNo: payment.referenceNo || `PAY-${payment.id?.substring(0, 6) || 'XXXX'}`,
+        supplier: supplierName,
+        description: payment.notes || payment.paymentMethod || 'Payment',
+        type: 'debit',
+        amount: amount,
+        balance: runningBalance,
+        status: payment.status || 'Paid',
+        purchase: null,
+        payment: payment
+      });
+    }
+  });
+
+  return entries;
+}
+
+// =========================================================================
+// FIX 5: Load Ledger with ALL payments (for complete view)
+// =========================================================================
+private setupRealtimeListeners(): void {
+  // Purchases listener
+  this.purchasesUnsubscribe = onSnapshot(
+    query(collection(this.firestore, 'purchases'), where('supplierId', '==', this.supplierId)),
+    (snapshot) => {
+      const purchases = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      this.processPurchases(purchases);
+    },
+    (error) => {
+      console.error('Error listening to purchases:', error);
+      this.isLoadingPurchases = false;
+    }
+  );
+
+  // Payments listener - get ALL payments for ledger calculation
+  this.paymentsUnsubscribe = onSnapshot(
+    query(collection(this.firestore, 'payments'), where('supplierId', '==', this.supplierId)),
+    (snapshot) => {
+      const allPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as any }));
+      
+      // For display in Payments tab - filter out adjustments
+      const actualPayments = allPayments.filter(payment => 
+        payment.paymentMethod !== 'Advance Adjustment' && 
+        payment.type !== 'advance_adjustment'
+      );
+      
+      // Process for UI display
+      this.processPaymentData(actualPayments);
+      
+      // Update ledger with ALL payments (including adjustments)
+      this.updateLedgerWithAllPayments(allPayments);
+    },
+    (error) => {
+      console.error('Error listening to payments:', error);
+      this.paymentLoading = false;
+    }
+  );
+}
+
+// Helper method to update ledger with complete payment history
+private updateLedgerWithAllPayments(allPayments: any[]): void {
+  const processedPayments = allPayments.map(payment => {
+    const rawDate = payment.paymentDate || payment.date || payment.createdAt;
+    return {
+      ...payment,
+      paymentDate: this.getSafeDate(rawDate)
+    };
+  });
   
-  const targetSupplierId = supplierId || this.supplierId;
-  const targetSupplierName = supplierDisplayName || this.getSupplierDisplayName(this.supplierDetails);
+  processedPayments.sort((a, b) => b.paymentDate.getTime() - a.paymentDate.getTime());
   
-  this.purchaseService.getPurchasesBySupplier(targetSupplierId).subscribe({
-    next: (purchases: Purchase[]) => {
-      if (purchases.length > 0) {
-        this.processPurchases(purchases);
-      } else {
-        // Fallback to name matching if no purchases found by ID
-        this.purchaseService.getPurchasesBySupplierName(targetSupplierName)
-          .subscribe({
+  // Update ledger entries with complete data
+  this.ledgerEntries = this.generateLedgerEntries(this.purchases, processedPayments);
+  this.filterLedger();
+}
+
+
+  // =========================================================================
+  // DATA LOADING & PROCESSING
+  // =========================================================================
+
+  loadPurchases(): void {
+    this.isLoadingPurchases = true;
+    
+    this.purchaseService.getPurchasesBySupplier(this.supplierId).subscribe({
+      next: (purchases: Purchase[]) => {
+        if (purchases.length > 0) {
+          this.processPurchases(purchases);
+        } else {
+          const supplierName = this.getSupplierDisplayName(this.supplierDetails);
+          this.purchaseService.getPurchasesBySupplierName(supplierName).subscribe({
             next: (nameMatchedPurchases: Purchase[]) => {
               this.processPurchases(nameMatchedPurchases);
             },
@@ -569,206 +692,311 @@ loadPurchases(supplierId?: string, supplierDisplayName?: string): void {
               this.handlePurchaseLoadError(err);
             }
           });
-      }
-    },
-    error: (err: any) => {
-      this.handlePurchaseLoadError(err);
-    }
-  });
-}
-loadPayments(): void {
-  this.paymentLoading = true;
-  this.paymentService.getSupplierPayments(this.supplierId).subscribe({
-    next: (payments) => {
-      this.payments = payments;
-      this.paymentLoading = false;
-    },
-    error: (error) => {
-      console.error('Error loading payments:', error);
-      this.paymentLoading = false;
-    }
-  });
-}
-  handlePurchaseLoadError(error: any): void {
-    console.error('Error loading purchases:', error);
-    this.isLoadingPurchases = false;
-    this.purchases = [];
-    this.filteredPurchases = [];
-  }
-getTotalPurchasesAmount(): number {
-  return this.filteredPurchases.reduce((total, purchase) => total + (purchase.grandTotal || 0), 0);
-}
-
-
-// Change from:
-// private getSupplierDisplayName(supplier: any): string {
-
-// To:
-public getSupplierDisplayName(supplier: any): string {
-  if (!supplier) return '';
-  
-  if (supplier.isIndividual) {
-    return `${supplier.firstName || ''} ${supplier.lastName || ''}`.trim();
-  }
-  return supplier.businessName || supplier.name || '';
-}
-  // Add this method to calculate total pages
-  calculateTotalPages(): void {
-    this.totalPages = Math.ceil(this.filteredPurchases.length / this.itemsPerPage);
-    if (this.currentPage > this.totalPages && this.totalPages > 0) {
-      this.currentPage = this.totalPages;
-    }
-  }
-  
-private processPurchases(purchases: Purchase[]): void {
-  this.purchases = purchases.map(purchase => {
-    const standardized = this.standardizePurchase(purchase);
-    const paymentAmount = standardized.paymentAmount || 0;
-    const paymentDue = Math.max(0, standardized.grandTotal - paymentAmount);
-
-    return {
-      ...standardized,
-      paymentAmount,
-      paymentDue,
-      paymentStatus: paymentDue <= 0 ? 'Paid' : (paymentAmount > 0 ? 'Partial' : 'Due')
-    };
-  });
-
-  this.filteredPurchases = [...this.purchases];
-  this.calculateTotalPages();
-  this.isLoadingPurchases = false;
-}
-
-  ngOnDestroy(): void {
-    if (this.purchasesUnsubscribe) {
-      this.purchasesUnsubscribe();
-    }
-  }
-
-  private getFormattedDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  loadLocations(): void {
-    this.locationService.getLocations().subscribe({
-      next: (locations) => {
-        this.locations = locations;
-        // Set default location to first one or 'all'
-        if (this.locations.length > 0) {
-          this.selectedLocation = this.locations[0].id;
         }
       },
-      error: (error) => {
-        console.error('Error loading locations:', error);
+      error: (err: any) => {
+        this.handlePurchaseLoadError(err);
       }
     });
   }
-  
-onDateFilterChange(): void {
-  if (this.selectedDateFilter !== 'custom') {
-    this.showCustomDateRange = false;
-    this.applyDateFilter();
-  } else {
-    this.showCustomDateRange = true;
-    // Initialize custom dates with current range when selecting custom
-    this.customFromDate = this.fromDate;
-    this.customToDate = this.toDate;
-  }
-}
-applyCustomDateRange(): void {
-  if (!this.customFromDate || !this.customToDate) {
-    alert('Please select both from and to dates');
-    return;
-  }
 
-  const fromDate = new Date(this.customFromDate);
-  const toDate = new Date(this.customToDate);
+  private processPurchases(purchases: Purchase[]): void {
+    this.purchases = purchases.map(purchase => {
+      const standardized = this.standardizePurchase(purchase);
+      const paymentAmount = standardized.paymentAmount || 0;
+      // Ensure paymentDue matches grandTotal if not paid
+      const paymentDue = Math.max(0, standardized.grandTotal - paymentAmount);
 
-  if (fromDate > toDate) {
-    alert('From date cannot be after To date');
-    return;
-  }
+      return {
+        ...standardized,
+        paymentAmount,
+        paymentDue,
+        paymentStatus: paymentDue <= 0 ? 'Paid' : (paymentAmount > 0 ? 'Partial' : 'Due')
+      };
+    });
 
-  this.fromDate = this.customFromDate;
-  this.toDate = this.customToDate;
-  
-  // Apply the same date range to all tabs
-  this.stockReportFromDate = this.fromDate;
-  this.stockReportToDate = this.toDate;
+    // Sort purchases by date descending
+    this.purchases.sort((a, b) => {
+      const dateA = a.purchaseDate instanceof Date ? a.purchaseDate.getTime() : 0;
+      const dateB = b.purchaseDate instanceof Date ? b.purchaseDate.getTime() : 0;
+      return dateB - dateA;
+    });
 
-  // Apply filters to all tabs
-  this.filterPurchases();
-  this.filterLedger();
-  this.filterStockReport();
-}
-
-// Add these methods to your component class
-calculateTotal(type: 'debit' | 'credit'): number {
-  return this.filteredLedgerEntries.reduce((sum, entry) => {
-    return sum + (entry.type === type ? entry.amount : 0);
-  }, 0);
-}
-
-getCurrentBalance(): number {
-  if (this.filteredLedgerEntries.length === 0) {
-    return this.supplierDetails?.openingBalance || 0;
-  }
-  
-  const lastEntry = this.filteredLedgerEntries[this.filteredLedgerEntries.length - 1];
-  return lastEntry.balance;
-}
-
-viewLedgerDetails(entry: LedgerEntry): void {
-  if (entry.purchase) {
-    this.viewPurchaseDetails(entry.purchase);
-  } else if (entry.payment) {
-    this.viewPaymentDetails(entry.payment.id);
-  }
-}
-
-filterLedger(): void {
-  if (!this.ledgerEntries || this.ledgerEntries.length === 0) {
-    this.filteredLedgerEntries = [];
-    return;
+    this.filteredPurchases = [...this.purchases];
+    this.calculateTotalPages();
+    this.isLoadingPurchases = false;
+    this.updateLedgerView();
+    this.updateAccountSummaryData(); 
   }
 
-  const fromDate = new Date(this.fromDate);
-  const toDate = new Date(this.toDate);
-  toDate.setHours(23, 59, 59, 999);
+  standardizePurchase(purchase: any): any {
+    let productsTotal = 0;
+    let totalTax = 0;
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+    let taxRate = 0;
+    const isInterState = purchase.isInterState || false;
 
-  this.filteredLedgerEntries = this.ledgerEntries.filter(entry => {
-    const entryDate = new Date(entry.date);
+    if (purchase.products?.length) {
+      const taxCalculations = purchase.products.reduce((acc: any, product: any) => {
+        const quantity = product.quantity || 0;
+        const price = product.unitCost || product.price || 0;
+        const productTotal = quantity * price;
+        const productTaxRate = product.taxRate || 0;
+        let taxAmount = product.taxAmount || 0;
+        
+        if (taxAmount === 0 && productTaxRate > 0) {
+          taxAmount = productTotal * (productTaxRate / 100);
+        }
+
+        acc.totalTax += taxAmount;
+        acc.productsTotal += productTotal;
+        
+        if (productTaxRate > 0 && acc.taxRate === 0) {
+          acc.taxRate = productTaxRate;
+        }
+        
+        return acc;
+      }, { totalTax: 0, productsTotal: 0, taxRate: 0 });
+
+      totalTax = taxCalculations.totalTax;
+      productsTotal = taxCalculations.productsTotal;
+      taxRate = taxCalculations.taxRate;
+
+      if (isInterState) {
+        igst = totalTax;
+      } else {
+        cgst = totalTax / 2;
+        sgst = totalTax / 2;
+      }
+    }
+
+    const shippingCharges = Number(purchase.shippingCharges) || 0;
     
-    // Date filter
-    if (entryDate < fromDate || entryDate > toDate) {
-      return false;
+    // Calculate what the total *would* be if calculated from scratch
+    const calculatedTotal = productsTotal + totalTax + shippingCharges;
+
+    // FIX: Prioritize the stored grandTotal value from Firebase to avoid mismatch.
+    // If roundedTotal exists, use it. Else grandTotal. Else purchaseTotal.
+    // Fallback to calculatedTotal only if everything else is missing.
+    const grandTotal = Number(purchase.roundedTotal) || 
+                       Number(purchase.grandTotal) || 
+                       Number(purchase.purchaseTotal) || 
+                       calculatedTotal;
+
+    // Use safe date converter
+    return {
+      ...purchase,
+      productsTotal,
+      totalTax,
+      cgst,
+      sgst,
+      igst,
+      taxRate,
+      isInterState,
+      shippingCharges,
+      grandTotal, // This will now match List Purchases
+      supplier: purchase.supplier || this.getSupplierDisplayName(purchase.supplierDetails),
+      purchaseStatus: this.getStatusText(purchase.purchaseStatus),
+      purchaseDate: this.getSafeDate(purchase.purchaseDate)
+    };
+  }
+
+
+
+  private processPaymentData(payments: any[]): void {
+    this.payments = payments.map(payment => {
+      const rawDate = payment.paymentDate || payment.date || payment.createdAt || payment.paidOn;
+      return {
+        ...payment,
+        paymentDate: this.getSafeDate(rawDate) 
+      };
+    });
+
+    this.payments.sort((a, b) => b.paymentDate.getTime() - a.paymentDate.getTime());
+
+    this.paymentLoading = false;
+    this.updateLedgerView();
+    this.updateAccountSummaryData();
+  }
+
+
+
+  // =========================================================================
+  // LEDGER LOGIC
+  // =========================================================================
+
+  loadLedgerData(): void {
+    this.ledgerLoading = true;
+    this.ledgerEntries = this.generateLedgerEntries(this.purchases, this.payments);
+    this.filterLedger();
+    this.ledgerLoading = false;
+  }
+
+  updateLedgerView(): void {
+    this.ledgerEntries = this.generateLedgerEntries(this.purchases, this.payments);
+    this.filterLedger();
+  }
+
+  filterLedger(): void {
+    if (!this.ledgerEntries.length) {
+      this.filteredLedgerEntries = [];
+      return;
     }
 
-    // Location filter (if applicable)
-    if (this.selectedLocation !== 'all') {
-      if (entry.purchase) {
-        return entry.purchase.businessLocation === this.selectedLocation;
-      }
-      if (entry.payment) {
-        return entry.payment.location === this.selectedLocation;
-      }
-    }
+    const fromDate = new Date(this.fromDate);
+    const toDate = new Date(this.toDate);
+    toDate.setHours(23, 59, 59, 999);
 
-    return true;
-  });
-}
-  getLocationName(locationId: string): string {
-    const location = this.locations.find(l => l.id === locationId);
-    return location ? location.name : 'All Locations';
+    this.filteredLedgerEntries = this.ledgerEntries.filter(entry => {
+      const entryDate = entry.date;
+      if (entryDate < fromDate || entryDate > toDate) return false;
+      
+      if (this.selectedLocation !== 'all') {
+        if (entry.purchase) return entry.purchase.businessLocation === this.selectedLocation;
+        if (entry.payment) return entry.payment.location === this.selectedLocation;
+      }
+      return true;
+    });
+
+    this.filteredLedgerEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  // =========================================================================
+  // HELPER METHODS
+  // =========================================================================
+
+  private updateAccountSummaryData(): void {
+    const totalPurchaseAmount = this.filteredPurchases.reduce((sum, p) => sum + this.getSafeGrandTotal(p), 0);
+    const totalPaidAmount = this.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const balanceDue = totalPurchaseAmount - totalPaidAmount;
+
+    this.accountSummaryData = {
+      openingBalance: 0, 
+      totalPurchase: totalPurchaseAmount,
+      totalExpense: 0, 
+      totalPaid: totalPaidAmount,
+      advanceBalance: totalPaidAmount > totalPurchaseAmount ? totalPaidAmount - totalPurchaseAmount : 0,
+      balanceDue: Math.max(0, balanceDue),
+      dateRange: {
+        from: this.formatDateForDisplay(this.fromDate),
+        to: this.formatDateForDisplay(this.toDate)
+      },
+      supplierDetails: this.supplierDetails,
+      companyDetails: {
+        name: 'HERBALY TOUCH AYURVEDA HOSPITAL PRIVATE LIMITED',
+        address: 'Your Company Address, City, State, Country - ZIP' 
+      }
+    };
+  }
+
+  getSafeGrandTotal(purchase: any): number {
+    // Priority: roundedTotal > grandTotal > purchaseTotal > calculated value
+    return Number(purchase?.roundedTotal) || 
+           Number(purchase?.grandTotal) || 
+           Number(purchase?.purchaseTotal) || 
+           Number(purchase?.totalAmount) || 0;
+  }
+
+  getStatusText(status: string): string {
+    if (!status) return 'Pending';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  }
+
+  getStatusClass(status?: string): string {
+    if (!status) return 'bg-secondary';
+    const s = status.toLowerCase();
+    if (['received', 'paid', 'completed'].includes(s)) return 'bg-success';
+    if (['pending', 'partial'].includes(s)) return 'bg-warning';
+    if (['cancelled', 'due', 'unpaid'].includes(s)) return 'bg-danger';
+    return 'bg-secondary';
+  }
+
+  // =========================================================================
+  // EXISTING METHODS (UNCHANGED FUNCTIONALITY)
+  // =========================================================================
+
+  downloadDocument(doc: any): void {
+    if (!doc || !doc.url) return;
+    const link = document.createElement('a');
+    link.href = doc.url;
+    link.download = doc.name || 'download';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  addNote(): void {
+    if (!this.newNote.title || !this.newNote.content) {
+      alert('Please fill all required fields');
+      return;
+    }
+    this.newNote.createdAt = new Date();
+    this.newNote.createdBy = this.currentUserName || this.currentUserId;
+    this.newNote.isPrivate = false;
+    
+    this.supplierService.addSupplierNote(this.supplierId, this.newNote).then(() => {
+      this.loadDocumentsAndNotes();
+      this.newNote = { title: '', content: '', createdAt: new Date(), createdBy: this.currentUserName, isPrivate: false };
+    }).catch(error => {
+      console.error('Error adding note:', error);
+      alert('Error adding note');
+    });
+  }
+
+  uploadDocuments(): void {
+    if (this.selectedFiles.length === 0) {
+      alert('Please select files to upload');
+      return;
+    }
+    this.isUploading = true;
+    const uploadPromises = this.selectedFiles.map((file: File) => {
+      return this.uploadFile(file).then(downloadURL => {
+        const document: SupplierDocument = {
+          name: file.name,
+          url: downloadURL,
+          uploadedAt: new Date(),
+          uploadedBy: this.currentUserName || this.currentUserId,
+          isPrivate: false 
+        };
+        return this.supplierService.addSupplierDocument(this.supplierId, document);
+      });
+    });
+
+    Promise.all(uploadPromises).then(() => {
+      this.loadDocumentsAndNotes();
+      this.selectedFiles = [];
+      this.isUploading = false;
+    }).catch(error => {
+      console.error('Error uploading:', error);
+      this.isUploading = false;
+      alert('Error uploading documents');
+    });
+  }
+
+
+
+  private updateAccountSummaryDateRange(): void {
+    this.accountSummaryData.dateRange = {
+      from: this.formatDateForDisplay(this.fromDate),
+      to: this.formatDateForDisplay(this.toDate)
+    };
+  }
+
+  private formatDateForDisplay(dateString: string): string {
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   }
 
   filterPurchases(): void {
-    if (!this.purchases || this.purchases.length === 0) {
+    if (!this.purchases.length) {
       this.filteredPurchases = [];
       this.calculateTotalPages();
+      this.updateAccountSummaryData(); 
       return;
     }
 
@@ -777,52 +1005,196 @@ filterLedger(): void {
     toDate.setHours(23, 59, 59, 999);
 
     this.filteredPurchases = this.purchases.filter(purchase => {
-      // Skip if purchase date is invalid
-      if (!purchase.purchaseDate) return false;
-      
-      const purchaseDate = new Date(purchase.purchaseDate);
-      
-      // Date filter
-      if (purchaseDate < fromDate || purchaseDate > toDate) {
-        return false;
-      }
-
-      // Location filter
-      if (this.selectedLocation !== 'all') {
-        return purchase.businessLocation === this.selectedLocation;
-      }
-
+      const pDate = purchase.purchaseDate instanceof Date ? purchase.purchaseDate : new Date(purchase.purchaseDate);
+      if (pDate < fromDate || pDate > toDate) return false;
+      if (this.selectedLocation !== 'all' && purchase.businessLocation !== this.selectedLocation) return false;
       return true;
     });
 
     this.calculateTotalPages();
+    this.updateAccountSummaryDateRange();
+    this.updateAccountSummaryData(); 
   }
 
-  // Add this method to your SupplierPurchasesComponent class
-  private convertTimestamp(timestamp: any): Date | null {
-    if (!timestamp) return null;
-    
-    // Firestore Timestamp
-    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
-      return timestamp.toDate();
+  applyDateFilter(): void {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    switch (this.selectedDateFilter) {
+      case 'today':
+        this.fromDate = this.formatDate(today);
+        this.toDate = this.formatDate(today);
+        break;
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        this.fromDate = this.formatDate(yesterday);
+        this.toDate = this.formatDate(yesterday);
+        break;
+      case 'thisWeek':
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        this.fromDate = this.formatDate(weekStart);
+        this.toDate = this.formatDate(today);
+        break;
+      case 'thisMonth':
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        this.fromDate = this.formatDate(monthStart);
+        this.toDate = this.formatDate(today);
+        break;
+      case 'thisFinancialYear':
+        const financialYear = this.getFinancialYear(today);
+        this.fromDate = this.formatDate(financialYear.start);
+        this.toDate = this.formatDate(financialYear.end);
+        break;
+      case 'previousYear':
+        const prevYear = new Date(today.getFullYear() - 1, 0, 1);
+        const prevYearEnd = new Date(today.getFullYear() - 1, 11, 31);
+        this.fromDate = this.formatDate(prevYear);
+        this.toDate = this.formatDate(prevYearEnd);
+        break;
     }
-    
-    // JavaScript Date or string
-    if (timestamp instanceof Date || typeof timestamp === 'string') {
-      return new Date(timestamp);
+
+    this.stockReportFromDate = this.fromDate;
+    this.stockReportToDate = this.toDate;
+
+    this.filterPurchases();
+    this.filterLedger();
+    this.filterStockReport();
+  }
+
+  loadSupplierDetails(): void {
+    this.supplierService.getSupplierById(this.supplierId).subscribe(supplier => {
+      this.supplierDetails = supplier || {};
+      this.supplierDetails.displayName = this.getSupplierDisplayName(supplier);
+      this.supplierDetails.formattedAddress = this.formatSupplierAddress(supplier);
+      this.accountSummaryData.supplierDetails = this.supplierDetails;
+      this.updateAccountSummaryData();
+    });
+  }
+
+  viewPurchaseDetails(purchase: any): void {
+    if (!purchase?.id) return;
+    this.router.navigate(['/view-purchase', purchase.id]);
+  }
+
+  calculateTotal(type: 'debit' | 'credit'): number {
+    return this.filteredLedgerEntries.reduce((sum, entry) => {
+      return sum + (entry.type === type ? entry.amount : 0);
+    }, 0);
+  }
+
+  getCurrentBalance(): number {
+    if (this.filteredLedgerEntries.length === 0) return 0;
+    return this.filteredLedgerEntries[this.filteredLedgerEntries.length - 1].balance;
+  }
+
+  private initializeSupplierForAddPurchase(): void {
+    this.supplierService.getSupplierById(this.supplierId).subscribe(supplier => {
+      this.supplierDetails = supplier;
+      this.supplierDetails.formattedAddress = this.formatSupplierAddress(supplier);
+      if (this.supplierDetails) {
+        this.accountSummary.openingBalance = 0;
+        this.currentBalance = 0;
+      }
+    });
+  }
+
+  private formatSupplierAddress(supplier: any): string {
+    if (!supplier) return '';
+    const addressParts = [
+      supplier.addressLine1,
+      supplier.addressLine2,
+      `${supplier.city}, ${supplier.state}`,
+      `${supplier.country} - ${supplier.zipCode}`
+    ].filter(part => part && part.trim() !== '');
+    return addressParts.join(', ');
+  }
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getFormattedDate(date: Date): string {
+    return this.formatDate(date);
+  }
+
+  public getSupplierDisplayName(supplier: any): string {
+    if (!supplier) return '';
+    if (supplier.isIndividual) {
+      return `${supplier.firstName || ''} ${supplier.lastName || ''}`.trim();
     }
-    
-    // Unix timestamp (seconds)
-    if (typeof timestamp === 'number' && timestamp < 1000000000000) {
-      return new Date(timestamp * 1000);
+    return supplier.businessName || supplier.name || '';
+  }
+
+  handlePurchaseLoadError(error: any): void {
+    console.error('Error loading purchases:', error);
+    this.isLoadingPurchases = false;
+    this.purchases = [];
+    this.filteredPurchases = [];
+  }
+
+  calculateTotalPages(): void {
+    this.totalPages = Math.ceil(this.filteredPurchases.length / this.itemsPerPage);
+    if (this.currentPage > this.totalPages && this.totalPages > 0) {
+      this.currentPage = this.totalPages;
     }
-    
-    // Unix timestamp (milliseconds)
-    if (typeof timestamp === 'number') {
-      return new Date(timestamp);
+  }
+
+  onDateFilterChange(): void {
+    if (this.selectedDateFilter !== 'custom') {
+      this.showCustomDateRange = false;
+      this.applyDateFilter();
+    } else {
+      this.showCustomDateRange = true;
+      this.customFromDate = this.fromDate;
+      this.customToDate = this.toDate;
     }
-    
-    return null;
+  }
+
+  applyCustomDateRange(): void {
+    if (!this.customFromDate || !this.customToDate) {
+      alert('Please select both from and to dates');
+      return;
+    }
+    this.fromDate = this.customFromDate;
+    this.toDate = this.customToDate;
+    this.stockReportFromDate = this.fromDate;
+    this.stockReportToDate = this.toDate;
+    this.filterPurchases();
+    this.filterLedger();
+    this.filterStockReport();
+  }
+
+  viewLedgerDetails(entry: LedgerEntry): void {
+    if (entry.purchase) {
+      this.viewPurchaseDetails(entry.purchase);
+    } else if (entry.payment) {
+      this.viewPaymentDetails(entry.payment.id);
+    }
+  }
+
+  filterStockReport(): void {
+    if (!this.stockReport) return;
+    this.filteredStockReport = this.stockReport.filter(item => {
+      const hasPurchaseInRange = item.purchases.some((p: any) => {
+        const purchaseDate = new Date(p.date).toISOString().split('T')[0];
+        return purchaseDate >= this.fromDate && purchaseDate <= this.toDate;
+      });
+      if (!hasPurchaseInRange) return false;
+      if (this.selectedLocation !== 'all') {
+        const hasPurchaseInLocation = item.purchases.some((p: any) => p.location === this.selectedLocation);
+        if (!hasPurchaseInLocation) return false;
+      }
+      return true;
+    });
+  }
+
+  getTotalPurchasesAmount(): number {
+    return this.filteredPurchases.reduce((total, purchase) => total + (purchase.grandTotal || 0), 0);
   }
 
   getPaginatedPurchases(): Purchase[] {
@@ -832,81 +1204,42 @@ filterLedger(): void {
 
   getPageNumbers(): number[] {
     const pages: number[] = [];
-    for (let i = 1; i <= this.totalPages; i++) {
-      pages.push(i);
-    }
+    for (let i = 1; i <= this.totalPages; i++) pages.push(i);
     return pages;
   }
 
   goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages) {
-      this.currentPage = page;
-    }
+    if (page >= 1 && page <= this.totalPages) this.currentPage = page;
   }
 
   previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+    if (this.currentPage > 1) this.currentPage--;
   }
 
   nextPage(): void {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-    }
+    if (this.currentPage < this.totalPages) this.currentPage++;
   }
 
-private setupRealtimeListeners(): void {
-  // Realtime purchases listener
-  this.purchasesUnsubscribe = onSnapshot(
-    query(
-      collection(this.firestore, 'purchases'),
-      where('supplierId', '==', this.supplierId)
-    ),
-    (snapshot) => {
-      const purchases = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as any
-      }));
-      this.processPurchases(purchases);
-      this.updateLedgerView();
-    },
-    (error) => {
-      console.error('Error listening to purchases:', error);
-      this.isLoadingPurchases = false;
-    }
-  );
+  loadLocations(): void {
+    this.locationService.getLocations().subscribe({
+      next: (locations) => {
+        this.locations = locations;
+        if (this.locations.length > 0) this.selectedLocation = this.locations[0].id;
+      },
+      error: (error) => console.error('Error loading locations:', error)
+    });
+  }
 
-  // Realtime payments listener
-  this.paymentsUnsubscribe = onSnapshot(
-    query(
-      collection(this.firestore, 'payments'),
-      where('supplierId', '==', this.supplierId)
-    ),
-    (snapshot) => {
-      this.payments = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data() as any
-      }));
-      this.updateLedgerView();
-    },
-    (error) => {
-      console.error('Error listening to payments:', error);
-      this.paymentLoading = false;
-    }
-  );
-}
-
+  getLocationName(locationId: string): string {
+    const location = this.locations.find(l => l.id === locationId);
+    return location ? location.name : 'All Locations';
+  }
 
   private getFinancialYear(date: Date): { start: Date, end: Date } {
-    const year = date.getMonth() >= this.financialYearStartMonth - 1 ? 
-      date.getFullYear() : 
-      date.getFullYear() - 1;
-    
+    const year = date.getMonth() >= this.financialYearStartMonth - 1 ? date.getFullYear() : date.getFullYear() - 1;
     const start = new Date(year, this.financialYearStartMonth - 1, 1);
     const end = new Date(year + 1, this.financialYearStartMonth - 1, 0);
     end.setHours(23, 59, 59, 999);
-    
     return { start, end };
   }
 
@@ -924,22 +1257,11 @@ private setupRealtimeListeners(): void {
     this.activeTab = tab;
   }
 
-  initializeStockReportDates(): void {
-    const today = new Date();
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(today.getFullYear() - 1);
-    
-    this.stockReportFromDate = oneYearAgo.toISOString().split('T')[0];
-    this.stockReportToDate = today.toISOString().split('T')[0];
-  }
-  
   loadPurchaseOrderStockData(): void {
     this.stockReportLoading = true;
-    
     this.purchaseService.getPurchasesBySupplier(this.supplierId).subscribe((purchases: any[]) => {
       this.stockReport = purchases.flatMap((purchase: { products: any[]; purchaseDate: any; }) => {
         if (!purchase.products) return [];
-        
         return purchase.products.map((product: any) => ({
           productId: product.productId,
           productName: product.productName,
@@ -952,248 +1274,20 @@ private setupRealtimeListeners(): void {
           currentStock: product.currentStock || 0
         }));
       });
-  
       this.filteredStockReport = [...this.stockReport];
       this.stockReportLoading = false;
     });
-  }
-  
-loadSupplierDetails(): void {
-  this.supplierService.getSupplierById(this.supplierId).subscribe(supplier => {
-    if (!supplier) {
-      this.supplierDetails = {};
-      return;
-    }
-    this.supplierDetails = supplier;
-    
-    // Store both individual name and business name
-    this.supplierDetails.firstName = supplier.firstName || '';
-    this.supplierDetails.lastName = supplier.lastName || '';
-    this.supplierDetails.businessName = supplier.businessName || '';
-    
-    // Store display name for the UI
-    this.supplierDetails.displayName = this.getSupplierDisplayName(supplier);
-    this.supplierDetails.formattedAddress = this.formatSupplierAddress(supplier);
-    
-    if (this.supplierDetails) {
-      this.accountSummary.openingBalance = this.supplierDetails.openingBalance || 0;
-      this.currentBalance = this.supplierDetails.openingBalance || 0;
-    }
-  });
-}
-  // 2. Update your data loading method
-async loadSupplierLedger(supplierName: string) {
-  try {
-    this.isLoading = true;
-    
-    // Get purchases
-    const purchasesQuery = query(
-      collection(this.firestore, 'purchases'),
-      where('supplierName', '==', supplierName)
-    );
-    const purchasesSnapshot = await getDocs(purchasesQuery);
-    this.purchases = purchasesSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ['supplierId']: data['supplierId'] || '',
-        ['supplierName']: data['supplierName'] || supplierName,
-        purchaseDate: data['purchaseDate'] || null,
-        purchaseTotal: data['purchaseTotal'] || 0,
-        grandTotal: data['grandTotal'] || 0,
-        referenceNo: data['referenceNo'] || '',
-        purchaseStatus: data['purchaseStatus'] || '',
-        products: data['products'] || [],
-        businessLocation: data['businessLocation'] || '',
-        shippingCharges: data['shippingCharges'] || 0,
-        paidOn: data['paidOn'] || null,
-        paymentMethod: data['paymentMethod'] || '',
-        // Add any other required fields from Purchase interface here
-        ...data,
-        docType: 'purchase'
-      } as Purchase;
-    });
-
-    // Get payments
-    const paymentsQuery = query(
-      collection(this.firestore, 'payments'),
-      where('supplier', '==', supplierName)
-    );
-    const paymentsSnapshot = await getDocs(paymentsQuery);
-    this.payments = paymentsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      docType: 'payment' // Add identifier
-    }));
-
-    // Combine and sort by date
-    const allTransactions = [...this.purchases, ...this.payments].sort((a, b) => {
-      const dateA = a.date?.toDate?.() || a.purchaseDate?.toDate?.() || new Date(0);
-      const dateB = b.date?.toDate?.() || b.purchaseDate?.toDate?.() || new Date(0);
-      return dateA - dateB;
-    });
-
-    // Generate ledger entries
-    this.ledgerEntries = [];
-    let balance = this.supplierDetails?.openingBalance || 0;
-    
-    allTransactions.forEach(transaction => {
-      if (transaction.docType === 'purchase') {
-        // Purchase entry (debit)
-        const amount = transaction.grandTotal || transaction.purchaseTotal || 0;
-        this.ledgerEntries.push({
-          date: transaction.purchaseDate?.toDate?.() || transaction.purchaseDate,
-          referenceNo: transaction.referenceNo || `PUR-${transaction.id.substring(0, 5)}`,
-          supplier: supplierName,
-          description: `Purchase ${transaction.referenceNo || ''}`.trim(),
-          type: 'debit',
-          amount: amount,
-          balance: balance += amount,
-          status: transaction.purchaseStatus || 'Pending',
-          purchase: transaction
-        });
-      } else {
-        // Payment entry (credit)
-        const amount = transaction.amount || 0;
-        this.ledgerEntries.push({
-          date: transaction.date?.toDate?.() || transaction.date,
-          referenceNo: transaction.referenceNo || `PAY-${transaction.id.substring(0, 5)}`,
-          supplier: supplierName,
-          description: transaction.notes || 'Payment',
-          type: 'credit',
-          amount: amount,
-          balance: balance -= amount,
-          status: transaction.status || 'Paid',
-          payment: transaction
-        });
-      }
-    });
-
-    this.isLoading = false;
-  } catch (error) {
-    console.error('Error loading ledger:', error);
-    this.isLoading = false;
-  }
-}
-// 2. Update the method to fetch data by supplier name
-// Add this method to load ledger data by supplier name
-async loadLedgerDataBySupplierName(supplierName: string): Promise<void> {
-  this.ledgerLoading = true;
-  
-  try {
-    // Fetch purchases and payments by supplier name
-    const [purchases, payments] = await Promise.all([
-      this.getPurchasesBySupplierName(supplierName).toPromise(),
-      this.getPaymentsBySupplierName(supplierName).toPromise()
-    ]);
-
-    this.purchases = purchases || [];
-    this.payments = payments || [];
-
-    // Generate ledger entries
-    this.ledgerEntries = this.generateLedgerEntries(
-      this.purchases,
-      this.payments,
-      this.supplierDetails?.openingBalance || 0
-    );
-
-    // Apply filters
-    this.filterLedger();
-    
-    this.ledgerLoading = false;
-  } catch (error) {
-    console.error('Error loading ledger data:', error);
-    this.ledgerLoading = false;
-  }
-}
-
-getPurchasesBySupplierName(supplierName: string): Observable<any[]> {
-  return new Observable(observer => {
-    const q = query(
-      collection(this.firestore, 'purchases'),
-      where('supplierName', '==', supplierName)
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const purchases = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        observer.next(purchases);
-      },
-      (error) => observer.error(error)
-    );
-
-    return () => unsubscribe();
-  });
-}
-
-getPaymentsBySupplierName(supplierName: string): Observable<any[]> {
-  return new Observable(observer => {
-    const q = query(
-      collection(this.firestore, 'payments'),
-      where('supplier', '==', supplierName)
-    );
-
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const payments = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        observer.next(payments);
-      },
-      (error) => observer.error(error)
-    );
-
-    return () => unsubscribe();
-  });
-}
-  
-debugLedgerData(): void {
-  console.log('Purchases:', this.purchases);
-  console.log('Payments:', this.payments);
-  console.log('Ledger Entries:', this.ledgerEntries);
-  console.log('Filtered Transactions:', this.filteredTransactions);
-}
-
-  onDateRangeChange(): void {
-    this.applyFilters();
   }
 
   onLocationChange(): void {
     this.applyFilters();
   }
 
-  getDateFromTimestamp(value: any): Date {
-    if (!value) return new Date(0);
-    return value instanceof Date ? value : value.toDate(); 
-  }
-
   applyFilters(): void {
-    let filtered = this.transactions.filter(t => {
-      const tDate = new Date(t.date);
-      const fromDate = new Date(this.fromDate);
-      const toDate = new Date(this.toDate);
-      return tDate >= fromDate && tDate <= toDate;
-    });
-
+    // Basic location filter placeholder
     if (this.selectedLocation !== 'All locations') {
-      filtered = filtered.filter(t => t.location === this.selectedLocation);
+      // Logic handled in specific tab filters
     }
-
-    this.filteredTransactions = filtered;
-  }
-
-  getLocations(): string[] {
-    const locations = new Set<string>(['All locations']);
-    this.transactions.forEach(t => {
-      if (t.location && t.location !== 'N/A') {
-        locations.add(t.location);
-      }
-    });
-    return Array.from(locations);
   }
 
   loadStockReport(): void {
@@ -1204,9 +1298,7 @@ debugLedgerData(): void {
       
       purchases.forEach((purchase: { products: any[]; businessLocation: string; purchaseDate: any; }) => {
         if (purchase.products && purchase.products.length > 0) {
-          if (purchase.businessLocation) {
-            locations.add(purchase.businessLocation);
-          }
+          if (purchase.businessLocation) locations.add(purchase.businessLocation);
           
           purchase.products.forEach((product: any) => {
             const key = product.productId || product.productName;
@@ -1261,8 +1353,6 @@ debugLedgerData(): void {
     });
   }
 
- 
-
   getTotalPurchasedQty(): number {
     return this.filteredStockReport.reduce((sum, item) => sum + (item.totalQuantity || 0), 0);
   }
@@ -1283,7 +1373,7 @@ debugLedgerData(): void {
       'Last Purchase Date': item.lastPurchaseDate,
       'Current Stock': item.currentStock
     }));
-  
+
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock Report');
@@ -1340,31 +1430,7 @@ debugLedgerData(): void {
       this.notes = supplier?.notes || [];
     });
   }
-  
-  addNote(): void {
-    if (!this.newNote.title || !this.newNote.content) {
-      alert('Please fill all required fields');
-      return;
-    }
-  
-    this.newNote.createdAt = new Date();
-    this.newNote.createdBy = this.currentUserName || this.currentUserId;
-    
-    this.supplierService.addSupplierNote(this.supplierId, this.newNote).then(() => {
-      this.loadDocumentsAndNotes();
-      this.newNote = {
-        title: '',
-        content: '',
-        createdAt: new Date(),
-        createdBy: this.currentUserName || this.currentUserId,
-        isPrivate: false
-      };
-    }).catch(error => {
-      console.error('Error adding note:', error);
-      alert('Error adding note');
-    });
-  }
-  
+
   deleteNote(noteId: string): void {
     if (confirm('Are you sure you want to delete this note?')) {
       this.supplierService.deleteSupplierNote(this.supplierId, noteId)
@@ -1381,66 +1447,40 @@ debugLedgerData(): void {
   onFileSelected(event: any): void {
     this.selectedFiles = Array.from(event.target.files);
   }
-  
-  uploadDocuments(): void {
-    if (this.selectedFiles.length === 0) {
-      alert('Please select files to upload');
-      return;
-    }
-  
-    this.isUploading = true;
-    this.uploadProgress = 0;
-  
-    const uploadPromises = this.selectedFiles.map((file: File) => {
-      return this.uploadFile(file).then(downloadURL => {
-        const document: SupplierDocument = {
-          name: file.name,
-          url: downloadURL,
-          uploadedAt: new Date(),
-          uploadedBy: this.currentUserName || this.currentUserId,
-          isPrivate: false
-        };
-        return this.supplierService.addSupplierDocument(this.supplierId, document);
-      });
+
+  viewPayments(purchase?: Purchase): void {
+    if (!purchase) return;
+    this.router.navigate(['/payment-history'], {
+      queryParams: { 
+        purchaseId: purchase.id,
+        purchaseRef: purchase.referenceNo,
+        supplierId: this.supplierId,
+        supplierName: this.supplierDetails.businessName || 
+                     `${this.supplierDetails.firstName} ${this.supplierDetails.lastName || ''}`.trim()
+      }
     });
-  
-    Promise.all(uploadPromises)
-      .then(() => {
-        this.loadDocumentsAndNotes();
-        this.selectedFiles = [];
-        this.uploadProgress = null;
-        this.isUploading = false;
-      })
-      .catch(error => {
-        console.error('Error uploading documents:', error);
-        this.isUploading = false;
-        this.uploadProgress = null;
-        alert('Error uploading documents');
-      });
   }
-viewPayments(purchase?: Purchase): void {
-  if (!purchase) return;
-  this.router.navigate(['/payment-history'], {
-    queryParams: { 
-      purchaseId: purchase.id,
-      purchaseRef: purchase.referenceNo,
-      supplierId: this.supplierId,
-      supplierName: this.supplierDetails.businessName || 
-                   `${this.supplierDetails.firstName} ${this.supplierDetails.lastName || ''}`.trim()
-    }
-  });
-}
-viewPaymentDetails(paymentId: string) {
-  // Your implementation here
-}
-addPayment(purchase?: Purchase): void {
-  if (!purchase) return;
-  this.router.navigate(['/suppliers', this.supplierId, 'payments'], {
-    queryParams: { 
-      purchaseId: purchase.id,
-      purchaseRef: purchase.referenceNo
-    }
-  });
+
+  openReceiptModal(payment: any): void {
+    this.selectedPayment = payment;
+    this.showReceiptModal = true;
+    document.body.classList.add('modal-open');
+  }
+
+  closeReceiptModal(): void {
+    this.showReceiptModal = false;
+    this.selectedPayment = null;
+    document.body.classList.remove('modal-open');
+  }
+  
+  addPayment(purchase?: Purchase): void {
+    if (!purchase) return;
+    this.router.navigate(['/suppliers', this.supplierId, 'payments'], {
+      queryParams: { 
+        purchaseId: purchase.id,
+        purchaseRef: purchase.referenceNo
+      }
+    });
   }
 
   private uploadFile(file: File): Promise<string> {
@@ -1450,19 +1490,27 @@ addPayment(purchase?: Purchase): void {
       }, 2000);
     });
   }
+
   navigateToAddPurchase() {
-  const supplierName = this.getSupplierDisplayName(this.supplierDetails);
-  console.log('Navigating with supplier name:', supplierName); // Debug log
-  
-  this.router.navigate(['/add-purchase'], {
-    queryParams: {
-      supplierId: this.supplierId,
-      fromSupplier: true,
-      supplierName: supplierName,
-      supplierAddress: this.supplierDetails.addressLine1
+    const supplierName = this.getSupplierDisplayName(this.supplierDetails);
+    this.router.navigate(['/add-purchase'], {
+      queryParams: {
+        supplierId: this.supplierId,
+        fromSupplier: true,
+        supplierName: supplierName,
+        supplierAddress: this.supplierDetails.addressLine1
+      }
+    });
+  }
+
+  viewPaymentDetails(paymentId: string): void {
+    if (paymentId) {
+      this.router.navigate(['/view-payment', paymentId]); 
+    } else {
+      console.warn('No payment ID found for this record.');
     }
-  });
-}
+  }
+
   deleteDocument(documentId: string): void {
     if (confirm('Are you sure you want to delete this document?')) {
       this.supplierService.deleteSupplierDocument(this.supplierId, documentId)
@@ -1475,5 +1523,78 @@ addPayment(purchase?: Purchase): void {
         });
     }
   }
-  
+
+
+
+
+  // ✅ NEW METHOD: Update payment amounts for all purchases
+  private async updatePurchasePaymentAmounts(): Promise<void> {
+    try {
+      // Get all purchases for this supplier
+      const purchasesQuery = query(
+        collection(this.firestore, 'purchases'),
+        where('supplierId', '==', this.supplierId)
+      );
+      
+      const purchasesSnapshot = await getDocs(purchasesQuery);
+      
+      // Get all payments for this supplier
+      const paymentsQuery = query(
+        collection(this.firestore, 'payments'),
+        where('supplierId', '==', this.supplierId)
+      );
+      
+      const paymentsSnapshot = await getDocs(paymentsQuery);
+      const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Calculate total payments made
+      const totalPayments = allPayments.reduce((sum, payment: any) => sum + (payment.amount || 0), 0);
+      
+      // Update each purchase document
+      const updatePromises = purchasesSnapshot.docs.map(async (purchaseDoc) => {
+        const purchaseData = purchaseDoc.data();
+        const purchaseRef = doc(this.firestore, 'purchases', purchaseDoc.id);
+        
+        // Get purchase-specific payments
+        const purchasePayments = allPayments.filter((payment: any) => 
+          payment.purchaseId === purchaseDoc.id
+        );
+        
+        const purchasePaymentAmount = purchasePayments.reduce((sum, payment: any) => 
+          sum + (payment.amount || 0), 0
+        );
+        
+        const grandTotal = Number(purchaseData['roundedTotal']) || 
+                          Number(purchaseData['grandTotal']) || 
+                          Number(purchaseData['purchaseTotal']) || 0;
+        
+        const paymentDue = Math.max(0, grandTotal - purchasePaymentAmount);
+        
+        const paymentStatus = paymentDue <= 0 ? 'Paid' : 
+                             (purchasePaymentAmount > 0 ? 'Partial' : 'Due');
+        
+        // Update the purchase document
+        await updateDoc(purchaseRef, {
+          paymentAmount: purchasePaymentAmount,
+          paymentDue: paymentDue,
+          paymentStatus: paymentStatus,
+          updatedAt: Timestamp.now()
+        });
+      });
+      
+      await Promise.all(updatePromises);
+      
+      console.log('✅ Purchase payment amounts updated successfully');
+      
+    } catch (error) {
+      console.error('Error updating purchase payment amounts:', error);
+      // Don't throw - payment was recorded successfully, this is just a sync issue
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.purchasesUnsubscribe) this.purchasesUnsubscribe();
+    if (this.paymentsUnsubscribe) this.paymentsUnsubscribe();
+    if (this.ledgerUnsubscribe) this.ledgerUnsubscribe();
+  }
 }

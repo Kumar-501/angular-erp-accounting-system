@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { FirebaseError } from '@angular/fire/app';
 import { 
   Firestore, 
   collection, 
@@ -13,7 +14,9 @@ import {
   limit,
   onSnapshot,
   serverTimestamp,
-  Timestamp 
+  Timestamp, 
+  QuerySnapshot,
+  DocumentData
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 
@@ -21,13 +24,14 @@ export interface SalesStockPriceLog {
   id?: string;
   saleId: string;
   invoiceNo: string;
+  locationId?: string;    // optional alternative
   productId: string;
   productName: string;
   quantity: number;
   sellingPrice: number;
   location: string;
-  paymentAccountId?: string;
-  paymentType?: string;
+  paymentAccountId: string | null;  // Explicit null type
+  paymentType: string | null; 
   taxRate: number;
   packingCharge?: number;
   shippingCharge?: number;
@@ -58,6 +62,7 @@ export interface SalesStockPriceLogSummary {
   providedIn: 'root'
 })
 export class SalesStockPriceLogService {
+  [x: string]: any;
   private collectionName = 'sales-stock-price-log';
   private collection;
 
@@ -66,22 +71,32 @@ export class SalesStockPriceLogService {
   }
 
   // Create a new sales stock price log entry
-  async createSalesStockPriceLog(logData: Partial<SalesStockPriceLog>): Promise<any> {
-    try {
-      const completeData = {
-        ...logData,
-        totalValue: (logData.sellingPrice || 0) * (logData.quantity || 0),
-        taxAmount: ((logData.sellingPrice || 0) * (logData.quantity || 0)) * ((logData.taxRate || 0) / 100),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
+async createSalesStockPriceLog(logData: Partial<SalesStockPriceLog>): Promise<any> {
+  try {
+    // Ensure all optional fields have proper values (not undefined)
+    const completeData = {
+      ...logData,
+      paymentAccountId: logData.paymentAccountId ?? null,
+      paymentType: logData.paymentType ?? null,
+      packingCharge: logData.packingCharge ?? 0,
+      shippingCharge: logData.shippingCharge ?? 0,
+      totalValue: (logData.sellingPrice || 0) * (logData.quantity || 0),
+      taxAmount: ((logData.sellingPrice || 0) * (logData.quantity || 0)) * ((logData.taxRate || 0) / 100),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
 
-      return await addDoc(this.collection, completeData);
-    } catch (error) {
-      console.error('Error creating sales stock price log:', error);
-      throw error;
-    }
+    // Remove any remaining undefined values that might have been missed
+    const firestoreData = Object.fromEntries(
+      Object.entries(completeData).filter(([_, v]) => v !== undefined)
+    );
+
+    return await addDoc(this.collection, firestoreData);
+  } catch (error) {
+    console.error('Error creating sales stock price log:', error);
+    throw error;
   }
+}
 
   // Get all sales stock price logs with real-time updates
   getSalesStockPriceLogs(): Observable<SalesStockPriceLog[]> {
@@ -107,6 +122,37 @@ export class SalesStockPriceLogService {
       return { unsubscribe };
     });
   }
+// In your sales-stock-price-log.service.ts
+
+async getLogsByProductName(name: string): Promise<SalesStockPriceLog[]> {
+  const collectionRef = collection(this.firestore, this.collectionName);
+  const q = query(
+    collectionRef,
+    where('productName', '==', name.trim()),
+    orderBy('createdAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return this.mapSnapshotToLogs(snapshot);
+}
+async getLogsByProductId(productId: string): Promise<SalesStockPriceLog[]> {
+  const collectionRef = collection(this.firestore, this.collectionName);
+  const q = query(
+    collectionRef,
+    where('productId', '==', productId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return this.mapSnapshotToLogs(snapshot);
+}
+
+async getAllLogs(): Promise<SalesStockPriceLog[]> {
+  const collectionRef = collection(this.firestore, this.collectionName);
+  const q = query(collectionRef, orderBy('createdAt', 'desc'));
+  const snapshot = await getDocs(q);
+  return this.mapSnapshotToLogs(snapshot);
+}
 
   // Get filtered sales stock price logs
   async getFilteredSalesStockPriceLogs(filter: SalesStockPriceLogFilter): Promise<SalesStockPriceLog[]> {
@@ -172,28 +218,53 @@ export class SalesStockPriceLogService {
   }
 
   // Get sales stock price logs by product name (for cases where productId might be empty)
+  // Improved method with better error handling
   async getSalesStockPriceLogsByProductName(productName: string): Promise<SalesStockPriceLog[]> {
     try {
-      const q = query(
-        this.collection, 
-        where('productName', '==', productName),
+      // First try exact match
+      const exactMatchQuery = query(
+        this.collection,
+        where('productName', '==', productName.trim()),
         orderBy('createdAt', 'desc')
       );
       
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        saleCreatedDate: doc.data()['saleCreatedDate'] instanceof Date ? 
-          doc.data()['saleCreatedDate'] : 
-          (doc.data()['saleCreatedDate']?.toDate?.() || new Date(doc.data()['saleCreatedDate'] || '')),
-        createdAt: doc.data()['createdAt']?.toDate?.() || doc.data()['createdAt'],
-        updatedAt: doc.data()['updatedAt']?.toDate?.() || doc.data()['updatedAt']
-      })) as SalesStockPriceLog[];
+      const exactMatchSnapshot = await getDocs(exactMatchQuery);
+      if (!exactMatchSnapshot.empty) {
+        return this['mapSnapshotToLogs'](exactMatchSnapshot);
+      }
+
+      // If no exact matches, try case-insensitive search
+      const allLogs = await this.getAllSalesStockPriceLogsPublic();
+      return allLogs.filter(log => 
+        log.productName?.toLowerCase().includes(productName.toLowerCase())
+      );
     } catch (error) {
       console.error('Error fetching sales stock price logs by product name:', error);
-      throw error;
+      if (error instanceof FirebaseError && error.code === 'failed-precondition') {
+        console.error('Missing index. Please create the composite index for productName and createdAt');
+      }
+      return []; // Return empty array instead of throwing error
     }
+  }
+ private mapSnapshotToLogs(snapshot: QuerySnapshot<DocumentData>): SalesStockPriceLog[] {
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      saleCreatedDate: this.parseFirestoreDate(data['saleCreatedDate']),
+      createdAt: this.parseFirestoreDate(data['createdAt']),
+      updatedAt: this.parseFirestoreDate(data['updatedAt'])
+    } as SalesStockPriceLog;
+  });
+}
+
+  private parseFirestoreDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    if (dateValue?.toDate) return dateValue.toDate();
+    if (dateValue?.seconds) return new Date(dateValue.seconds * 1000);
+    return new Date(dateValue);
   }
 
   // Get sales stock price logs by sale ID
@@ -350,37 +421,36 @@ export class SalesStockPriceLogService {
     return this.createSalesStockPriceLog(logData);
   }
 
-  // Log price change method for compatibility
-  async logPriceChange(
-    productId: string,
-    productName: string,
-    saleId: string,
-    invoiceNo: string,
-    quantity: number,
-    sellingPrice: number,
-    location: string,
-    paymentAccountId?: string,
-    paymentType?: string,
-    taxRate: number = 0,
-    packingCharge: number = 0,
-    shippingCharge: number = 0
-  ): Promise<void> {
-    const logData: Partial<SalesStockPriceLog> = {
-      saleId,
-      invoiceNo,
-      productId,
-      productName,
-      quantity,
-      sellingPrice,
-      location,
-      paymentAccountId,
-      paymentType,
-      taxRate,
-      packingCharge,
-      shippingCharge,
-      saleCreatedDate: new Date()
-    };
+async logPriceChange(
+  productId: string,
+  productName: string,
+  saleId: string,
+  invoiceNo: string,
+  quantity: number,
+  sellingPrice: number,
+  location: string,
+  paymentAccountId?: string,
+  paymentType?: string,
+  taxRate: number = 0,
+  packingCharge: number = 0,
+  shippingCharge: number = 0
+): Promise<void> {
+  const logData: Partial<SalesStockPriceLog> = {
+    saleId,
+    invoiceNo,
+    productId,
+    productName,
+    quantity,
+    sellingPrice,
+    location,
+    paymentAccountId: paymentAccountId ?? null, // Convert undefined to null
+    paymentType: paymentType ?? null,          // Convert undefined to null
+    taxRate,
+    packingCharge,
+    shippingCharge,
+    saleCreatedDate: new Date()
+  };
 
-    await this.createSalesStockPriceLog(logData);
-  }
+  await this.createSalesStockPriceLog(logData);
+}
 }

@@ -1,0 +1,82 @@
+<!-- src/app/balance-sheet-2/balance-sheet-2.component.html -->
+
+<div class="page-container">
+  <div class="report-header">
+    <h1>Balance Sheet</h1>
+    <p>As of {{ asOfDate | date:'longDate' }}</p>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-message">
+    Generating Report...
+  </div>
+
+  <div *ngIf="!isLoading" class="balance-sheet-grid">
+    <!-- ASSETS Column -->
+    <div class="sheet-column">
+      <div class="column-header">
+        <h2>ASSETS</h2>
+      </div>
+      <div class="column-content">
+        <!-- Loop through each Asset group (Fixed, Current, etc.) -->
+        <div *ngFor="let group of assetGroups" class="report-group">
+          <div class="group-header">
+            <h3>{{ group.groupName }}</h3>
+          </div>
+          <!-- Loop through each account item in the group -->
+          <div *ngFor="let item of group.items" class="report-item">
+            <span>{{ item.name }}</span>
+            <span>{{ item.balance | currency:'INR' }}</span>
+          </div>
+          <!-- Display the total for the group -->
+          <div class="group-total">
+            <span>Total {{ group.groupName }}</span>
+            <span>{{ group.total | currency:'INR' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="column-footer">
+        <h3>TOTAL ASSETS</h3>
+        <h3>{{ totalAssets | currency:'INR' }}</h3>
+      </div>
+    </div>
+
+    <!-- LIABILITIES & EQUITY Column -->
+    <div class="sheet-column">
+      <div class="column-header">
+        <h2>LIABILITIES & EQUITY</h2>
+      </div>
+      <div class="column-content">
+        <!-- Loop through each L&E group (Current, Long-Term, Equity) -->
+        <div *ngFor="let group of liabilityEquityGroups" class="report-group">
+          <div class="group-header">
+            <h3>{{ group.groupName }}</h3>
+          </div>
+          <!-- Loop through each account item in the group -->
+          <div *ngFor="let item of group.items" class="report-item">
+            <span>{{ item.name }}</span>
+            <span>{{ item.balance | currency:'INR' }}</span>
+          </div>
+          <!-- Display the total for the group -->
+          <div class="group-total">
+            <span>Total {{ group.groupName }}</span>
+            <span>{{ group.total | currency:'INR' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="column-footer">
+        <h3>TOTAL LIABILITIES & EQUITY</h3>
+        <h3>{{ totalLiabilitiesAndEquity | currency:'INR' }}</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Balance Check Footer -->
+  <div *ngIf="!isLoading && !isBalanced" class="balance-check-footer unbalanced">
+    <strong>Balance Check: ✗ NOT BALANCED</strong>
+    <span>Assets: {{ totalAssets | currency:'INR' }} | Liabilities + Equity: {{ totalLiabilitiesAndEquity | currency:'INR' }}</span>
+  </div>
+
+  <div *ngIf="!isLoading && isBalanced" class="balance-check-footer balanced">
+    <strong>Balance Check: ✓ BALANCED</strong>
+  </div>
+</div>

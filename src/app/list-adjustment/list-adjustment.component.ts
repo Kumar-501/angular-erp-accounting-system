@@ -20,7 +20,8 @@ export class ListAdjustmentComponent implements OnInit {
   filteredAdjustments$!: Observable<any>;
   adjustmentsList: any[] = [];
   adjustmentToDelete: any = null;
-  showDeleteModal = false;  isDeleting = false;
+  showDeleteModal = false;
+  isDeleting = false;
   sortField: string = 'date';
   sortDirection: 'asc' | 'desc' = 'desc';
   locations: any[] = [];
@@ -38,14 +39,15 @@ export class ListAdjustmentComponent implements OnInit {
     { key: 'totalAmount', label: 'Total Amount', visible: true },
     { key: 'totalAmountRecovered', label: 'Total amount recovered', visible: true },
     { key: 'reason', label: 'Reason', visible: true },
-    { key: 'addedBy', label: 'Added By', visible: true }
   ];
+
   constructor(
     private adjustmentService: AdjustmentService,
     private router: Router,
     private firestore: Firestore,
     private locationService: LocationService
   ) {}
+
   ngOnInit(): void {
     this.loadAdjustments();
     this.loadLocations();
@@ -102,16 +104,22 @@ export class ListAdjustmentComponent implements OnInit {
       let valueA = a[field];
       let valueB = b[field];
   
-      // Special handling for dates
-      if (field === 'date') {
-        valueA = new Date(valueA).getTime();
-        valueB = new Date(valueB).getTime();
+      // Special handling for dates (now works with JS Date objects)
+      if (field === 'date' && valueA instanceof Date && valueB instanceof Date) {
+        valueA = valueA.getTime();
+        valueB = valueB.getTime();
       }
   
       // Special handling for products
       if (field === 'products') {
         valueA = a.products?.[0]?.name || '';
         valueB = b.products?.[0]?.name || '';
+      }
+
+      // Special handling for business location
+      if (field === 'businessLocation') {
+        valueA = this.getLocationName(a[field]);
+        valueB = this.getLocationName(b[field]);
       }
   
       if (valueA < valueB) return this.sortDirection === 'asc' ? -1 : 1;
@@ -122,6 +130,7 @@ export class ListAdjustmentComponent implements OnInit {
     // Trigger search filter update to refresh the view
     this.searchControl.setValue(this.searchControl.value || '');
   }
+
   // Setup search filter
   private setupSearchFilter(): void {
     this.filteredAdjustments$ = this.searchControl.valueChanges.pipe(
@@ -141,7 +150,13 @@ export class ListAdjustmentComponent implements OnInit {
       // Check regular fields
       const matchesRegularFields = Object.keys(adjustment).some(key => {
         if (key === 'products') return false; // Handle products separately
-        const value = adjustment[key];
+        let value = adjustment[key];
+        
+        // Convert business location ID to name for search
+        if (key === 'businessLocation') {
+          value = this.getLocationName(adjustment[key]);
+        }
+        
         if (value === null || value === undefined) {
           return false;
         }
@@ -177,7 +192,14 @@ export class ListAdjustmentComponent implements OnInit {
   loadAdjustments(): void {
     this.stockAdjustments$ = this.adjustmentService.getStockAdjustments();
     this.stockAdjustments$.subscribe(adjustments => {
-      this.adjustmentsList = adjustments;
+      // FIX: Convert Firestore Timestamps to JavaScript Date objects
+      this.adjustmentsList = adjustments.map((adj: any) => {
+        // Check if 'date' exists and has a 'toDate' method (which identifies a Firestore Timestamp)
+        if (adj.date && typeof adj.date.toDate === 'function') {
+          return { ...adj, date: adj.date.toDate() };
+        }
+        return adj; // Return the adjustment as is if no conversion is needed
+      });
       this.searchControl.setValue(''); // Reset search when new data loads
     });
   }
@@ -274,7 +296,7 @@ export class ListAdjustmentComponent implements OnInit {
     const headers = visibleHeaders.map(header => this.formatHeader(header));
     const data = this.prepareDataForExport(dataToExport, visibleHeaders);
     
-    this.exportToPDFHelper(data, headers, 'List Adjustment');
+    this.exportToPDFHelper(data, headers, 'Stock Adjustments');
   }
   
   private exportToPDFHelper(data: any[], headers: string[], title: string): void {
@@ -316,7 +338,7 @@ export class ListAdjustmentComponent implements OnInit {
       }
     });
     
-    doc.save('ListAdjustment.pdf');
+    doc.save('stock_adjustments.pdf');
   }
 
   printData(): void {
@@ -343,13 +365,16 @@ export class ListAdjustmentComponent implements OnInit {
     dataToPrint.forEach(item => {
       printContents += '<tr>';
       visibleHeaders.forEach(header => {
+        let cellValue = '';
         if (header === 'products') {
-          const productText = item[header]?.length ? 
+          cellValue = item[header]?.length ? 
             item[header][0].name + (item[header].length > 1 ? ` +${item[header].length - 1} more` : '') : '';
-          printContents += `<td>${productText}</td>`;
+        } else if (header === 'businessLocation') {
+          cellValue = this.getLocationName(item[header]);
         } else {
-          printContents += `<td>${item[header] || ''}</td>`;
+          cellValue = item[header] || '';
         }
+        printContents += `<td>${cellValue}</td>`;
       });
       printContents += '</tr>';
     });
@@ -399,6 +424,8 @@ export class ListAdjustmentComponent implements OnInit {
         if (header === 'products') {
           exportItem[header] = item[header]?.length ? 
             item[header][0].name + (item[header].length > 1 ? ` +${item[header].length - 1} more` : '') : '';
+        } else if (header === 'businessLocation') {
+          exportItem[header] = this.getLocationName(item[header]);
         } else {
           exportItem[header] = item[header];
         }
@@ -416,6 +443,8 @@ export class ListAdjustmentComponent implements OnInit {
         if (header === 'products') {
           value = item[header]?.length ? 
             item[header][0].name + (item[header].length > 1 ? ` +${item[header].length - 1} more` : '') : '';
+        } else if (header === 'businessLocation') {
+          value = this.getLocationName(item[header]);
         } else {
           value = item[header] || '';
         }

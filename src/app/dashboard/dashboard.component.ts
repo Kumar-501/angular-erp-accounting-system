@@ -8,6 +8,8 @@ import { PurchaseReturnService } from '../services/purchase-return.service';
 import { SupplierService } from '../services/supplier.service';
 import { Subscription } from 'rxjs';
 import { AuthService } from '../auth.service';
+import { StockService } from '../services/stock.service';
+
 
 interface DashboardCard {
   title: string;
@@ -57,13 +59,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
       trend: 15
     },
     {
-      title: 'Current Stock',
-      value: '0',
-      icon: 'layers',
-      color: 'teal',
-      trend: -3
-    },
-    {
       title: 'Purchase Due',
       value: '₹0.00',
       icon: 'credit-card',
@@ -95,7 +90,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private purchasesSubscription: Subscription | undefined;
   private purchaseReturnsSubscription: Subscription | undefined;
   private suppliersSubscription: Subscription | undefined;
-  
+    private stockSubscription: Subscription | undefined; // Add this for stock updates
+
   totalSalesAmount: number = 0;
   totalUsersCount: number = 0;
   totalCustomersCount: number = 0;
@@ -114,10 +110,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private purchaseReturnService: PurchaseReturnService,
     private supplierService: SupplierService,
     private authService: AuthService,
+    private stockService: StockService // Inject StockService
   ) { }
 
   ngOnInit(): void {
-    // Get user information
     this.authService.getCurrentUser().subscribe(user => {
       if (user) {
         this.userName = user.displayName || user.email.split('@')[0];
@@ -125,102 +121,94 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Subscribe to sales data to get total payment amount
     this.salesSubscription = this.saleService.listenForSales().subscribe((salesData) => {
-      // Calculate total sales amount from all completed sales
       const completedSales = salesData.filter(sale => sale.status === 'Completed');
       this.totalSalesAmount = completedSales.reduce((sum, sale) => 
         sum + (sale.paymentAmount ? Number(sale.paymentAmount) : 0), 0);
-      
-      // Update the Total Sales card with the calculated value
       this.updateSalesCard(this.totalSalesAmount);
     });
 
-    // Subscribe to users data to get total user count
     this.usersSubscription = this.userService.getUsers().subscribe((users) => {
-      // Set the total users count
       this.totalUsersCount = users.length;
-      
-      // Update the Total Users card with the count
       this.updateUsersCard(this.totalUsersCount);
     });
 
-    // Subscribe to customers data to get total customers count
     this.customersSubscription = this.customerService.getCustomers().subscribe((customers) => {
-      // Set the total customers count
       this.totalCustomersCount = customers.length;
-      
-      // Update the Total Customers card with the count
       this.updateCustomersCard(this.totalCustomersCount);
     });
 
-    // Subscribe to products data to get total products count and total stock
     this.productsSubscription = this.productsService.getProductsRealTime().subscribe((products) => {
-      // Set the total products count
       this.totalProductsCount = products.length;
-      
-      // Calculate total stock across all products
-      this.totalStockCount = products.reduce((sum, product) => 
-        sum + (product.currentStock ? Number(product.currentStock) : 0), 0);
-      
-      // Update the cards with the calculated values
       this.updateProductsCard(this.totalProductsCount);
-      this.updateStockCard(this.totalStockCount);
+    });
+    
+    this.stockSubscription = this.stockService.stockUpdated$.subscribe(() => {
+      this.loadCurrentStockData();
     });
 
-    // Subscribe to purchases data to get total purchase due amount
+    // *** FIX APPLIED HERE: Changed all dot notation to bracket notation ***
     this.purchasesSubscription = this.purchaseService.getPurchases().subscribe((purchases) => {
-      // Calculate total purchase due amount
-      this.totalPurchaseDue = purchases.reduce((sum, purchase) => 
-        sum + (purchase.paymentDue ? Number(purchase.paymentDue) : 0), 0);
+      this.totalPurchaseDue = purchases.reduce((totalDueSum, purchase) => {
+        let productsTotal = 0;
+        let totalTax = 0;
+        
+        const purchaseProducts = purchase['products'];
+        if (purchaseProducts && Array.isArray(purchaseProducts)) {
+            purchaseProducts.forEach(product => {
+                const quantity = Number(product['quantity']) || 0;
+                // Accessing with ['price'] as required by the error message
+                const price = Number(product['unitCost']) || Number(product['price']) || 0; 
+                const taxRate = Number(product['taxRate']) || 0;
+                
+                const lineTotal = quantity * price;
+                productsTotal += lineTotal;
+                totalTax += lineTotal * (taxRate / 100);
+            });
+        }
+        
+        const shippingCharges = Number(purchase['shippingCharges']) || 0;
+        const accurateGrandTotal = productsTotal + totalTax + shippingCharges;
+        const paymentAmount = Number(purchase['paymentAmount']) || 0;
+        const dueForThisPurchase = Math.max(0, accurateGrandTotal - paymentAmount);
+
+        return totalDueSum + dueForThisPurchase;
+      }, 0); 
       
-      // Update the Purchase Due card with the calculated value
       this.updatePurchaseDueCard(this.totalPurchaseDue);
     });
 
-    // Subscribe to purchase returns data to get total purchase return amount
     this.purchaseReturnsSubscription = this.purchaseReturnService.getPurchaseReturns().subscribe((returns) => {
-      // Calculate total purchase return amount
       this.totalPurchaseReturn = returns.reduce((sum, returnItem) => 
         sum + (returnItem.grandTotal ? Number(returnItem.grandTotal) : 0), 0);
-      
-      // Update the Purchase Return card with the calculated value
       this.updatePurchaseReturnCard(this.totalPurchaseReturn);
     });
 
-    // Subscribe to suppliers data to get total suppliers count
     this.suppliersSubscription = this.supplierService.getSuppliers().subscribe((suppliers) => {
-      // Set the total suppliers count
       this.totalSuppliersCount = suppliers.length;
-      
-      // Update the Total Suppliers card with the count
       this.updateSuppliersCard(this.totalSuppliersCount);
     });
   }
 
+  async loadCurrentStockData(): Promise<void> {
+    try {
+      const stockData = await this.stockService['getCurrentStockData']();
+      this.totalStockCount = stockData.reduce((sum: any, item: { currentStock: any; }) => sum + (item.currentStock || 0), 0);
+      this.updateStockCard(this.totalStockCount);
+    } catch (error) {
+      console.error('Error loading current stock data:', error);
+    }
+  }
+
   ngOnDestroy(): void {
-    // Clean up subscriptions to prevent memory leaks
-    if (this.salesSubscription) {
-      this.salesSubscription.unsubscribe();
-    }
-    if (this.usersSubscription) {
-      this.usersSubscription.unsubscribe();
-    }
-    if (this.customersSubscription) {
-      this.customersSubscription.unsubscribe();
-    }
-    if (this.productsSubscription) {
-      this.productsSubscription.unsubscribe();
-    }
-    if (this.purchasesSubscription) {
-      this.purchasesSubscription.unsubscribe();
-    }
-    if (this.purchaseReturnsSubscription) {
-      this.purchaseReturnsSubscription.unsubscribe();
-    }
-    if (this.suppliersSubscription) {
-      this.suppliersSubscription.unsubscribe();
-    }
+    if (this.salesSubscription) this.salesSubscription.unsubscribe();
+    if (this.usersSubscription) this.usersSubscription.unsubscribe();
+    if (this.customersSubscription) this.customersSubscription.unsubscribe();
+    if (this.productsSubscription) this.productsSubscription.unsubscribe();
+    if (this.purchasesSubscription) this.purchasesSubscription.unsubscribe();
+    if (this.purchaseReturnsSubscription) this.purchaseReturnsSubscription.unsubscribe();
+    if (this.suppliersSubscription) this.suppliersSubscription.unsubscribe();
+    if (this.stockSubscription) this.stockSubscription.unsubscribe();
   }
 
   updateSalesCard(totalAmount: number): void {
@@ -232,7 +220,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       })}`;
     }
   }
-  // Method to update the users card with the total users count
+
   updateUsersCard(totalUsers: number): void {
     const usersCard = this.cards.find(card => card.title === 'Total Users');
     if (usersCard) {
@@ -240,7 +228,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Method to update the customers card with the total customers count
   updateCustomersCard(totalCustomers: number): void {
     const customersCard = this.cards.find(card => card.title === 'Total Customers');
     if (customersCard) {
@@ -248,7 +235,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Method to update the products card with the total products count
   updateProductsCard(totalProducts: number): void {
     const productsCard = this.cards.find(card => card.title === 'Total Products');
     if (productsCard) {
@@ -256,7 +242,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Method to update the stock card with the total stock count
   updateStockCard(totalStock: number): void {
     const stockCard = this.cards.find(card => card.title === 'Current Stock');
     if (stockCard) {
@@ -264,29 +249,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  // Method to update the purchase due card with the total purchase due amount
   updatePurchaseDueCard(totalDue: number): void {
     const purchaseDueCard = this.cards.find(card => card.title === 'Purchase Due');
     if (purchaseDueCard) {
-      purchaseDueCard.value = `₹${totalDue.toLocaleString('en-US', {
+      purchaseDueCard.value = `₹${totalDue.toLocaleString('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })}`;
     }
   }
 
-  // Method to update the purchase return card with the total purchase return amount
   updatePurchaseReturnCard(totalReturn: number): void {
     const purchaseReturnCard = this.cards.find(card => card.title === 'Purchase Return');
     if (purchaseReturnCard) {
-      purchaseReturnCard.value = `₹${totalReturn.toLocaleString('en-US', {
+      purchaseReturnCard.value = `₹${totalReturn.toLocaleString('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })}`;
     }
   }
 
-  // Method to update the suppliers card with the total suppliers count
   updateSuppliersCard(totalSuppliers: number): void {
     const suppliersCard = this.cards.find(card => card.title === 'Total Suppliers');
     if (suppliersCard) {

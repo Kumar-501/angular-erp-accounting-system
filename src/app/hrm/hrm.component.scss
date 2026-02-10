@@ -1,29 +1,87 @@
-.hrm-menu {
-    margin-top: 80px; // Moves the box down
-    background: #fff;
-    border-radius: 16px;
-    padding: 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    color: #4b5563;
+.hrm-dashboard {
+  padding: 20px;
+
+  .cards-container {
+    margin-bottom: 30px;
+  }
+
+  .hrm-menu {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 8px 15px;
+    margin-bottom: 30px;
     display: flex;
     align-items: center;
-    gap: 24px;
-  
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    white-space: nowrap;
+
     .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-right: 15px;
       display: flex;
       align-items: center;
       gap: 8px;
-      font-weight: 500;
+
+      i {
+        color: #3498db;
+        font-size: 14px;
+      }
     }
-  
+
     a {
       text-decoration: none;
-      color: #4b5563;
-      font-weight: 400;
-  
+      color: #7f8c8d;
+      padding: 5px 10px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+
+      i {
+        font-size: 12px;
+      }
+
+      &:hover {
+        color: #3498db;
+        background-color: #f8f9fa;
+      }
+
       &.active-link {
-        font-weight: 600;
-        color: #2563eb; // blue
+        color: #fff;
+        background-color: #3498db;
+
+        i {
+          color: #fff;
+        }
+      }
+    }
+  }
 }
+
+// Hide scrollbar but keep functionality
+.hrm-menu::-webkit-scrollbar {
+  display: none;
 }
+
+// Responsive adjustments
+@media (max-width: 768px) {
+  .hrm-dashboard {
+    .hrm-menu {
+      padding: 6px 12px;
+      
+      a {
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+    }
+  }
 }

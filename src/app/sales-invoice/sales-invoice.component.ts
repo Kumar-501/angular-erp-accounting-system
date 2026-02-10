@@ -1,6 +1,9 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { SaleService } from '../services/sale.service';
-import { map, Observable, of } from 'rxjs';
+import { map, Observable, of, take } from 'rxjs';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
+
 
 @Component({
   selector: 'app-sales-invoice',
@@ -16,7 +19,9 @@ export class SalesInvoiceComponent implements OnInit {
   fromDate: string = '';
   toDate: string = '';
   searchText: string = '';
-  
+    totalSales: number = 0;
+  totalRecords: number = 0;
+  isLoading: boolean = false;
   constructor(private saleService: SaleService) {}
 
   ngOnInit() {
@@ -37,7 +42,10 @@ export class SalesInvoiceComponent implements OnInit {
         })))
       );
     }
-    
+    this.filteredSales$.subscribe(sales => {
+      this.totalRecords = sales.length;
+      this.totalSales = sales.reduce((sum, sale) => sum + (sale.totalPayable || 0), 0);
+    });
     this.filteredSales$ = this.sales$;
   }
 
@@ -96,20 +104,7 @@ export class SalesInvoiceComponent implements OnInit {
     });
   }
 
-  exportToExcel(): void {
-    this.filteredSales$.subscribe(sales => {
-      // This would require a library like xlsx for proper Excel export
-      // For now, we'll export as CSV with .xlsx extension
-      const csvContent = this.convertToCSV(sales);
-      const blob = new Blob([csvContent], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'sales-report.xlsx';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    });
-  }
+
 
   private convertToCSV(data: any[]): string {
     const headers = ['S.No', 'Invoice No', 'Date', 'Sales Value', 'Order No', 'Incentive User'];
@@ -150,4 +145,43 @@ export class SalesInvoiceComponent implements OnInit {
     console.log('Viewing invoice for sale:', saleId);
     // Your existing implementation
   }
+exportToExcel(): void {
+  this.filteredSales$.pipe(take(1)).subscribe(sales => {
+    try {
+      // Prepare worksheet data
+      const wsData = [
+        ['S.No', 'Invoice No', 'Date', 'Sales Value', 'Order No', 'Incentive User'], // headers
+        ...sales.map((sale, index) => [
+          index + 1,
+          sale.invoiceNo || 'N/A',
+          new Date(sale.saleDate).toLocaleDateString(),
+          sale.totalPayable || 0,
+          sale.orderNo || 'N/A',
+          sale.addedByDisplayName || sale.addedBy || 'N/A'
+        ])
+      ];
+
+      // Create worksheet
+      const ws: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(wsData);
+      
+      // Create workbook
+      const wb: XLSX.WorkBook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Sales Report');
+      
+      // Generate Excel file (array buffer)
+      const excelBuffer: any = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      
+      // Create blob and save
+      const data: Blob = new Blob([excelBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8'
+      });
+      
+      // Save with proper filename and extension
+      saveAs(data, 'sales-report_' + new Date().getTime() + '.xlsx');
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      // Show error to user (implement your error handling)
+    }
+  });
+}
 }

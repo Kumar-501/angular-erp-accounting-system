@@ -2,12 +2,16 @@
 <div class="container-fluid p-4">
   <!-- Main Header -->
   <h2 class="mb-4 text-dark fw-semibold">Sales Summary by Service</h2>
-  
+
   <!-- Export Section -->
   <div class="card mb-4 border">
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-12 text-end">
+          <!-- Added Export to Excel Button -->
+          <button class="btn btn-primary me-2" (click)="exportAsExcel()">
+            <i class="bi bi-file-earmark-excel me-1"></i> Export to Excel
+          </button>
           <button class="btn btn-success" (click)="exportAsCSV()">
             <i class="bi bi-download me-1"></i> Export to CSV
           </button>
@@ -15,7 +19,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- Table Section -->
   <div class="table-responsive">
     <table class="table table-hover mb-0" id="summaryTable">
@@ -48,7 +52,7 @@
           </td>
         </tr>
 
-        <tr *ngFor="let summary of filteredSummaries; let i = index" 
+        <tr *ngFor="let summary of filteredSummaries; let i = index"
             [class]="i % 2 === 0 ? 'table-row-even' : 'table-row-odd'">
           <td class="fw-medium text-dark">{{i + 1}}</td>
           <td *ngIf="isColumnVisible('service.name')" class="text-primary fw-medium">{{summary.service.name}}</td>
@@ -58,13 +62,11 @@
             {{summary.totalValue | currency:'INR':'symbol':'1.2-2'}}
           </td>
         </tr>
-        
+
         <!-- Total Row -->
         <tr class="table-total-row" *ngIf="!loading && filteredSummaries.length > 0">
-          <td></td>
-          <td *ngIf="isColumnVisible('service.name')"></td>
-          <td *ngIf="isColumnVisible('service.description')"></td>
-          <td *ngIf="isColumnVisible('salesCount')" class="text-end fw-bold text-dark">Totals: {{ getTotalSales() }}</td>
+          <td [attr.colspan]="getColspan() + 1" class="text-end fw-bold text-dark">Totals:</td>
+          <td *ngIf="isColumnVisible('salesCount')" class="text-end fw-bold text-dark">{{ getTotalSales() }}</td>
           <td *ngIf="isColumnVisible('totalValue')" class="text-end fw-bold text-dark">
             {{ getTotalValue() | currency:'INR':'symbol':'1.2-2' }}
           </td>
@@ -72,7 +74,7 @@
       </tbody>
     </table>
   </div>
-  
+
   <!-- Hidden controls for existing functionality -->
   <div class="d-none">
     <div class="input-group">
@@ -81,7 +83,7 @@
         <i class="bi bi-x"></i>
       </button>
     </div>
-    
+
     <div class="dropdown">
       <button class="btn btn-outline-secondary dropdown-toggle" (click)="toggleColumnVisibility()">
         <i class="bi bi-eye"></i> Columns
@@ -90,7 +92,7 @@
         <li *ngFor="let col of columns">
           <div class="dropdown-item">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" 
+              <input class="form-check-input" type="checkbox"
                      [(ngModel)]="col.visible" id="col-{{col.field}}">
               <label class="form-check-label" for="col-{{col.field}}">
                 {{col.header}}
@@ -100,13 +102,13 @@
         </li>
       </ul>
     </div>
-    
+
+    <!-- The original Print button, now hidden -->
     <div class="dropdown">
       <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-        <i class="bi bi-download"></i> Export
+        <i class="bi bi-printer"></i> Print
       </button>
       <ul class="dropdown-menu">
-        <li><a class="dropdown-item" (click)="exportAsExcel()">Excel</a></li>
         <li><a class="dropdown-item" (click)="print()">Print</a></li>
       </ul>
     </div>

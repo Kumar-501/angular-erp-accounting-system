@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { SaleService } from '../services/sale.service';
 import { Location } from '@angular/common';
 
+// --- UPDATED: Interface with clearer property name ---
 interface Shipment {
   id: string;
   date: string;
@@ -12,7 +13,7 @@ interface Shipment {
   alternateContact: string;
   location: string;
   billingAddress: string;
-  shippingDetails: string;
+  shippingAddress: string; // Renamed from shippingDetails
   shippingStatus: string;
   shippingCharge: number;
   addedBy: string;
@@ -66,7 +67,8 @@ export class ShipmentDetailsComponent implements OnInit {
       }
     });
   }
-
+  
+  // --- UPDATED: Transformation logic now maps to shippingAddress ---
   private transformOrderToShipment(order: any): Shipment {
     return {
       id: order.id,
@@ -77,7 +79,8 @@ export class ShipmentDetailsComponent implements OnInit {
       alternateContact: order.alternateContact || 'N/A',
       location: order.location || order.businessLocation || 'N/A',
       billingAddress: order.billingAddress || 'N/A',
-      shippingDetails: order.shippingDetails || 'N/A',
+      // This line is updated to be more robust and use the new property name
+      shippingAddress: order.shippingAddress || order.shippingDetails || 'N/A',
       shippingStatus: order.shippingStatus || 'N/A',
       shippingCharge: order.shippingCharges || 0,
       addedBy: order.addedBy || 'System',
@@ -131,13 +134,13 @@ export class ShipmentDetailsComponent implements OnInit {
   goBack(): void {
     this.location.back();
   }
-  // Add this method to your component class
-getProductsSubtotal(): number {
-  if (!this.shipment || !this.shipment.products) return 0;
-  return this.shipment.products.reduce((sum, product) => {
-    const quantity = product.quantity || 1;
-    const price = product.price || product.unitPrice || 0;
-    return sum + (quantity * price);
-  }, 0);
-}
+
+  getProductsSubtotal(): number {
+    if (!this.shipment || !this.shipment.products) return 0;
+    return this.shipment.products.reduce((sum, product) => {
+      const quantity = product.quantity || 1;
+      const price = product.price || product.unitPrice || 0;
+      return sum + (quantity * price);
+    }, 0);
+  }
 }

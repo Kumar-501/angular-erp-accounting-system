@@ -18,16 +18,25 @@ import {
   increment,
   setDoc
 } from '@angular/fire/firestore';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { SkuGeneratorService } from './sku-generator.service';
+import { TaxRate } from '../tax/tax.model';
 
 // In products.service.ts or shared interfaces file
 export interface Product {
+  formattedExpiryDate: string;
+  displayTax: string;
+  calculatedUnitPurchasePrice: number;
+  locationStocks: { [key: string]: number; };
+  totalStock: number;
+  displayStock: any;
   // Core identification
   id?: string;
   productName: string;
   productNameLower?: string; // For search/filtering purposes
   sku: string;
+    taxRateObject?: TaxRate | null; // ✅ ADD THIS LINE
+
   hsnCode: string;
   batchNumber: string;
   
@@ -36,8 +45,9 @@ export interface Product {
   locations?: string[]; // Array of location IDs
   locationName?: string; // Single location name (for backward compatibility)  
   locationNames?: string[]; // Array of location names
-   totalQuantity: number;       // Total quantity in stock
+  totalQuantity: number;       // Total quantity in stock
   lastNumber: string; 
+  
   // Pricing
   unitPurchasePrice: number | null;
   unitSellingPrice: number | null;
@@ -65,7 +75,7 @@ export interface Product {
   
   // Stock management
   currentStock: number;
-  alertQuantity: number | null;
+  alertQuantity: number | null; // Ensure this is properly defined
   
   // Tax information
   applicableTax: string;
@@ -93,7 +103,7 @@ export interface Product {
   // Timestamps
   createdAt?: Date;
   updatedAt?: Date;
-    expiryDate?: string | null; // Add this line
+  expiryDate?: string | null;
 
   // Complex product structures
   components?: {
@@ -127,171 +137,178 @@ export class ProductsService {
   getProducts() {
     throw new Error('Method not implemented.');
   }
- getProductPurchaseHistory(productId: string): Observable<any[]> {
-  return new Observable(observer => {
-    const purchaseOrdersRef = collection(this.firestore, 'purchase_orders');
-    const q = query(
-      purchaseOrdersRef,
-      where('items', 'array-contains', { productId: productId })
-    );
-    
-    onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        date: doc.data()['date']?.toDate() || null
-      }));
-      observer.next(orders);
-    }, error => {
-      console.error('Error getting purchase orders:', error);
-      observer.error(error);
+  
+  // Add Subject for broadcasting product updates
+  private productUpdatedSubject = new Subject<{productId?: string, action: string, timestamp: Date}>();
+  public productUpdated$ = this.productUpdatedSubject.asObservable();
+
+  getProductPurchaseHistory(productId: string): Observable<any[]> {
+    return new Observable(observer => {
+      const purchaseOrdersRef = collection(this.firestore, 'purchase_orders');
+      const q = query(
+        purchaseOrdersRef,
+        where('items', 'array-contains', { productId: productId })
+      );
+      
+      onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          date: doc.data()['date']?.toDate() || null
+        }));
+        observer.next(orders);
+      }, error => {
+        console.error('Error getting purchase orders:', error);
+        observer.error(error);
+      });
     });
-  });
   }
   
   getProductSalesHistory(productId: string) {
     throw new Error('Method not implemented.');
   }
+  
   private productsCollection;
   private historyCollection;
 
-  constructor(private firestore: Firestore,
-
-        private skuGenerator: SkuGeneratorService
-
-  )
-  
-  
-  
-  {
+  constructor(private firestore: Firestore, private skuGenerator: SkuGeneratorService) {
     this.productsCollection = collection(this.firestore, 'products');
     this.historyCollection = collection(this.firestore, 'product_history');
-    
   }
-// In products.service.ts
-async searchProducts(searchQuery: string): Promise<Product[]> {  // Changed parameter name from 'query' to 'searchQuery'
-  try {
-    const searchTerm = searchQuery.toLowerCase().trim();
-    
-    if (!searchTerm) return [];
 
-    // Search by SKU (exact match)
-    const skuQuery = query(  // Now this correctly references the imported query function
-      this.productsCollection,
-      where('sku', '==', searchTerm),
-      firestoreLimit(1)
-    );
-    const skuResults = await getDocs(skuQuery);
-    
-    if (!skuResults.empty) {
-      return skuResults.docs.map(doc => ({
+  // Broadcast product update
+  private broadcastProductUpdate(productId?: string, action: string = 'update') {
+    this.productUpdatedSubject.next({
+      productId,
+      action,
+      timestamp: new Date()
+    });
+  }
+
+  // In products.service.ts
+  async searchProducts(searchQuery: string): Promise<Product[]> {  // Changed parameter name from 'query' to 'searchQuery'
+    try {
+      const searchTerm = searchQuery.toLowerCase().trim();
+      
+      if (!searchTerm) return [];
+
+      // Search by SKU (exact match)
+      const skuQuery = query(  // Now this correctly references the imported query function
+        this.productsCollection,
+        where('sku', '==', searchTerm),
+        firestoreLimit(1)
+      );
+      const skuResults = await getDocs(skuQuery);
+      
+      if (!skuResults.empty) {
+        return skuResults.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data() as Product
+        }));
+      }
+
+      // Search by product name (partial match)
+      const nameQuery = query(  // Now this correctly references the imported query function
+        this.productsCollection,
+        where('productNameLower', '>=', searchTerm),
+        where('productNameLower', '<=', searchTerm + '\uf8ff'),
+        firestoreLimit(10)
+      );
+      const nameResults = await getDocs(nameQuery);
+      
+      return nameResults.docs.map(doc => ({
         id: doc.id,
         ...doc.data() as Product
       }));
-    }
 
-    // Search by product name (partial match)
-    const nameQuery = query(  // Now this correctly references the imported query function
-      this.productsCollection,
-      where('productNameLower', '>=', searchTerm),
-      where('productNameLower', '<=', searchTerm + '\uf8ff'),
-      firestoreLimit(10)
-    );
-    const nameResults = await getDocs(nameQuery);
-    
-    return nameResults.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data() as Product
-    }));
-
-  } catch (error) {
-    console.error('Error searching products:', error);
-    throw error;
-  }
-  }
-  
-// In products.service.ts
-
-// In products.service.ts
-
-async addProduct(product: Product): Promise<string> {
-  try {
-    // Generate SKU first if not provided
-    if (!product.sku) {
-      product.sku = await this.skuGenerator.getNextSku();
-    }
-    
-    // Prepare product data for saving
-    const productToSave = {
-      ...this.prepareProductData(product),
-      productNameLower: product.productName.toLowerCase(),
-      locations: product.locations || [], // Array of location IDs
-      locationNames: product.locationNames || [], // Array of location names
-      // Maintain backward compatibility
-      location: product.locations?.[0] || '', // First location ID
-      locationName: product.locationNames?.[0] || '' // First location name
-    };
-    
-    // Remove ID if it exists (for duplicate case)
-    if (productToSave.id) {
-      delete productToSave.id;
-    }
-    
-    // Add product to Firestore
-    const docRef = await addDoc(this.productsCollection, productToSave);
-    
-    // Add history entry for tracking
-    await this.addHistoryEntry({
-      productId: docRef.id,
-      action: 'add',
-      timestamp: serverTimestamp(),
-      user: 'System',
-      newValue: productToSave.productName,
-      note: 'Product created'
-    });
-    
-    return docRef.id;
-  } catch (error) {
-    console.error('Error adding product:', error);
-    throw error;
-  }
-}
-
-// Add this method to generate numeric SKUs
-// Add this method to generate numeric SKUs
-private generateNumericSku(lastSku: string | null): string {
-  // Default starting SKU if no products exist
-  let nextNumber = 100001;
-  
-  if (lastSku) {
-    // Extract numeric part and increment
-    const lastNumber = parseInt(lastSku, 10);
-    if (!isNaN(lastNumber)) {
-      nextNumber = lastNumber + 1;
+    } catch (error) {
+      console.error('Error searching products:', error);
+      throw error;
     }
   }
-  
-  return nextNumber.toString();
-}
-public async getLastUsedSku(): Promise<string | null> {
-  try {
-    const q = query(
-      this.productsCollection,
-      orderBy('sku', 'desc'),
-      firestoreLimit(1)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const lastProduct = querySnapshot.docs[0].data() as Product;
-      return lastProduct.sku;
+
+  async addProduct(product: Product): Promise<string> {
+    try {
+      // Generate SKU first if not provided
+      if (!product.sku) {
+        product.sku = await this.skuGenerator.getNextSku();
+      }
+      
+      // Prepare product data for saving
+      const productToSave = {
+        ...this.prepareProductData(product),
+        productNameLower: product.productName.toLowerCase(),
+        locations: product.locations || [], // Array of location IDs
+        locationNames: product.locationNames || [], // Array of location names
+        // Maintain backward compatibility
+        location: product.locations?.[0] || '', // First location ID
+        locationName: product.locationNames?.[0] || '' // First location name
+      };
+      
+      // Remove ID if it exists (for duplicate case)
+      if (productToSave.id) {
+        delete productToSave.id;
+      }
+      
+      // Add product to Firestore
+      const docRef = await addDoc(this.productsCollection, productToSave);
+      
+      // Add history entry for tracking
+      await this.addHistoryEntry({
+        productId: docRef.id,
+        action: 'add',
+        timestamp: serverTimestamp(),
+        user: 'System',
+        newValue: productToSave.productName,
+        note: 'Product created'
+      });
+
+      // Broadcast product addition
+      this.broadcastProductUpdate(docRef.id, 'add');
+      
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding product:', error);
+      throw error;
     }
-    return null;
-  } catch (error) {
-    console.error('Error getting last SKU:', error);
-    return null;
   }
-}
+
+  // Add this method to generate numeric SKUs
+  private generateNumericSku(lastSku: string | null): string {
+    // Default starting SKU if no products exist
+    let nextNumber = 100001;
+    
+    if (lastSku) {
+      // Extract numeric part and increment
+      const lastNumber = parseInt(lastSku, 10);
+      if (!isNaN(lastNumber)) {
+        nextNumber = lastNumber + 1;
+      }
+    }
+    
+    return nextNumber.toString();
+  }
+
+  public async getLastUsedSku(): Promise<string | null> {
+    try {
+      const q = query(
+        this.productsCollection,
+        orderBy('sku', 'desc'),
+        firestoreLimit(1)
+      );
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const lastProduct = querySnapshot.docs[0].data() as Product;
+        return lastProduct.sku;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting last SKU:', error);
+      return null;
+    }
+  }
+
   getProductsRealTime() {
     const productsCollection = collection(this.firestore, 'products');
     return new Observable<any[]>(observer => {
@@ -314,19 +331,25 @@ public async getLastUsedSku(): Promise<string | null> {
       const productDoc = doc(this.firestore, `products/${productId}`);
       const currentProduct = await this.getProductById(productId);
       
-  await updateDoc(productDoc, {
-    ...updatedData,
-    updatedAt: new Date(),
-    lastUpdated: new Date()
-      });
+      // Add timestamp to update data
+      const updateDataWithTimestamp = {
+        ...updatedData,
+        updatedAt: new Date(),
+        lastUpdated: new Date()
+      };
+
+      await updateDoc(productDoc, updateDataWithTimestamp);
       
       // Add history entry for product update
       await this.addHistoryEntry({
         productId: productId,
         action: 'update',
         timestamp: serverTimestamp(),
-        newValue: updatedData.productName
+        newValue: updatedData.productName || currentProduct?.productName
       });
+
+      // Broadcast product update
+      this.broadcastProductUpdate(productId, 'update');
     
     } catch (error) {
       console.error('Error updating product:', error);
@@ -335,52 +358,56 @@ public async getLastUsedSku(): Promise<string | null> {
   }
 
   // Delete product
-// In your deleteProduct method, ensure it looks like this:
-async deleteProduct(productId: string): Promise<void> {
-  try {
-    const product = await this.getProductById(productId);
-    const productDoc = doc(this.firestore, `products/${productId}`);
-    
-    // Add history entry before deletion
-    if (product) {
-      await this.addHistoryEntry({
-        productId: productId,
-        action: 'delete',
-        timestamp: serverTimestamp(),
-        user: 'System', // Update this with actual user info
-        oldValue: product.productName
-      });
+  async deleteProduct(productId: string): Promise<void> {
+    try {
+      const product = await this.getProductById(productId);
+      const productDoc = doc(this.firestore, `products/${productId}`);
+      
+      // Add history entry before deletion
+      if (product) {
+        await this.addHistoryEntry({
+          productId: productId,
+          action: 'delete',
+          timestamp: serverTimestamp(),
+          user: 'System', // Update this with actual user info
+          oldValue: product.productName
+        });
+      }
+      
+      await deleteDoc(productDoc);
+
+      // Broadcast product deletion
+      this.broadcastProductUpdate(productId, 'delete');
+      
+      // Optional: Delete any related documents (like stock history)
+      // You might want to add this if you have subcollections
+      // await this.deleteProductSubcollections(productId);
+      
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      throw error;
     }
-    
-    await deleteDoc(productDoc);
-    
-    // Optional: Delete any related documents (like stock history)
-    // You might want to add this if you have subcollections
-    // await this.deleteProductSubcollections(productId);
-    
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    throw error;
   }
-}
 
-// Optional: Add this method if you need to delete subcollections
-private async deleteProductSubcollections(productId: string): Promise<void> {
-  try {
-    // Example: Delete stock history subcollection
-    const stockHistoryRef = collection(this.firestore, `products/${productId}/stock_history`);
-    const snapshot = await getDocs(stockHistoryRef);
-    const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
-    await Promise.all(deletePromises);
-  } catch (error) {
-    console.error('Error deleting product subcollections:', error);
-    throw error;
+  // Optional: Add this method if you need to delete subcollections
+  private async deleteProductSubcollections(productId: string): Promise<void> {
+    try {
+      // Example: Delete stock history subcollection
+      const stockHistoryRef = collection(this.firestore, `products/${productId}/stock_history`);
+      const snapshot = await getDocs(stockHistoryRef);
+      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    } catch (error) {
+      console.error('Error deleting product subcollections:', error);
+      throw error;
+    }
   }
-}
 
-  // Update product by SKU
+  // Update product by SKU with enhanced broadcasting
   async updateProductBySKU(sku: string, updatedData: Partial<Product>): Promise<void> {
     try {
+      console.log('Updating product by SKU:', sku, 'with data:', updatedData);
+      
       const q = query(this.productsCollection, where("sku", "==", sku));
       const querySnapshot = await getDocs(q);
 
@@ -388,58 +415,98 @@ private async deleteProductSubcollections(productId: string): Promise<void> {
         const productId = querySnapshot.docs[0].id;
         const currentProduct = await this.getProductById(productId);
         
-        const productDoc = doc(this.firestore, `products/${productId}`);
-        await updateDoc(productDoc, {
+        // Add timestamp to update data
+        const updateDataWithTimestamp = {
           ...updatedData,
-          updatedAt: new Date()
-        });
+          updatedAt: new Date(),
+          lastUpdated: new Date()
+        };
+        
+        const productDoc = doc(this.firestore, `products/${productId}`);
+        await updateDoc(productDoc, updateDataWithTimestamp);
+        
+        console.log('Successfully updated product:', productId);
         
         // Add history entry for product update by SKU
         await this.addHistoryEntry({
           productId: productId,
-          action: 'update',
+          action: 'price_update',
           timestamp: serverTimestamp(),
           user: 'System',
-          note: 'Updated via SKU',
-          oldValue: currentProduct?.productName,
-          newValue: updatedData.productName || currentProduct?.productName
+          note: 'Price updated via bulk import',
+          oldValue: {
+            sellingPrice: currentProduct?.defaultSellingPriceExcTax,
+            purchasePrice: currentProduct?.defaultPurchasePriceExcTax
+          },
+          newValue: {
+            sellingPrice: updatedData.defaultSellingPriceExcTax,
+            purchasePrice: updatedData.defaultPurchasePriceExcTax
+          }
         });
+
+        // Broadcast product update with specific action
+        this.broadcastProductUpdate(productId, 'price_update');
+      } else {
+        console.error('Product not found with SKU:', sku);
+        throw new Error(`Product with SKU ${sku} not found`);
       }
     } catch (error) {
       console.error('Error updating product by SKU:', error);
       throw error;
     }
   }
-// In products.service.ts
 
-
-
-
-private async addHistoryEntry(entry: HistoryEntry): Promise<void> {
-  try {
-    // Clean the entry object to remove undefined values
-    const cleanedEntry: any = {
-      productId: entry.productId,
-      action: entry.action,
-      timestamp: entry.timestamp || serverTimestamp(),
-      user: entry.user || 'System',
-      note: entry.note || '',
+  // Bulk update method for better performance
+  async bulkUpdateProductsBySKU(updates: {sku: string, data: Partial<Product>}[]): Promise<{success: number, failed: number, errors: string[]}> {
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[]
     };
 
-    // Only include oldValue and newValue if they're not undefined
-    if (entry.oldValue !== undefined) {
-      cleanedEntry.oldValue = entry.oldValue;
-    }
-    if (entry.newValue !== undefined) {
-      cleanedEntry.newValue = entry.newValue;
-    }
+    const updatePromises = updates.map(async (update) => {
+      try {
+        await this.updateProductBySKU(update.sku, update.data);
+        results.success++;
+      } catch (error) {
+        results.failed++;
+        results.errors.push(`SKU ${update.sku}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    });
 
-    await addDoc(this.historyCollection, cleanedEntry);
-  } catch (error) {
-    console.error('Error adding history entry:', error);
-    throw error;
+    await Promise.all(updatePromises);
+
+    // Broadcast bulk update completion
+    this.broadcastProductUpdate(undefined, 'bulk_price_update');
+
+    return results;
   }
-}
+
+  private async addHistoryEntry(entry: HistoryEntry): Promise<void> {
+    try {
+      // Clean the entry object to remove undefined values
+      const cleanedEntry: any = {
+        productId: entry.productId,
+        action: entry.action,
+        timestamp: entry.timestamp || serverTimestamp(),
+        user: entry.user || 'System',
+        note: entry.note || '',
+      };
+
+      // Only include oldValue and newValue if they're not undefined
+      if (entry.oldValue !== undefined) {
+        cleanedEntry.oldValue = entry.oldValue;
+      }
+      if (entry.newValue !== undefined) {
+        cleanedEntry.newValue = entry.newValue;
+      }
+
+      await addDoc(this.historyCollection, cleanedEntry);
+    } catch (error) {
+      console.error('Error adding history entry:', error);
+      throw error;
+    }
+  }
 
   // Get product history
   getProductHistory(productId: string): Observable<HistoryEntry[]> {
@@ -474,56 +541,59 @@ private async addHistoryEntry(entry: HistoryEntry): Promise<void> {
       return unsubscribe;
     });
   }
-// In products.service.ts
-async updateProductStock(productId: string, newStock: number): Promise<void> {
-  try {
-    const productDoc = doc(this.firestore, `products/${productId}`);
-    await updateDoc(productDoc, {
-      currentStock: newStock,
-      updatedAt: new Date()
-    });
-  } catch (error) {
-    console.error('Error updating product stock:', error);
-    throw error;
-  }
-}
 
-async getProductById(productId: string): Promise<Product | null> {
-  try {
-    const productDoc = doc(this.firestore, `products/${productId}`);
-    const docSnapshot = await getDoc(productDoc);
+  // In products.service.ts
+  async updateProductStock(productId: string, newStock: number): Promise<void> {
+    try {
+      const productDoc = doc(this.firestore, `products/${productId}`);
+      await updateDoc(productDoc, {
+        currentStock: newStock,
+        updatedAt: new Date()
+      });
 
-    if (docSnapshot.exists()) {
-      return {
-        id: docSnapshot.id,
-        ...docSnapshot.data()
-      } as Product;
+      // Broadcast stock update
+      this.broadcastProductUpdate(productId, 'stock_update');
+    } catch (error) {
+      console.error('Error updating product stock:', error);
+      throw error;
     }
-    return null;
-  } catch (error) {
-    console.error('Error getting product by ID:', error);
-    throw error;
   }
-}
 
-async getProductByName(productName: string): Promise<Product | null> {
-  try {
-    const q = query(this.productsCollection, where("productName", "==", productName));
-    const querySnapshot = await getDocs(q);
+  async getProductById(productId: string): Promise<Product | null> {
+    try {
+      const productDoc = doc(this.firestore, `products/${productId}`);
+      const docSnapshot = await getDoc(productDoc);
 
-    if (!querySnapshot.empty) {
-      return {
-        id: querySnapshot.docs[0].id,
-        ...querySnapshot.docs[0].data()
-      } as Product;
+      if (docSnapshot.exists()) {
+        return {
+          id: docSnapshot.id,
+          ...docSnapshot.data()
+        } as Product;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting product by ID:', error);
+      throw error;
     }
-    return null;
-  } catch (error) {
-    console.error('Error getting product by Name:', error);
-    throw error;
   }
-}
 
+  async getProductByName(productName: string): Promise<Product | null> {
+    try {
+      const q = query(this.productsCollection, where("productName", "==", productName));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        return {
+          id: querySnapshot.docs[0].id,
+          ...querySnapshot.docs[0].data()
+        } as Product;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting product by Name:', error);
+      throw error;
+    }
+  }
 
   // Get product by SKU
   async getProductBySku(sku: string): Promise<Product | null> {
@@ -544,202 +614,218 @@ async getProductByName(productName: string): Promise<Product | null> {
     }
   }
 
- 
- async getProductByIdForLocation(productId: string, locationId: string): Promise<Product | null> {
-  try {
-    const productDoc = doc(this.firestore, `products/${productId}`);
-    const docSnapshot = await getDoc(productDoc);
-
-    if (docSnapshot.exists()) {
-      const product = docSnapshot.data() as Product;
-      if (product.location === locationId) {
-        return { id: docSnapshot.id, ...product };
-      }
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting product by ID for location:', error);
-    throw error;
-  }
-  }
-  // Add these methods to your ProductsService
-
-async getProductStockAtLocation(productId: string, locationId: string): Promise<number> {
-  try {
-    
-    // First check if the product exists and get its primary location
-    const productRef = doc(this.firestore, `products/${productId}`);
-    const productSnap = await getDoc(productRef);
-    
-    if (!productSnap.exists()) {
-      console.error(`Product ${productId} not found`);
-      return 0;
-    }
-    
-    const productData = productSnap.data();
-    
-    // If the product's primary location matches the requested location, return currentStock
-    if (productData['location'] === locationId) {
-      return productData['currentStock'] || 0;
-    }
-    
-    // Check if there's another product with the same name in the requested location
-    const sameProductInLocation = await this.getProductByNameAndLocation(productData['productName'], locationId);
-    if (sameProductInLocation) {
-      return sameProductInLocation.currentStock || 0;
-    }
-    
-    // Otherwise, check the stock subcollection
-    const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
-    const stockSnap = await getDoc(stockRef);
-    
-    if (stockSnap.exists()) {
-      const stockQuantity = stockSnap.data()['quantity'] || 0;
-      return stockQuantity;
-    }
-    
-    return 0;
-  } catch (error) {
-    console.error('Error getting product stock:', error);
-    throw error;
-  }
-}
-async increaseStock(productId: string, locationId: string, quantity: number): Promise<void> {
-  if (quantity <= 0) {
-    throw new Error('Quantity must be positive');
-  }
-
-  try {
-    
-    // First get the product data to find the product name
-    const sourceProductRef = doc(this.firestore, `products/${productId}`);
-    const sourceProductSnap = await getDoc(sourceProductRef);
-    
-    if (!sourceProductSnap.exists()) {
-      throw new Error(`Product ${productId} not found`);
-    }
-    
-    const sourceProductData = sourceProductSnap.data();
-    const productName = sourceProductData['productName'];
-    
-    
-    // If the product's primary location matches the requested location, update main document
-    if (sourceProductData['location'] === locationId) {
-      await updateDoc(sourceProductRef, {
-        currentStock: increment(quantity),
-        lastUpdated: serverTimestamp()
-      });
-      
-      return;
-    }
-    
-    // Look for a product with the same name in the destination location
-    const destinationProduct = await this.getProductByNameAndLocation(productName, locationId);
-    
-    if (destinationProduct) {
-      // Update the destination product's stock
-      const destinationProductRef = doc(this.firestore, `products/${destinationProduct.id}`);
-      await updateDoc(destinationProductRef, {
-        currentStock: increment(quantity),
-        lastUpdated: serverTimestamp()
-      });
-      return;
-    }
-    
-    // Otherwise, update the stock subcollection
-    const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
-    
+  async getProductByIdForLocation(productId: string, locationId: string): Promise<Product | null> {
     try {
-      await updateDoc(stockRef, {
-        quantity: increment(quantity),
-        lastUpdated: serverTimestamp()
-      });
+      const productDoc = doc(this.firestore, `products/${productId}`);
+      const docSnapshot = await getDoc(productDoc);
+
+      if (docSnapshot.exists()) {
+        const product = docSnapshot.data() as Product;
+        if (product.location === locationId) {
+          return { id: docSnapshot.id, ...product };
+        }
+      }
+      return null;
     } catch (error) {
-      // Type guard to check if it's a Firebase error
-      if (error instanceof Error && 'code' in error && error.code === 'not-found') {
-        // Create stock record if it doesn't exist
-        await setDoc(stockRef, {
-          productId,
-          locationId,
-          quantity,
+      console.error('Error getting product by ID for location:', error);
+      throw error;
+    }
+  }
+
+  // Add these methods to your ProductsService
+  async getProductStockAtLocation(productId: string, locationId: string): Promise<number> {
+    try {
+      
+      // First check if the product exists and get its primary location
+      const productRef = doc(this.firestore, `products/${productId}`);
+      const productSnap = await getDoc(productRef);
+      
+      if (!productSnap.exists()) {
+        console.error(`Product ${productId} not found`);
+        return 0;
+      }
+      
+      const productData = productSnap.data();
+      
+      // If the product's primary location matches the requested location, return currentStock
+      if (productData['location'] === locationId) {
+        return productData['currentStock'] || 0;
+      }
+      
+      // Check if there's another product with the same name in the requested location
+      const sameProductInLocation = await this.getProductByNameAndLocation(productData['productName'], locationId);
+      if (sameProductInLocation) {
+        return sameProductInLocation.currentStock || 0;
+      }
+      
+      // Otherwise, check the stock subcollection
+      const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
+      const stockSnap = await getDoc(stockRef);
+      
+      if (stockSnap.exists()) {
+        const stockQuantity = stockSnap.data()['quantity'] || 0;
+        return stockQuantity;
+      }
+      
+      return 0;
+    } catch (error) {
+      console.error('Error getting product stock:', error);
+      throw error;
+    }
+  }
+
+  async increaseStock(productId: string, locationId: string, quantity: number): Promise<void> {
+    if (quantity <= 0) {
+      throw new Error('Quantity must be positive');
+    }
+
+    try {
+      
+      // First get the product data to find the product name
+      const sourceProductRef = doc(this.firestore, `products/${productId}`);
+      const sourceProductSnap = await getDoc(sourceProductRef);
+      
+      if (!sourceProductSnap.exists()) {
+        throw new Error(`Product ${productId} not found`);
+      }
+      
+      const sourceProductData = sourceProductSnap.data();
+      const productName = sourceProductData['productName'];
+      
+      
+      // If the product's primary location matches the requested location, update main document
+      if (sourceProductData['location'] === locationId) {
+        await updateDoc(sourceProductRef, {
+          currentStock: increment(quantity),
           lastUpdated: serverTimestamp()
         });
-      } else {
-        throw error;
+
+        // Broadcast stock update
+        this.broadcastProductUpdate(productId, 'stock_increase');
+        
+        return;
       }
-    }
-  } catch (error) {
-    console.error('Error increasing stock:', error);
-    throw error;
-  }
-}
+      
+      // Look for a product with the same name in the destination location
+      const destinationProduct = await this.getProductByNameAndLocation(productName, locationId);
+      
+      if (destinationProduct) {
+        // Update the destination product's stock
+        const destinationProductRef = doc(this.firestore, `products/${destinationProduct.id}`);
+        await updateDoc(destinationProductRef, {
+          currentStock: increment(quantity),
+          lastUpdated: serverTimestamp()
+        });
 
-async decreaseStock(productId: string, locationId: string, quantity: number): Promise<void> {
-  if (quantity <= 0) {
-    throw new Error('Quantity must be positive');
+        // Broadcast stock update
+        this.broadcastProductUpdate(destinationProduct.id, 'stock_increase');
+        return;
+      }
+      
+      // Otherwise, update the stock subcollection
+      const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
+      
+      try {
+        await updateDoc(stockRef, {
+          quantity: increment(quantity),
+          lastUpdated: serverTimestamp()
+        });
+      } catch (error) {
+        // Type guard to check if it's a Firebase error
+        if (error instanceof Error && 'code' in error && error.code === 'not-found') {
+          // Create stock record if it doesn't exist
+          await setDoc(stockRef, {
+            productId,
+            locationId,
+            quantity,
+            lastUpdated: serverTimestamp()
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      // Broadcast stock update
+      this.broadcastProductUpdate(productId, 'stock_increase');
+    } catch (error) {
+      console.error('Error increasing stock:', error);
+      throw error;
+    }
   }
 
-  try {
-    console.log(`=== DecreaseStock DEBUG ===`);
-    console.log(`Product ID: ${productId}, Location ID: ${locationId}, Quantity: ${quantity}`);
-    
-    // First check if the product exists and get its primary location
-    const productRef = doc(this.firestore, `products/${productId}`);
-    const productSnap = await getDoc(productRef);
-    
-    if (!productSnap.exists()) {
-      throw new Error(`Product ${productId} not found`);
+  async decreaseStock(productId: string, locationId: string, quantity: number): Promise<void> {
+    if (quantity <= 0) {
+      throw new Error('Quantity must be positive');
     }
-    
-    const productData = productSnap.data();
-    console.log(`Product location: ${productData['location']}, Current stock: ${productData['currentStock']}`);
-    
-    // If the product's primary location matches the requested location, update main document
-    if (productData['location'] === locationId) {
-      const currentStock = productData['currentStock'] || 0;
+
+    try {
+      console.log(`=== DecreaseStock DEBUG ===`);
+      console.log(`Product ID: ${productId}, Location ID: ${locationId}, Quantity: ${quantity}`);
+      
+      // First check if the product exists and get its primary location
+      const productRef = doc(this.firestore, `products/${productId}`);
+      const productSnap = await getDoc(productRef);
+      
+      if (!productSnap.exists()) {
+        throw new Error(`Product ${productId} not found`);
+      }
+      
+      const productData = productSnap.data();
+      console.log(`Product location: ${productData['location']}, Current stock: ${productData['currentStock']}`);
+      
+      // If the product's primary location matches the requested location, update main document
+      if (productData['location'] === locationId) {
+        const currentStock = productData['currentStock'] || 0;
+        if (currentStock < quantity) {
+          throw new Error(`Insufficient stock. Available: ${currentStock}, Needed: ${quantity}`);
+        }
+        
+        console.log(`Decreasing main document stock from ${currentStock} by ${quantity}`);
+        
+        // Update the main product document
+        await updateDoc(productRef, {
+          currentStock: increment(-quantity),
+          lastUpdated: serverTimestamp()
+        });
+
+        // Broadcast stock update
+        this.broadcastProductUpdate(productId, 'stock_decrease');
+        
+        console.log(`Stock decreased successfully`);
+        return;
+      }
+      
+      console.log(`Product not in requested location, checking subcollection`);
+      
+      // Otherwise, update the stock subcollection
+      const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
+      const stockSnap = await getDoc(stockRef);
+
+      if (!stockSnap.exists()) {
+        throw new Error('No stock record found at source location');
+      }
+
+      const currentStock = stockSnap.data()['quantity'] || 0;
       if (currentStock < quantity) {
         throw new Error(`Insufficient stock. Available: ${currentStock}, Needed: ${quantity}`);
       }
-      
-      console.log(`Decreasing main document stock from ${currentStock} by ${quantity}`);
-      
-      // Update the main product document
-      await updateDoc(productRef, {
-        currentStock: increment(-quantity),
+
+      console.log(`Decreasing subcollection stock from ${currentStock} by ${quantity}`);
+
+      await updateDoc(stockRef, {
+        quantity: increment(-quantity),
         lastUpdated: serverTimestamp()
       });
+
+      // Broadcast stock update
+      this.broadcastProductUpdate(productId, 'stock_decrease');
       
-      console.log(`Stock decreased successfully`);
-      return;
+      console.log(`Subcollection stock decreased successfully`);
+    } catch (error) {
+      console.error('Error decreasing stock:', error);
+      throw error;
     }
-    
-    console.log(`Product not in requested location, checking subcollection`);
-    
-    // Otherwise, update the stock subcollection
-    const stockRef = doc(this.firestore, `products/${productId}/stock/${locationId}`);
-    const stockSnap = await getDoc(stockRef);
-
-    if (!stockSnap.exists()) {
-      throw new Error('No stock record found at source location');
-    }
-
-    const currentStock = stockSnap.data()['quantity'] || 0;
-    if (currentStock < quantity) {
-      throw new Error(`Insufficient stock. Available: ${currentStock}, Needed: ${quantity}`);
-    }
-
-    console.log(`Decreasing subcollection stock from ${currentStock} by ${quantity}`);
-
-    await updateDoc(stockRef, {
-      quantity: increment(-quantity),
-      lastUpdated: serverTimestamp()    });
-    
-    console.log(`Subcollection stock decreased successfully`);
-  } catch (error) {
-    console.error('Error decreasing stock:', error);
-    throw error;
   }
-}
 
   async adjustProductStock(productId: string, locationId: string, quantity: number): Promise<void> {
     try {
@@ -763,6 +849,9 @@ async decreaseStock(productId: string, locationId: string, quantity: number): Pr
           oldValue: currentProduct.currentStock,
           newValue: newStock
         });
+
+        // Broadcast stock update
+        this.broadcastProductUpdate(productId, 'stock_adjustment');
       }
     } catch (error) {
       console.error('Error adjusting product stock:', error);
@@ -770,72 +859,73 @@ async decreaseStock(productId: string, locationId: string, quantity: number): Pr
     }
   }  
 
-// Update the prepareProductData() method in ProductsService:
-private prepareProductData(product: Product): Product {
-  return {
-    ...product,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    location: product.location || '',
-       // Ensure selling prices are properly set
-    unitSellingPrice: Number(product.unitSellingPrice) || null,
-    defaultSellingPriceExcTax: Number(product.defaultSellingPriceExcTax) || 
-                              Number(product.unitSellingPrice) || 
-                              null,
-    hsnCode: product.hsnCode || '',
-    productImage: product.productImage?.name ? product.productImage.name : product.productImage,
-    productBrochure: product.productBrochure?.name || null,
-    alertQuantity: Number(product.alertQuantity) || null,
-        unitPurchasePrice: Number(product.unitPurchasePrice) || null,
-    weight: Number(product.weight) || null,
-    length: Number(product.length) || null,
-        expiryDate: product.expiryDate || null, // Add this line
+  // Update the prepareProductData() method in ProductsService:
+  private prepareProductData(product: Product): Product {
+    return {
+      ...product,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      location: product.location || '',
+      // Ensure selling prices are properly set
+      unitSellingPrice: Number(product.unitSellingPrice) || null,
+      defaultSellingPriceExcTax: Number(product.defaultSellingPriceExcTax) || 
+                                Number(product.unitSellingPrice) || 
+                                null,
+      hsnCode: product.hsnCode || '',
+      productImage: product.productImage?.name ? product.productImage.name : product.productImage,
+      productBrochure: product.productBrochure?.name || null,
+      alertQuantity: Number(product.alertQuantity) || null, // Ensure alertQuantity is properly handled
+      unitPurchasePrice: Number(product.unitPurchasePrice) || null,
+      weight: Number(product.weight) || null,
+      length: Number(product.length) || null,
+      expiryDate: product.expiryDate || null,
+      totalQuantity: Number(product.totalQuantity) || 0,
+      lastNumber: product.lastNumber || '',
+      breadth: Number(product.breadth) || null,
+      height: Number(product.height) || null,
+      defaultPurchasePriceExcTax: Number(product.defaultPurchasePriceExcTax) || null,
+      defaultPurchasePriceIncTax: Number(product.defaultPurchasePriceIncTax) || null,
+      marginPercentage: Number(product.marginPercentage) || 25,
+      defaultSellingPriceIncTax: Number(product.defaultSellingPriceIncTax) || null,
+      taxPercentage: Number(product.taxPercentage) || 0,
+      currentStock: Number(product.currentStock) || 0,
+      components: product.components ? [...product.components] : [],
+      variations: product.variations ? [...product.variations] : []
+    };
+  }  
 
-       totalQuantity: Number(product.totalQuantity) || 0,
-    lastNumber: product.lastNumber || '',
-    breadth: Number(product.breadth) || null,
-    height: Number(product.height) || null,
-    defaultPurchasePriceExcTax: Number(product.defaultPurchasePriceExcTax) || null,
-    defaultPurchasePriceIncTax: Number(product.defaultPurchasePriceIncTax) || null,
-    marginPercentage: Number(product.marginPercentage) || 25,
-    defaultSellingPriceIncTax: Number(product.defaultSellingPriceIncTax) || null,
-    taxPercentage: Number(product.taxPercentage) || 0,
-    currentStock: Number(product.currentStock) || 0,
-    components: product.components ? [...product.components] : [],
-    variations: product.variations ? [...product.variations] : []
-  };
-}  // Add to ProductsService
-getProductStockHistory(productId: string, locationId?: string): Observable<any[]> {
-  let historyQuery;
-  if (locationId) {
-    historyQuery = query(
-      collection(this.firestore, 'product-stock-history'),
-      where('productId', '==', productId),
-      where('locationId', '==', locationId),
-      orderBy('timestamp', 'desc')
-    );
-  } else {
-    historyQuery = query(
-      collection(this.firestore, 'product-stock-history'),
-      where('productId', '==', productId),
-      orderBy('timestamp', 'desc')
-    );
-  }
-  
-  return new Observable<any[]>(observer => {
-    const unsubscribe = onSnapshot(historyQuery, (snapshot) => {
-      const history = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      observer.next(history);
-    }, error => {
-      console.error('Error fetching product stock history:', error);
-      observer.error(error);
+  // Add to ProductsService
+  getProductStockHistory(productId: string, locationId?: string): Observable<any[]> {
+    let historyQuery;
+    if (locationId) {
+      historyQuery = query(
+        collection(this.firestore, 'product-stock-history'),
+        where('productId', '==', productId),
+        where('locationId', '==', locationId),
+        orderBy('timestamp', 'desc')
+      );
+    } else {
+      historyQuery = query(
+        collection(this.firestore, 'product-stock-history'),
+        where('productId', '==', productId),
+        orderBy('timestamp', 'desc')
+      );
+    }
+    
+    return new Observable<any[]>(observer => {
+      const unsubscribe = onSnapshot(historyQuery, (snapshot) => {
+        const history = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        observer.next(history);
+      }, error => {
+        console.error('Error fetching product stock history:', error);
+        observer.error(error);
+      });
+      return unsubscribe;
     });
-    return unsubscribe;
-  });
-}
+  }
 
   // Fetch all products
   async fetchAllProducts(): Promise<Product[]> {
@@ -850,6 +940,7 @@ getProductStockHistory(productId: string, locationId?: string): Observable<any[]
       throw error;
     }
   }
+
   async getProductsByLocation(locationId: string): Promise<Product[]> {
     try {
       const q = query(this.productsCollection, where("location", "==", locationId));
@@ -863,6 +954,7 @@ getProductStockHistory(productId: string, locationId?: string): Observable<any[]
       throw error;
     }
   }
+
   async getLocations(): Promise<any[]> {
     const locationsCollection = collection(this.firestore, 'businessLocations');
     const snapshot = await getDocs(locationsCollection);
@@ -871,6 +963,7 @@ getProductStockHistory(productId: string, locationId?: string): Observable<any[]
       ...doc.data()
     }));
   }
+
   // Get recent product history for all products
   getAllProductsHistory(limitCount: number = 50): Observable<HistoryEntry[]> {
     const historyQuery = query(
@@ -997,6 +1090,9 @@ getProductStockHistory(productId: string, locationId?: string): Observable<any[]
         referenceNo,
         notes
       });
+
+      // Broadcast stock update
+      this.broadcastProductUpdate(productId, 'stock_update');
       
     } catch (error) {
       console.error('Error updating product stock:', error);

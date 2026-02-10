@@ -1,3 +1,5 @@
+// src/app/services/expense.service.ts
+
 import { Injectable } from '@angular/core';
 import {
   Firestore,
@@ -12,7 +14,9 @@ import {
   orderBy,
   DocumentReference,
   getDocs,
-  where
+  where,
+  runTransaction,
+  writeBatch // Import writeBatch
 } from '@angular/fire/firestore';
 import { BehaviorSubject, from, Observable, firstValueFrom } from 'rxjs';
 import { AccountService } from './account.service';
@@ -20,6 +24,8 @@ import { LocationService } from './location.service';
 import { ExpenseCategoriesService } from './expense-categories.service';
 
 export interface Expense {
+  balanceAmount: number;
+  paymentStatus: string;
   id?: string;
   type: 'expense' | 'income';
   businessLocation: string;
@@ -32,7 +38,7 @@ export interface Expense {
   expenseType?: string;
   incomeType?: string;
   taxAmount?: number;
-  taxRate?: string; // Optional: if you want to store the tax rate separately
+  taxRate?: string;
   paymentAmountWithTax?: number;
   accountHead?: string;
   referenceNo: string;
@@ -50,8 +56,7 @@ export interface Expense {
   isRefund?: boolean;
   isRecurring: boolean;
   recurringInterval: string;
-  entryType: 'expense' | 'income' | 'sale' | 'shipment' | 'payroll' | 'purchase'; // Add this
-
+  entryType: 'expense' | 'income' | 'sale' | 'shipment' | 'payroll' | 'purchase';
   repetitions?: number;
   paymentAmount: number;
   paidOn: string;
@@ -61,19 +66,16 @@ export interface Expense {
   paymentNote?: string;
   addedBy?: string;
   addedByDisplayName?: string;
+  source?: 'journal'; // To identify journal-created entries
+  sourceId?: string;   // To store the journal document ID
 }
 
 @Injectable({
   providedIn: 'root'
 })
 export class ExpenseService {
-  deleteIncome(docId: string) {
-    throw new Error('Method not implemented.');
-  }
-  uploadDocument(id: string, selectedFile: File) {
-    throw new Error('Method not implemented.');
-  }
-  
+  // ... (existing properties)
+
   private expensesCollection;
   private incomesCollection;
   private expenses = new BehaviorSubject<Expense[]>([]);
@@ -91,80 +93,199 @@ export class ExpenseService {
     this.listenToIncomes();
   }
 
-  private async resolveDocumentReferences(expenseData: any): Promise<any> {
+  // ... (existing methods like listenToExpenses, getExpenses, addExpense, etc. remain unchanged)
+
+  /**
+   * [NEW] Adds an expense or income record from a journal entry without creating new financial transactions.
+   */
+  async addJournalTransaction(data: Partial<Expense>, type: 'expense' | 'income'): Promise<void> {
+    const collectionRef = type === 'expense' ? this.expensesCollection : this.incomesCollection;
+    const processedData = {
+        ...data,
+        entryType: type,
+        type: type,
+        // Ensure required fields have defaults if not provided
+        isRecurring: data.isRecurring || false,
+        recurringInterval: data.recurringInterval || 'days',
+        applicableTax: data.applicableTax || 'none'
+    };
+    await addDoc(collectionRef, processedData);
+  }
+
+  /**
+   * [NEW] Deletes all expense and income records associated with a specific journal ID.
+   */
+  async deleteJournalTransactions(journalId: string): Promise<void> {
+    const batch = writeBatch(this.firestore);
+
+    // Query and delete from expenses
+    const expensesQuery = query(this.expensesCollection, where('sourceId', '==', journalId));
+    const expenseDocs = await getDocs(expensesQuery);
+    expenseDocs.forEach(doc => batch.delete(doc.ref));
+
+    // Query and delete from incomes
+    const incomesQuery = query(this.incomesCollection, where('sourceId', '==', journalId));
+    const incomeDocs = await getDocs(incomesQuery);
+    incomeDocs.forEach(doc => batch.delete(doc.ref));
+
+    await batch.commit();
+  }
+  
+  // ... (rest of the existing methods in the service)
+  private async resolveDocumentReferences(data: any, type: 'expense' | 'income'): Promise<any> {
+    const resolvedData = { ...data };
+    
+    // Lazy load categories only when needed
+    let allCategories: any[] | null = null;
+    const getCategories = async () => {
+        if (allCategories === null) {
+            allCategories = await firstValueFrom(this.expenseCategoriesService.getCategories());
+        }
+        return allCategories;
+    };
+
+    if (type === 'expense' && resolvedData.expenseCategory) {
+        const categories = await getCategories();
+        const category = categories.find(cat => cat.id === resolvedData.expenseCategory);
+        resolvedData.expenseCategoryName = category?.categoryName || 'Unknown Category';
+        resolvedData.expenseType = category?.type || 'Expense';
+    } else if (type === 'income' && resolvedData.incomeCategory) {
+        const categories = await getCategories();
+        const category = categories.find(cat => cat.id === resolvedData.incomeCategory);
+        resolvedData.incomeCategoryName = category?.categoryName || 'Unknown Category';
+        resolvedData.incomeType = category?.type || 'Income';
+    }
+
+    // Resolve other references as before...
+    if (resolvedData.businessLocation) {
+        const locations = await firstValueFrom(this.locationService.getLocations());
+        const location = locations.find(loc => loc.id === resolvedData.businessLocation);
+        resolvedData.businessLocationName = location?.name || '';
+    }
+
+    if (resolvedData.paymentAccount) {
+        const account = await this.accountService.getAccountById(resolvedData.paymentAccount);
+        const accountData = account instanceof Observable ? await firstValueFrom(account) : account;
+        resolvedData.paymentAccountName = accountData?.name || '';
+    }
+
+    return resolvedData;
+  }
+
+  private listenToExpenses(): void {
+    const q = query(this.expensesCollection, orderBy('date', 'desc'));
+
+    onSnapshot(q, async (snapshot) => {
+      const expensesPromises = snapshot.docs.map(doc => 
+        this.resolveDocumentReferences({ id: doc.id, ...doc.data() }, 'expense')
+      );
+      const resolvedExpenses = await Promise.all(expensesPromises);
+      this.expenses.next(resolvedExpenses);
+    });
+  }
+
+  private listenToIncomes(): void {
+    const q = query(this.incomesCollection, orderBy('date', 'desc'));
+
+    onSnapshot(q, async (snapshot) => {
+        const incomesPromises = snapshot.docs.map(doc => 
+            this.resolveDocumentReferences({ id: doc.id, ...doc.data() }, 'income')
+        );
+        const resolvedIncomes = await Promise.all(incomesPromises);
+        this.incomes.next(resolvedIncomes);
+    });
+  }
+
+  getExpenses() {
+    return this.expenses.asObservable();
+  }
+
+  getIncomes() {
+    return this.incomes.asObservable();
+  }
+
+  async addExpense(expenseData: any): Promise<DocumentReference> {
+    const accountId = expenseData.paymentAccount;
+    const expenseAmount = Number(expenseData.paymentAmount) || 0;
+
+    // If there's no payment involved, just save the expense record.
+    if (!accountId || expenseAmount <= 0) {
+      return await addDoc(this.expensesCollection, { ...expenseData, entryType: 'expense' });
+    }
+
     try {
-      // Resolve business location name
-      if (expenseData.businessLocation) {
-        try {
-          const locations = await firstValueFrom(this.locationService.getLocations());
-          const location = locations.find(loc => loc.id === expenseData.businessLocation);
-          expenseData.businessLocationName = location?.name || '';
-        } catch (error) {
-          console.warn('Error resolving business location:', error);
-          expenseData.businessLocationName = '';
+      // Use Firestore's `runTransaction` to ensure the balance check and write operations are atomic.
+      const expenseDocRef = await runTransaction(this.firestore, async (transaction) => {
+        
+        // 1. Get the TRUE current balance using the reliable service method.
+        const currentBalance = await this.accountService.getCalculatedBalance(accountId);
+
+        // 2. Perform the critical balance check.
+        if (currentBalance < expenseAmount) {
+          // This is a safe failure. The transaction will abort.
+          throw new Error(`Insufficient balance in account. Current: ₹${currentBalance.toFixed(2)}, Required: ₹${expenseAmount.toFixed(2)}`);
         }
-      }
 
-      // Resolve expense category name
-      if (expenseData.expenseCategory) {
-        try {
-          const categories = await firstValueFrom(this.expenseCategoriesService.getCategories());
-          const category = categories.find(cat => cat.id === expenseData.expenseCategory);
-          expenseData.expenseCategoryName = category?.categoryName || '';
-          expenseData.expenseType = category?.type || '';
-        } catch (error) {
-          console.warn('Error resolving expense category:', error);
-          expenseData.expenseCategoryName = '';
-          expenseData.expenseType = '';
-        }
-      }
+        // 3. If the balance is sufficient, proceed to create the documents within the transaction.
+        const newExpenseRef = doc(collection(this.firestore, 'expenses'));
+        const newTransactionRef = doc(collection(this.firestore, 'transactions'));
+        
+        // Create the expense document
+        transaction.set(newExpenseRef, {
+            ...expenseData,
+            entryType: 'expense',
+            referenceNo: expenseData.referenceNo || this.generateReferenceNumber('EXP')
+        });
 
-      // Resolve income category name
-      if (expenseData.incomeCategory) {
-        try {
-          const categories = await firstValueFrom(this.expenseCategoriesService.getCategories());
-          const category = categories.find(cat => cat.id === expenseData.incomeCategory);
-          expenseData.incomeCategoryName = category?.categoryName || '';
-          expenseData.incomeType = category?.type || '';
-        } catch (error) {
-          console.warn('Error resolving income category:', error);
-          expenseData.incomeCategoryName = '';
-          expenseData.incomeType = '';
-        }
-      }
+        // Create the corresponding financial transaction document (the debit)
+        transaction.set(newTransactionRef, {
+            accountId: accountId,
+            date: expenseData.paidOn || new Date(),
+            createdAt: new Date(),
+            description: `Expense: ${expenseData.expenseCategoryName || 'N/A'} - ${expenseData.expenseNote || ''}`,
+            paymentMethod: expenseData.paymentMethod,
+            debit: expenseAmount,
+            credit: 0,
+            amount: expenseAmount,
+            reference: expenseData.referenceNo,
+            relatedDocId: newExpenseRef.id,
+            type: 'expense'
+        });
 
-      // Resolve payment account name
-      if (expenseData.paymentAccount) {
-        try {
-          const account = await this.accountService.getAccountById(expenseData.paymentAccount);
-          // Assuming getAccountById returns a Promise or Observable, handle accordingly
-          if (account) {
-            // If it's an Observable, convert to Promise
-            const accountData = account instanceof Observable ? await firstValueFrom(account) : account;
-            expenseData.paymentAccountName = accountData?.name || '';
-          } else {
-            expenseData.paymentAccountName = '';
-          }
-        } catch (error) {
-          console.warn('Error resolving payment account:', error);
-          expenseData.paymentAccountName = '';
-        }
-      }
+        return newExpenseRef; // Return the reference from the transaction
+      });
 
-      // Resolve expense for contact name (if applicable)
-      if (expenseData.expenseForContact) {
-        // You'll need to implement this based on how you store contacts
-        // expenseData.expenseForContactName = await this.getContactName(expenseData.expenseForContact);
-      }
+      return expenseDocRef;
 
-      return expenseData;
     } catch (error) {
-      console.error('Error in resolveDocumentReferences:', error);
-      return expenseData;
+        console.error('Error in addExpense transaction:', error);
+        // Re-throw the error so the component can catch it and show it to the user.
+        throw error;
     }
   }
+  async addIncome(incomeData: any): Promise<DocumentReference> {
+      const processedData = {
+          ...incomeData,
+          taxAmount: Number(incomeData.taxAmount) || 0,
+          entryType: 'income'
+      };
+      const docRef = await addDoc(this.incomesCollection, processedData);
+      if (processedData.paymentAccount && processedData.paymentAmount) {
+          await this.updateAccountBalance(processedData.paymentAccount, processedData.paymentAmount, docRef.id, 'income', processedData);
+      }
+      return docRef;
+  }
+
+  // No changes needed for the rest of the file...
+  // ... (deleteExpense, updateTransaction, getExpenseById, etc. remain the same)
+  deleteIncome(docId: string) {
+    throw new Error('Method not implemented.');
+  }
+  uploadDocument(id: string, selectedFile: File) {
+    throw new Error('Method not implemented.');
+  }
+
 private async processIncomeData(incomeData: any): Promise<any> {
-    // Generate reference number if not provided
     if (!incomeData.referenceNo) {
       incomeData.referenceNo = this.generateReferenceNumber('INC');
     }
@@ -184,14 +305,12 @@ private async processIncomeData(incomeData: any): Promise<any> {
     };
   }  private async recordIncomeTransaction(incomeData: any, docId: string): Promise<void> {
     try {
-      // Only update account balance - this will create the transaction
       await this.updateAccountBalance(
         incomeData.paymentAccount, 
         incomeData.paymentAmount,
         docId,
         'income',
         incomeData
-        // Don't pass isUpdateOperation parameter, defaults to false which creates the transaction
       );
     } catch (error) {
       console.error('Error recording income transaction:', error);
@@ -199,19 +318,15 @@ private async processIncomeData(incomeData: any): Promise<any> {
     }
   }
   private async processExpenseForStorage(expenseData: any): Promise<any> {
-    // Convert to storage format (keep only IDs for references)
     const storageData = {
       ...expenseData,
-      businessLocation: expenseData.businessLocation, // Keep ID
-      expenseCategory: expenseData.expenseCategory, // Keep ID
-      incomeCategory: expenseData.incomeCategory, // Keep ID
-      paymentAccount: expenseData.paymentAccount, // Keep ID
-      expenseForContact: expenseData.expenseForContact, // Keep ID
+      businessLocation: expenseData.businessLocation,
+      expenseCategory: expenseData.expenseCategory,
+      incomeCategory: expenseData.incomeCategory,
+      paymentAccount: expenseData.paymentAccount,
+      expenseForContact: expenseData.expenseForContact,
           taxAmount: Number(expenseData.taxAmount) || 0,
-
     };
-
-    // Remove resolved names (they'll be resolved when read)
     delete storageData.businessLocationName;
     delete storageData.expenseCategoryName;
     delete storageData.incomeCategoryName;
@@ -220,56 +335,6 @@ private async processIncomeData(incomeData: any): Promise<any> {
 
     return storageData;
   }
-
-private listenToExpenses(): void {
-  const q = query(this.expensesCollection, orderBy('date', 'desc'));
-
-  onSnapshot(q, async (snapshot) => {
-    const expenses = await Promise.all(snapshot.docs.map(async doc => {
-      const expenseData = doc.data() as Expense;
-
-      // Pass only necessary fields to resolveDocumentReferences
-      const resolvedData = await this.resolveDocumentReferences({
-        id: doc.id,
-        ...expenseData
-      });
-
-      // Return final expense object with type and entryType set
-      return {
-        ...resolvedData,
-        type: 'expense' as const,
-        entryType: 'expense' as const
-      };
-    }));
-
-    // Update the observable/subject with the new expenses list
-    this.expenses.next(expenses);
-  });
-}
-
-private listenToIncomes(): void {
-  const q = query(this.incomesCollection, orderBy('date', 'desc'));
-
-  onSnapshot(q, async (snapshot) => {
-    const incomes = await Promise.all(snapshot.docs.map(async doc => {
-      const incomeData = doc.data() as Expense;
-
-      // Don't include entryType here to avoid overwrite conflicts
-      const resolvedData = await this.resolveDocumentReferences({
-        id: doc.id,
-        ...incomeData
-      });
-
-      return {
-        ...resolvedData,
-        type: 'income' as const,
-        entryType: 'income' as const
-      };
-    }));
-
-    this.incomes.next(incomes);
-  });
-}
 
   async getExpensesByDateRange(startDate: Date, endDate: Date): Promise<any[]> {
     const expensesCollection = collection(this.firestore, 'expenses');
@@ -285,7 +350,7 @@ private listenToIncomes(): void {
       const resolvedData = await this.resolveDocumentReferences({
         id: doc.id,
         ...expenseData
-      });
+      }, 'expense');
       return resolvedData;
     }));
   }
@@ -304,7 +369,7 @@ private listenToIncomes(): void {
       const resolvedData = await this.resolveDocumentReferences({
         id: doc.id,
         ...incomeData
-      });
+      }, 'income');
       return resolvedData;
     }));
   }
@@ -318,118 +383,10 @@ private listenToIncomes(): void {
     return `${prefix}-${year}${month}${day}-${random}`;
   }
 
-  async addExpense(expenseData: any): Promise<DocumentReference> {
-    try {
-      // Check if already processed
-      if (expenseData._processed) {
-        console.warn('This expense has already been processed');
-        throw new Error('Expense already processed');
-      }
-      
-      // Mark as processed to prevent duplicate processing
-      expenseData._processed = true;
-
-      // Process the expense data for storage
-      const storageData = await this.processExpenseForStorage(expenseData);
-      
-      // Generate reference number if not provided
-      if (!storageData.referenceNo) {
-        storageData.referenceNo = this.generateReferenceNumber('EXP');
-      }
-
-// In your addExpense method, modify the expense object creation:
-const expense: Expense = {
-  type: 'expense',
-  businessLocation: storageData.businessLocation,
-  expenseCategory: storageData.expenseCategory,
-  expenseCategoryName: storageData.expenseCategoryName || '', // Add category name
-  subCategory: storageData.subCategory,
-  expenseType: storageData.expenseType || '', // Get from resolved data
-  accountHead: storageData.accountHead,
-  referenceNo: storageData.referenceNo,
-  date: storageData.date,
-  applicableTax: storageData.applicableTax,
-      taxAmount: Number(expenseData.taxAmount) || 0, 
-  expenseFor: storageData.expenseFor,
-  entryType: 'expense',
-  expenseForContact: storageData.expenseForContact,
-  document: storageData.document,
-
-
-  totalAmount: Number(storageData.totalAmount),
-  expenseNote: storageData.expenseNote,
-  isRefund: storageData.isRefund || false,
-  isRecurring: storageData.isRecurring || false,
-  recurringInterval: storageData.recurringInterval || 'Days',
-  repetitions: storageData.repetitions,
-  paymentAmount: Number(storageData.paymentAmount),
-  paidOn: storageData.paidOn,
-  paymentMethod: storageData.paymentMethod,
-  paymentAccount: storageData.paymentAccount,
-  paymentNote: storageData.paymentNote,
-  addedBy: storageData.addedBy,
-  addedByDisplayName: storageData.addedByDisplayName
-};
-
-console.log('Adding expense to Firestore:', expense);
-    const docRef = await addDoc(this.expensesCollection, expense);
-      console.log('Adding expense to Firestore:', expense);
-      console.log('Expense added successfully with ID:', docRef.id);      // Record transaction in account book if payment account exists
-      if (expense.paymentAccount && expense.paymentAmount) {
-        // Only update account balance - this will create the transaction
-        await this.updateAccountBalance(
-          expense.paymentAccount, 
-          -expense.paymentAmount,
-          docRef.id,
-          'expense',
-          expense
-          // Don't pass isUpdateOperation parameter, defaults to false which creates the transaction
-        );
-      }
-      
-      return docRef;
-    } catch (error) {
-      console.error('Error adding expense:', error);
-      // Clean up the _processed flag if there was an error
-      if (expenseData) expenseData._processed = false;
-      throw error;
-    }
-  }
-
-   async addIncome(incomeData: any): Promise<string> {
-    try {
-      // Process and validate income data
-      const processedData = await this.processIncomeData(incomeData);
-      
-      // Add to Firestore
-      const docRef = await addDoc(this.incomesCollection, processedData);
-      
-      // Record transaction if payment account exists
-      if (processedData.paymentAccount && processedData.paymentAmount) {
-        await this.recordIncomeTransaction(processedData, docRef.id);
-      }
-      
-      return docRef.id;
-    } catch (error) {
-      console.error('Error adding income:', error);
-      throw error;
-    }
-  }
-
-
-  getExpenses() {
-    return this.expenses.asObservable();
-  }
-
-  getIncomes() {
-    return this.incomes.asObservable();
-  }
-
   getAllTransactions(): Observable<Expense[]> {
     return new BehaviorSubject([...this.expenses.value, ...this.incomes.value]).asObservable();
   }
   
-
   public async updateAccountBalance(
     accountId: string,
     amount: number,
@@ -456,45 +413,33 @@ console.log('Adding expense to Firestore:', expense);
       let newBalance = currentBalance;
       const absoluteAmount = Math.abs(amount);
 
-      // Handle balance update based on transaction type
       if (type === 'expense') {
-        // For expenses, subtract from balance
         newBalance = currentBalance - absoluteAmount;
-        
-        // Check for negative balance
         if (newBalance < 0) {
           throw new Error(`Insufficient balance in account ${accountId}`);
         }
       } else if (type === 'income') {
-        // For incomes, add to balance
         newBalance = currentBalance + absoluteAmount;
       } else {
         throw new Error(`Invalid transaction type: ${type}`);
       }
-
-      // Update the account balance
       await updateDoc(accountDocRef, {
         openingBalance: newBalance
       });
-
-      // Only record a new transaction if this isn't part of an update operation
       if (!isUpdateOperation) {
         const transactionsRef = collection(this.firestore, 'transactions');
-          // Get category name for better description and category field
         let categoryName = '';
         if (type === 'expense' && transactionData.expenseCategory) {
-          // Try to get category name from the expense categories
           categoryName = transactionData.expenseCategoryName || transactionData.expenseCategory;
         } else if (type === 'income' && transactionData.incomeCategory) {
-          // Try to get category name from the income categories
           categoryName = transactionData.incomeCategoryName || transactionData.incomeCategory;
         }
 
         const transactionDataToSave = {
           accountId: accountId,
           date: transactionData.paidOn || new Date().toISOString(),
-          createdAt: new Date(), // Add createdAt timestamp
-          category: categoryName || '', // Add category field
+          createdAt: new Date(),
+          category: categoryName || '',
           description: type === 'expense' ? 
             `Expense: ${categoryName} - ${transactionData.expenseNote || 'No description'}` :
             `Income: ${categoryName} - ${transactionData.incomeNote || 'No description'}`,
@@ -504,11 +449,11 @@ console.log('Adding expense to Firestore:', expense);
           addedBy: transactionData.addedByDisplayName || transactionData.addedBy || 'System',
           debit: type === 'expense' ? absoluteAmount : 0,
           credit: type === 'income' ? absoluteAmount : 0,
-          amount: absoluteAmount, // Add amount field for consistency
-          reference: transactionData.referenceNo || transactionId, // Add reference field
+          amount: absoluteAmount,
+          reference: transactionData.referenceNo || transactionId,
           type: type,
           referenceId: transactionId,
-          relatedDocId: transactionId, // Add relatedDocId field
+          relatedDocId: transactionId,
           hasDocument: !!transactionData.document,
           attachmentUrl: transactionData.document || '',
           previousBalance: currentBalance,
@@ -543,6 +488,7 @@ console.log('Adding expense to Firestore:', expense);
     }
   }
 
+// In expense.service.ts - Replace the existing updateTransaction method
 async updateTransaction(
   id: string,
   updatedTransaction: Partial<Expense>,
@@ -558,8 +504,7 @@ async updateTransaction(
 
     const originalData = originalDoc.data() as Expense;
     const newType = updatedTransaction.type || originalType;
-
-    // Reverse the original transaction from account balance
+    
     if (originalData.paymentAccount && originalData.paymentAmount !== undefined) {
       const reverseAmount =
         originalType === 'expense' ? originalData.paymentAmount : -originalData.paymentAmount;
@@ -575,7 +520,6 @@ async updateTransaction(
     }
 
     if (originalType !== newType) {
-      // Delete original and create new transaction
       await deleteDoc(doc(this.firestore, originalType === 'expense' ? 'expenses' : 'incomes', id));
 
       const paymentAmount = updatedTransaction.paymentAmount ?? originalData.paymentAmount ?? 0;
@@ -592,7 +536,7 @@ async updateTransaction(
       if (newType === 'expense') {
         docRef = await this.addExpense(transactionToAdd);
       } else {
-        docRef = await this.addIncome(transactionToAdd);
+        docRef = await this.addIncome(transactionToAdd as any);
       }
 
       const newDocId = typeof docRef === 'string' ? docRef : (docRef as DocumentReference).id;
@@ -608,30 +552,38 @@ async updateTransaction(
         );
       }
     } else {
-      // Same type: update directly
       const processedUpdate = await this.processExpenseForStorage(updatedTransaction);
-
       const paymentAmount = processedUpdate.paymentAmount ?? originalData.paymentAmount;
-      const finalTransaction = {
+      
+      // Remove undefined values to prevent Firestore errors
+      const updateData = {
         ...processedUpdate,
         entryType: newType,
         paymentAmount
       };
-
+      
+      // Create a clean object with proper typing for Firestore
+      const cleanedUpdate: { [key: string]: any } = {};
+      Object.entries(updateData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanedUpdate[key] = value;
+        }
+      });
+      
       await updateDoc(
         doc(this.firestore, originalType === 'expense' ? 'expenses' : 'incomes', id),
-        finalTransaction
+        cleanedUpdate
       );
 
-      if (finalTransaction.paymentAccount && paymentAmount !== undefined) {
+      if (cleanedUpdate['paymentAccount'] && paymentAmount !== undefined) {
         const newAmount = newType === 'expense' ? -paymentAmount : paymentAmount;
 
         await this.updateAccountBalance(
-          finalTransaction.paymentAccount,
+          cleanedUpdate['paymentAccount'] as string,
           newAmount,
           id,
           newType,
-          finalTransaction
+          cleanedUpdate
         );
       }
     }
@@ -640,7 +592,6 @@ async updateTransaction(
     throw error;
   }
 }
-
   async getExpenseById(id: string): Promise<Expense | null> {
     try {
       const snapshot = await getDoc(doc(this.firestore, 'expenses', id));
@@ -649,7 +600,7 @@ async updateTransaction(
         const resolvedData = await this.resolveDocumentReferences({
           id: snapshot.id,
           ...expenseData
-        });
+        }, 'expense');
         return { 
           ...resolvedData,
           type: 'expense' as const
@@ -670,7 +621,7 @@ async updateTransaction(
         const resolvedData = await this.resolveDocumentReferences({
           id: snapshot.id,
           ...incomeData
-        });
+        }, 'income');
         return { 
           ...resolvedData,
           type: 'income' as const
@@ -686,8 +637,6 @@ async updateTransaction(
   getExpenseByIdObservable(id: string): Observable<Expense | null> {
     return from(this.getExpenseById(id));
   }
-
-  // Add this method to your ExpenseService class
   getExpensesByAccount(accountId: string, callback: (expenses: Expense[]) => void): () => void {
     const q = query(
       this.expensesCollection, 
@@ -701,7 +650,7 @@ async updateTransaction(
         const resolvedData = await this.resolveDocumentReferences({
           id: doc.id,
           ...expenseData
-        });
+        }, 'expense');
         return {
           ...resolvedData,
           type: 'expense' as const
@@ -713,7 +662,6 @@ async updateTransaction(
     return unsubscribe;
   }
 
-  // Similarly, add this method for incomes by account
   getIncomesByAccount(accountId: string, callback: (incomes: Expense[]) => void): () => void {
     const q = query(
       this.incomesCollection, 
@@ -727,7 +675,7 @@ async updateTransaction(
         const resolvedData = await this.resolveDocumentReferences({
           id: doc.id,
           ...incomeData
-        });
+        }, 'income');
         return {
           ...resolvedData,
           type: 'income' as const
@@ -738,16 +686,163 @@ async updateTransaction(
     
     return unsubscribe;
   }
+  // src/app/services/expense.service.ts
 
-  async getTransactionById(id: string, type: 'expense' | 'income'): Promise<Expense | null> {
-    if (type === 'expense') {
-      return this.getExpenseById(id);
-    } else {
-      return this.getIncomeById(id);
-    }
+// Add this new method inside the ExpenseService class
+  
+  async getAggregatedTotalsByDateRange(startDate: Date, endDate: Date): Promise<{
+    directExpense: number;
+    indirectExpense: number;
+    operationalExpense: number;
+    otherPurchases: number; // You may need to define this category
+    directIncome: number;
+    indirectIncome: number;
+  }> {
+    const totals = {
+      directExpense: 0,
+      indirectExpense: 0,
+      operationalExpense: 0,
+      otherPurchases: 0,
+      directIncome: 0,
+      indirectIncome: 0,
+    };
+
+    // Format dates to strings for querying, assuming 'YYYY-MM-DD' format in Firestore
+    const startDateString = startDate.toISOString().split('T')[0];
+    const endDateString = endDate.toISOString().split('T')[0];
+
+    // Query Expenses
+    const expenseQuery = query(
+      this.expensesCollection,
+      where('date', '>=', startDateString),
+      where('date', '<=', endDateString)
+    );
+    const expenseSnapshot = await getDocs(expenseQuery);
+    expenseSnapshot.forEach(doc => {
+      const data = doc.data();
+      const amount = Number(data['totalAmount']) || 0;
+      switch (data['accountHead']) {
+        case 'Expense|Direct Expense':
+          totals.directExpense += amount;
+          break;
+        case 'Expense|Indirect Expense':
+          totals.indirectExpense += amount;
+          break;
+        case 'Expense|Operational Expenses': // Ensure this matches your category value
+          totals.operationalExpense += amount;
+          break;
+        // Add other expense cases as needed
+      }
+    });
+
+    // Query Incomes
+    const incomeQuery = query(
+      this.incomesCollection,
+      where('date', '>=', startDateString),
+      where('date', '<=', endDateString)
+    );
+    const incomeSnapshot = await getDocs(incomeQuery);
+    incomeSnapshot.forEach(doc => {
+      const data = doc.data();
+      const amount = Number(data['totalAmount']) || 0;
+      switch (data['accountHead']) {
+        case 'Income|Direct Income':
+          totals.directIncome += amount;
+          break;
+        case 'Income|Indirect Income':
+          totals.indirectIncome += amount;
+          break;
+        // Add other income cases as needed
+      }
+    });
+
+    return totals;
   }
+ async processPartialPayment(
+    id: string,
+    type: 'expense' | 'income',
+    paymentData: {
+      paymentAmount: number;
+      paymentDate: string;
+      paymentMethod: string;
+      paymentAccount: string;
+      paymentNote?: string;
+    }
+  ): Promise<void> {
+    const expenseDocRef = doc(this.firestore, type === 'expense' ? 'expenses' : 'incomes', id);
+    const accountDocRef = doc(this.firestore, 'accounts', paymentData.paymentAccount);
 
-  getTransactionByIdObservable(id: string, type: 'expense' | 'income'): Observable<Expense | null> {
-    return from(this.getTransactionById(id, type));
+    try {
+      await runTransaction(this.firestore, async (transaction) => {
+        // Step 1: Get the current state of the expense and account documents atomically.
+        const expenseDoc = await transaction.get(expenseDocRef);
+        const accountDoc = await transaction.get(accountDocRef);
+
+        if (!expenseDoc.exists()) {
+          throw new Error(`${type} not found.`);
+        }
+        if (!accountDoc.exists()) {
+          throw new Error('Payment account not found.');
+        }
+
+        const expenseData = expenseDoc.data() as Expense;
+        const accountData = accountDoc.data();
+
+        // Step 2: Perform the critical balance checks.
+        const currentPaidAmount = expenseData.paymentAmount || 0;
+        const totalAmount = (expenseData as any).finalAmount || expenseData.totalAmount || 0;
+        const remainingBalanceDue = totalAmount - currentPaidAmount;
+        const accountBalance = accountData['currentBalance'] || 0;
+
+        // Check 2a: Ensure payment does not exceed the amount due.
+        if (paymentData.paymentAmount > remainingBalanceDue) {
+          throw new Error(`Payment amount (₹${paymentData.paymentAmount.toFixed(2)}) exceeds the remaining balance due (₹${remainingBalanceDue.toFixed(2)}).`);
+        }
+        
+        // Check 2b: Ensure the selected account has sufficient funds.
+        if (type === 'expense' && accountBalance < paymentData.paymentAmount) {
+          throw new Error(`Insufficient funds in ${accountData['name']}. Available: ₹${accountBalance.toFixed(2)}, Required: ₹${paymentData.paymentAmount.toFixed(2)}`);
+        }
+        
+        // Step 3: Prepare the updates.
+        const newPaidAmount = currentPaidAmount + paymentData.paymentAmount;
+        const newBalanceAmount = totalAmount - newPaidAmount;
+        const newPaymentStatus = newBalanceAmount <= 0 ? 'Paid' : 'Partial';
+
+        // Step 4: Queue up all write operations for the transaction.
+        // Action 4a: Update the expense document.
+        transaction.update(expenseDocRef, {
+          paymentAmount: newPaidAmount,
+          balanceAmount: newBalanceAmount,
+          paymentStatus: newPaymentStatus
+        });
+        
+        // Action 4b: Update the account balance.
+        const newAccountBalance = type === 'expense' 
+            ? accountBalance - paymentData.paymentAmount 
+            : accountBalance + paymentData.paymentAmount;
+        transaction.update(accountDocRef, { currentBalance: newAccountBalance });
+
+        // Action 4c: Create a corresponding debit/credit transaction record.
+        const newTransactionRef = doc(collection(this.firestore, 'transactions'));
+        transaction.set(newTransactionRef, {
+          accountId: paymentData.paymentAccount,
+          date: new Date(paymentData.paymentDate),
+          description: `Payment for ${type} #${expenseData.referenceNo}`,
+          paymentMethod: paymentData.paymentMethod,
+          debit: type === 'expense' ? paymentData.paymentAmount : 0,
+          credit: type === 'income' ? paymentData.paymentAmount : 0,
+          amount: paymentData.paymentAmount,
+          reference: expenseData.referenceNo,
+          relatedDocId: id,
+          type: type,
+          createdAt: new Date(),
+        });
+      });
+    } catch (error) {
+      console.error('Error processing partial payment transaction:', error);
+      // Re-throw the error so the component can catch and display it.
+      throw error;
+    }
   }
 }

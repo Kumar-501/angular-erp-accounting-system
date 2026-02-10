@@ -1,0 +1,492 @@
+<!-- Main container that displays only when customer data is available -->
+<div class="view-contact-container" *ngIf="customer$ | async as customer; else loading">
+  
+  <!-- Page Header -->
+  <div class="page-header">
+    <h1>View Contact</h1>
+  </div>
+
+  <!-- Customer Information Card -->
+  <div class="contact-card">
+    <div class="contact-info">
+      <h2>
+        <i class="fa fa-user"></i> 
+        {{ customer.businessName || (customer.firstName + ' ' + customer.lastName) }}
+        <span class="customer-tag">{{ customer.contactType }}</span>
+      </h2>
+      
+      <div class="info-grid">
+        <div class="info-item">
+          <i class="fa fa-map-marker-alt"></i>
+          <div>
+            <strong>Address</strong>
+            <span>{{ getFullAddress(customer) }}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <i class="fa fa-mobile-alt"></i>
+          <div>
+            <strong>Mobile</strong>
+            <span>{{ customer.mobile }}</span>
+          </div>
+        </div>
+        <div class="info-item">
+          <i class="fa fa-calendar-alt"></i>
+          <div>
+            <strong>Added On</strong>
+            <span>{{ customer.createdAt | date:'dd-MM-yyyy ' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="contact-actions">
+        <!-- QR Code and other actions can be placed here if needed in the future -->
+    </div>
+  </div>
+
+  <!-- Tab Navigation and Content -->
+  <div class="details-tabs">
+    <ul class="nav-tabs">
+      <li [class.active]="activeTab === 'ledger'" (click)="switchTab('ledger')">
+        <i class="fa fa-book"></i> Ledger
+      </li>
+      <li [class.active]="activeTab === 'sales'" (click)="switchTab('sales')">
+        <i class="fa fa-chart-line"></i> Sales
+      </li>
+      <li [class.active]="activeTab === 'documents'" (click)="switchTab('documents')">
+        <i class="fa fa-file-alt"></i> Documents & Note
+      </li>
+      <li [class.active]="activeTab === 'payments'" (click)="switchTab('payments')">
+        <i class="fa fa-credit-card"></i> Payments
+      </li>
+      <li [class.active]="activeTab === 'activities'" (click)="switchTab('activities')">
+        <i class="fa fa-tasks"></i> Activities
+      </li>
+    </ul>
+    
+    <!-- Ledger Tab Content -->
+    <div class="tab-content" *ngIf="activeTab === 'ledger'">
+      <div class="date-range-bar">
+        <label for="startDate">From:</label>
+        <input type="date" id="startDate" [(ngModel)]="dateRange.startDate" (change)="updateDateRange()">
+        
+        <label for="endDate">To:</label>
+        <input type="date" id="endDate" [(ngModel)]="dateRange.endDate" (change)="updateDateRange()">
+      </div>
+
+      <div class="ledger-summary">
+        <div class="billing-address">
+          <div class="summary-header">To:</div>
+          <address>
+            <strong>{{ customer.businessName || (customer.firstName + ' ' + customer.lastName) }}</strong><br>
+            {{ getFullAddress(customer) }}<br>
+            Mobile: {{ customer.mobile }}
+          </address>
+        </div>
+        <div class="account-summary">
+          <div class="summary-header">Account Summary</div>
+          <div class="summary-body">
+            <div class="summary-item">
+              <span>Opening Balance</span>
+              <span>{{ formatCurrency(accountSummary.openingBalance) }}</span>
+            </div>
+            <div class="summary-item">
+              <span>Total Invoice</span>
+              <span>{{ formatCurrency(accountSummary.totalInvoice) }}</span>
+            </div>
+            <div class="summary-item">
+              <span>Total Paid</span>
+              <span>{{ formatCurrency(accountSummary.totalPaid) }}</span>
+            </div>
+            <div class="summary-item">
+              <span>Advance Balance</span>
+              <span>{{ formatCurrency(accountSummary.advanceBalance) }}</span>
+            </div>
+            <hr>
+            <div class="summary-item total">
+              <strong>Balance Due</strong>
+              <strong>{{ formatCurrency(accountSummary.balanceDue) }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="ledger-table-container">
+        <p class="table-info">
+          Showing all invoices and payments between {{ dateRange.startDate | date:'dd/MM/yyyy' }} and {{ dateRange.endDate | date:'dd/MM/yyyy' }}
+        </p>
+        <table class="ledger-table table table-striped">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference No</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Payment Status</th>
+              <th class="text-right">Credit</th>
+              <th class="text-right">Debit</th>
+              <th class="text-right">Balance</th>
+              <th>Payment Method</th>
+              <th>Others</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let entry of ledgerEntries">
+              <td>{{ entry.date }}</td>
+              <td>
+                <a *ngIf="entry.saleId" (click)="viewSaleDetails(entry.saleId)" 
+                   class="text-primary cursor-pointer">{{ entry.ref }}</a>
+                <span *ngIf="!entry.saleId">{{ entry.ref }}</span>
+              </td>
+              <td>{{ entry.type }}</td>
+              <td>{{ entry.location }}</td>
+              <td>
+                <span [ngClass]="getPaymentStatusBadgeClass(entry.status)" 
+                      *ngIf="entry.status">{{ entry.status }}</span>
+              </td>
+              <td class="text-right">{{ formatCurrency(entry.credit) }}</td>
+              <td class="text-right">{{ formatCurrency(entry.debit) }}</td>
+              <td class="text-right">{{ formatCurrency(entry.balance) }}</td>
+              <td>{{ entry.method }}</td>
+              <td>{{ entry.others }}</td>
+            </tr>
+            <tr *ngIf="ledgerEntries.length === 0">
+              <td colspan="10" class="text-center">No ledger entries found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sales Tab Content -->
+    <div class="tab-content" *ngIf="activeTab === 'sales'">
+      <div class="sales-header">
+        <h3>Customer Sales History</h3>
+        <div class="sales-stats">
+          <div class="stat-card">
+            <div class="stat-value">{{ customerSales.length }}</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ formatCurrency(accountSummary.totalInvoice) }}</div>
+            <div class="stat-label">Total Sales</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ formatCurrency(accountSummary.balanceDue) }}</div>
+            <div class="stat-label">Outstanding</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="sales-table-container">
+        <table class="sales-table table table-striped">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Invoice No</th>
+              <th>Order No</th>
+              <th>Status</th>
+              <th>Payment Status</th>
+              <th>Shipping Status</th>
+              <th>Products</th>
+              <th class="text-right">Total Amount</th>
+              <th class="text-right">Paid Amount</th>
+              <th class="text-right">Balance</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let sale of customerSales">
+              <td>{{ formatDisplayDate(sale.saleDate) }}</td>
+              <td>
+                <a (click)="viewSaleDetails(sale.id)" class="text-primary cursor-pointer">
+                  {{ sale.invoiceNo }}
+                </a>
+              </td>
+              <td>{{ sale.orderNo }}</td>
+              <td>
+                <span [ngClass]="getStatusBadgeClass(sale.status)">{{ sale.status }}</span>
+              </td>
+              <td>
+                <span [ngClass]="getPaymentStatusBadgeClass(sale.paymentStatus)">
+                  {{ sale.paymentStatus }}
+                </span>
+              </td>
+              <td>
+                <span [ngClass]="getShippingStatusBadgeClass(sale.shippingStatus)">
+                  {{ sale.shippingStatus }}
+                </span>
+              </td>
+              <td>
+                <span class="text-truncate" [title]="getProductDetails(sale.products)">
+                  {{ getProductDetails(sale.products) }}
+                </span>
+              </td>
+              <td class="text-right">{{ formatCurrency(sale.totalAmount) }}</td>
+              <td class="text-right">{{ formatCurrency(sale.paidAmount) }}</td>
+              <td class="text-right">{{ formatCurrency(sale.balanceAmount) }}</td>
+              <td>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-primary" (click)="viewSaleDetails(sale.id)" title="View Sale">
+                    <i class="fa fa-eye"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="editSale(sale.id)" title="Edit Sale">
+                    <i class="fa fa-edit"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="customerSales.length === 0">
+              <td colspan="11" class="text-center">No sales found for this customer</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+   <div class="tab-content" *ngIf="activeTab === 'documents'">
+      <div class="documents-header">
+        <h3>Documents & Notes</h3>
+        <button class="btn btn-primary" (click)="openNoteModal()">
+          <i class="fa fa-plus"></i> Add
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped documents-table">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Heading</th>
+              <th>Description</th>
+              <th>File</th>
+              <th>Added By</th>
+              <th>Checked At</th>
+              <th>Updated At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let doc of customerDocuments">
+              <td>
+                 <div class="btn-group">
+                  <button *ngIf="doc.fileData" (click)="downloadDocument(doc)" 
+                          class="btn btn-sm btn-outline-primary" title="Download Document">
+                    <i class="fa fa-download"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" (click)="deleteDocument(doc)" title="Delete Document">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+              <td>
+                <strong>{{ doc.heading }}</strong>
+                <small class="text-muted" *ngIf="doc.isPrivate"><br><i class="fa fa-lock"></i> Private</small>
+              </td>
+              <td>{{ doc.description || 'No description' }}</td>
+              <td>
+                <span *ngIf="doc.fileName" class="file-info">
+                  <i class="fa {{ getFileIcon(doc.fileType || '') }}"></i> 
+                  {{ doc.fileName }}
+                  <small class="text-muted d-block" *ngIf="doc.fileSize">
+                    {{ formatFileSize(doc.fileSize) }}
+                  </small>
+                </span>
+                <span *ngIf="!doc.fileName" class="text-muted">No file</span>
+              </td>
+              <td>{{ doc.addedBy || 'System' }}</td>
+              <td>{{ doc.checkedAt ? (doc.checkedAt | date:'dd-MM-yyyy') : 'N/A' }}</td>
+              <td>{{ doc.updatedAt | date:'dd-MM-yyyy HH:mm' }}</td>
+            </tr>
+            <tr *ngIf="customerDocuments.length === 0">
+              <td colspan="7" class="text-center">No data available in table</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Payments Tab Content -->
+    <div class="tab-content" *ngIf="activeTab === 'payments'">
+      <div class="table-responsive">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>Paid on</th>
+              <th>Reference No</th>
+              <th>Amount</th>
+              <th>Payment Method</th>
+              <th>Payment For</th>
+              <th class="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let payment of customerPayments">
+              <td>{{ formatPaymentDate(payment.paidOn) }}</td>
+              <td>{{ payment.referenceNo }}</td>
+              <td>{{ formatCurrency(payment.amount) }}</td>
+              <td>
+                {{ payment.paymentMethod }}
+                <div *ngIf="payment.transactionDetails" class="text-muted small">
+                  {{ payment.transactionDetails }}
+                </div>
+              </td>
+              <td>
+                <a (click)="viewSaleDetails(payment.saleId)" class="text-primary cursor-pointer">
+                  {{ payment.paymentFor }}
+                </a>
+                <div class="text-muted small">({{ payment.paymentForType }})</div>
+              </td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-primary me-1" (click)="viewSaleDetails(payment.saleId)">View</button>
+                <button class="btn btn-sm btn-info me-1" (click)="editSale(payment.saleId)">Edit</button>
+                <button class="btn btn-sm btn-danger" (click)="deletePayment(payment)">Delete</button>
+              </td>
+            </tr>
+            <tr *ngIf="customerPayments.length === 0">
+              <td colspan="6" class="text-center">No payment data available.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+ <!-- ENHANCED Activities Tab Content -->
+<!-- REPLACE the entire activities tab section with this new code -->
+<div class="tab-content" *ngIf="activeTab === 'activities'">
+  <div class="activities-section">
+    <div class="activities-header">
+      <h3>Customer Activities</h3>
+    </div>
+    
+    <div class="table-responsive">
+      <table class="activity-table">
+        <thead>
+          <tr>
+            <th class="date-col">Date</th>
+            <th class="action-col">Action</th>
+            <th class="by-col">By</th>
+            <th class="note-col">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Loop through all customer activities -->
+          <tr *ngFor="let activity of customerActivities">
+            <td>{{ activity.date | date:'dd-MM-yyyy HH:mm' }}</td>
+            <!-- Use the new function to format the Action -->
+            <td>{{ formatActivityAction(activity.action) }}</td>
+            <td>{{ activity.by || 'System' }}</td>
+            <!-- Use the new function to format the Note -->
+            <td class="note-cell">{{ formatActivityNote(activity) }}</td>
+          </tr>
+
+          <!-- This message will show only if there are no activities -->
+          <tr *ngIf="customerActivities.length === 0">
+            <td colspan="4" class="no-data-cell">
+              No activities have been recorded for this customer.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<!-- End of new activities tab section -->
+<!-- End of updated activities tab section -->
+<!-- End of updated activities tab section -->
+  </div>
+</div>
+
+<!-- Add Note Modal -->
+<div class="modal-backdrop fade" [class.show]="isNoteModalOpen" *ngIf="isNoteModalOpen"></div>
+<div class="modal fade" tabindex="-1" role="dialog" [class.show]="isNoteModalOpen" 
+     [style.display]="isNoteModalOpen ? 'block' : 'none'" *ngIf="isNoteModalOpen">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <form [formGroup]="noteForm" (ngSubmit)="onAddNoteSubmit()">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Note/Document</h5>
+          <button type="button" class="close" aria-label="Close" (click)="closeNoteModal()" [disabled]="isSubmittingNote">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="heading">Heading<span class="text-danger">*</span></label>
+            <input type="text" id="heading" class="form-control" formControlName="heading" 
+                   [class.is-invalid]="noteForm.get('heading')?.invalid && noteForm.get('heading')?.touched"
+                   placeholder="Enter document/note heading">
+            <div *ngIf="noteForm.get('heading')?.invalid && noteForm.get('heading')?.touched" class="invalid-feedback">
+              Heading is required.
+            </div>
+          </div>
+          
+          <div class="form-group mt-3">
+            <label for="description">Description</label>
+            <textarea id="description" class="form-control" rows="4" formControlName="description" 
+                      placeholder="Enter description (optional)"></textarea>
+          </div>
+
+          <div class="form-group mt-3">
+            <label>Upload Document/File (Optional)</label>
+            <div class="file-upload-container">
+              <div class="drop-files-area" (click)="fileInput.click()" 
+                   [class.has-file]="selectedFile"
+                   [class.disabled]="isSubmittingNote">
+                <i class="fa fa-cloud-upload-alt fa-2x"></i>
+                <p *ngIf="!selectedFile">Click to select a file or drop it here</p>
+                <div *ngIf="selectedFile" class="file-info">
+                  <p class="file-name">
+                    <i class="fa {{ getFileIcon(selectedFile.type) }}"></i>
+                    <strong>{{ selectedFile.name }}</strong>
+                  </p>
+                  <p class="file-size">{{ formatFileSize(selectedFile.size) }}</p>
+                  <small class="text-muted">Click to change file</small>
+                </div>
+                <input type="file" #fileInput (change)="onFileSelected($event)" 
+                       style="display: none;" [disabled]="isSubmittingNote"
+                       accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt,.csv,.xlsx,.xls">
+              </div>
+              <small class="text-muted">
+                Supported formats: PDF, DOC, DOCX, JPG, PNG, GIF, TXT, CSV, XLS, XLSX (Max: 10MB)
+              </small>
+            </div>
+          </div>
+
+          <div class="form-check mt-3">
+            <input type="checkbox" id="isPrivate" class="form-check-input" formControlName="isPrivate">
+            <label class="form-check-label" for="isPrivate">
+              <i class="fa fa-lock"></i> Mark as Private
+            </label>
+            <small class="form-text text-muted">Private documents are only visible to authorized users</small>
+          </div>
+
+          <!-- Progress indicator -->
+          <div *ngIf="isSubmittingNote" class="mt-3">
+            <div class="d-flex align-items-center">
+              <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+              <span>{{ selectedFile ? 'Processing file and saving document...' : 'Saving document...' }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeNoteModal()" [disabled]="isSubmittingNote">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="noteForm.invalid || isSubmittingNote">
+            <i class="fa fa-spinner fa-spin" *ngIf="isSubmittingNote"></i>
+            {{ isSubmittingNote ? 'Saving...' : 'Save Document' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Loading State Template -->
+<ng-template #loading>
+  <div class="loading-container">
+    <div class="spinner-border" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+    <p>Loading Contact Details...</p>
+  </div>
+</ng-template>

@@ -10,6 +10,7 @@ export class CustomerEditPopupComponent implements OnChanges {
   @Input() customerData: any;
   @Output() save = new EventEmitter<any>();
   @Output() close = new EventEmitter<void>();
+genders = ['Male', 'Female', 'Other'];
 
   show = true;
   isSaving = false;
@@ -41,6 +42,7 @@ export class CustomerEditPopupComponent implements OnChanges {
 
   constructor(private customerService: CustomerService) {}
 
+// Update the ngOnChanges method
 ngOnChanges(changes: SimpleChanges): void {
   if (changes['customerData'] && this.customerData) {
     // Initialize isIndividual
@@ -52,6 +54,13 @@ ngOnChanges(changes: SimpleChanges): void {
     this.customerData.middleName = this.customerData.middleName || '';
     this.customerData.lastName = this.customerData.lastName || '';
     
+    // Initialize demographic fields
+    this.customerData.age = this.customerData.age || null;
+    this.customerData.dob = this.customerData.dob || '';
+    this.customerData.gender = this.customerData.gender || '';
+    this.customerData.occupation = this.customerData.occupation || '';
+        this.customerData.district = this.customerData.district || '';
+
     // Initialize addresses
     if (!this.customerData.billingAddress) {
       this.customerData.billingAddress = this.customerData.addressLine1 || '';
@@ -81,6 +90,64 @@ ngOnChanges(changes: SimpleChanges): void {
     //   this.assignedUsers = users;
     // });
   }
+  districtsByState: { [key: string]: string[] } = {
+    'Tamil Nadu': [
+    'Ariyalur',
+    'Chengalpattu',
+    'Chennai',
+    'Coimbatore',
+    'Cuddalore',
+    'Dharmapuri',
+    'Dindigul',
+    'Erode',
+    'Kallakurichi',
+    'Kancheepuram',
+    'Karur',
+    'Krishnagiri',
+    'Madurai',
+    'Mayiladuthurai',
+    'Nagapattinam',
+    'Namakkal',
+    'Nilgiris',
+    'Perambalur',
+    'Pudukkottai',
+    'Ramanathapuram',
+    'Ranipet',
+    'Salem',
+    'Sivaganga',
+    'Tenkasi',
+    'Thanjavur',
+    'Theni',
+    'Thoothukudi',
+    'Tiruchirappalli',
+    'Tirunelveli',
+    'Tirupathur',
+    'Tiruppur',
+    'Tiruvallur',
+    'Tiruvannamalai',
+    'Tiruvarur',
+    'Vellore',
+    'Viluppuram',
+    'Virudhunagar'
+  ],
+    'Kerala': [
+    'Alappuzha',
+    'Ernakulam',
+    'Idukki',
+    'Kannur',
+    'Kasaragod',
+    'Kollam',
+    'Kottayam',
+    'Kozhikode',
+    'Malappuram',
+    'Palakkad',
+    'Pathanamthitta',
+    'Thiruvananthapuram',
+    'Thrissur',
+    'Wayanad'
+  ]
+
+};
 
   loadLeadStatuses(): void {
     // Implement your lead status service call here
@@ -96,29 +163,41 @@ ngOnChanges(changes: SimpleChanges): void {
     // });
   }
 
-  updateDisplayName(): void {
-    if (this.isIndividual) {
-      // For individuals: "FirstName LastName"
-      const names = [
-        this.customerData.prefix,
-        this.customerData.firstName,
-        this.customerData.middleName,
-        this.customerData.lastName
-      ].filter(name => name && name.trim());
-      
-      this.customerData.displayName = names.join(' ');
-    } else {
-      // For businesses: use business name
-      this.customerData.displayName = this.customerData.businessName;
-    }
+updateDisplayName(): void {
+  if (this.isIndividual) {
+    // For individuals: "FirstName LastName"
+    const names = [
+      this.customerData.prefix,
+      this.customerData.firstName,
+      this.customerData.middleName,
+      this.customerData.lastName
+    ].filter(name => name && name.trim());
+    
+    this.customerData.displayName = names.join(' ');
+  } else {
+    // For businesses: use business name
+    this.customerData.displayName = this.customerData.businessName;
   }
+  
+  // Update the combined address when name changes
+  this.updateCombinedAddress();
+}
+get districts(): string[] {
+  return this.customerData.state ? this.districtsByState[this.customerData.state] || [] : [];
+}
 updateCombinedAddress(): void {
+  // Build name part
+  const namePart = this.customerData.displayName || 
+                  [this.customerData.firstName, this.customerData.lastName]
+                    .filter(n => n).join(' ');
+
   // Build address parts array
   const addressParts = [
     this.customerData.addressLine1,
     this.customerData.addressLine2,
-    this.customerData.city,
     this.customerData.state,
+        this.customerData.district, // Add district here
+
     this.customerData.country,
     this.customerData.zipCode
   ].filter(part => part && part.trim());
@@ -129,8 +208,9 @@ updateCombinedAddress(): void {
     this.customerData.alternateContact ? `Alt: ${this.customerData.alternateContact}` : ''
   ].filter(part => part).join(', ');
 
-  // Combine address and contact info
+  // Combine all parts
   const fullAddress = [
+    namePart,
     ...addressParts,
     contactInfo
   ].filter(part => part).join(', ');

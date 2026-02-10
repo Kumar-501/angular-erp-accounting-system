@@ -1,250 +1,368 @@
-/* sell-return.component.scss */
-.sell-return-container {
-    padding: 20px;
-    background-color: #f5f5f5;
-    min-height: 100vh;
-    margin-top: 5%;
-    
-    h1 {
-      margin-bottom: 15px;
-      font-size: 24px;
-      font-weight: 600;
-    }
-  }
-  
-  .filters-section {
-    background-color: #ffffff;
-    padding: 15px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    
-    .btn {
-      display: flex;
-      align-items: center;
-      
-      i {
-        margin-right: 5px;
-      }
-    }
-  }
-  
-  .sell-return-content {
-    background-color: #ffffff;
-    padding: 15px;
-    border-radius: 4px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  
-  .table-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-    
-    .entries-control {
-      display: flex;
-      align-items: center;
-      
-      select {
-        margin: 0 5px;
-        padding: 5px;
-        border-radius: 4px;
-        border: 1px solid #ced4da;
-      }
-    }
-    
-    .export-controls {
-      display: flex;
-      gap: 5px;
-      flex-wrap: wrap;
-      
-      .btn {
-        display: flex;
-        align-items: center;
-        
-        i {
-          margin-right: 5px;
-        }
-      }
-    }
-    
-    .search-control {
-      input {
-        padding: 8px 12px;
-        border-radius: 4px;
-        border: 1px solid #ced4da;
-        min-width: 200px;
-      }
-    }
-  }
-  
-  .table-responsive {
-    overflow-x: auto;
-    
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      
-      th, td {
-        padding: 10px;
-        text-align: left;
-        border: 1px solid #dee2e6;
-      }
-      
-      th {
-        background-color: #f8f9fa;
-        position: relative;
-        cursor: pointer;
-        
-        i {
-          position: absolute;
-          right: 2px;
-          top: 50%;
-          transform: translateY(-50%);
-          opacity: 0.5;
-        }
-      }
-      
-      tbody tr:hover {
-        background-color: #f8f9fa;
-      }
-      
-      .action-buttons {
-        display: flex;
-        gap: 5px;
-      }
-      
-      .total-row {
-        background-color: #f0f0f0;
-        font-weight: 600;
-        
-        .text-right {
-          text-align: right;
-        }
-      }
-    }
-  }
-  
-  .pagination-info {
-    margin: 15px 0;
-  }
-  
-  .pagination-controls {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-  }
-  /* Targeting the table header cells with Font Awesome sort icons */
-th i.fa-sort {
-    margin-left: 10%; /* Adds a little space between the text and the icon */
-    color: #333; /* Sets the color of the icon (you can change this color as per your design) */
-    font-size: 16px; /* Adjusts the size of the sort icon */
-    transition: transform 0.3s ease; /* Adds smooth transition when icon changes */
-   
-  }
-  
-  /* On hover, you can add a rotation effect to indicate sorting behavior */
-  th:hover i.fa-sort {
-    transform: rotate(180deg); /* Rotates the icon when hovering over the column header */
-  }
-  
-  /* If you want to style the icon when the sort is active, you can use a class like .sorted */
-  th.sorted i.fa-sort {
-    color: #007bff; /* Changes color of the sort icon when it's active (e.g., blue for active state) */
-    transform: rotate(180deg); /* Optional: if you want it to stay rotated */
-  }
-  /* sell-return.component.scss */
+/* Sales Return Modal Styles */
+.return-modal-custom {
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: none;
+}
 
-.filter-panel {
-    background-color: #f8f9fa;
-    padding: 15px;
-    margin-bottom: 20px;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-  }
-  
-  .filter-row {
-    display: flex;
-    flex-wrap: wrap;
-    margin: -10px;
-  }
-  
-  .filter-column {
-    flex: 1;
-    min-width: 200px;
-    padding: 10px;
-  }
-  
-  .date-range-inputs {
-    display: flex;
-    align-items: center;
-    
-    span {
-      margin: 0 10px;
-    }
-    
-    input {
-      flex: 1;
-    }
-  }
-  
-  .filter-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 15px;
-  }
-  
-  // You may need to add this import in your Angular project
-  // @import '~bootstrap/scss/bootstrap';
-  
-  // Add this to ensure your other styles work correctly
-  .sell-return-container {
-    width: 100%;
-    padding: 20px;
-  }
-  
-  .filters-section {
-    margin-bottom: 15px;
-  }
-  
-  .table-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-  }
-  
-  @media (max-width: 768px) {
-    .filter-column {
-      flex: 1 0 100%;
-    }
-    
-    .table-controls {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .entries-control, .export-controls, .search-control {
-      margin-bottom: 10px;
-      width: 100%;
-    }
-  }
-  
-  @media (max-width: 768px) {
-    .table-controls {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-      
-      .entries-control, .export-controls, .search-control {
-        width: 100%;
-      }
-      
-      .export-controls {
-        justify-content: space-between;
+.return-modal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+  padding: 1.5rem 2rem;
 }
+
+.return-modal-header .modal-title {
+  font-weight: 600;
+  font-size: 1.25rem;
 }
+
+.return-modal-body {
+  padding: 2rem;
+  background-color: #fafbfc;
+  position: relative;
+}
+
+.return-modal-footer {
+  background-color: white;
+  border-top: 1px solid #e9ecef;
+  border-radius: 0 0 12px 12px;
+  padding: 1.5rem 2rem;
+}
+
+.screen-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  border-radius: 0 0 12px 12px;
+}
+
+.overlay-spinner {
+  width: 3rem;
+  height: 3rem;
+}
+
+.overlay-message {
+  margin-top: 1rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.disabled-content {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Header Section */
+.header-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid #e9ecef;
+}
+
+.return-label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.return-reference-value, 
+.return-supplier-value, 
+.return-date-value {
+  font-weight: 500;
+  color: #212529;
+  font-size: 1rem;
+}
+
+.return-date-input {
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  padding: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+.return-date-input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+}
+
+/* Products Table */
+.return-products-table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.return-products-table .table {
+  margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.return-products-table .table th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 1rem 0.75rem;
+  border-top: none;
+}
+
+.return-products-table .table td {
+  padding: 1rem 0.75rem;
+  vertical-align: middle;
+  border-top: 1px solid #e9ecef;
+}
+
+.table-warning {
+  background-color: rgba(255, 193, 7, 0.1);
+}
+
+.product-details strong {
+  color: #212529;
+  font-size: 0.95rem;
+}
+
+.purchased-qty .badge {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.input-group-sm .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.input-group-sm .form-control {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.unit-price-before-tax {
+  font-weight: 600;
+}
+
+.subtotal-before-tax {
+  font-weight: 600;
+}
+
+.total-amount {
+  font-weight: 600;
+}
+
+/* Column Widths */
+.product-col { width: 25%; }
+.qty-col { width: 10%; }
+.return-col { width: 12%; }
+.price-col { width: 12%; }
+.tax-col { width: 8%; }
+.total-col { width: 11%; }
+
+/* Return Reason Section */
+.return-reason-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.return-reason-textarea {
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+  resize: vertical;
+}
+
+.return-reason-textarea:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+}
+
+/* Status Section */
+.status-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.status-section .form-select {
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  transition: border-color 0.2s;
+}
+
+.status-section .form-select:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+}
+
+/* Total Amount Section */
+.total-amount-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.total-breakdown {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef !important;
+}
+
+.breakdown-row {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.breakdown-value {
+  font-weight: 600;
+  color: #212529;
+}
+
+.shipping-row {
+  background-color: rgba(255, 193, 7, 0.1);
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-radius: 4px;
+}
+
+.partial-return-note {
+  background-color: rgba(13, 202, 240, 0.1);
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-radius: 4px;
+  border-bottom: none !important;
+}
+
+.grand-total {
+  background-color: rgba(102, 126, 234, 0.1);
+  margin: 0 -1rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  border-radius: 4px;
+  font-size: 1.1rem;
+}
+
+.total-divider {
+  border-color: #667eea;
+  border-width: 2px;
+  margin: 1rem 0;
+}
+
+/* Buttons */
+.btn-cancel {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-cancel:hover {
+  background-color: #545b62;
+  border-color: #545b62;
+  transform: translateY(-1px);
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Badge Styles */
+.badge {
+  font-weight: 500;
+}
+
+.bg-warning {
+  background-color: #ffc107 !important;
+  color: #212529 !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .modal-xl {
+    max-width: 95%;
+    margin: 1rem;
+  }
+  
+  .return-modal-body {
+    padding: 1rem;
+  }
+  
+  .header-section {
+    padding: 1rem;
+  }
+  
+  .return-products-table .table th,
+  .return-products-table .table td {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+  
+  .price-col, .tax-col, .total-col {
+    width: 8%;
+  }
+  
+  .product-col {
+    width: 35%;
+  }
+}
+
+/* Alert Styles */
+.alert-info {
+  background-color: rgba(13, 202, 240, 0.1);
+  border-color: rgba(13, 202, 240, 0.2);
+  color: #055160;
+  border-radius: 8px;
+}
+
+.alert-info h6 {
+  color: #055160;
+  font-weight: 600;
 }

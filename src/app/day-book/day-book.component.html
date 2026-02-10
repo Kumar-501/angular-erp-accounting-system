@@ -1,0 +1,81 @@
+<!-- src/app/day-book/day-book.component.html -->
+
+<div class="report-page-container">
+<form [formGroup]="filterForm" (ngSubmit)="generateDaybookReport()" class="filter-bar">
+  <!-- Start Date -->
+  <div class="form-group">
+    <label for="start-date">Start Date:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('startDate')?.value)"
+             (blur)="onManualDateInput($event, 'startDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #startDatePicker type="date" formControlName="startDate" class="hidden-date-picker">
+    </div>
+  </div>
+
+  <!-- End Date -->
+  <div class="form-group">
+    <label for="end-date">End Date:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="date-input" 
+             [value]="getFormattedDateForInput(filterForm.get('endDate')?.value)"
+             (blur)="onManualDateInput($event, 'endDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+        <i class="fa fa-calendar-alt"></i>
+      </button>
+      <input #endDatePicker type="date" formControlName="endDate" class="hidden-date-picker">
+    </div>
+  </div>
+
+  <button type="submit" class="submit-btn" [disabled]="isLoading">
+    {{ isLoading ? 'Loading...' : 'Generate Report' }}
+  </button>
+</form>
+
+  <!-- Report Display Area -->
+  <div class="report-container">
+    <div class="report-header">
+      <h2>DAY BOOK</h2>
+      <p>
+        Displaying transactions from {{ filterForm.value.startDate | date:'dd-MM-yyyy' }} to {{ filterForm.value.endDate | date:'dd-MM-yyyy' }}
+      </p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Voucher</th>
+          <th>Entry</th>
+          <th class="text-right">Debit</th>
+          <th class="text-right">Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="isLoading">
+          <td colspan="5" class="status-message">Loading entries...</td>
+        </tr>
+        <tr *ngIf="!isLoading && daybookEntries.length === 0">
+          <td colspan="5" class="status-message no-entries">
+            No entries found for the selected date range
+          </td>
+        </tr>
+        <tr *ngFor="let entry of daybookEntries">
+          <!-- THIS IS THE FIX: Changed the date format to remove the time -->
+          <td>{{ entry.date | date:'dd-MM-yyyy' }}</td>
+          <td>{{ entry.voucher }}</td>
+          <td>{{ entry.entry }}</td>
+          <td class="text-right">{{ (entry.debit > 0) ? (entry.debit | currency:'INR') : '-' }}</td>
+          <td class="text-right">{{ (entry.credit > 0) ? (entry.credit | currency:'INR') : '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

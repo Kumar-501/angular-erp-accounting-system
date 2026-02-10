@@ -12,6 +12,181 @@ h2 {
   padding-bottom: 12px;
   margin-bottom: 24px;
 }
+/* Date Input Wrapper Logic */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  .date-input {
+    padding-right: 35px !important; /* Space for the calendar icon */
+    background-color: #fff !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 4px;
+    height: 38px;
+    width: 100%;
+    
+    &:focus {
+      border-color: #86b7fe;
+      outline: 0;
+      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
+    height: 100%;
+
+    &:hover {
+      color: #0d6efd;
+    }
+
+    i {
+      font-size: 16px;
+    }
+  }
+
+  /* The actual date picker is invisible but triggered by the button */
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+/* Specific styling for Add Sale page structure */
+.card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0,0,0,.125);
+  margin-bottom: 1.5rem;
+
+  .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 0.75rem 1.25rem;
+    
+    h5 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #333;
+    }
+  }
+}
+
+/* Product Search Dropdown Styling */
+.search-results-dropdown {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  
+  .list-group-item {
+    cursor: pointer;
+    border-left: none;
+    border-right: none;
+    
+    &:hover {
+      background-color: #f1f8ff;
+    }
+    
+    .highlight {
+      background-color: #fff3cd;
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+  }
+}
+
+/* Summary Box in Footer */
+.summary-box {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #dee2e6;
+  min-width: 300px;
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+
+    .summary-label {
+      color: #6c757d;
+    }
+
+    .summary-value {
+      font-weight: 600;
+      color: #212529;
+    }
+
+    &.total-payable {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 2px solid #dee2e6;
+      font-size: 1.2rem;
+      
+      .summary-label, .summary-value {
+        color: #0d6efd;
+        font-weight: 800;
+      }
+    }
+  }
+}
+
+/* Prescription Section Buttons */
+.prescription-button-container {
+  padding: 1rem 0;
+  display: flex;
+  gap: 10px;
+}
+
+.btn-pill {
+  border-radius: 50px;
+  padding: 5px 15px;
+  font-size: 0.85rem;
+  margin-bottom: 5px;
+}
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: #ffffff; // or any background you prefer
+  border-bottom: 1px solid #e0e0e0;
+
+  img {
+    max-width: 150px;
+    height: auto;
+    object-fit: contain;
+  }
+
+  // Optional hover effect
+  &:hover img {
+    opacity: 0.9;
+    transform: scale(1.02);
+    transition: all 0.3s ease-in-out;
+  }
+}
+
 
 /* Card Styles */
 .card {
@@ -729,4 +904,17 @@ select.form-control {
   margin-top: 0.25rem;
   font-size: 0.875em;
   color: #dc3545;
+}.prescription-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.prescription-list .list-group-item {
+  margin-bottom: 5px;
+  border-radius: 5px;
+}
+
+.prescription-list .btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
 }

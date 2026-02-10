@@ -106,6 +106,7 @@ export class ViewPurchaseComponent implements OnInit {
       });
   }
 
+  // ================== UPDATED AND CORRECTED METHOD ==================
   formatPurchaseData(purchase: any): Purchase {
     let supplierName = 'N/A';
     let supplierAddress = '';
@@ -131,27 +132,51 @@ export class ViewPurchaseComponent implements OnInit {
       }
     }
 
+    // Use the totals calculated and saved during purchase creation. These are the source of truth.
+    const grandTotal = purchase.grandTotal || 0;
+    const totalTax = purchase.totalTax || 0;
+
+    // Map the products for display, using the saved financial data. DO NOT RECALCULATE.
     const formattedProducts = purchase.products?.map((product: any) => {
       const quantity = product.quantity || 0;
-      const price = product.unitCost || product.price || 0;
-      const subtotal = quantity * price;
-      const taxRate = product.taxRate || 0;
-      const taxAmount = product.taxAmount || (subtotal * (taxRate / 100));
       
+      // Use the saved line total (with tax).
+      const lineTotal = product.lineTotal || 0;
+      
+      // Use the saved tax amount for the line.
+      const taxAmount = product.taxAmount || 0;
+      
+      // The subtotal for the line is the total minus the tax.
+      const subtotal = lineTotal - taxAmount;
+      
+      // The unit price (before tax) is the subtotal divided by the quantity.
+      const price = quantity > 0 ? (subtotal / quantity) : 0;
+
       return {
         id: product.id || product.productId || '',
         name: product.productName || product.name || 'Unnamed Product',
-        productName: product.productName || product.name || 'Unnamed Product',
         quantity: quantity,
-        price: price,
-        taxAmount: taxAmount,
-        taxRate: taxRate,
-        lineTotal: subtotal + taxAmount,
-        subtotal: subtotal,
+        price: price, // This is now the correct pre-tax unit price.
+        taxAmount: taxAmount, // The correct, saved tax amount for the line.
+        taxRate: product.taxRate || 0,
+        lineTotal: lineTotal, // The correct, saved total for the line.
+        subtotal: subtotal, // The correct, subtotal for the line.
         batchNumber: product.batchNumber || '',
         expiryDate: product.expiryDate || ''
       };
     }) || [];
+
+    // Split the CORRECT total tax for display
+    const isInterState = purchase.isInterState || false;
+    let igst = 0;
+    let cgst = 0;
+    let sgst = 0;
+    if (isInterState) {
+      igst = totalTax;
+    } else {
+      cgst = totalTax / 2;
+      sgst = totalTax / 2;
+    }
 
     return {
       ...purchase,
@@ -159,11 +184,13 @@ export class ViewPurchaseComponent implements OnInit {
       supplierAddress: supplierAddress,
       products: formattedProducts,
       purchaseDate: this.formatDate(purchase.purchaseDate),
-      totalTax: purchase.totalTax || formattedProducts.reduce((sum: number, p: any) => sum + (p.taxAmount || 0), 0),
-      grandTotal: purchase.grandTotal || 
-        (formattedProducts.reduce((sum: number, p: any) => sum + p.lineTotal, 0) + (purchase.shippingCharges || 0)),
-      paymentDue: purchase.paymentDue || 
-        ((purchase.grandTotal || 0) - (purchase.paymentAmount || 0))
+      totalTax: totalTax, // Correct saved total tax
+      cgst: cgst,
+      sgst: sgst,
+      igst: igst,
+      isInterState: isInterState,
+      grandTotal: grandTotal, // Correct saved grand total
+      paymentDue: purchase.paymentDue !== undefined ? purchase.paymentDue : (grandTotal - (purchase.paymentAmount || 0))
     };
   }
 
@@ -466,5 +493,5 @@ export class ViewPurchaseComponent implements OnInit {
         type === 'error' ? 'snackbar-error' : 'snackbar-info'
       ]
     });
-  }
+  } 
 }

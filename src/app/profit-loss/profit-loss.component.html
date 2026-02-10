@@ -7,6 +7,7 @@
           <p class="text-sm mb-0">
             <i class="fas fa-calendar-alt me-1"></i> {{ currentDateRange }}
             <span class="badge bg-primary ms-2" *ngIf="profitLossData">As of {{ today | date:'mediumDate' }}</span>
+            <span class="badge bg-info ms-2">Sales & Purchases Excluding Tax</span>
           </p>
         </div>
         <div class="col-md-6 d-flex align-items-center justify-content-end">
@@ -35,12 +36,20 @@
         <i class="fas fa-exclamation-circle me-2"></i> {{ errorMessage }}
       </div>
       
+      <div class="alert alert-info" *ngIf="!loading && profitLossData">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Note:</strong> This Profit & Loss statement shows sales and purchases excluding tax amounts for accurate profitability analysis.
+      </div>
+      
       <div class="d-flex justify-content-end mb-3" *ngIf="!loading && profitLossData">
         <button class="btn btn-sm btn-outline-primary me-2" (click)="exportToExcel()">
           <i class="fas fa-file-excel me-1"></i> Export
         </button>
-        <button class="btn btn-sm btn-outline-secondary" (click)="printReport()">
-          <i class="fas fa-print me-1"></i> Print
+        <button class="btn btn-sm btn-outline-secondary me-2" (click)="refreshStockData()">
+          <i class="fas fa-sync-alt me-1"></i> Refresh Stock
+        </button>
+        <button class="btn btn-sm btn-outline-success" (click)="forceRefresh()">
+          <i class="fas fa-redo me-1"></i> Force Refresh
         </button>
       </div>
 
@@ -52,7 +61,8 @@
               <th colspan="2">Cost of Goods Sold</th>
               <th colspan="2">Total</th>
             </tr>
-          </thead>          <tbody>
+          </thead>
+          <tbody>
             <tr>
               <td class="font-weight-bold text-nowrap"><i class="fas fa-box-open me-2"></i>Opening Stock</td>
               <td class="text-end">{{ profitLossData.openingStock | currency:'INR':'symbol':'1.2-2' }}</td>
@@ -62,83 +72,93 @@
               </td>
             </tr>
             <tr>
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-shopping-cart me-2"></i>Purchases</td>
-              <td class="text-end">{{ profitLossData.purchases | currency:'INR':'symbol':'1.2-2' }}</td>
-            </tr>
-            <tr>
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-tools me-2"></i>Direct Expenses</td>
-              <td class="text-end">{{ profitLossData.directExpenses | currency:'INR':'symbol':'1.2-2' }}</td>
-            </tr>
-            <tr>
               <td class="font-weight-bold text-nowrap"><i class="fas fa-box me-2"></i>Closing Stock</td>
               <td class="text-end text-danger">({{ profitLossData.closingStock | currency:'INR':'symbol':'1.2-2' }})</td>
             </tr>
+            <tr>
+              <td class="font-weight-bold text-nowrap">
+                <i class="fas fa-shopping-cart me-2"></i>Purchases (Excluding Tax)
+                <small class="text-muted d-block">Base cost without tax</small>
+              </td>
+              <td class="text-end">{{ profitLossData.purchases | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+            <!-- <a -->
           </tbody>
 
           <!-- Revenue Section -->
-          <thead class="table-light">
+ <thead class="table-light">
+  <tr>
+    <th colspan="2">Revenue</th>
+    <th colspan="2">Total</th>
+  </tr>
+</thead>
+<tbody>
             <tr>
-              <th colspan="2">Revenue</th>
-              <th colspan="2">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-cash-register me-2"></i>Sales</td>
-              <td class="text-end">{{ profitLossData.sales | currency:'INR':'symbol':'1.2-2' }}</td>
-              <td rowspan="2" class="font-weight-bold text-center align-middle bg-light">Total Revenue</td>
-              <td rowspan="2" class="text-end align-middle bg-light">
-                {{ (profitLossData.sales + profitLossData.directIncome) | currency:'INR':'symbol':'1.2-2' }}
-              </td>
-            </tr>
-            <tr>
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-money-bill-wave me-2"></i>Direct Income</td>
-              <td class="text-end">{{ profitLossData.directIncome | currency:'INR':'symbol':'1.2-2' }}</td>
-            </tr>
-          </tbody>
+    <td class="font-weight-bold text-nowrap">
+      <i class="fas fa-cash-register me-2"></i>Sales (Excluding Tax)
+      <small class="text-muted d-block">Revenue without tax component</small>
+    </td>
+    <td class="text-end">{{ profitLossData.sales | currency:'INR':'symbol':'1.2-2' }}</td>
+    <td rowspan="2" class="font-weight-bold text-center align-middle bg-light">Total Revenue</td>
+    <td rowspan="2" class="text-end align-middle bg-light">
+      {{ (profitLossData.sales + profitLossData.directIncome) | currency:'INR':'symbol':'1.2-2' }}
+    </td>
+  </tr>
+  <tr>
+    <td class="font-weight-bold text-nowrap"><i class="fas fa-money-bill-wave me-2"></i>Direct Income</td>
+    <td class="text-end">{{ profitLossData.directIncome | currency:'INR':'symbol':'1.2-2' }}</td>
+  </tr>
+</tbody>
 
           <!-- Gross Profit -->
           <tbody>
             <tr class="table-success">
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-chart-line me-2"></i>Gross Profit</td>
+              <td class="font-weight-bold text-nowrap">
+                <i class="fas fa-chart-line me-2"></i>Gross Profit (Tax Excluded)
+                <small class="text-muted d-block">Revenue - COGS (both excluding tax)</small>
+              </td>
               <td class="text-end">{{ grossProfit | currency:'INR':'symbol':'1.2-2' }}</td>
               <td class="font-weight-bold text-center">Gross Profit</td>
               <td class="text-end">{{ grossProfit | currency:'INR':'symbol':'1.2-2' }}</td>
             </tr>
           </tbody>
 
- <!-- In profit-loss.component.html, update the indirect expenses section -->
-<thead class="table-light">
-  <tr>
-    <th colspan="4">Operating Expenses</th>
-  </tr>
-</thead>
-<tbody>
-  <tr *ngFor="let expense of profitLossData.indirectExpenses; let i = index">
-    <td class="font-weight-bold text-nowrap">
-      <i class="fas fa-minus-circle me-2 text-danger"></i> {{ expense.name }}
-    </td>
-    <td class="text-end">{{ expense.amount | currency:'INR':'symbol':'1.2-2' }}</td>
-    <td *ngIf="i === 0" 
-        [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
-        class="font-weight-bold text-center align-middle bg-light">Total Expenses</td>
-    <td *ngIf="i === 0" 
-        [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
-        class="text-end align-middle bg-light">
-      {{ totalIndirectExpenses | currency:'INR':'symbol':'1.2-2' }}
-    </td>
-  </tr>
-  <tr *ngIf="profitLossData.indirectIncome > 0">
-    <td class="font-weight-bold text-nowrap text-success">
-      <i class="fas fa-plus-circle me-2 text-success"></i> Other Income
-    </td>
-    <td class="text-end text-success">{{ profitLossData.indirectIncome | currency:'INR':'symbol':'1.2-2' }}</td>
-  </tr>          </tbody>
+          <!-- Operating Expenses -->
+          <thead class="table-light">
+            <tr>
+              <th colspan="4">Operating Expenses</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let expense of profitLossData.indirectExpenses; let i = index">
+              <td class="font-weight-bold text-nowrap">
+                <i class="fas fa-minus-circle me-2 text-danger"></i> {{ expense.name }}
+              </td>
+              <td class="text-end">{{ expense.amount | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td *ngIf="i === 0" 
+                  [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
+                  class="font-weight-bold text-center align-middle bg-light">Total Expenses</td>
+              <td *ngIf="i === 0" 
+                  [attr.rowspan]="profitLossData.indirectExpenses.length + 1" 
+                  class="text-end align-middle bg-light">
+                {{ totalIndirectExpenses | currency:'INR':'symbol':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="profitLossData.indirectIncome > 0">
+              <td class="font-weight-bold text-nowrap text-success">
+                <i class="fas fa-plus-circle me-2 text-success"></i> Other Income
+              </td>
+              <td class="text-end text-success">{{ profitLossData.indirectIncome | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+          </tbody>
 
           <!-- Net Profit -->
           <tbody>
             <tr class="table-primary">
-              <td class="font-weight-bold text-nowrap"><i class="fas fa-calculator me-2"></i>Net Profit</td>
+              <td class="font-weight-bold text-nowrap">
+                <i class="fas fa-calculator me-2"></i>Net Profit (Tax Excluded)
+                <small class="text-muted d-block">True operational profitability</small>
+              </td>
               <td class="text-end">{{ netProfit | currency:'INR':'symbol':'1.2-2' }}</td>
               <td class="font-weight-bold text-center">Net Profit</td>
               <td class="text-end" [ngClass]="{'text-success': netProfit >= 0, 'text-danger': netProfit < 0}">
@@ -155,7 +175,9 @@
           <div class="col-md-6">
             <div class="card border-0 shadow-sm">
               <div class="card-body">
-                <h6 class="card-title"><i class="fas fa-info-circle me-2"></i>Key Metrics</h6>
+                <h6 class="card-title">
+                  <i class="fas fa-info-circle me-2"></i>Key Metrics (Tax Excluded)
+                </h6>
                 <div class="d-flex justify-content-between py-2 border-bottom">
                   <span>Gross Margin</span>
                   <strong>{{ (grossProfit / (profitLossData.sales || 1) * 100) | number:'1.2-2' }}%</strong>
@@ -164,9 +186,13 @@
                   <span>Operating Margin</span>
                   <strong>{{ (netProfit / (profitLossData.sales || 1) * 100) | number:'1.2-2' }}%</strong>
                 </div>
-                <div class="d-flex justify-content-between py-2">
+                <div class="d-flex justify-content-between py-2 border-bottom">
                   <span>Expense Ratio</span>
                   <strong>{{ (totalIndirectExpenses / (profitLossData.sales || 1) * 100) | number:'1.2-2' }}%</strong>
+                </div>
+                <div class="d-flex justify-content-between py-2">
+                  <span>Sales (Pre-tax)</span>
+                  <strong>{{ profitLossData.sales | currency:'INR':'symbol':'1.0-0' }}</strong>
                 </div>
               </div>
             </div>
@@ -174,6 +200,9 @@
           <div class="col-md-6">
             <div class="card border-0 shadow-sm">
               <div class="card-body">
+                <h6 class="card-title">
+                  <i class="fas fa-chart-pie me-2"></i>Expense Breakdown
+                </h6>
                 <div class="expense-chart-container">
                   <canvas #expenseChart width="100%" height="100"></canvas>
                 </div>
@@ -188,7 +217,7 @@
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
           </div>
-          <p class="mt-2">Loading Profit & Loss data...</p>
+          <p class="mt-2">Loading Profit & Loss data (excluding tax)...</p>
         </div>
       </ng-template>
     </div>

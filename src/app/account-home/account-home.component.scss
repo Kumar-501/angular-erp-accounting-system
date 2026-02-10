@@ -1,0 +1,124 @@
+/* src/app/account-home/account-home.component.scss */
+
+// --- Host Element ---
+// Ensures the component takes up the full width of its container.
+:host {
+  display: block;
+  width: 100%;
+}
+
+// --- Main Container ---
+// This is the root container for the entire component, including the scroll arrows.
+.account-home-container {
+  display: flex;
+  position: relative;
+  align-items: center;
+  padding: 1rem 0;
+  background-color: #f4f6f9; // A light, neutral background
+}
+
+// --- Scrolling Wrapper for Cards ---
+// This div holds the cards and handles the horizontal scrolling behavior.
+.account-cards-container {
+  display: flex;
+  flex-wrap: nowrap; // Prevents cards from wrapping to the next line
+  gap: 1.5rem;
+  padding: 1.5rem; // Provides space around the cards
+  overflow-x: auto;
+  scroll-behavior: smooth;
+
+  // Hides the default browser scrollbar for a cleaner look
+  -ms-overflow-style: none;  /* For IE and Edge */
+  scrollbar-width: none;     /* For Firefox */
+  &::-webkit-scrollbar {
+    display: none;           /* For Chrome, Safari, and Opera */
+  }
+}
+
+// --- Individual Account Card ---
+// Styling for each card that displays account information.
+.account-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 0 0 260px; // Prevents card from shrinking, sets a fixed width
+  height: 180px;
+  padding: 1.5rem;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+// --- Card Content Elements ---
+.balance {
+  margin-bottom: 0.5rem;
+  color: #27ae60; // Default green color for positive balance
+  font-size: 2rem;
+  font-weight: 700;
+
+  // Modifier class for negative balances
+  &.negative {
+    color: #e74c3c; // Red color for negative amounts
+  }
+}
+
+.account-name {
+  margin-bottom: 1.5rem;
+  color: #555555;
+  font-size: 1rem;
+}
+
+.check-btn {
+  padding: 12px 20px;
+  background-color: #27ae60;
+  border: none;
+  border-radius: 5px;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: #229954; // Darker green on hover
+  }
+}
+
+// --- Scroll Arrow Buttons ---
+// Arrows positioned on the sides of the container for navigation.
+.scroll-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  background-color: #ffffff;
+  border: 1px solid #dde2e7;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  color: #333333;
+  font-size: 1.5rem;
+  cursor: pointer;
+
+  &.left-arrow {
+    left: 10px;
+  }
+  
+  &.right-arrow {
+    right: 10px;
+  }
+}
+
+// --- Informational Messages ---
+// Styles for when data is loading or no accounts are found.
+.loading-message,
+.no-accounts-message {
+  width: 100%;
+  padding: 3rem 2rem;
+  color: #666666;
+  font-size: 1.2rem;
+  text-align: center;
+}

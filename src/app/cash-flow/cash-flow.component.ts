@@ -1,7 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { AccountService } from '../services/account.service';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';import { AccountService } from '../services/account.service';
 import { FormBuilder, FormGroup } from '@angular/forms';
+import * as XLSX from 'xlsx'; // Import the xlsx library
+import { DatePipe, formatDate } from '@angular/common'; // Added formatDate
 
 interface CashFlowTransaction {
   id: string;
@@ -35,298 +35,294 @@ interface TrialBalanceItem {
   providers: [DatePipe]
 })
 export class CashFlowComponent implements OnInit {
+  @ViewChild('fromDatePicker') fromDatePicker!: ElementRef;
+  @ViewChild('toDatePicker') toDatePicker!: ElementRef;
+
   allAccounts: any[] = [];
   transactions: CashFlowTransaction[] = [];
   filteredTransactions: CashFlowTransaction[] = [];
   pagedTransactions: CashFlowTransaction[] = [];
   totalDebit: number = 0;
   totalCredit: number = 0;
-  loading: boolean = true; // Set to true initially to show loading
-  isLoading: boolean = false; // Added for trial balance loading state
-  isEmpty: boolean = false; // Set to false by default, will be updated after loading
-  
-  // Trial Balance properties
+  loading: boolean = true;
+  isLoading: boolean = false;
+  isEmpty: boolean = false;
+
   trialBalanceItems: TrialBalanceItem[] = [
     { name: 'Supplier Due', debit: null, credit: null },
     { name: 'Customer Due', debit: null, credit: null }
   ];
   accountBalanceItems: TrialBalanceItem[] = [];
-  
-  // Pagination
+
   currentPage: number = 1;
   entriesPerPage: number = 25;
-  
-  // Filter options
+
   viewMode: 'table' | 'card' = 'table';
-  dateRange = {
-    from: new Date(new Date().setDate(new Date().getDate() - 30)),
-    to: new Date()
-  };
-  transactionType: string = 'All';
-  searchQuery: string = '';
-  
   filterForm: FormGroup;
 
   constructor(
     private accountService: AccountService,
     private datePipe: DatePipe,
-    private formBuilder: FormBuilder
+    private fb: FormBuilder
   ) {
-    this.filterForm = this.formBuilder.group({
-      fromDate: [this.dateRange.from],
-      toDate: [this.dateRange.to],
+    this.filterForm = this.fb.group({
+      fromDate: [new Date(new Date().setDate(new Date().getDate() - 30))],
+      toDate: [new Date()],
       transactionType: ['All'],
       searchQuery: [''],
-      accountId: ['All']
+      accountId: ['All'],
+      entriesPerPage: [25] // Added entries per page to the form
     });
   }
+  // 1. Helper to convert internal YYYY-MM-DD to display format DD-MM-YYYY
+  getFormattedDateForInput(dateString: any): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
 
+  // 2. Trigger the hidden native picker
+  openDatePicker(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.fromDatePicker.nativeElement.showPicker();
+    } else {
+      this.toDatePicker.nativeElement.showPicker();
+    }
+  }
+
+  // 3. Handle manual entry with validation
+  onManualDateInput(event: any, controlName: string): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        const formattedDate = `${year}-${month}-${day}`;
+        this.filterForm.get(controlName)?.setValue(formattedDate);
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        this.resetVisibleInput(event, controlName);
+      }
+    } else if (input !== '') {
+      alert('Format must be DD-MM-YYYY');
+      this.resetVisibleInput(event, controlName);
+    }
+  }
+
+  private resetVisibleInput(event: any, controlName: string): void {
+    event.target.value = this.getFormattedDateForInput(this.filterForm.get(controlName)?.value);
+  }
   ngOnInit(): void {
-    // First load accounts
     this.loadAccounts();
-    
-    // Load trial balance
     this.loadTrialBalance();
-    
-    // Watch for filter changes
-    this.filterForm.valueChanges.subscribe(() => {
-      this.applyFilters();
+
+    // Subscribe to form changes to re-filter data
+    this.filterForm.valueChanges.subscribe(values => {
+      this.entriesPerPage = +values.entriesPerPage;
+      this.filterTransactions();
     });
   }
 
   loadAccounts(): void {
-    this.loading = true; // Show loading indicator
+    this.loading = true;
     this.accountService.getAccounts((accounts) => {
       this.allAccounts = accounts;
-      // After accounts are loaded, load transactions
       this.loadAllTransactions();
     });
   }
 
   loadAllTransactions(): void {
     this.loading = true;
-    let accountsProcessed = 0;
-    let allTransactions: CashFlowTransaction[] = [];
-    
-    // If no accounts found or loading
-    if (this.allAccounts.length === 0) {
-      this.isEmpty = true;
-      this.loading = false;
-      return;
-    }
-    
-    // Filter by account if selected
     const selectedAccountId = this.filterForm.get('accountId')?.value;
-    const accountsToProcess = selectedAccountId === 'All' ? 
-      this.allAccounts : 
-      this.allAccounts.filter(acc => acc.id === selectedAccountId);
-    
+    const accountsToProcess = selectedAccountId === 'All'
+      ? this.allAccounts
+      : this.allAccounts.filter(acc => acc.id === selectedAccountId);
+
     if (accountsToProcess.length === 0) {
       this.transactions = [];
-      this.filteredTransactions = [];
-      this.pagedTransactions = [];
-      this.isEmpty = true;
+      this.filterTransactions();
       this.loading = false;
       return;
     }
-    
-    // Process each account
+
+    let allTransactions: CashFlowTransaction[] = [];
+    let accountsProcessed = 0;
+
     accountsToProcess.forEach(account => {
       this.accountService.getAllAccountTransactions(account.id, (transactions) => {
-        // Map transactions to our format with account info
-        const mappedTransactions: CashFlowTransaction[] = transactions.map(t => {
-          return {
-            id: t.id,
-            date: new Date(t.date), // Ensure date is properly converted
-            account: account.name,
-            description: t.description,
-            paymentMethod: t.paymentMethod || '',
-            paymentDetails: t.paymentDetails || '',
-            note: t.note || '',
-            addedBy: t.addedBy || 'System',
-            debit: Number(t.debit) || 0,
-            credit: Number(t.credit) || 0,
-            balance: t.balance || 0,
-            accountBalance: t.balance || 0,
-            totalBalance: 0, // Will calculate later
-            type: t.type || 'transaction',
-            hasDocument: t.hasDocument || false,
-            attachmentUrl: t.attachmentUrl
-          };
-        });
-        
+        const mappedTransactions = transactions.map(t => ({
+          id: t.id,
+          date: new Date(t.date),
+          account: account.name,
+          description: t.description,
+          paymentMethod: t.paymentMethod || '',
+          paymentDetails: t.paymentDetails || '',
+          note: t.note || '',
+          addedBy: t.addedBy || 'System',
+          debit: Number(t.debit) || 0,
+          credit: Number(t.credit) || 0,
+          balance: t.balance || 0,
+          accountBalance: t.balance || 0,
+          totalBalance: 0,
+          type: t.type || 'transaction',
+          hasDocument: !!t.hasDocument,
+          attachmentUrl: t.attachmentUrl
+        }));
+
         allTransactions = [...allTransactions, ...mappedTransactions];
-        
         accountsProcessed++;
-        
-        // Once all accounts are processed
+
         if (accountsProcessed === accountsToProcess.length) {
-          // Sort by date (newest first)
-          allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          
-          // Calculate total balance
+          allTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
           this.calculateTotalBalance(allTransactions);
-          
           this.transactions = allTransactions;
-          this.filterTransactions();
+          this.filterTransactions(); // Apply initial filters
           this.loading = false;
-          this.isEmpty = this.filteredTransactions.length === 0;
         }
       });
     });
   }
-  
+
   calculateTotalBalance(transactions: CashFlowTransaction[]): void {
-    // Sort by date (oldest first) for running total calculation
-    const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    let runningTotal = 0;
-    // Calculate initial balance from all accounts
-    this.allAccounts.forEach(account => {
-      runningTotal += account.openingBalance || 0;
-    });
-    
-    // Calculate running total
-    sortedTransactions.forEach(t => {
-      runningTotal = runningTotal + t.credit - t.debit;
+    const sorted = [...transactions].sort((a, b) => a.date.getTime() - b.date.getTime());
+    let runningTotal = this.allAccounts.reduce((sum, acc) => sum + (acc.openingBalance || 0), 0);
+    sorted.forEach(t => {
+      runningTotal += t.credit - t.debit;
       t.totalBalance = runningTotal;
     });
-    
-    // Resort to newest first
-    transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  applyFilters(): void {
-    // Get values from form
-    const formValues = this.filterForm.value;
-    this.dateRange.from = formValues.fromDate;
-    this.dateRange.to = formValues.toDate;
-    this.transactionType = formValues.transactionType;
-    this.searchQuery = formValues.searchQuery;
-    
-    // Load fresh data with new filters
-    this.loadAllTransactions();
   }
 
   filterTransactions(): void {
-    // Apply date filter
-    this.filteredTransactions = this.transactions.filter(t => {
+    const filters = this.filterForm.value;
+    const fromDate = new Date(filters.fromDate);
+    const toDate = new Date(filters.toDate);
+    toDate.setHours(23, 59, 59, 999); // Include the entire 'to' day
+
+    let filtered = this.transactions.filter(t => {
       const transactionDate = new Date(t.date);
-      return transactionDate >= new Date(this.dateRange.from) && 
-             transactionDate <= new Date(this.dateRange.to);
+      return transactionDate >= fromDate && transactionDate <= toDate;
     });
-    
-    // Apply search filter
-    if (this.searchQuery) {
-      const query = this.searchQuery.toLowerCase();
-      this.filteredTransactions = this.filteredTransactions.filter(t => 
-        t.description.toLowerCase().includes(query) ||
-        t.account.toLowerCase().includes(query) ||
-        t.paymentMethod.toLowerCase().includes(query) ||
-        t.addedBy.toLowerCase().includes(query) ||
-        (t.note && t.note.toLowerCase().includes(query))
+
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase();
+      filtered = filtered.filter(t =>
+        Object.values(t).some(val => String(val).toLowerCase().includes(query))
       );
     }
-    
-    // Apply transaction type filter
-    if (this.transactionType !== 'All') {
-      if (this.transactionType === 'Debit') {
-        this.filteredTransactions = this.filteredTransactions.filter(t => t.debit > 0);
-      } else if (this.transactionType === 'Credit') {
-        this.filteredTransactions = this.filteredTransactions.filter(t => t.credit > 0);
-      } else if (this.transactionType === 'Transfer') {
-        this.filteredTransactions = this.filteredTransactions.filter(t => 
-          t.type === 'transfer' || 
-          t.type === 'transfer_in' || 
-          t.type === 'transfer_out'
-        );
+
+    if (filters.transactionType !== 'All') {
+      if (filters.transactionType === 'Debit') {
+        filtered = filtered.filter(t => t.debit > 0);
+      } else if (filters.transactionType === 'Credit') {
+        filtered = filtered.filter(t => t.credit > 0);
       }
     }
     
-    // Calculate totals
+    // Account filter is handled by `loadAllTransactions`, but we ensure consistency
+    if (filters.accountId !== 'All') {
+        const selectedAccount = this.allAccounts.find(a => a.id === filters.accountId);
+        if (selectedAccount) {
+            filtered = filtered.filter(t => t.account === selectedAccount.name);
+        }
+    }
+
+
+    this.filteredTransactions = filtered;
     this.calculateTotals();
-    
-    // Update pagination
     this.currentPage = 1;
     this.updatePagedTransactions();
-    
-    // Check if empty
     this.isEmpty = this.filteredTransactions.length === 0;
   }
-  
+
   calculateTotals(): void {
     this.totalDebit = this.filteredTransactions.reduce((sum, t) => sum + t.debit, 0);
     this.totalCredit = this.filteredTransactions.reduce((sum, t) => sum + t.credit, 0);
   }
-  
+
   updatePagedTransactions(): void {
     const start = (this.currentPage - 1) * this.entriesPerPage;
-    this.pagedTransactions = this.filteredTransactions.slice(start, start + this.entriesPerPage);
+    const end = start + this.entriesPerPage;
+    this.pagedTransactions = this.filteredTransactions.slice(start, end);
   }
-  
+
   previousPage(): void {
     if (this.currentPage > 1) {
       this.currentPage--;
       this.updatePagedTransactions();
     }
   }
-  
+
   nextPage(): void {
-    if (this.currentPage * this.entriesPerPage < this.filteredTransactions.length) {
+    if ((this.currentPage * this.entriesPerPage) < this.filteredTransactions.length) {
       this.currentPage++;
       this.updatePagedTransactions();
     }
   }
-  
+
   getMinValue(a: number, b: number): number {
     return Math.min(a, b);
   }
-  
-  // Download cash flow data as CSV
+
+  /**
+   * Generates and downloads an Excel file from the filtered transactions.
+   */
   downloadCashFlowData(): void {
     if (this.filteredTransactions.length === 0) {
-      alert('No data to download');
+      alert('No data to download.');
       return;
     }
 
-    // Create CSV data
-    let csvContent = 'Date,Account,Description,Payment Method,Payment Details,Note,Added By,Debit,Credit,Account Balance,Total Balance\n';
-    
-    this.filteredTransactions.forEach(t => {
-      const formattedDate = this.datePipe.transform(t.date, 'MM/dd/yyyy HH:mm') || '';
-      const account = t.account.replace(/,/g, ' ');
-      const description = t.description.replace(/,/g, ' ');
-      const paymentMethod = t.paymentMethod.replace(/,/g, ' ');
-      const paymentDetails = (t.paymentDetails || '').replace(/,/g, ' ');
-      const note = (t.note || '').replace(/,/g, ' ');
-      const addedBy = t.addedBy.replace(/,/g, ' ');
-      
-      csvContent += `${formattedDate},"${account}","${description}","${paymentMethod}","${paymentDetails}","${note}","${addedBy}",${t.debit},${t.credit},${t.accountBalance},${t.totalBalance}\n`;
-    });
-    
-    // Add total row
-    csvContent += `Total,,,,,,,,${this.totalDebit},${this.totalCredit},,\n`;
-    
-    // Create a Blob with the CSV data
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    
-    // Create a download link
-    const link = document.createElement('a');
-    const url = window.URL.createObjectURL(blob);
-    
-    // Set link properties
-    link.setAttribute('href', url);
-    link.setAttribute('download', `cash_flow_${this.datePipe.transform(new Date(), 'yyyyMMdd')}.csv`);
-    link.style.visibility = 'hidden';
-    
-    // Append to document, click to download, and remove
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
+    // 1. Map the data to a simpler format for the Excel sheet
+    const dataForExcel = this.filteredTransactions.map(t => ({
+      'Date': this.datePipe.transform(t.date, 'MM/dd/yyyy HH:mm'),
+      'Account': t.account,
+      'Description': t.description,
+      'Payment Method': t.paymentMethod,
+      'Note': t.note,
+      'Added By': t.addedBy,
+      'Debit': t.debit,
+      'Credit': t.credit,
+      'Account Balance': t.accountBalance,
+      'Total Balance': t.totalBalance
+    }));
 
-  // Added downloadDocument method to handle document downloads for transactions
+    // 2. Create a worksheet from the data
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(dataForExcel);
+
+    // Optional: Set column widths for better readability
+    const colWidths = [{ wch: 20 }, { wch: 25 }, { wch: 40 }, { wch: 20 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+    ws['!cols'] = colWidths;
+    
+    // Add total row at the bottom
+    XLSX.utils.sheet_add_json(ws,
+        [{ 'Debit': this.totalDebit, 'Credit': this.totalCredit }],
+        { header: ['Debit', 'Credit'], skipHeader: true, origin: -1 } // -1 means append from the end
+    );
+
+
+    // 3. Create a workbook and add the worksheet
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'CashFlow');
+
+    // 4. Trigger the download
+    const fileName = `CashFlow_Report_${this.datePipe.transform(new Date(), 'yyyyMMdd')}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  }
+  
+  // No changes needed for the rest of the methods
+  // ... (downloadDocument, loadTrialBalance, etc.)
   downloadDocument(transaction: CashFlowTransaction): void {
     if (!transaction.hasDocument || !transaction.attachmentUrl) {
       alert('No document attached to this transaction');

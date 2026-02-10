@@ -3,6 +3,8 @@ import { SaleService } from '../services/sale.service';
 import { PurchaseService } from '../services/purchase.service';
 import { ExpenseService } from '../services/expense.service';
 import { DatePipe } from '@angular/common';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 @Component({
   selector: 'app-summary-report',
@@ -28,7 +30,7 @@ export class SummaryReportComponent implements OnInit {
       return sum;
     }, 0);
   }
-  
+
   calculateExpenseTaxByRate(items: any[], rate: number): number {
     if (!items) return 0;
     return items.reduce((sum, item) => {
@@ -36,6 +38,7 @@ export class SummaryReportComponent implements OnInit {
       return sum + (Math.abs(itemRate - rate) < 0.01 ? (item.tax || 0) : 0);
     }, 0);
   }
+
   startDate: string;
   endDate: string;
   loading = false;
@@ -197,5 +200,68 @@ export class SummaryReportComponent implements OnInit {
 
   onDateChange(): void {
     this.generateReport();
+  }
+
+  exportToExcel(): void {
+    const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(this.getExcelData());
+    const workbook: XLSX.WorkBook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
+    const excelBuffer: any = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    this.saveAsExcelFile(excelBuffer, 'VAT_Summary_Report');
+  }
+
+  private getExcelData(): any[] {
+    const excelData: any[] = [];
+
+    // Add Sales Data
+    if (this.vatSummary.details?.sales?.length > 0) {
+      excelData.push({ 'Type': 'Output Tax (Sales)', 'Total': this.vatSummary.outputTax });
+      this.vatSummary.details.sales.forEach((sale: any) => {
+        excelData.push({
+          'Type': 'SALE',
+          'Date': this.datePipe.transform(sale.date, 'shortDate'),
+          'Reference': sale.document,
+          'Amount': sale.amount,
+          'Tax Rate (%)': sale.taxRate,
+          'Tax Amount': sale.tax
+        });
+      });
+    }
+
+    // Add Purchase Data
+    if (this.vatSummary.details?.purchases?.length > 0) {
+      excelData.push({ 'Type': 'Input Tax (Purchases)', 'Total': this.vatSummary.inputTax });
+      this.vatSummary.details.purchases.forEach((purchase: any) => {
+        excelData.push({
+          'Type': 'PURCHASE',
+          'Date': this.datePipe.transform(purchase.date, 'shortDate'),
+          'Reference': purchase.document,
+          'Amount': purchase.amount,
+          'Tax Rate (%)': purchase.taxRate,
+          'Tax Amount': purchase.tax
+        });
+      });
+    }
+
+    // Add Expense Data
+    if (this.vatSummary.details?.expenses?.length > 0) {
+      excelData.push({ 'Type': 'Expense Tax', 'Total': this.vatSummary.expenseTax });
+      this.vatSummary.details.expenses.forEach((expense: any) => {
+        excelData.push({
+          'Type': 'EXPENSE',
+          'Date': this.datePipe.transform(expense.date, 'shortDate'),
+          'Reference': expense.document,
+          'Amount': expense.amount,
+          'Tax Rate (%)': expense.taxRate,
+          'Tax Amount': expense.tax
+        });
+      });
+    }
+
+    return excelData;
+  }
+
+  private saveAsExcelFile(buffer: any, fileName: string): void {
+    const data: Blob = new Blob([buffer], { type: 'application/octet-stream' });
+    saveAs(data, fileName + '_export_' + new Date().getTime() + '.xlsx');
   }
 }

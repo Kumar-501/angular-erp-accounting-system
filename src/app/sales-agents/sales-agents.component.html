@@ -2,9 +2,9 @@
   <div class="header">
     <h3>Sales Commission Agents</h3>
   </div>
-  
+
   <div class="users-panel">
-    
+
     <div class="action-bar">
       <div class="entries-section">
         <span>Show</span>
@@ -17,33 +17,33 @@
         </select>
         <span>entries</span>
       </div>
-      
+
       <div class="export-buttons">
-      
+
         <button class="btn btn-outline" (click)="exportExcel()">
           <i class="fas fa-file-excel"></i> Export Excel
         </button>
         <button class="btn btn-outline" (click)="printTable()">
           <i class="fas fa-print"></i> Print
         </button>
-     
-     
+
+
       </div>
-      
+
       <div class="search-container">
         <input type="text" placeholder="Search..." (input)="onSearch($event)" />
       </div>
-      
+
       <button class="btn btn-primary add-button" (click)="openModal()">
         <i class="fas fa-plus"></i> Add
       </button>
     </div>
-    
+
     <table class="user-table">
       <thead>
         <tr>
           <th (click)="sortTable('userName')">
-            User Name 
+            User Name
             <i class="fas" [ngClass]="{
               'fa-sort': sortColumn !== 'userName',
               'fa-sort-up': sortColumn === 'userName' && sortDirection === 'asc',
@@ -51,14 +51,14 @@
             }"></i>
           </th>
           <th (click)="sortTable('commissionPercentage')">
-            Commission Percentage (%) 
+            Commission Percentage (%)
             <i class="fas" [ngClass]="{
               'fa-sort': sortColumn !== 'commissionPercentage',
               'fa-sort-up': sortColumn === 'commissionPercentage' && sortDirection === 'asc',
               'fa-sort-down': sortColumn === 'commissionPercentage' && sortDirection === 'desc'
             }"></i>
           </th>
-          <th>Action</th>
+          <th class="no-print">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -66,7 +66,7 @@
           <tr *ngFor="let agent of paginatedAgents">
             <td>{{ agent.userName }}</td>
             <td>{{ agent.commissionPercentage }}%</td>
-            <td class="action-buttons">
+            <td class="action-buttons no-print">
               <button class="btn btn-edit" (click)="openModal(true, agent)">
                 <i class="fas fa-edit"></i> Edit
               </button>
@@ -83,11 +83,11 @@
         </ng-template>
       </tbody>
     </table>
-    
+
     <div class="pagination">
       <div class="showing-info">
-        Showing {{ (paginatedAgents.length > 0) ? ((currentPage - 1) * entriesPerPage + 1) : 0 }} to 
-        {{ (currentPage * entriesPerPage > totalEntries) ? totalEntries : (currentPage * entriesPerPage) }} 
+        Showing {{ (paginatedAgents.length > 0) ? ((currentPage - 1) * entriesPerPage + 1) : 0 }} to
+        {{ (currentPage * entriesPerPage > totalEntries) ? totalEntries : (currentPage * entriesPerPage) }}
         of {{ totalEntries }} entries
       </div>
       <div class="page-buttons">
@@ -110,10 +110,10 @@
       <div class="modal-header">
         <h5 class="modal-title">{{ isEditMode ? 'Edit Sales Commission Agent' : 'Add Sales Commission Agent' }}</h5>
         <button type="button" class="close" (click)="closeModal()">
-          <span>&times;</span>
+          <span>×</span>
         </button>
       </div>
-      
+
       <div class="modal-body">
         <form [formGroup]="agentForm" (ngSubmit)="saveAgent()">
           <div class="form-group">
@@ -128,16 +128,16 @@
               User name is required
             </div>
           </div>
-          
+
           <div class="form-group">
             <label for="commissionPercentage">Commission Percentage (%)*</label>
-            <input type="number" id="commissionPercentage" formControlName="commissionPercentage" 
+            <input type="number" id="commissionPercentage" formControlName="commissionPercentage"
                    class="form-control" placeholder="Enter commission percentage">
             <div class="error-message" *ngIf="agentForm.get('commissionPercentage')?.invalid && agentForm.get('commissionPercentage')?.touched">
               Valid commission percentage is required
             </div>
           </div>
-          
+
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
         <button type="submit" class="btn btn-primary" [disabled]="agentForm.invalid || isSaving">
@@ -148,5 +148,5 @@
         </form>
       </div>
     </div>
-  </div>
+  </div>
 </div>

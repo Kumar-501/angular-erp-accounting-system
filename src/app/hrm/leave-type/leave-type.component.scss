@@ -304,3 +304,32 @@
     margin: 0 10px;
 }
 }
+.pagination-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  
+  .pagination-buttons {
+    display: flex;
+    gap: 5px;
+    
+    .page-numbers {
+      display: flex;
+      gap: 5px;
+    }
+  }
+  
+  .items-per-page {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    
+    select {
+      width: 70px;
+    }
+  }
+}

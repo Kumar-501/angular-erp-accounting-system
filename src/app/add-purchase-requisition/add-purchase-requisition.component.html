@@ -54,60 +54,87 @@
           </div>
 
           <div class="col-md-4">
-<!-- To this -->
 <div class="form-group">
   <label>Required by date:</label>
-  <div class="input-group">
-    <input type="date" formControlName="requiredByDate" class="form-control" />
-    <span class="input-group-text">
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseForm.get('requiredByDate')?.value)"
+           (blur)="onManualDateInput($event, 'requiredByDate')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('requiredBy')">
       <i class="fa fa-calendar"></i>
-    </span>
+    </button>
+    <input #requiredByDatePicker
+           type="date" 
+           class="hidden-date-picker" 
+           formControlName="requiredByDate">
   </div>
 </div>
           </div>
 
           <div class="col-md-4">
-            <div class="form-group">
-              <label>Date:</label>
-              <div class="input-group">
-                <input type="date" formControlName="date" class="form-control" required />
-                <span class="input-group-text">
-                  <i class="fa fa-calendar"></i>
-                </span>
-              </div>
-            </div>
+  <div class="form-group">
+  <label>Date:</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseForm.get('date')?.value)"
+           (blur)="onManualDateInput($event, 'date')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('date')">
+      <i class="fa fa-calendar"></i>
+    </button>
+    <input #datePicker
+           type="date" 
+           class="hidden-date-picker" 
+           formControlName="date">
+  </div>
+</div>
           </div>
         </div>
 
-        <div class="row mt-3">
-          <div class="col-md-4">
-            <div class="form-group">
-              <label>Supplier:</label>
-              <select formControlName="supplier" class="form-control">
-                <option value="">Select Supplier</option>
-                <option *ngFor="let supplier of suppliers" [value]="supplier.id">
-                  {{ supplier.businessName || supplier.firstName + ' ' + supplier.lastName }}
-                </option>
-              </select>
-            </div>
-          </div>
+       <div class="row mt-3">
+  <div class="col-md-4">
+    <div class="form-group">
+      <label>Supplier:</label>
+      <select formControlName="supplier" class="form-control">
+        <option value="">Select Supplier</option>
+        <option *ngFor="let supplier of suppliers" [value]="supplier.id">
+          {{ supplier.businessName || supplier.firstName + ' ' + supplier.lastName }}
+        </option>
+      </select>
+    </div>
+  </div>
+</div>
 <!-- Add this in your form, preferably near the supplier dropdown -->
 
           <div class="col-md-4">
 <div class="form-group">
   <label>Shipping Date:</label>
-  <div class="input-group">
-    <input type="date" formControlName="shippingDate" class="form-control" />
-    <span class="input-group-text">
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseForm.get('shippingDate')?.value)"
+           (blur)="onManualDateInput($event, 'shippingDate')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('shipping')">
       <i class="fa fa-calendar"></i>
-    </span>
+    </button>
+    <input #shippingDatePicker
+           type="date" 
+           class="hidden-date-picker" 
+           formControlName="shippingDate">
   </div>
 </div>
           </div>
 <div class="col-md-12 mt-3">
   <div class="form-group">
     <label>Supplier Address:</label>
-    <textarea formControlName="supplierAddress" class="form-control" rows="3" readonly></textarea>
+    <textarea formControlName="supplierAddress" class="form-control" rows="3"></textarea>
   </div>
 </div>
      <!-- In your form template -->

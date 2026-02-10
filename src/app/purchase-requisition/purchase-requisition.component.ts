@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { PurchaseRequisitionService } from '../services/purchase-requisition.service';
 import { PurchaseOrderService } from '../services/purchase-order.service';
@@ -7,23 +7,21 @@ import { SupplierService } from '../services/supplier.service';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { Subject } from 'rxjs';
+import { Subject, Subscription } from 'rxjs';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { AuthService } from '../auth.service';
-
 
 interface RequisitionItem {
   productId: string;
   productName: string;
   requiredQuantity: number;
-    subtotal?: number; // Add this line
-  supplierAddress?: string; // Ensure this exists
-
+  subtotal?: number;
+  supplierAddress?: string;
   alertQuantity: number;
   currentStock?: number;
-  unitPurchasePrice: number;       // Add this
-  purchasePriceIncTax: number;     // Add this
-  itemReference?: string;          // Optional if you're using this
+  unitPurchasePrice: number;
+  purchasePriceIncTax: number;
+  itemReference?: string;
 }
 
 interface Requisition {
@@ -40,10 +38,9 @@ interface Requisition {
   updatedAt?: Date;
   brand?: string;
   category?: string;
-    supplierAddress?: string; // Add this line
-
+  supplierAddress?: string;
+  supplier?: string; // Keep as string, not boolean
   shippingStatus?: string;
-  supplier?: string;
   supplierName?: string;
   shippingDate?: string;
 }
@@ -53,6 +50,7 @@ interface ColumnVisibility {
   field: string;
   visible: boolean;
 }
+
 interface Product {
   id: string;
   productName: string;
@@ -66,34 +64,33 @@ interface Product {
   templateUrl: './purchase-requisition.component.html',
   styleUrls: ['./purchase-requisition.component.scss']
 })
-export class PurchaseRequisitionComponent implements OnInit {
+export class PurchaseRequisitionComponent implements OnInit, OnDestroy {
   rows: Requisition[] = [];
   filteredRows: Requisition[] = [];
   isLoading: boolean = false;
-isAdmin: boolean = true;
+  isAdmin: boolean = true;
+
+  // Add the missing subscription property
+  private requisitionsSubscription: Subscription = new Subscription();
 
   selectedRequisitions: string[] = [];
-allSelected: boolean = false;
-// Add these properties to your component class
+  allSelected: boolean = false;
   isDateDrawerOpen: boolean = false;
-  
-selectedRange: string = '';
+  selectedRange: string = '';
   isCustomDate: boolean = false;
-  // In your component class
-isSaving: boolean = false;
-fromDate: string = '';
-toDate: string = '';
+  isSaving: boolean = false;
+  fromDate: string = '';
+  toDate: string = '';
   showFilters: boolean = false;
   showColumnVisibility: boolean = false;
   currentPage: number = 1;
-  // Change from 25 to 10 as default
-entriesPerPage: number = 10;
+  entriesPerPage: number = 10;
   totalPages: number = 1;
   searchTerm: string = '';
   private searchTerms = new Subject<string>();
-startDate: string = '';
-endDate: string = '';
-selectedSupplier: string = 'All';
+  startDate: string = '';
+  endDate: string = '';
+  selectedSupplier: string = 'All';
   
   openActionDropdownId: string | null = null;
   
@@ -111,12 +108,11 @@ selectedSupplier: string = 'All';
     { name: 'Shipping Date', field: 'shippingDate', visible: true },
     { name: 'Products', field: 'items', visible: true },
     { name: 'Total Required Qty', field: 'totalQuantity', visible: true },
-    { name: 'Current Stock', field: 'currentStock', visible: true }, // Add this new column
+    { name: 'Current Stock', field: 'currentStock', visible: true },
     { name: 'Unit Purchase Price', field: 'unitPurchasePrice', visible: true },
     { name: 'Purchase Price (Inc Tax)', field: 'purchasePriceIncTax', visible: true },
     { name: 'Purchase Price', field: 'subtotal', visible: true },
-     { name: 'Supplier Address', field: 'supplierAddress', visible: true }, // Add this line
-
+    { name: 'Supplier Address', field: 'supplierAddress', visible: true },
   ];
   
   businessLocations: any[] = [];
@@ -137,27 +133,32 @@ selectedSupplier: string = 'All';
     private supplierService: SupplierService,
     private router: Router,
     private cdr: ChangeDetectorRef,
-      private authService: AuthService,
-
+    private authService: AuthService,
   ) {}
 
   ngOnInit(): void {
     this.loadLocations();
-     this.isAdmin = this.authService.isAdmin(); // This will now properly check admin status
-  console.log("ADMIN STATUS:", this.isAdmin); 
+    this.isAdmin = this.authService.isAdmin();
+    console.log("ADMIN STATUS:", this.isAdmin); 
 
     // First load suppliers, then load requisitions
     this.supplierService.getSuppliers().subscribe({
       next: (suppliers) => {
         this.suppliers = suppliers;
-        this.loadRequisitions(); // Load requisitions after suppliers are loaded
+        this.loadRequisitions();
       },
       error: (error) => {
         console.error('Error loading suppliers:', error);
-        this.loadRequisitions(); // Still try to load requisitions even if suppliers fail
+        this.loadRequisitions();
       }
     });
-    
+
+    // Fix the subscription assignment
+    this.requisitionsSubscription = this.requisitionService.getRequisitions().subscribe(requisitions => {
+      this.rows = requisitions;
+      this.applyFilters();
+    });
+
     // Setup search debounce
     this.searchTerms.pipe(
       debounceTime(300),
@@ -173,213 +174,239 @@ selectedSupplier: string = 'All';
       }
     });
     
+    // Set default sort to referenceNo in ascending order
+    this.sortColumn = 'referenceNo';
+    this.sortDirection = 'asc';
   }
+
+  ngOnDestroy(): void {
+    // Clean up subscription to prevent memory leaks
+    if (this.requisitionsSubscription) {
+      this.requisitionsSubscription.unsubscribe();
+    }
+  }
+
   calculateTotalRequiredQuantity(items: RequisitionItem[]): number {
     if (!items || items.length === 0) return 0;
     return items.reduce((total, item) => total + (item.requiredQuantity || 0), 0);
   }
-  toggleDateDrawer(): void {
-  this.isDateDrawerOpen = !this.isDateDrawerOpen;
-  }
-  
 
-filterByDate(range: string): void {
-  this.selectedRange = range;
-  this.isCustomDate = false;
-  
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  switch (range) {
-    case 'today':
-      this.startDate = this.endDate = this.formatDate(today);
-      break;
-    case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
-      this.startDate = this.endDate = this.formatDate(yesterday);
-      break;
-    case 'sevenDays':
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      this.startDate = this.formatDate(sevenDaysAgo);
-      this.endDate = this.formatDate(today);
-      break;
-    case 'thirtyDays':
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      this.startDate = this.formatDate(thirtyDaysAgo);
-      this.endDate = this.formatDate(today);
-      break;
-    case 'lastMonth':
-      const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
-      this.startDate = this.formatDate(firstDayLastMonth);
-      this.endDate = this.formatDate(lastDayLastMonth);
-      break;
-    case 'thisMonth':
-      const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-      this.startDate = this.formatDate(firstDayThisMonth);
-      this.endDate = this.formatDate(today);
-      break;
-    case 'thisFinancialYear':
-      const financialYearStart = this.getFinancialYearStart(today);
-      this.startDate = this.formatDate(financialYearStart);
-      this.endDate = this.formatDate(today);
-      break;
-    case 'lastFinancialYear':
-      const lastFinancialYearStart = new Date(today.getFullYear() - 1, 3, 1);
-      const lastFinancialYearEnd = new Date(today.getFullYear(), 2, 31);
-      this.startDate = this.formatDate(lastFinancialYearStart);
-      this.endDate = this.formatDate(lastFinancialYearEnd);
-      break;
+  toggleDateDrawer(): void {
+    this.isDateDrawerOpen = !this.isDateDrawerOpen;
   }
-  
-  this.applyFilters();
-  this.isDateDrawerOpen = false;
-}
-selectCustomRange(): void {
-  this.selectedRange = 'custom';
-  this.isCustomDate = true;
-  this.fromDate = '';
-  this.toDate = '';
-}
+
+  filterByDate(range: string): void {
+    this.selectedRange = range;
+    this.isCustomDate = false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    switch (range) {
+      case 'today':
+        this.startDate = this.endDate = this.formatDate(today);
+        break;
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        this.startDate = this.endDate = this.formatDate(yesterday);
+        break;
+      case 'sevenDays':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        this.startDate = this.formatDate(sevenDaysAgo);
+        this.endDate = this.formatDate(today);
+        break;
+      case 'thirtyDays':
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        this.startDate = this.formatDate(thirtyDaysAgo);
+        this.endDate = this.formatDate(today);
+        break;
+      case 'lastMonth':
+        const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        this.startDate = this.formatDate(firstDayLastMonth);
+        this.endDate = this.formatDate(lastDayLastMonth);
+        break;
+      case 'thisMonth':
+        const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        this.startDate = this.formatDate(firstDayThisMonth);
+        this.endDate = this.formatDate(today);
+        break;
+      case 'thisFinancialYear':
+        const financialYearStart = this.getFinancialYearStart(today);
+        this.startDate = this.formatDate(financialYearStart);
+        this.endDate = this.formatDate(today);
+        break;
+      case 'lastFinancialYear':
+        const lastFinancialYearStart = new Date(today.getFullYear() - 1, 3, 1);
+        const lastFinancialYearEnd = new Date(today.getFullYear(), 2, 31);
+        this.startDate = this.formatDate(lastFinancialYearStart);
+        this.endDate = this.formatDate(lastFinancialYearEnd);
+        break;
+    }
+    
+    this.applyFilters();
+    this.isDateDrawerOpen = false;
+  }
+
+  selectCustomRange(): void {
+    this.selectedRange = 'custom';
+    this.isCustomDate = true;
+    this.fromDate = '';
+    this.toDate = '';
+  }
 
   loadLocations() {
     this.locationService.getLocations().subscribe(locations => {
       this.businessLocations = locations;
     });
   }
+
   toggleSelectAll(event: Event): void {
-  const target = event.target as HTMLInputElement;
-  this.allSelected = target.checked;
-  
-  if (this.allSelected) {
-    this.selectedRequisitions = this.getPaginatedRows().map(row => row.id);
-  } else {
-    this.selectedRequisitions = [];
-  }
-}
-
-toggleSelection(id: string): void {
-  const index = this.selectedRequisitions.indexOf(id);
-  if (index === -1) {
-    this.selectedRequisitions.push(id);
-  } else {
-    this.selectedRequisitions.splice(index, 1);
-  }
-  this.allSelected = this.selectedRequisitions.length === this.getPaginatedRows().length;
-}
-
-isSelected(id: string): boolean {
-  return this.selectedRequisitions.includes(id);
-}
-// Add these methods to your component class
-calculateTotalUnitPurchasePrice(): number {
-  return this.filteredRows.reduce((total, row) => {
-    if (row.items && row.items.length > 0) {
-      return total + row.items.reduce((itemTotal, item) => {
-        return itemTotal + (item.unitPurchasePrice || 0) * (item.requiredQuantity || 0);
-      }, 0);
-    }
-    return total;
-  }, 0);
-}
-
-calculateTotalPurchasePriceIncTax(): number {
-  return this.filteredRows.reduce((total, row) => {
-    if (row.items && row.items.length > 0) {
-      return total + row.items.reduce((itemTotal, item) => {
-        return itemTotal + (item.purchasePriceIncTax || 0) * (item.requiredQuantity || 0);
-      }, 0);
-    }
-    return total;
-  }, 0);
-}
-deleteSelectedRequisitions(): void {
-  if (this.selectedRequisitions.length === 0) return;
-  
-  if (confirm(`Are you sure you want to delete ${this.selectedRequisitions.length} selected requisition(s)?`)) {
-    this.isLoading = true;
+    const target = event.target as HTMLInputElement;
+    this.allSelected = target.checked;
     
-    // Create an array of delete promises
-    const deletePromises = this.selectedRequisitions.map(id => 
-      this.requisitionService.deleteRequisition(id)
-    );
-    
-    // Execute all delete operations
-    Promise.all(deletePromises)
-      .then(() => {
-        this.loadRequisitions();
-        this.selectedRequisitions = [];
-        this.allSelected = false;
-      })
-      .catch(error => {
-        console.error('Error deleting requisitions:', error);
-        alert('Some requisitions could not be deleted. Please try again.');
-      })
-      .finally(() => {
-        this.isLoading = false;
-      });
-  }
-}
-   // Add sorting method
-   sortTable(column: string) {
-    if (this.sortColumn === column) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    if (this.allSelected) {
+      this.selectedRequisitions = this.getPaginatedRows().map(row => row.id);
     } else {
-      this.sortColumn = column;
-      this.sortDirection = 'asc';
+      this.selectedRequisitions = [];
     }
-
-    this.filteredRows.sort((a, b) => {
-      let valueA: any;
-      let valueB: any;
-
-      // Special handling for nested properties
-      if (column === 'items') {
-        valueA = this.calculateTotalRequiredQuantity(a.items);
-        valueB = this.calculateTotalRequiredQuantity(b.items);
-      } else if (column === 'totalQuantity') {
-        valueA = this.calculateTotalRequiredQuantity(a.items);
-        valueB = this.calculateTotalRequiredQuantity(b.items);
-      } else {
-        valueA = a[column as keyof Requisition];
-        valueB = b[column as keyof Requisition];
-      }
-
-      // Handle dates
-      if (column.includes('Date') || column === 'date') {
-        valueA = new Date(valueA).getTime();
-        valueB = new Date(valueB).getTime();
-      }
-
-      // Handle undefined/null values
-      if (valueA === undefined || valueA === null) valueA = '';
-      if (valueB === undefined || valueB === null) valueB = '';
-
-      // Compare values
-      if (valueA < valueB) {
-        return this.sortDirection === 'asc' ? -1 : 1;
-      } else if (valueA > valueB) {
-        return this.sortDirection === 'asc' ? 1 : -1;
-      } else {
-        return 0;
-      }
-    });
   }
 
-  // Update the getSortIcon method to determine which icon to show
+  toggleSelection(id: string): void {
+    const index = this.selectedRequisitions.indexOf(id);
+    if (index === -1) {
+      this.selectedRequisitions.push(id);
+    } else {
+      this.selectedRequisitions.splice(index, 1);
+    }
+    this.allSelected = this.selectedRequisitions.length === this.getPaginatedRows().length;
+  }
+
+  isSelected(id: string): boolean {
+    return this.selectedRequisitions.includes(id);
+  }
+
+  calculateTotalUnitPurchasePrice(): number {
+    return this.filteredRows.reduce((total, row) => {
+      if (row.items && row.items.length > 0) {
+        return total + row.items.reduce((itemTotal, item) => {
+          return itemTotal + (item.unitPurchasePrice || 0) * (item.requiredQuantity || 0);
+        }, 0);
+      }
+      return total;
+    }, 0);
+  }
+
+  calculateTotalPurchasePriceIncTax(): number {
+    return this.filteredRows.reduce((total, row) => {
+      if (row.items && row.items.length > 0) {
+        return total + row.items.reduce((itemTotal, item) => {
+          return itemTotal + (item.purchasePriceIncTax || 0) * (item.requiredQuantity || 0);
+        }, 0);
+      }
+      return total;
+    }, 0);
+  }
+
+  deleteSelectedRequisitions(): void {
+    if (this.selectedRequisitions.length === 0) return;
+    
+    if (confirm(`Are you sure you want to delete ${this.selectedRequisitions.length} selected requisition(s)?`)) {
+      this.isLoading = true;
+      
+      const deletePromises = this.selectedRequisitions.map(id => 
+        this.requisitionService.deleteRequisition(id)
+      );
+      
+      Promise.all(deletePromises)
+        .then(() => {
+          this.loadRequisitions();
+          this.selectedRequisitions = [];
+          this.allSelected = false;
+        })
+        .catch(error => {
+          console.error('Error deleting requisitions:', error);
+          alert('Some requisitions could not be deleted. Please try again.');
+        })
+        .finally(() => {
+          this.isLoading = false;
+        });
+    }
+  }
+
+sortTable(column: string) {
+  if (this.sortColumn === column) {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    this.sortColumn = column;
+    // Set default sort direction based on column - referenceNo now defaults to 'asc'
+    this.sortDirection = column === 'date' ? 'desc' : 'asc';
+  }
+
+  this.filteredRows.sort((a, b) => {
+    let valueA: any;
+    let valueB: any;
+
+    // Handle 'items' and 'totalQuantity' using helper
+    if (column === 'items' || column === 'totalQuantity') {
+      valueA = this.calculateTotalRequiredQuantity(a.items);
+      valueB = this.calculateTotalRequiredQuantity(b.items);
+    } 
+    // Special handling for reference numbers (e.g., "PR-00123")
+    else if (column === 'referenceNo') {
+      const numA = parseInt(a.referenceNo.replace(/\D/g, ''));
+      const numB = parseInt(b.referenceNo.replace(/\D/g, ''));
+
+      if (!isNaN(numA) && !isNaN(numB)) {
+        valueA = numA;
+        valueB = numB;
+      } else {
+        valueA = a.referenceNo;
+        valueB = b.referenceNo;
+      }
+    } 
+    // Generic case: access property directly
+    else {
+      valueA = a[column as keyof typeof a];
+      valueB = b[column as keyof typeof b];
+    }
+
+    // Handle dates
+    if (column.includes('Date') || column === 'date') {
+      valueA = new Date(valueA).getTime();
+      valueB = new Date(valueB).getTime();
+    }
+
+    // Normalize null or undefined
+    if (valueA === undefined || valueA === null) valueA = '';
+    if (valueB === undefined || valueB === null) valueB = '';
+
+    // Final comparison
+    if (valueA < valueB) {
+      return this.sortDirection === 'asc' ? -1 : 1;
+    } else if (valueA > valueB) {
+      return this.sortDirection === 'asc' ? 1 : -1;
+    } else {
+      return 0;
+    }
+  });
+}
+
   getSortIcon(column: string): string {
     if (this.sortColumn !== column) {
       return 'fa-sort';
     }
     return this.sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down';
   }
+
 loadRequisitions() {
   this.isLoading = true;
   this.requisitionService.getRequisitions().subscribe({
     next: (data) => {
+      // First map all the requisitions with proper transformations
       this.rows = data.map(req => {
         const locationObj = this.businessLocations.find(loc => loc.id === req.location);
         const locationName = locationObj ? locationObj.name : req.location;
@@ -392,7 +419,7 @@ loadRequisitions() {
         
         let supplierName = 'N/A';
         let supplierValue: string | undefined = undefined;
-        let supplierAddress = 'N/A'; // Add this line
+        let supplierAddress = 'N/A';
         
         if ('supplier' in req) {
           if (typeof req.supplier === 'string') {
@@ -404,7 +431,6 @@ loadRequisitions() {
                 supplierName = supplierObj.businessName || 
                               `${supplierObj.firstName} ${supplierObj.lastName}`.trim();
                 
-                // Build the address string
                 const addressParts = [
                   supplierObj.address,
                   supplierObj.addressLine1,
@@ -413,9 +439,9 @@ loadRequisitions() {
                   supplierObj.state,
                   supplierObj.postalCode || supplierObj.zipCode,
                   supplierObj.country
-                ].filter(part => !!part); // Remove empty parts
+                ].filter(part => !!part);
                 
-                supplierAddress = addressParts.join(', '); // Set the address
+                supplierAddress = addressParts.join(', ');
               }
             }
           }
@@ -440,12 +466,14 @@ loadRequisitions() {
           shippingStatus: ('shippingStatus' in req) ? req.shippingStatus || 'Not Shipped' : 'Not Shipped',
           supplier: supplierValue,
           supplierName: supplierName,
-          supplierAddress: supplierAddress, // Add this line
+          supplierAddress: supplierAddress,
           shippingDate: ('shippingDate' in req) ? req.shippingDate || 'N/A' : 'N/A',
           totalQuantity: this.calculateTotalRequiredQuantity(req.items || [])
         };
       });
-      
+
+      // Apply initial sort by referenceNo in ascending order
+      this.sortTable('referenceNo');
       this.applyFilters();
       this.isLoading = false;
       this.cdr.detectChanges();
@@ -457,36 +485,40 @@ loadRequisitions() {
   });
 }
 
-applyCustomRange(): void {
-  if (this.fromDate && this.toDate) {
-    this.startDate = this.fromDate;
-    this.endDate = this.toDate;
-    this.applyFilters();
-    this.isDateDrawerOpen = false;
-  } else {
-    alert('Please select both from and to dates');
+  applyCustomRange(): void {
+    if (this.fromDate && this.toDate) {
+      this.startDate = this.fromDate;
+      this.endDate = this.toDate;
+      this.applyFilters();
+      this.isDateDrawerOpen = false;
+    } else {
+      alert('Please select both from and to dates');
+    }
   }
-  }
+
   cancelCustomRange(): void {
-  this.isCustomDate = false;
-  this.selectedRange = '';
-}private formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const day = date.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-private getFinancialYearStart(date: Date): Date {
-  // Assuming financial year starts April 1st
-  const currentMonth = date.getMonth();
-  const currentYear = date.getFullYear();
-  
-  if (currentMonth < 3) { // April is month 3 (0-indexed)
-    return new Date(currentYear - 1, 3, 1);
-  } else {
-    return new Date(currentYear, 3, 1);
+    this.isCustomDate = false;
+    this.selectedRange = '';
   }
-}
+
+  private formatDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private getFinancialYearStart(date: Date): Date {
+    const currentMonth = date.getMonth();
+    const currentYear = date.getFullYear();
+    
+    if (currentMonth < 3) {
+      return new Date(currentYear - 1, 3, 1);
+    } else {
+      return new Date(currentYear, 3, 1);
+    }
+  }
+
   onSearchInput(event: Event): void {
     const target = event.target as HTMLInputElement;
     this.searchTerms.next(target.value);
@@ -497,10 +529,10 @@ private getFinancialYearStart(date: Date): Date {
     this.openActionDropdownId = this.openActionDropdownId === id ? null : id;
   }
 
-getPaginatedRows(): Requisition[] {
-  const startIndex = (this.currentPage - 1) * this.entriesPerPage;
-  return this.filteredRows.slice(startIndex, startIndex + this.entriesPerPage);
-}
+  getPaginatedRows(): Requisition[] {
+    const startIndex = (this.currentPage - 1) * this.entriesPerPage;
+    return this.filteredRows.slice(startIndex, startIndex + this.entriesPerPage);
+  }
 
   getFirstEntryIndex(): number {
     if (this.filteredRows.length === 0) return 0;
@@ -511,239 +543,275 @@ getPaginatedRows(): Requisition[] {
     return Math.min(this.currentPage * this.entriesPerPage, this.filteredRows.length);
   }
 
-approveRequisition(requisition: Requisition, event?: Event) {
-  if (event) event.stopPropagation();
-    
-  if (!this.isAdmin) {
-    alert('Only admin users can approve requisitions');
-    return;
-  }
-  
-  if (confirm('Are you sure you want to approve this requisition?')) {
-    // Get the supplier details including address
-    const supplier = this.suppliers.find(s => s.id === requisition.supplier);
-    let supplierAddress = requisition.supplierAddress || ''; // Use the address from requisition if available
-    
-    if (!supplierAddress && supplier) {
-      // Build the address string from supplier details if not in requisition
-      const addressParts = [
-        supplier.address,
-        supplier.addressLine1,
-        supplier.addressLine2,
-        supplier.city,
-        supplier.state,
-        supplier.postalCode || supplier.zipCode,
-        supplier.country
-      ].filter(part => !!part);
+  approveRequisition(requisition: Requisition, event?: Event) {
+    if (event) event.stopPropagation();
       
-      supplierAddress = addressParts.join(', ');
+    if (!this.isAdmin) {
+      alert('Only admin users can approve requisitions');
+      return;
     }
-
-    // Create a complete purchase order object from the requisition
-    const purchaseOrder = {
-      date: new Date().toLocaleDateString(),
-      referenceNo: requisition.referenceNo,
-      businessLocation: requisition.locationName,
-      businessLocationId: requisition.location,
-      supplier: requisition.supplier || 'To be assigned',
-      supplierName: requisition.supplierName || 'Unknown Supplier',
-      supplierAddress: supplierAddress, // Include the supplier address
-      status: 'Pending',
-      quantityRemaining: 0,
-      shippingStatus: requisition.shippingStatus || 'Not Shipped',
-      shippingCharges: 0,
-      addedBy: requisition.addedBy,
-      createdAt: new Date(),
-      requisitionId: requisition.id,
-      requiredByDate: requisition.requiredByDate,
-      products: requisition.items.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.requiredQuantity,
-        unitCost: item.unitPurchasePrice || 0,
-        unitPurchasePrice: item.unitPurchasePrice || 0,
-        alertQuantity: item.alertQuantity,
-        currentStock: item.currentStock,
-        requiredQuantity: item.requiredQuantity,
-        subtotal: item.subtotal
-      })),
-      items: requisition.items.map(item => ({
-        ...item,
-        unitCost: item.unitPurchasePrice || 0,
-        subtotal: item.subtotal
-      })),
-      brand: requisition.brand,
-      category: requisition.category,
-      shippingDate: requisition.shippingDate,
-      orderTotal: this.calculateRequisitionTotal(requisition.items)
-    };
-
-    this.isLoading = true;
     
-    this.requisitionService.updateRequisitionStatus(requisition.id, 'Approved')
-      .then(() => {
-        return this.purchaseOrderService.createPurchaseOrderFromRequisition(purchaseOrder);
-      })
-      .then((createdOrder) => {
-        this.router.navigate(['/purchase-order'], {
-          queryParams: { 
-            newlyApproved: requisition.id 
-          }
+    if (confirm('Are you sure you want to approve this requisition?')) {
+      const supplier = this.suppliers.find(s => s.id === requisition.supplier);
+      let supplierAddress = requisition.supplierAddress || '';
+      
+      if (!supplierAddress && supplier) {
+        const addressParts = [
+          supplier.address,
+          supplier.addressLine1,
+          supplier.addressLine2,
+          supplier.city,
+          supplier.state,
+          supplier.postalCode || supplier.zipCode,
+          supplier.country
+        ].filter(part => !!part);
+        
+        supplierAddress = addressParts.join(', ');
+      }
+
+      const purchaseOrder = {
+        date: new Date().toLocaleDateString(),
+        referenceNo: requisition.referenceNo,
+        businessLocation: requisition.locationName,
+        businessLocationId: requisition.location,
+        supplier: requisition.supplier || 'To be assigned',
+        supplierName: requisition.supplierName || 'Unknown Supplier',
+        supplierAddress: supplierAddress,
+        status: 'Pending',
+        quantityRemaining: 0,
+        shippingStatus: requisition.shippingStatus || 'Not Shipped',
+        shippingCharges: 0,
+        addedBy: requisition.addedBy,
+        createdAt: new Date(),
+        requisitionId: requisition.id,
+        requiredByDate: requisition.requiredByDate,
+        products: requisition.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.requiredQuantity,
+          unitCost: item.unitPurchasePrice || 0,
+          unitPurchasePrice: item.unitPurchasePrice || 0,
+          alertQuantity: item.alertQuantity,
+          currentStock: item.currentStock,
+          requiredQuantity: item.requiredQuantity,
+          subtotal: item.subtotal
+        })),
+        items: requisition.items.map(item => ({
+          ...item,
+          unitCost: item.unitPurchasePrice || 0,
+          subtotal: item.subtotal
+        })),
+        brand: requisition.brand,
+        category: requisition.category,
+        shippingDate: requisition.shippingDate,
+        orderTotal: this.calculateRequisitionTotal(requisition.items)
+      };
+
+      this.isLoading = true;
+      
+      this.requisitionService.updateRequisitionStatus(requisition.id, 'Approved')
+        .then(() => {
+          return this.purchaseOrderService.createPurchaseOrderFromRequisition(purchaseOrder);
+        })
+        .then((createdOrder) => {
+          this.router.navigate(['/purchase-order'], {
+            queryParams: { 
+              newlyApproved: requisition.id 
+            }
+          });
+        })
+        .catch(error => {
+          console.error('Error in approval process:', error);
+          alert('Error during approval process. Please try again.');
+        })
+        .finally(() => {
+          this.isLoading = false;
         });
-      })
-      .catch(error => {
-        console.error('Error in approval process:', error);
-        alert('Error during approval process. Please try again.');
-      })
-      .finally(() => {
-        this.isLoading = false;
-      });
+    }
   }
-}
- createPurchaseOrderFromRequisition(order: any): Promise<any> {
-  // Include supplierAddress in the data being saved
-  const orderData = {
-    ...order,
-    supplierAddress: order.supplierAddress || 'N/A'
-  };
-  
-  return this.afs.collection('purchaseOrders').add(orderData);
-}
-calculateRequisitionTotal(items: RequisitionItem[]): number {
-  if (!items || items.length === 0) return 0;
-  return items.reduce((total, item) => {
-    return total + (item.subtotal || (item.requiredQuantity * (item.unitPurchasePrice || 0)));
-  }, 0);
-}
 
-previousPage(): void {
-  if (this.currentPage > 1) {
-    this.currentPage--;
+async updateRequisition(requisition: Requisition, updatedData: Partial<Requisition>): Promise<void> {
+  try {
+    // Remove supplier from the update data since the service expects it as boolean
+    const { supplier, ...cleanedData } = updatedData;
+    
+    await this.requisitionService.updateRequisitionAndOrder(requisition.id, cleanedData);
+    this.loadRequisitions();
+    alert('Requisition and linked order updated successfully!');
+  } catch (error) {
+    console.error('Error updating requisition:', error);
+    alert('Failed to update requisition');
   }
 }
 
-
-nextPage(): void {
-  if (this.currentPage < this.totalPages) {
-    this.currentPage++;
+  createPurchaseOrderFromRequisition(order: any): Promise<any> {
+    const orderData = {
+      ...order,
+      supplierAddress: order.supplierAddress || 'N/A'
+    };
+    
+    return this.afs.collection('purchaseOrders').add(orderData);
   }
-}
 
-calculateTotalPages(): void {
-  this.totalPages = Math.max(1, Math.ceil(this.filteredRows.length / this.entriesPerPage));
-  if (this.currentPage > this.totalPages && this.totalPages > 0) {
+  calculateRequisitionTotal(items: RequisitionItem[]): number {
+    if (!items || items.length === 0) return 0;
+    return items.reduce((total, item) => {
+      return total + (item.subtotal || (item.requiredQuantity * (item.unitPurchasePrice || 0)));
+    }, 0);
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+    }
+  }
+
+  calculateTotalPages(): void {
+    this.totalPages = Math.max(1, Math.ceil(this.filteredRows.length / this.entriesPerPage));
+    if (this.currentPage > this.totalPages && this.totalPages > 0) {
+      this.currentPage = 1;
+    }
+  }
+
+  onEntriesChange(): void {
+    this.calculateTotalPages();
     this.currentPage = 1;
   }
-}
 
-onEntriesChange(): void {
-  this.calculateTotalPages();
-  this.currentPage = 1;
-}
+// In purchase-requisition.component.ts
 
-  applyFilters() {
+// ... inside the PurchaseRequisitionComponent class
+
+applyFilters() {
+  // Filter the original 'rows' array and assign the result to 'filteredRows'
   this.filteredRows = this.rows.filter(row => {
-      const searchTerm = this.searchTerm.toLowerCase();
-      const matchesSearch = !this.searchTerm || 
-        (row.referenceNo?.toLowerCase().includes(searchTerm) ||
-        row.locationName?.toLowerCase().includes(searchTerm) || 
-        row.addedBy?.toLowerCase().includes(searchTerm) || 
-        row.status?.toLowerCase().includes(searchTerm) ||
-        (row.brand && row.brand.toLowerCase().includes(searchTerm)) ||
-        (row.category && row.category.toLowerCase().includes(searchTerm)) ||
-        (row.supplierName && row.supplierName.toLowerCase().includes(searchTerm)) ||
+      const searchTerm = this.searchTerm.toLowerCase().trim();
+
+      // Condition 1: Check if the row matches the search term
+      const matchesSearch = !searchTerm || 
+        (row.referenceNo?.toLowerCase().includes(searchTerm)) ||
+        (row.locationName?.toLowerCase().includes(searchTerm)) || 
+        (row.addedBy?.toLowerCase().includes(searchTerm)) || 
+        (row.status?.toLowerCase().includes(searchTerm)) ||
+        (row.brand?.toLowerCase().includes(searchTerm)) ||
+        (row.category?.toLowerCase().includes(searchTerm)) ||
+        (row.supplierName?.toLowerCase().includes(searchTerm)) ||
         (row.items && row.items.some(item => 
           item.productName?.toLowerCase().includes(searchTerm)
-        )));
+        ));
       
+      // Condition 2: Check if the row matches the selected location
       const matchesLocation = this.selectedLocation === 'All' || 
                             row.locationName === this.selectedLocation;
   
+      // --- THIS IS THE CORRECTED LINE ---
+      // It handles case-insensitivity and checks if row.status exists.
       const matchesStatus = this.selectedStatus === 'All' || 
-                          row.status === this.selectedStatus;
-  
+                          (row.status && row.status.toLowerCase() === this.selectedStatus.toLowerCase());
+      
+      // Condition 4: Check if the row matches the selected supplier
       const matchesSupplier = this.selectedSupplier === 'All' || 
                             row.supplier === this.selectedSupplier;
   
-    // Date range filter
-    const matchesRequiredByDate = !this.requiredByDate || 
+      // Condition 5: Check if the row matches the required-by date
+      const matchesRequiredByDate = !this.requiredByDate || 
                                 row.requiredByDate === this.requiredByDate;
 
-    // Date range filter logic
-    let matchesDateRange = true;
-    if (this.startDate && this.endDate) {
-      const rowDate = new Date(row.date);
-      const start = new Date(this.startDate);
-      const end = new Date(this.endDate);
-      // Set time to 0 for comparison
-      rowDate.setHours(0, 0, 0, 0);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(0, 0, 0, 0);
-      matchesDateRange = rowDate >= start && rowDate <= end;
-    }
+      // Condition 6: Check if the row falls within the selected date range
+      let matchesDateRange = true;
+      if (this.startDate && this.endDate) {
+        try {
+          const rowDate = new Date(row.date);
+          const start = new Date(this.startDate);
+          const end = new Date(this.endDate);
+          
+          // Normalize dates to ignore time component
+          rowDate.setHours(0, 0, 0, 0);
+          start.setHours(0, 0, 0, 0);
+          end.setHours(0, 0, 0, 0);
+          
+          matchesDateRange = rowDate >= start && rowDate <= end;
+        } catch (e) {
+          matchesDateRange = false; // Invalid date format in data
+        }
+      }
 
-    return matchesSearch && matchesLocation && matchesStatus && 
-           matchesSupplier && matchesDateRange && matchesRequiredByDate;
+      // The row will be included in the final list only if ALL conditions are true
+      return matchesSearch && 
+             matchesLocation && 
+             matchesStatus && 
+             matchesSupplier && 
+             matchesDateRange && 
+             matchesRequiredByDate;
   });
-
+  
+  // After filtering, re-apply the current sort order
+  if (this.sortColumn) {
+    this.sortTable(this.sortColumn);
+  }
+  
+  // Reset pagination to the first page and update total pages
   this.calculateTotalPages();
   this.currentPage = 1;
-  this.openActionDropdownId = null;
+  this.openActionDropdownId = null; // Close any open action dropdowns
 }
+  resetFilters(): void {
+      this.selectedLocation = 'All';
+      this.selectedStatus = 'All';
+      this.selectedSupplier = 'All';
+      this.startDate = '';
+      this.endDate = '';
+      this.requiredByDate = '';
+      this.searchTerm = '';
+      this.applyFilters();
+    }
 
-resetFilters(): void {
-    this.selectedLocation = 'All';
-    this.selectedStatus = 'All';
-    this.selectedSupplier = 'All';
-    this.startDate = '';
-    this.endDate = '';
-    this.requiredByDate = '';
-    this.searchTerm = '';
-    this.applyFilters();
+  exportCSV() {
+    const visibleColumns = this.columns.filter(col => col.visible);
+    const headers = visibleColumns.map(col => col.name);
+    
+    const data = this.filteredRows.map(row => 
+      visibleColumns.map(col => {
+        if (col.field === 'items') {
+          return row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
+        }
+        if (col.field === 'totalQuantity') {
+          return this.calculateTotalRequiredQuantity(row.items);
+        }
+        return row[col.field as keyof Requisition] || '';
+      })
+    );
+
+    const totalsRow: (string | number)[] = visibleColumns.map(col => {
+      if (col.field === 'unitPurchasePrice') {
+        return this.calculateTotalUnitPurchasePrice();
+      }
+      if (col.field === 'purchasePriceIncTax') {
+        return this.calculateTotalPurchasePriceIncTax();
+      }
+      return '';
+    });
+    totalsRow[0] = 'Totals:';
+
+    let csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(',') + '\n'
+      + data.map(e => e.join(',')).join('\n')
+      + '\n' + totalsRow.join(',');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "purchase_requisitions.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
-
- exportCSV() {
-  const visibleColumns = this.columns.filter(col => col.visible);
-  const headers = visibleColumns.map(col => col.name);
-  
-  const data = this.filteredRows.map(row => 
-    visibleColumns.map(col => {
-      if (col.field === 'items') {
-        return row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ');
-      }
-      if (col.field === 'totalQuantity') {
-        return this.calculateTotalRequiredQuantity(row.items);
-      }
-      return row[col.field as keyof Requisition] || '';
-    })
-  );
-
-  // Add totals row
-  const totalsRow: (string | number)[] = visibleColumns.map(col => {
-    if (col.field === 'unitPurchasePrice') {
-      return this.calculateTotalUnitPurchasePrice();
-    }
-    if (col.field === 'purchasePriceIncTax') {
-      return this.calculateTotalPurchasePriceIncTax();
-    }
-    return '';
-  });
-  totalsRow[0] = 'Totals:'; // Set the first column to "Totals"
-
-  let csvContent = "data:text/csv;charset=utf-8," 
-    + headers.join(',') + '\n'
-    + data.map(e => e.join(',')).join('\n')
-    + '\n' + totalsRow.join(',');
-
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "purchase_requisitions.csv");
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
 
 exportExcel() {
   const visibleData = this.filteredRows.map(row => {
@@ -782,45 +850,99 @@ exportExcel() {
   XLSX.writeFile(workbook, 'purchase_requisitions.xlsx');
 }
 
-  print() {
-    const printDiv = document.createElement('div');
-    printDiv.innerHTML = `
-      <h2>Purchase Requisitions</h2>
-      <table border="1" cellpadding="3" cellspacing="0" style="width:100%">
-        <thead>
-          <tr>
-            ${this.columns.filter(col => col.visible)
-              .map(col => `<th>${col.name}</th>`).join('')}
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${this.getPaginatedRows().map(row => `
+print(): void {
+  // Format the date as DD-MM-YYYY
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-GB').replace(/\//g, '-');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Create the print content with styling
+  const printContent = `
+    <html>
+      <head>
+        <title>Purchase Requisitions</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h2 { color: #333; text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+          }
+          .pending { background-color: #fff3cd; color: #856404; }
+          .approved { background-color: #d4edda; color: #155724; }
+          .rejected { background-color: #f8d7da; color: #721c24; }
+          .footer { margin-top: 20px; text-align: center; font-size: 14px; }
+        </style>
+      </head>
+      <body>
+        <h2>Purchase Requisitions</h2>
+        <table>
+          <thead>
             <tr>
-              ${this.columns.filter(col => col.visible)
-                .map(col => {
+              ${this.getVisibleColumns().map(col => `<th>${col.name}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${this.filteredRows.map(row => `
+              <tr>
+                ${this.getVisibleColumns().map(col => {
                   if (col.field === 'items') {
                     return `<td>${row.items.map(item => `${item.productName} (${item.requiredQuantity})`).join(', ')}</td>`;
                   }
-                  return `<td>${row[col.field as keyof Requisition] || ''}</td>`;
+                  if (col.field === 'status') {
+                    return `<td><span class="status-badge ${row.status.toLowerCase()}">${row.status}</span></td>`;
+                  }
+                  if (col.field === 'totalQuantity') {
+                    return `<td>${this.calculateTotalRequiredQuantity(row.items)}</td>`;
+                  }
+                  if (col.field === 'unitPurchasePrice') {
+                    return `<td>₹ ${row.items.reduce((total, item) => total + (item.unitPurchasePrice || 0), 0).toFixed(2)}</td>`;
+                  }
+                  if (col.field === 'purchasePriceIncTax') {
+                    return `<td>₹ ${row.items.reduce((total, item) => total + (item.purchasePriceIncTax || 0), 0).toFixed(2)}</td>`;
+                  }
+                  return `<td>${row[col.field as keyof Requisition] || 'N/A'}</td>`;
                 }).join('')}
-              <td>View/Approve/Delete</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      <div style="margin-top: 20px;">
-        Showing ${this.getFirstEntryIndex()} to ${this.getLastEntryIndex()} 
-        of ${this.filteredRows.length} entries
-      </div>
-    `;
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          Showing ${this.getFirstEntryIndex()} to ${this.getLastEntryIndex()} of ${this.filteredRows.length} entries
+        </div>
+      </body>
+    </html>
+  `;
+
+  // Create a new window for printing
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(printContent);
+    printWindow.document.close();
     
-    const printWindow = window.open('', '_blank');
-    printWindow?.document.write(printDiv.innerHTML);
-    printWindow?.document.close();
-    printWindow?.focus();
-    printWindow?.print();
+    // Wait for the content to load before printing
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    };
+  } else {
+    alert('Please allow popups for this site to enable printing.');
   }
+}
 
   toggleColumnVisibility() {
     this.showColumnVisibility = !this.showColumnVisibility;
@@ -923,7 +1045,6 @@ exportPDF() {
 
   doc.save('purchase_requisitions.pdf');
 }
-
 
   toggleFilters(): void {
     this.showFilters = !this.showFilters;

@@ -1,122 +1,144 @@
-<div class="card">
-    <div class="card-header">
-      <h3 class="card-title">Product Sales Report</h3>
-    </div>
-    <div class="card-body">
-      <!-- Filter and Export Section -->
-      <div class="row mb-4">
-        <div class="col-md-8">
-          <div class="card">
-            <div class="card-body">
-              <h5 class="card-title mb-3">Date Filter</h5>
-              <div class="row">
-                <div class="col-md-4">
-                  <label class="form-label">From Date</label>
-                  <input type="date" class="form-control" [(ngModel)]="startDate">
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">To Date</label>
-                  <input type="date" class="form-control" [(ngModel)]="endDate">
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                  <div class="btn-group">
-                    <button class="btn btn-primary" (click)="applyDateFilter()">
-                      <i class="fa fa-filter"></i> Apply
-                    </button>
-                    <button class="btn btn-secondary" (click)="resetFilters()">
-                      <i class="fa fa-sync"></i> Reset
-                    </button>
-                  </div>
-                </div>
-              </div>
+
+<div class="card product-sales-report">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa fa-chart-bar me-2"></i>Product Sales Report</h3>
+  </div>
+  <div class="card-body">
+    <!-- Filter and Export Section -->
+    <div class="filter-card card mb-4">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Filters</h5>
+        <div class="row g-3">
+          <!-- NEW: General Search Input -->
+          <div class="col-md-3">
+            <label class="form-label">Search</label>
+            <input type="text" class="form-control" placeholder="Search by Name, SKU, Location..."
+                   [(ngModel)]="searchTerm" (input)="applyFilters()">
+          </div>
+
+          <!-- <div class="col-md-2">
+            <label class="form-label">Location</label>
+            <select class="form-select" [(ngModel)]="selectedLocation">
+              <option value="">All Locations</option>
+              <option *ngFor="let location of availableLocations" [value]="location">{{ location }}</option>
+            </select>
+          </div> -->
+
+<!-- From Date Filter -->
+<div class="col-md-2">
+  <label class="form-label">From Date</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(startDate)"
+           (blur)="onManualDateInput($event, 'start')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="startDate" (change)="applyFilters()">
+  </div>
+</div>
+
+<!-- To Date Filter -->
+<div class="col-md-2">
+  <label class="form-label">To Date</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(endDate)"
+           (blur)="onManualDateInput($event, 'end')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="endDate" (change)="applyFilters()">
+  </div>
+</div>
+
+          <!-- Action Buttons -->
+          <div class="col-md-3 d-flex align-items-end">
+            <div class="btn-group w-100">
+              <button class="btn btn-primary" (click)="runReport()">
+                <i class="fa fa-filter"></i> Apply
+              </button>
+              <button class="btn btn-secondary" (click)="resetFilters()">
+                <i class="fa fa-sync"></i> Reset
+              </button>
             </div>
           </div>
         </div>
-        <div class="col-md-4 d-flex align-items-center justify-content-end">
-          <button class="btn btn-success" (click)="exportToCSV()">
-            <i class="fa fa-download"></i> Export to CSV
-          </button>
-        </div>
       </div>
-  
-      <!-- Loading indicator -->
-      <div *ngIf="isLoading" class="text-center my-4">
-        <div class="spinner-border" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-        <p class="mt-2">Loading product sales data...</p>
+    </div>
+
+    <!-- Header for Table and Export -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">Sales Data</h5>
+      <!-- UPDATED: Export to Excel Button -->
+      <button class="btn btn-success" (click)="exportToExcel()">
+        <i class="fa fa-file-excel me-2"></i> Export to Excel
+      </button>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div *ngIf="isLoading" class="text-center my-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
       </div>
-  
-      <!-- Table Section -->
-      <div class="table-responsive" *ngIf="!isLoading">
-        <table class="table table-hover">
-          <thead>
-            <tr>
-              <th>S.No</th>
-              <th (click)="sortData('productName')">
-                Product Name
-                <i class="fa" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'productName',
-                  'fa-sort-up': currentSortColumn === 'productName' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'productName' && !isAscending
-                }"></i>
-              </th>
-              <th (click)="sortData('sku')">
-                SKU
-                <i class="fa" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'sku',
-                  'fa-sort-up': currentSortColumn === 'sku' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'sku' && !isAscending
-                }"></i>
-              </th>
-              <th (click)="sortData('quantity')">
-                Quantity Sold
-                <i class="fa" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'quantity',
-                  'fa-sort-up': currentSortColumn === 'quantity' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'quantity' && !isAscending
-                }"></i>
-              </th>
-              <th (click)="sortData('averagePrice')">
-                Average Price
-                <i class="fa" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'averagePrice',
-                  'fa-sort-up': currentSortColumn === 'averagePrice' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'averagePrice' && !isAscending
-                }"></i>
-              </th>
-              <th (click)="sortData('totalSales')">
-                Total Sales
-                <i class="fa" [ngClass]="{
-                  'fa-sort': currentSortColumn !== 'totalSales',
-                  'fa-sort-up': currentSortColumn === 'totalSales' && isAscending,
-                  'fa-sort-down': currentSortColumn === 'totalSales' && !isAscending
-                }"></i>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let product of products; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>{{ product.productName }}</td>
-              <td>{{ product.sku }}</td>
-              <td>{{ product.quantity }}</td>
-              <td>₹{{ product.averagePrice | number:'1.2-2' }}</td>
-              <td>₹{{ product.totalSales | number:'1.2-2' }}</td>
-            </tr>
-            <tr *ngIf="products.length === 0">
-              <td colspan="6" class="text-center">No product sales data available</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="table-active">
-              <td colspan="3" class="text-end fw-bold">Totals:</td>
-              <td class="fw-bold">{{ totalQuantity }}</td>
-              <td></td>
-              <td class="fw-bold">₹{{ totalSales | number:'1.2-2' }}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
+      <p class="mt-2 text-muted">Loading product sales data...</p>
+    </div>
+
+    <!-- Table Section -->
+    <div class="table-responsive" *ngIf="!isLoading">
+      <table class="table table-hover table-striped styled-table">
+        <thead>
+          <tr>
+            <th>S.No</th>
+            <th (click)="sortData('productName')">
+              Product Name <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'productName', 'fa-sort-up': currentSortColumn === 'productName' && isAscending, 'fa-sort-down': currentSortColumn === 'productName' && !isAscending}"></i>
+            </th>
+            <th (click)="sortData('sku')">
+              SKU <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'sku', 'fa-sort-up': currentSortColumn === 'sku' && isAscending, 'fa-sort-down': currentSortColumn === 'sku' && !isAscending}"></i>
+            <!-- </th>
+            <th (click)="sortData('location')">
+              Location <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'location', 'fa-sort-up': currentSortColumn === 'location' && isAscending, 'fa-sort-down': currentSortColumn === 'location' && !isAscending}"></i>
+            </th> -->
+            <th class="text-end" (click)="sortData('quantity')">
+              Quantity Sold <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'quantity', 'fa-sort-up': currentSortColumn === 'quantity' && isAscending, 'fa-sort-down': currentSortColumn === 'quantity' && !isAscending}"></i>
+            </th>
+            <th class="text-end" (click)="sortData('averagePrice')">
+              Average Price <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'averagePrice', 'fa-sort-up': currentSortColumn === 'averagePrice' && isAscending, 'fa-sort-down': currentSortColumn === 'averagePrice' && !isAscending}"></i>
+            </th>
+            <th class="text-end" (click)="sortData('totalSales')">
+              Total Sales <i class="fa" [ngClass]="{'fa-sort': currentSortColumn !== 'totalSales', 'fa-sort-up': currentSortColumn === 'totalSales' && isAscending, 'fa-sort-down': currentSortColumn === 'totalSales' && !isAscending}"></i>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let product of products; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td>{{ product.productName }}</td>
+            <td>{{ product.sku }}</td>
+            <!-- <td>{{ product.location }}</td> -->
+            <td class="text-end">{{ product.quantity }}</td>
+            <td class="text-end">₹{{ product.averagePrice | number:'1.2-2' }}</td>
+            <td class="text-end fw-bold">₹{{ product.totalSales | number:'1.2-2' }}</td>
+          </tr>
+          <tr *ngIf="products.length === 0">
+            <td colspan="7" class="text-center py-4">
+              <i class="fa fa-info-circle me-2"></i>No product sales data available for the selected filters.
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="4" class="text-end fw-bold fs-5">Totals:</td>
+            <td class="fw-bold fs-5 text-end">{{ totalQuantity }}</td>
+            <td></td>
+            <td class="fw-bold fs-5 text-end">₹{{ totalSales | number:'1.2-2' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   </div>
+</div>

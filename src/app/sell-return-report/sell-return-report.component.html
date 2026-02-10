@@ -1,12 +1,18 @@
-<!-- sell-return-report.component.html -->
 <div class="container mt-4">
-  <div class="card">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <h4>Sales Returns Report</h4>
-      <div class="input-group" style="width: 300px;">
-        <span class="input-group-text"><i class="fa fa-search"></i></span>
-        <input type="text" class="form-control" placeholder="Search returns..."
-                [(ngModel)]="searchTerm" (keyup)="applyFilters()">
+  <div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap py-3">
+      <h4 class="mb-0">Sales Returns Report</h4>
+      
+      <div class="d-flex gap-2">
+        <button class="btn btn-success" (click)="exportToExcel()">
+          <i class="fa fa-file-excel-o me-1"></i> Export Excel
+        </button>
+
+        <div class="input-group" style="width: 300px;">
+          <span class="input-group-text"><i class="fa fa-search"></i></span>
+          <input type="text" class="form-control" placeholder="Search invoice or customer..."
+                  [(ngModel)]="searchTerm" (keyup)="applyFilters()">
+        </div>
       </div>
     </div>
     
@@ -14,62 +20,85 @@
       <!-- Summary Cards -->
       <div class="row mb-4">
         <div class="col-md-3">
-          <div class="card bg-primary text-white">
+          <div class="card bg-primary text-white border-0">
             <div class="card-body text-center">
-              <h3>{{ returns.length }}</h3>
-              <p class="mb-0">Total Returns</p>
+              <h3 class="mb-0">{{ returns.length }}</h3>
+              <small>Total Returns</small>
             </div>
           </div>
         </div>
         <div class="col-md-3">
-          <div class="card bg-success text-white">
+          <div class="card bg-success text-white border-0">
             <div class="card-body text-center">
-              <h3>{{ getProcessedReturnsCount() }}</h3>
-              <p class="mb-0">Processed</p>
+              <h3 class="mb-0">{{ getProcessedReturnsCount() }}</h3>
+              <small>Processed</small>
             </div>
           </div>
         </div>
         <div class="col-md-3">
-          <div class="card bg-warning text-white">
+          <div class="card bg-warning text-white border-0">
             <div class="card-body text-center">
-              <h3>{{ getPendingReturnsCount() }}</h3>
-              <p class="mb-0">Pending</p>
+              <h3 class="mb-0">{{ getPendingReturnsCount() }}</h3>
+              <small>Pending</small>
             </div>
           </div>
         </div>
         <div class="col-md-3">
-          <div class="card bg-info text-white">
+          <div class="card bg-info text-white border-0">
             <div class="card-body text-center">
-              <h3>₹{{ getTotalRefundAmountAll() | number:'1.2-2' }}</h3>
-              <p class="mb-0">Total Refunds</p>
+              <h3 class="mb-0">₹{{ getTotalRefundAmountAll() | number:'1.2-2' }}</h3>
+              <small>Total Refunds</small>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Date Filter -->
-      <div class="row mb-3">
-        <div class="col-md-4">
-          <label class="form-label">From Date:</label>
-          <input type="date" class="form-control" [(ngModel)]="fromDate" (change)="applyFilters()">
+      <!-- Filters Section (Updated with dd-mm-yyyy logic) -->
+      <div class="row mb-4 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label fw-bold">From Date:</label>
+          <div class="date-input-wrapper">
+            <input type="text" class="form-control" 
+                   [value]="getDisplayDate(fromDate)"
+                   (blur)="onDateInput($event, 'from')"
+                   (keyup.enter)="onDateInput($event, 'from')"
+                   placeholder="DD-MM-YYYY">
+            <button class="calendar-btn" (click)="openDatePicker('from')">
+              <i class="fa fa-calendar"></i>
+            </button>
+            <input #fromDatePicker type="date" class="hidden-date-picker" [(ngModel)]="fromDate" (change)="applyFilters()">
+          </div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">To Date:</label>
-          <input type="date" class="form-control" [(ngModel)]="toDate" (change)="applyFilters()">
+        <div class="col-md-3">
+          <label class="form-label fw-bold">To Date:</label>
+          <div class="date-input-wrapper">
+            <input type="text" class="form-control" 
+                   [value]="getDisplayDate(toDate)"
+                   (blur)="onDateInput($event, 'to')"
+                   (keyup.enter)="onDateInput($event, 'to')"
+                   placeholder="DD-MM-YYYY">
+            <button class="calendar-btn" (click)="openDatePicker('to')">
+              <i class="fa fa-calendar"></i>
+            </button>
+            <input #toDatePicker type="date" class="hidden-date-picker" [(ngModel)]="toDate" (change)="applyFilters()">
+          </div>
         </div>
-        <div class="col-md-4">
-          <label class="form-label">Status:</label>
-          <select class="form-control" [(ngModel)]="statusFilter" (change)="applyFilters()">
+        <div class="col-md-3">
+          <label class="form-label fw-bold">Status:</label>
+          <select class="form-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
             <option value="">All Statuses</option>
             <option value="Processed">Processed</option>
             <option value="Pending">Pending</option>
             <option value="Rejected">Rejected</option>
           </select>
         </div>
+        <div class="col-md-3">
+            <button class="btn btn-outline-secondary w-100" (click)="searchTerm=''; fromDate=''; toDate=''; applyFilters()">Reset Filters</button>
+        </div>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-hover">
+        <table class="table table-hover align-middle">
           <thead class="table-light">
             <tr>
               <th>Return Date</th>
@@ -82,97 +111,64 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let ret of filteredReturns | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage; let i = index">
-              <td>
-                <strong>{{ getReturnDate(ret) | date:'shortDate' }}</strong>
-                <br>
-              </td>
-              <td>
-                <span class="badge bg-secondary">{{ ret.invoiceNo || ret.saleData?.invoiceNo || 'N/A' }}</span>
-              </td>
-              <td>
-                <strong>{{ ret.customer || ret.saleData?.customer || 'N/A' }}</strong>
-              </td>
+            <tr *ngFor="let ret of filteredReturns | slice: (currentPage-1)*entriesPerPage : currentPage*entriesPerPage" 
+                (click)="viewReturnDetails(ret)" style="cursor: pointer;">
+              <td class="fw-bold">{{ getReturnDate(ret) | date:'dd-MM-yyyy' }}</td>
+              <td><span class="badge bg-secondary">{{ ret.invoiceNo }}</span></td>
+              <td>{{ ret.customer }}</td>
               <td>
                 <div class="small">
-                  <div *ngFor="let item of ret.returnedItems; let first = first" 
-                       [class.mb-1]="!first">
-                    <span class="badge bg-light text-dark me-1">
-                      {{ item.name || item.productName || 'Unknown Item' }}
-                    </span>
-                    <span class="text-muted">
-                      ({{ item.quantity || item.returnQuantity || 0 }} of {{ item.originalQuantity || item.quantity || 0 }})
-                    </span>
+                  <div *ngFor="let item of ret.returnedItems">
+                    <span class="text-primary">•</span> {{ item.name }} 
+                    <small class="text-muted">({{ item.quantity }})</small>
                   </div>
                 </div>
               </td>
               <td>
-                <span class="text-muted" [title]="ret.returnReason || ret.reason || 'No reason provided'">
-                  {{ (ret.returnReason || ret.reason || 'No reason provided') | slice:0:50 }}
-                  <span *ngIf="(ret.returnReason || ret.reason || '').length > 50">...</span>
-                </span>
+                <small class="text-muted text-truncate d-inline-block" style="max-width: 150px;">
+                  {{ ret.returnReason || 'No reason' }}
+                </small>
               </td>
-              <td class="text-end">
-                <strong class="text-success">₹{{ getTotalRefundAmount(ret.returnedItems) | number:'1.2-2' }}</strong>
-              </td>
+              <td class="text-end fw-bold text-success">₹{{ getTotalRefundAmount(ret.returnedItems) | number:'1.2-2' }}</td>
               <td>
                 <span class="badge" [ngClass]="{
                   'bg-success': getReturnStatus(ret) === 'Processed',
                   'bg-warning text-dark': getReturnStatus(ret) === 'Pending',
-                  'bg-danger': getReturnStatus(ret) === 'Rejected',
-                  'bg-info': getReturnStatus(ret) === 'Completed'
+                  'bg-danger': getReturnStatus(ret) === 'Rejected'
                 }">
                   {{ getReturnStatus(ret) }}
                 </span>
               </td>
-
             </tr>
           </tbody>
         </table>
         
-        <div *ngIf="filteredReturns.length === 0" class="text-center py-4">
-          <div class="alert alert-info">
-            <i class="fa fa-info-circle me-2"></i>
-            <strong>No returns found</strong>
-            <p class="mb-0 mt-2">Try adjusting your search criteria or date filters.</p>
-          </div>
+        <div *ngIf="filteredReturns.length === 0" class="text-center py-5">
+            <i class="fa fa-inbox fa-3x text-light mb-3"></i>
+            <p class="text-muted">No matching returns found for this criteria.</p>
         </div>
       </div>
       
       <!-- Pagination -->
-      <div class="row mt-3" *ngIf="filteredReturns.length > 0">
+      <div class="row mt-3 align-items-center" *ngIf="filteredReturns.length > 0">
         <div class="col-md-6">
-          <div class="d-flex align-items-center">
-            <span class="me-2">Show:</span>
-            <select class="form-select form-select-sm" style="width: auto;" 
-                    [(ngModel)]="entriesPerPage" (change)="onEntriesPerPageChange()">
-              <option value="5">5</option>
+          <div class="d-flex align-items-center gap-2">
+            <span>Show</span>
+            <select class="form-select form-select-sm" style="width: 80px;" [(ngModel)]="entriesPerPage" (change)="onEntriesPerPageChange()">
               <option value="10">10</option>
               <option value="25">25</option>
               <option value="50">50</option>
             </select>
-            <span class="ms-2">entries</span>
+            <span>entries</span>
           </div>
         </div>
-        <div class="col-md-6">
-          <div class="d-flex justify-content-end align-items-center">
-            <span class="me-3">
-              Showing {{ (currentPage-1)*entriesPerPage + 1 }} to 
-              {{ Math.min(currentPage*entriesPerPage, totalEntries) }} 
-              of {{ totalEntries }} entries
-            </span>
-            <div class="btn-group">
-              <button class="btn btn-outline-secondary btn-sm"
-                      [disabled]="currentPage === 1"
-                      (click)="previousPage()">
-                <i class="fa fa-chevron-left"></i> Previous
-              </button>
-              <button class="btn btn-outline-secondary btn-sm"
-                      [disabled]="currentPage*entriesPerPage >= totalEntries"
-                      (click)="nextPage()">
-                Next <i class="fa fa-chevron-right"></i>
-              </button>
-            </div>
+        <div class="col-md-6 text-end">
+          <span class="me-3 small text-muted">
+            Showing {{ (currentPage-1)*entriesPerPage + 1 }} to {{ Math.min(currentPage*entriesPerPage, totalEntries) }} of {{ totalEntries }}
+          </span>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-outline-secondary" [disabled]="currentPage === 1" (click)="previousPage()">Prev</button>
+            <button class="btn btn-sm btn-outline-secondary" [disabled]="currentPage*entriesPerPage >= totalEntries" (click)="nextPage()">Next</button>
           </div>
         </div>
       </div>
@@ -180,7 +176,7 @@
   </div>
 </div>
 
-<!-- Return Details Modal -->
+<!-- Return Details Modal (Updated Date Display) -->
 <div class="modal fade" id="returnDetailsModal" tabindex="-1" *ngIf="selectedReturn">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -189,56 +185,35 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div class="row">
+        <div class="row mb-3">
           <div class="col-md-6">
-            <p><strong>Return Date:</strong> {{ getReturnDate(selectedReturn) | date:'medium' }}</p>
-            <p><strong>Customer:</strong> {{ selectedReturn.customer || selectedReturn.saleData?.customer }}</p>
-            <p><strong>Status:</strong> 
-              <span class="badge" [ngClass]="{
-                'bg-success': getReturnStatus(selectedReturn) === 'Processed',
-                'bg-warning text-dark': getReturnStatus(selectedReturn) === 'Pending',
-                'bg-danger': getReturnStatus(selectedReturn) === 'Rejected'
-              }">
-                {{ getReturnStatus(selectedReturn) }}
-              </span>
-            </p>
+            <p class="mb-1"><strong>Return Date:</strong> {{ getReturnDate(selectedReturn) | date:'dd-MM-yyyy' }}</p>
+            <p class="mb-1"><strong>Customer:</strong> {{ selectedReturn.customer }}</p>
           </div>
-          <div class="col-md-6">
-            <p><strong>Original Sale Date:</strong> {{ selectedReturn.saleData?.saleDate | date:'mediumDate' }}</p>
-            <p><strong>Total Refund:</strong> ₹{{ getTotalRefundAmount(selectedReturn.returnedItems) | number:'1.2-2' }}</p>
+          <div class="col-md-6 text-md-end">
+            <p class="mb-1"><strong>Status:</strong> {{ getReturnStatus(selectedReturn) }}</p>
+            <p class="mb-1"><strong>Refund Total:</strong> ₹{{ getTotalRefundAmount(selectedReturn.returnedItems) | number:'1.2-2' }}</p>
           </div>
         </div>
-        
-        <h6>Return Reason:</h6>
-        <p class="bg-light p-2 rounded">{{ selectedReturn.returnReason || selectedReturn.reason || 'No reason provided' }}</p>
-        
-        <h6>Returned Items:</h6>
-        <div class="table-responsive">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Returned Qty</th>
-                <th>Unit Price</th>
-                <th class="text-end">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let item of selectedReturn.returnedItems">
-                <td>{{ item.name || item.productName }}</td>
-                <td>{{ item.quantity || item.returnQuantity }}</td>
-                <td>₹{{ item.unitPrice || item.price | number:'1.2-2' }}</td>
-                <td class="text-end">₹{{ item.subtotal || (item.unitPrice * item.quantity) | number:'1.2-2' }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="bg-light p-3 rounded mb-3">
+            <strong>Reason:</strong><br>{{ selectedReturn.returnReason || 'N/A' }}
         </div>
+        <table class="table table-sm">
+          <thead>
+            <tr><th>Item</th><th class="text-center">Qty</th><th class="text-end">Subtotal</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of selectedReturn.returnedItems">
+              <td>{{ item.name }}</td>
+              <td class="text-center">{{ item.quantity }}</td>
+              <td class="text-end">₹{{ item.subtotal | number:'1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div class="modal-footer">
+        <button type="button" class="btn btn-primary" (click)="printReturn(selectedReturn)">Print</button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" (click)="printReturn(selectedReturn)">
-          <i class="fa fa-print"></i> Print Receipt
-        </button>
       </div>
     </div>
   </div>

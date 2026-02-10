@@ -222,21 +222,9 @@
   position: relative;
   z-index: 1;
 }/* Ensure parent containers don't clip the dropdown */
-.table-responsive {
-  max-height: 400px;   /* adjust as needed */
-  overflow-y: auto;
-  position: relative;  /* necessary for sticky headers */
-}
-
-.table-responsive thead th {
-  position: sticky;
-  top: 0;
-  background-color: #fff; /* or your header background color */
-  z-index: 10;
-  box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
-}
-
-.ledger-table {
+.table-responsive, .card-body {
+  overflow: visible !important;
+}.ledger-table {
   width: 100%;
   border-collapse: collapse;
   

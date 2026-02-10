@@ -3,106 +3,96 @@
     <h3>Suppliers</h3>
     <p>Manage your Suppliers</p>
   </div>
-  <!-- Add this below your content-header section -->
-<!-- Your existing content header section -->
 
-<!-- Add a filter button that toggles athe filters section -->
-<!-- Add this right after the opening <div class="suppliers-container"> -->
-<div class="filter-overlay" [class.show]="isFilterVisible" (click)="toggleFilters()"></div>
+  <!-- Filter Overlay -->
+  <div class="filter-overlay" [class.show]="isFilterVisible" (click)="toggleFilters()"></div>
 
-<!-- Replace your current filter button and section with this -->
-<div class="filter-button-container">
-  <button class="btn-filter" (click)="toggleFilters()">
-    <i class="fa fa-filter"></i> Filters
-  </button>
-</div>
-
-<div class="filters-section" [class.show]="isFilterVisible">
-  <h3>Filters</h3>
-<!-- Add this inside your filters-section div, after the existing filters -->
- <!-- Add this near your other filter controls -->
-<div class="filter-drawer-container">
-  <!-- Drawer Trigger Button -->
-<div class="input-group">
-  <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
-         readonly (click)="toggleDateDrawer()">
-  <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
-    <i class="fas fa-calendar-alt"></i>
-  </button>
-</div>
-      <div class="form-group">
-    <label>State:</label>
-    <select [(ngModel)]="filterOptions.state" (change)="applyFilters()">
-      <option value="">All States</option>
-      <option *ngFor="let state of statesList" [value]="state">{{state}}</option>
-    </select>
+  <!-- Filter Button -->
+  <div class="filter-button-container">
+    <button class="btn-filter" (click)="toggleFilters()">
+      Filters
+    </button>
   </div>
-  <!-- Drawer Panel -->
-  <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
-    <div class="drawer-header">
-      <h5>Date Range Filter</h5>
-      <button class="btn-close" (click)="toggleDateDrawer()"></button>
-    </div>
+
+  <!-- Filters Section -->
+  <div class="filters-section" [class.show]="isFilterVisible">
+    <h3>Filters</h3>
     
-    <div class="drawer-body">
-      <!-- Predefined Date Ranges -->
-      <div class="date-options">
-        <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
-          <span>Today</span>
+    <div class="filter-drawer-container">
+      <div class="filter-controls">
+        <div class="input-group">
+          <input type="text" class="form-control" [value]="dateRangeLabel || 'Date Filter'" 
+                 readonly (click)="toggleDateDrawer()">
+          <button class="btn btn-outline-secondary" (click)="toggleDateDrawer()">
+            <i class="fas fa-calendar-alt"></i>
+          </button>
+          <button *ngIf="dateRangeLabel" class="btn btn-outline-secondary" (click)="clearDateFilter()">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
-        <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
-          <span>Yesterday</span>
+        
+        <div class="form-group">
+          <label>State:</label>
+          <select [(ngModel)]="filterOptions.state" (change)="applyFilters()">
+            <option value="">All States</option>
+            <option *ngFor="let state of statesList" [value]="state">{{state}}</option>
+          </select>
         </div>
-        <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
-          <span>Last 7 Days</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
-          <span>Last 30 Days</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
-          <span>Last Month</span>
-        </div>
-        <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
-          <span>Custom Range</span>
+
+        <!-- Date Range Drawer -->
+        <div class="filter-drawer" [class.drawer-open]="isDateDrawerOpen">
+          <div class="drawer-header">
+            <h5>Date Range Filter</h5>
+            <button class="btn-close" (click)="toggleDateDrawer()"></button>
+          </div>
+
+          <div class="drawer-body">
+            <div class="date-options">
+              <div class="date-option" [class.active]="selectedRange === 'today'" (click)="filterByDate('today')">
+                <span>Today</span>
+              </div>
+              <div class="date-option" [class.active]="selectedRange === 'yesterday'" (click)="filterByDate('yesterday')">
+                <span>Yesterday</span>
+              </div>
+              <div class="date-option" [class.active]="selectedRange === 'sevenDays'" (click)="filterByDate('sevenDays')">
+                <span>Last 7 Days</span>
+              </div>
+              <div class="date-option" [class.active]="selectedRange === 'thirtyDays'" (click)="filterByDate('thirtyDays')">
+                <span>Last 30 Days</span>
+              </div>
+              <div class="date-option" [class.active]="selectedRange === 'lastMonth'" (click)="filterByDate('lastMonth')">
+                <span>Last Month</span>
+              </div>
+              <div class="date-option" [class.active]="selectedRange === 'custom'" (click)="selectCustomRange()">
+                <span>Custom Range</span>
+              </div>
+            </div>
+
+            <!-- Custom Date Range -->
+            <div class="custom-date-container" *ngIf="isCustomDate">
+              <div class="mb-3">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" [(ngModel)]="fromDate">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" [(ngModel)]="toDate">
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-footer" *ngIf="isCustomDate">
+            <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
+            <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+          </div>
         </div>
       </div>
       
-      <!-- Custom Date Range Picker -->
-      <div class="custom-date-container" *ngIf="isCustomDate">
-        <div class="mb-3">
-          <label class="form-label">From Date</label>
-          <input type="date" class="form-control" [(ngModel)]="fromDate">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">To Date</label>
-          <input type="date" class="form-control" [(ngModel)]="toDate">
-        </div>
-      </div>
-    </div>
-   </div>
-  
-  <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
-</div>
-    <div class="drawer-footer" *ngIf="isCustomDate">
-      <button class="btn btn-outline-secondary me-2" (click)="cancelCustomRange()">Cancel</button>
-      <button class="btn btn-primary" (click)="applyCustomRange()">Apply</button>
+      <button class="btn-clear" (click)="clearFilters()">Clear All Filters</button>
     </div>
   </div>
-  <!-- Backdrop when drawer is open -->
-  <div class="drawer-backdrop" [ngClass]="{'backdrop-visible': isDrawerOpen}" (click)="toggleDrawer()"></div>
-</div>
 
-  <!-- Dropdown Filters -->
-  <div class="dropdown-filters">
-   
-    
-   
-    
-  
-</div>
- 
-
-  <!-- Main Content Section -->
+  <!-- Main Content -->
   <div class="main-content">
     <div class="content-header">
       <h2>All your Suppliers</h2>
@@ -113,226 +103,217 @@
     
     <!-- Table Controls -->
     <div class="table-controls">
-     <div class="entries-control">
-    Show 
-    <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
-      <option value="10">10</option>
-      <option value="25">25</option>
-      <option value="50">50</option>
-      <option value="100">100</option>
-    </select> 
-    entries
-  </div>
-  
+      <div class="entries-control">
+        Show 
+        <select [(ngModel)]="entriesPerPage" (change)="applyFilters()">
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select> 
+        entries
+      </div>
       
       <div class="export-controls">
+        <button class="btn-delete" (click)="deleteSelectedSuppliers()">
+          Delete Selected
+        </button>
         <button class="btn-export" (click)="exportCSV()">
-          <i class="fa fa-file-csv"></i> Export CSV
+          Export CSV
         </button>
         <button class="btn-export" (click)="exportExcel()">
-          <i class="fa fa-file-excel"></i> Export Excel
+          Export Excel
         </button>
-      
- <div class="search-container">
-  <input type="text" [(ngModel)]="searchTerm" 
-         (ngModelChange)="applyFilters()" 
-         placeholder="Search suppliers...">
-</div>
-    </div>
-    
-<!-- Suppliers Table -->
-<div class="table-responsive">
-  <table class="suppliers-table">
-    <thead>
-      <tr>
-        <th>Action</th>
-        <th (click)="sortBy('contactId')">Contact ID</th>
-        <th (click)="sortBy('createdAt')">Created Date</th>
-        <th (click)="sortBy('businessName')">Business Name</th>
-      <th (click)="sortBy('firstName')">Name</th>
-        <th (click)="sortBy('email')">Email</th>
-        <th (click)="sortBy('taxNumber')">Tax Number</th>
-        <th (click)="sortBy('payTerm')">Pay Term</th>
-        <th (click)="sortBy('openingBalance')">Opening Balance</th>
-        <th (click)="sortBy('city')">Address</th>
-        <th (click)="sortBy('mobile')">Mobile</th>
-        <th (click)="sortBy('landline')">Landline</th>
-        <th (click)="sortBy('alternateContact')">Alternate Contact</th>
-        <th (click)="sortBy('prefix')">Prefix</th>
-        <th (click)="sortBy('middleName')">Middle Name</th>
-        <th (click)="sortBy('dob')">Date of Birth</th>
-        <th (click)="sortBy('addressLine1')">Address Line 1</th>
-        <th (click)="sortBy('addressLine2')">Address Line 2</th>
-        <th (click)="sortBy('state')">State</th>
-        <th (click)="sortBy('country')">Country</th>
-        <th (click)="sortBy('zipCode')">Zip Code</th>
-<th (click)="sortBy('paymentDue')">Payment Due</th>
-<th (click)="sortBy('paymentAmount')">Paid Amount</th>
-<th (click)="sortBy('totalPurchases')">Total Purchases</th>
-<th (click)="sortBy('paymentDue')">Payment Due</th>
-
-        <th (click)="sortBy('contactType')">Contact Type</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let supplier of paginatedSuppliers">
-        <!-- Action Column -->
-        <td>
-          <div class="action-container">
-            <button class="action-btn" (click)="openActionPopup(supplier)">
-              Actions
-              <span class="status-dot" [ngClass]="{'active': supplier.status === 'Active', 'inactive': supplier.status !== 'Active'}"></span>
-            </button>
+        <button class="btn-export" (click)="toggleColumnSelector()">
+          Columns
+        </button>
+        
+        <!-- Column Selector Dropdown -->
+        <div class="column-selector-dropdown" [class.show]="showColumnSelector">
+          <div class="column-selector-header">
+            <h4>Select Columns</h4>
+            <button class="close-btn" (click)="toggleColumnSelector()">&times;</button>
           </div>
-
-          <!-- Action Popup -->
-          <div class="action-popup-overlay" *ngIf="currentActionPopup === supplier.id" (click)="closeActionPopup()">
-            <div class="action-popup" (click)="$event.stopPropagation()">
-              <div class="popup-header">
-                <h4>{{supplier.businessName || (supplier.firstName + ' ' + (supplier.lastName || ''))}}</h4>
-                <button class="close-btn" (click)="closeActionPopup()">&times;</button>
-              </div>
-              
-              <div class="popup-body">
-                <div class="action-item" (click)="editSupplier(supplier); closeActionPopup()">
-                  <i class="fa fa-edit icon-edit"></i> 
-                  <span>Edit</span>
-                </div>
-                
-                <div class="action-item text-danger" (click)="deleteSupplier(supplier.id); closeActionPopup()">
-                  <i class="fa fa-trash icon-delete"></i> 
-                  <span>Delete</span>
-                </div>
-   
-                
-                <div class="action-item" [routerLink]="['/suppliers', supplier.id]" (click)="closeActionPopup()">
-                  <i class="fa fa-eye icon-view"></i> 
-                  <span>View</span>
-                </div>
-                
-                <div class="action-item" (click)="viewPurchases(supplier); closeActionPopup()">
-                  <i class="fa fa-list-alt icon-purchases"></i> 
-                  <span>Purchases</span>
-                </div>
-                <!-- Inside the action-popup div in suppliers.component.html -->
-
-<!--                 
-                <div class="action-item" (click)="viewPaymentHistory(supplier); closeActionPopup()">
-                  <i class="fa fa-history icon-history"></i> 
-                  <span>Payment History</span>
-                </div> -->
-                
-                <div class="divider"></div>
-                
-                <div class="status-section">
-                  <h5>Status</h5>
-                  <div class="status-option">
-                    <input type="radio" id="activeCheckbox{{supplier.id}}" 
-                           [checked]="supplier.status === 'Active'"
-                           (change)="updateSupplierStatus(supplier, 'Active'); closeActionPopup()">
-                    <label for="activeCheckbox{{supplier.id}}">Active</label>
-                  </div>
-                  <div class="status-option">
-                    <input type="radio" id="inactiveCheckbox{{supplier.id}}" 
-                           [checked]="supplier.status !== 'Active'"
-                           (change)="updateSupplierStatus(supplier, 'Inactive'); closeActionPopup()">
-                    <label for="inactiveCheckbox{{supplier.id}}">Inactive</label>
-                  </div>
-                </div>
-              </div>
+          <div class="column-selector-body">
+            <div *ngFor="let column of columnVisibility" class="column-option">
+              <label>
+                <input type="checkbox" 
+                       [checked]="column.visible"
+                       (change)="toggleColumnVisibility(column.name)">
+                {{column.label}}
+              </label>
             </div>
           </div>
-        </td>
+        </div>
+      </div>
+      
+      <div class="search-container">
+        <input type="text" [(ngModel)]="searchTerm" 
+               (ngModelChange)="applyFilters()" 
+               placeholder="Search suppliers...">
+        <button *ngIf="searchTerm" (click)="clearSearch()" class="clear-search-btn">
+          ×
+        </button>
+      </div>
+    </div>
 
-        <!-- Contact ID -->
-        <td>{{ supplier.contactId }}</td>
+    <!-- Suppliers Table -->
+    <div class="table-responsive">
+      <table class="suppliers-table">
+        <thead>
+          <tr>
+            <th>
+              <input type="checkbox"
+                     [checked]="allSelected"
+                     (change)="toggleSelectAll($event)">
+            </th>
+            <th>Action</th>
+            <th *ngIf="isColumnVisible('contactId')" (click)="sortBy('contactId')">Contact ID</th>
+            <th *ngIf="isColumnVisible('createdAt')" (click)="sortBy('createdAt')">Created Date</th>
+            <th *ngIf="isColumnVisible('businessName')" (click)="sortBy('businessName')">Business Name</th>
+            <th *ngIf="isColumnVisible('firstName')" (click)="sortBy('firstName')">Name</th>
+            <th *ngIf="isColumnVisible('email')" (click)="sortBy('email')">Email</th>
+            <th *ngIf="isColumnVisible('taxNumber')" (click)="sortBy('taxNumber')">Tax Number</th>
+            <th *ngIf="isColumnVisible('payTerm')" (click)="sortBy('payTerm')">Pay Term</th>
+            <!-- <th *ngIf="isColumnVisible('openingBalance')" (click)="sortBy('openingBalance')">Opening Balance</th> -->
+            <th *ngIf="isColumnVisible('mobile')" (click)="sortBy('mobile')">Mobile</th>
+            <th *ngIf="isColumnVisible('landline')" (click)="sortBy('landline')">Landline</th>
+            <th *ngIf="isColumnVisible('alternateContact')" (click)="sortBy('alternateContact')">Alternate Contact</th>
+            <th *ngIf="isColumnVisible('prefix')" (click)="sortBy('prefix')">Prefix</th>
+            <th *ngIf="isColumnVisible('middleName')" (click)="sortBy('middleName')">Middle Name</th>
+            <th *ngIf="isColumnVisible('dob')" (click)="sortBy('dob')">Date of Birth</th>
+            <th *ngIf="isColumnVisible('addressLine1')" (click)="sortBy('addressLine1')">Address Line 1</th>
+            <th *ngIf="isColumnVisible('addressLine2')" (click)="sortBy('addressLine2')">Address Line 2</th>
+            <th *ngIf="isColumnVisible('state')" (click)="sortBy('state')">State</th>
+            <th *ngIf="isColumnVisible('country')" (click)="sortBy('country')">Country</th>
+            <th *ngIf="isColumnVisible('zipCode')" (click)="sortBy('zipCode')">Zip Code</th>
+            <th *ngIf="isColumnVisible('totalPurchases')" (click)="sortBy('totalPurchases')">Total Purchases</th>
+            <th *ngIf="isColumnVisible('contactType')" (click)="sortBy('contactType')">Contact Type</th>
+            <th *ngIf="isColumnVisible('bankName')" (click)="sortBy('bankName')">Bank Name</th>
+            <th *ngIf="isColumnVisible('bankBranchName')" (click)="sortBy('bankBranchName')">Branch Name</th>
+            <th *ngIf="isColumnVisible('identificationCode')" (click)="sortBy('identificationCode')">ID Code</th>
+            <th *ngIf="isColumnVisible('swiftCode')" (click)="sortBy('swiftCode')">Swift Code</th>
+          </tr>
+        </thead>
 
-        <!-- Created Date -->
-        <td>{{ supplier.createdAt ? (supplier.createdAt | date:'medium') : '' }}</td>
+        <tbody>
+          <tr *ngFor="let supplier of paginatedSuppliers">
+            <td>
+              <input type="checkbox"
+                     [checked]="selectedSuppliers.has(supplier.id || '')"
+                     (change)="toggleSupplierSelection(supplier.id || '')">
+            </td>
 
-        <!-- Business Name -->
-        <td>{{ supplier.businessName || '' }}</td>
+            <!-- Action Column -->
+            <td>
+              <div class="action-container">
+                <button class="action-btn" (click)="openActionPopup(supplier)">
+                  Actions
+                  <span class="status-dot" [ngClass]="{'active': supplier.status === 'Active', 'inactive': supplier.status !== 'Active'}"></span>
+                </button>
+              </div>
 
-        <!-- Name (First Name + Last Name for individuals, Business Name for companies) -->
-<td>
-  {{ supplier.firstName }} {{ supplier.lastName || '' }}
-</td>
+              <!-- Action Popup -->
+              <div class="action-popup-overlay" *ngIf="currentActionPopup === supplier.id" (click)="closeActionPopup()">
+                <div class="action-popup" (click)="$event.stopPropagation()">
+                  <div class="popup-header">
+                    <h4>{{supplier.businessName || (supplier.firstName + ' ' + (supplier.lastName || ''))}}</h4>
+                    <button class="close-btn" (click)="closeActionPopup()">&times;</button>
+                  </div>
+                  <div class="popup-body">
+                    <div class="action-item" (click)="editSupplier(supplier); closeActionPopup()">Edit</div>
+                    <div class="action-item text-danger" (click)="deleteSupplier(supplier.id); closeActionPopup()">Delete</div>
+                    <div class="action-item" [routerLink]="['/suppliers', supplier.id]" (click)="closeActionPopup()">View</div>
+                    <div class="action-item" (click)="viewPurchases(supplier); closeActionPopup()">Purchases</div>
+                    <div class="divider"></div>
+                    <div class="status-section">
+                      <h5>Status</h5>
+                      <div class="status-option">
+                        <input type="radio" id="activeCheckbox{{supplier.id}}"
+                               [checked]="supplier.status === 'Active'"
+                               (change)="updateSupplierStatus(supplier, 'Active'); closeActionPopup()">
+                        <label for="activeCheckbox{{supplier.id}}">Active</label>
+                      </div>
+                      <div class="status-option">
+                        <input type="radio" id="inactiveCheckbox{{supplier.id}}"
+                               [checked]="supplier.status !== 'Active'"
+                               (change)="updateSupplierStatus(supplier, 'Inactive'); closeActionPopup()">
+                        <label for="inactiveCheckbox{{supplier.id}}">Inactive</label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
 
-        <!-- Email -->
-        <td>{{ supplier.email }}</td>
+            <!-- Table Data Columns -->
+            <td *ngIf="isColumnVisible('contactId')">{{ supplier.contactId }}</td>
+<!-- Table Data Column for Created Date -->
+<td *ngIf="isColumnVisible('createdAt')">{{ supplier.createdAt | date:'dd-MM-yy' }}</td>            <td *ngIf="isColumnVisible('businessName')">{{ supplier.businessName || '' }}</td>
+            <td *ngIf="isColumnVisible('firstName')">{{ getFullName(supplier) }}</td>
+            <td *ngIf="isColumnVisible('email')">{{ supplier.email }}</td>
+            <td *ngIf="isColumnVisible('taxNumber')">{{ supplier.taxNumber }}</td>
+            <td *ngIf="isColumnVisible('payTerm')">{{ supplier.payTerm || 0 }} days</td>
+            <!-- <td *ngIf="isColumnVisible('openingBalance')">₹ {{ supplier.openingBalance || '0.00' }}</td> -->
+            <td *ngIf="isColumnVisible('mobile')">{{ supplier.mobile }}</td>
+            <td *ngIf="isColumnVisible('landline')">{{ supplier.landline || '' }}</td>
+            <td *ngIf="isColumnVisible('alternateContact')">{{ supplier.alternateContact }}</td>
+            <td *ngIf="isColumnVisible('prefix')">{{ supplier.prefix }}</td>
+            <td *ngIf="isColumnVisible('middleName')">{{ supplier.middleName }}</td>
+            <td *ngIf="isColumnVisible('dob')">{{ supplier.dob | date }}</td>
+            <td *ngIf="isColumnVisible('addressLine1')">{{ supplier.addressLine1 }}</td>
+            <td *ngIf="isColumnVisible('addressLine2')">{{ supplier.addressLine2 }}</td>
+            <td *ngIf="isColumnVisible('state')">{{ supplier.state }}</td>
+            <td *ngIf="isColumnVisible('country')">{{ supplier.country }}</td>
+            <td *ngIf="isColumnVisible('zipCode')">{{ supplier.zipCode }}</td>
+            <td *ngIf="isColumnVisible('totalPurchases')">₹ {{ supplier.totalPurchases || '0.00' }}</td>
+            <td *ngIf="isColumnVisible('contactType')">{{ supplier.contactType }}</td>
+            <td *ngIf="isColumnVisible('bankName')">{{ supplier.bankDetails?.bankName }}</td>
+            <td *ngIf="isColumnVisible('bankBranchName')">{{ supplier.bankDetails?.bankBranchName }}</td>
+            <td *ngIf="isColumnVisible('identificationCode')">{{ supplier.bankDetails?.identificationCode }}</td>
+            <td *ngIf="isColumnVisible('swiftCode')">{{ supplier.bankDetails?.swiftCode }}</td>
+          </tr>
 
-        <!-- Tax Number -->
-        <td>{{ supplier.taxNumber }}</td>
-
-        <!-- Pay Term -->
-        <td>{{ supplier.payTerm }} Days</td>
-
-        <!-- Opening Balance -->
-        <td>₹ {{ supplier.openingBalance || '0.00' }}</td>
-
-        <!-- Address (City) -->
-        <td>{{ supplier.city }}</td>
-
-        <!-- Mobile -->
-        <td>{{ supplier.mobile }}</td>
-
-        <!-- Landline -->
-        <td>{{ supplier.landline }}</td>
-
-        <!-- Alternate Contact -->
-        <td>{{ supplier.alternateContact }}</td>
-
- 
-
-        <!-- Prefix -->
-        <td>{{ supplier.prefix }}</td>
-
-        <!-- Middle Name -->
-        <td>{{ supplier.middleName }}</td>
-
-        <!-- Date of Birth -->
-        <td>{{ supplier.dob | date }}</td>
-
-        <!-- Address Line 1 -->
-        <td>{{ supplier.addressLine1 }}</td>
-
-        <!-- Address Line 2 -->
-        <td>{{ supplier.addressLine2 }}</td>
-
-        <!-- State -->
-        <td>{{ supplier.state }}</td>
-
-        <!-- Country -->
-        <td>{{ supplier.country }}</td>
-
-        <!-- Zip Code -->
-        <td>{{ supplier.zipCode }}</td>
-<td>₹ {{ supplier.paymentDue || '0.00' }}</td>
-<td>₹ {{ supplier.paymentAmount || '0.00' }}</td>
-<td>₹ {{ supplier.totalPurchases || '0.00' }}</td>
-<td>
-  <button class="btn-pay-due" (click)="payDue(supplier)" [disabled]="!supplier.paymentDue || supplier.paymentDue <= 0">
-    Pay ₹{{ supplier.paymentDue || 0 }}
-  </button>
-</td>        <td>{{ supplier.contactType }}</td>
-      </tr>
-
-      <!-- No Data Row -->
-      <tr *ngIf="paginatedSuppliers.length === 0">
-        <td colspan="23" class="no-data">No suppliers found</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+          <!-- No Data Row -->
+          <tr *ngIf="paginatedSuppliers.length === 0">
+            <td colspan="100%" class="no-data">No suppliers found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     
     <!-- Pagination Controls -->
-   <div class="pagination-controls">
-  <button [disabled]="currentPage <= 1 || filteredSuppliers.length === 0" (click)="prevPage()" class="btn-page">Previous</button>
-  <span>Page {{ currentPage }} of {{ totalPages }}</span>
-  <button [disabled]="currentPage >= totalPages || filteredSuppliers.length === 0" (click)="nextPage()" class="btn-page">Next</button>
-</div>
+    <div class="pagination-controls">
+      <button [disabled]="currentPage <= 1 || filteredSuppliers.length === 0" 
+              (click)="goToPage(1)" class="btn-page">
+        First
+      </button>
+      <button [disabled]="currentPage <= 1 || filteredSuppliers.length === 0" 
+              (click)="prevPage()" class="btn-page">
+        Previous
+      </button>
+      
+      <span *ngFor="let page of getPageNumbers()" 
+            [class.active]="page === currentPage"
+            (click)="goToPage(page)"
+            class="page-number">
+        {{ page }}
+      </span>
+      
+      <button [disabled]="currentPage >= totalPages || filteredSuppliers.length === 0" 
+              (click)="nextPage()" class="btn-page">
+        Next
+      </button>
+      <button [disabled]="currentPage >= totalPages || filteredSuppliers.length === 0" 
+              (click)="goToPage(totalPages)" class="btn-page">
+        Last
+      </button>
+      
+      <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+      <span class="item-count">Showing {{ getFirstItemNumber() }}-{{ getLastItemNumber() }} of {{ filteredSuppliers.length }} items</span>
+    </div>
   </div>
-  
+
   <!-- Supplier Form Modal -->
   <div class="modal" [class.show]="showForm">
     <div class="modal-content">
@@ -342,398 +323,262 @@
       </div>
       
       <div class="modal-body">
-        <form [formGroup]="supplierForm" (ngSubmit)="saveSupplier()">
-          <!-- Contact Type Dropdown -->
+<form [formGroup]="supplierForm" (ngSubmit)="saveSupplier()">
+  <!-- Contact Type -->
+  <div class="form-group">
+    <label for="contactType">Contact Type:</label>
+    <select formControlName="contactType" id="contactType" (change)="onContactTypeChange()">
+      <option value="Supplier">Supplier</option>
+      <option value="Customer">Customer</option>
+      <option value="Both">Both Supplier and Customer</option>
+    </select>
+  </div>
+  
+  <!-- Individual or Business Toggle -->
+  <div class="form-group toggle-group">
+    <label>Contact is:</label>
+    <div class="toggle-buttons">
+      <label class="toggle-btn" [class.active]="isIndividual">
+        <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="true"> 
+        Individual
+      </label>
+      <label class="toggle-btn" [class.active]="!isIndividual">
+        <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="false"> 
+        Business
+      </label>
+    </div>
+  </div>
+  
+  <!-- Contact ID -->
+  <div class="form-group">
+    <label for="contactId">Contact ID:</label>
+    <input type="text" formControlName="contactId" id="contactId" placeholder="Auto-generated" readonly>
+  </div>
+  
+  <!-- START Individual Fields Block -->
+  <div *ngIf="isIndividual" class="individual-fields">
+    <div class="form-row">
+      <div class="form-group">
+        <label for="prefix">Prefix:</label>
+        <select formControlName="prefix" id="prefix">
+          <option value="">Select</option>
+          <option value="Mr">Mr</option>
+          <option value="Mrs">Mrs</option>
+          <option value="Ms">Ms</option>
+          <option value="Dr">Dr</option>
+        </select>
+      </div>
+      
+      <div class="form-group required">
+        <label for="firstName">First Name <span class="required">*</span></label>
+        <input type="text" formControlName="firstName" id="firstName" placeholder="Enter First Name" />
+      </div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-group">
+        <label for="middleName">Middle Name:</label>
+        <input type="text" formControlName="middleName" id="middleName" placeholder="Enter Middle Name (Optional)" />
+      </div>
+      
+      <div class="form-group">
+        <label for="lastName">Last Name:</label>
+        <input type="text" formControlName="lastName" id="lastName" placeholder="Enter Last Name" />
+      </div>
+    </div>
+
+    <!-- Date of Birth -->
+    <div class="form-group">
+      <label for="dob">Date of Birth:</label>
+      <div class="custom-date-wrapper">
+        <input type="date" formControlName="dob" id="dob" class="native-date-input">
+        <div class="date-display-overlay">
+          {{ (supplierForm.get('dob')?.value ? (supplierForm.get('dob')?.value | date:'dd-MM-yyyy') : 'Select Date') }}
+        </div>
+        <i class="fa fa-calendar date-icon"></i>
+      </div>
+    </div>
+  </div> 
+  <!-- END Individual Fields Block -->
+  
+  <!-- Business Specific Section -->
+  <div class="form-group required" *ngIf="!isIndividual">
+    <label for="businessName">Business Name <span class="required">*</span></label>
+    <input type="text" formControlName="businessName" id="businessName" placeholder="Enter Business Name" />
+  </div>
+
+  <!-- Pay Term -->
+  <div class="form-group">
+    <label for="payTerm">Pay Term (days):</label>
+    <input type="number" formControlName="payTerm" id="payTerm" min="0" placeholder="0" (blur)="validatePayTerm()" />
+  </div>
+  
+  <hr>
+  <h3>Contact Information</h3>
+  
+  <div class="form-row">
+    <div class="form-group required">
+      <label for="mobile">Mobile:*</label>
+      <input type="text" formControlName="mobile" id="mobile" placeholder="Enter Mobile Number (10 digits)" maxlength="10">
+    </div>
+    
+    <div class="form-group">
+      <label for="landline">Landline:</label>
+      <input type="text" formControlName="landline" id="landline" placeholder="Enter Landline Number (12 digits)" maxlength="12">
+    </div>
+
+    <div class="form-group">
+      <label for="alternateContact">Alternate Contact:</label>
+      <input type="text" formControlName="alternateContact" id="alternateContact" placeholder="Enter Alternate Contact Number" maxlength="10">
+    </div>
+  </div>
+  
+  <div class="form-group">
+    <label for="email">Email:</label>
+    <input type="email" formControlName="email" id="email" placeholder="Enter Email Address" />
+  </div>
+
+  <!-- Created Date -->
+  <div class="form-group">
+    <label for="createdAt">Created Date:</label>
+    <div class="custom-date-wrapper">
+      <input type="date" formControlName="createdAt" id="createdAt" class="native-date-input" required>
+      <div class="date-display-overlay">
+        {{ (supplierForm.get('createdAt')?.value ? (supplierForm.get('createdAt')?.value | date:'dd-MM-yyyy') : 'Select Date') }}
+      </div>
+      <i class="fa fa-calendar date-icon"></i>
+    </div>
+  </div>
+  
+  <!-- More Information Accordion -->
+  <div class="accordion mt-3">
+    <div class="accordion-header" (click)="toggleMoreInfo()" style="cursor: pointer; border: 1px solid #ddd; padding: 10px; background: #f9f9f9; display: flex; justify-content: space-between;">
+      <span>More Information</span>
+      <span>{{ showMoreInfo ? '−' : '+' }}</span>
+    </div>
+    
+    <div class="accordion-content p-3" *ngIf="showMoreInfo" style="border: 1px solid #ddd; border-top: none;">
+      <!-- Financial / Address / Bank fields go here... -->
+      <p class="text-muted">Financial and Bank details section...</p>
+    </div>
+  </div>
+
+  <!-- Combined Address Display -->
+  <div class="form-group mt-3">
+    <label>Combined Address:</label>
+    <textarea class="form-control" readonly rows="3">{{ combinedAddress }}</textarea>
+  </div>
+  
+  <!-- Form Actions -->
+  <div class="form-actions mt-4">
+    <button type="button" class="btn btn-secondary me-2" (click)="toggleForm()">Cancel</button>
+    <button type="submit" class="btn btn-primary" [disabled]="!isFormValid() || isSubmitting">
+      {{ isSubmitting ? 'Saving...' : 'Save' }}
+    </button>
+  </div>
+</form>
+  <!-- Payment Form Modal -->
+  <div class="modal" [class.show]="showPaymentForm">
+    <div class="modal-content payment-modal">
+      <div class="modal-header">
+        <h2>Record Payment</h2>
+        <span class="close" (click)="closePaymentForm()">&times;</span>
+      </div>
+      
+      <div class="modal-body">
+        <form [formGroup]="paymentForm">
           <div class="form-group">
-            <label for="contactType">Contact Type:</label>
-            <select formControlName="contactType" id="contactType" (change)="onContactTypeChange()">
-              <option value="Supplier">Supplier</option>
-              <option value="Customer">Customer</option>
-              <option value="Both">Both Supplier and Customer</option>
+            <label>Supplier:</label>
+            <input type="text" class="form-control" formControlName="supplierName" readonly>
+          </div>
+
+          <div class="form-group">
+            <label>Payment Account:*</label>
+            <select class="form-control" formControlName="paymentAccount" required>
+              <option value="">Select Payment Account</option>
+              <option *ngFor="let account of paymentAccounts" [ngValue]="account"
+                      [disabled]="account.openingBalance <= 0">
+                {{account.name}} ({{account.accountNumber}}) 
+              </option>
+            </select>
+            
+            <div *ngIf="paymentAccountsLoading" class="loading-text">
+              <i class="fas fa-spinner fa-spin"></i> Loading payment accounts...
+            </div>
+            
+            <div *ngIf="!paymentAccountsLoading && paymentAccounts.length === 0" class="no-accounts">
+              <i class="fas fa-exclamation-circle"></i> No payment accounts available
+              <button (click)="loadPaymentAccounts()" class="btn btn-link">Retry</button>
+            </div>
+            
+            <div *ngIf="paymentForm.get('paymentAccount')?.invalid && paymentForm.get('paymentAccount')?.touched" 
+                 class="error-message">
+              <i class="fas fa-exclamation-circle"></i> Please select a payment account
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Payment Method:*</label>
+            <select class="form-control" formControlName="paymentMethod" required>
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Other">Other</option>
             </select>
           </div>
           
-          <!-- Individual or Business Toggle -->
-          <div class="form-group toggle-group">
-            <label>Contact is:</label>
-            <div class="toggle-buttons">
-              <label class="toggle-btn" [class.active]="isIndividual">
-                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="true"> 
-                Individual
-              </label>
-              <label class="toggle-btn" [class.active]="!isIndividual">
-                <input type="radio" name="isIndividual" [(ngModel)]="isIndividual" [ngModelOptions]="{standalone: true}" [value]="false"> 
-                Business
-              </label>
-            </div>
-          </div>
-          
-          <!-- Common Fields -->
           <div class="form-group">
-            <label for="contactId">Contact ID:</label>
-            <input 
-              type="text" 
-              formControlName="contactId" 
-              id="contactId" 
-              placeholder="Auto-generated" 
-              readonly>
+            <label>Reference No:</label>
+            <input type="text" class="form-control" formControlName="reference">
           </div>
           
-          <!-- Individual Specific Fields -->
-          <div *ngIf="isIndividual" class="individual-fields">
-            <div class="form-row">
-              <div class="form-group">
-                <label for="prefix">Prefix:</label>
-                <select formControlName="prefix" id="prefix">
-                  <option value="">Select</option>
-                  <option value="Mr">Mr</option>
-                  <option value="Mrs">Mrs</option>
-                  <option value="Ms">Ms</option>
-                  <option value="Dr">Dr</option>
-                </select>
-              </div>
-              
-              <div class="form-group required">
-                <label for="firstName">First Name:</label>
-                <input 
-                  type="text" 
-                  formControlName="firstName" 
-                  id="firstName" 
-                  required 
-                  placeholder="Enter First Name" />
-              </div>
+          <div class="payment-summary">
+            <div class="summary-row">
+              <span>Total Purchases:</span>
+              <span>₹ {{ paymentSummary.totalPurchase || '0.00' }}</span>
             </div>
-            
-            <div class="form-row">
-              <div class="form-group">
-                <label for="middleName">Middle Name:</label>
-                <input 
-                  type="text" 
-                  formControlName="middleName" 
-                  id="middleName" 
-                  placeholder="Enter Middle Name (Optional)" />
-              </div>
-              
-              <div class="form-group">
-                <label for="lastName">Last Name:</label>
-                <input 
-                  type="text" 
-                  formControlName="lastName" 
-                  id="lastName" 
-                  placeholder="Enter Last Name" />
-              </div>
+            <div class="summary-row">
+              <span>Opening Balance:</span>
+              <span>₹ {{ paymentSummary.openingBalance || '0.00' }}</span>
             </div>
-            
-            <div class="form-group">
-              <label for="dob">Date of Birth:</label>
-              <input 
-                type="date" 
-                formControlName="dob" 
-                id="dob" />
+            <div class="summary-row">
+              <span>Total Paid:</span>
+              <span>₹ {{ paymentSummary.totalPaid || '0.00' }}</span>
+            </div>
+            <div class="summary-row highlight">
+              <span>Current Balance Due:</span>
+              <span>₹ {{ (paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue) || '0.00' }}</span>
             </div>
           </div>
-          
-          <!-- Business Specific Fields -->
-          <div *ngIf="!isIndividual" class="business-fields">
-            <div class="form-group required">
-              <label for="businessName">Business Name:</label>
-              <input 
-                type="text" 
-                formControlName="businessName" 
-                id="businessName" 
-                required
-                placeholder="Enter Business Name" />
-            </div>
+
+          <div class="form-group">
+            <label>Amount:*</label>
+            <input type="number" class="form-control" formControlName="amount" 
+                   [max]="paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue"
+                   required>
           </div>
           
-          <!-- Contact Information -->
-          <h3>Contact Information</h3>
-      <div class="form-row">
-  <div class="form-group required">
-    <label for="mobile">Mobile:</label>
-    <input 
-      type="text" 
-      formControlName="mobile" 
-      id="mobile" 
-      required 
-      (blur)="validatePhoneNumber('mobile')"
-      placeholder="Enter Mobile Number (10 digits)" 
-      maxlength="10"
-      onkeypress="return event.charCode >= 48 && event.charCode <= 57">
-    <div *ngIf="validationErrors.mobile" class="error-message">
-      {{ validationErrors.mobile }}
-    </div>
-  </div>
-            
-            <div class="form-group">
-  <label for="alternateContact">Alternate Contact:</label>
-    <input 
-      type="text" 
-      formControlName="alternateContact" 
-      id="alternateContact" 
-      (blur)="validatePhoneNumber('alternateContact')"
-      placeholder="Enter Alternate Contact Number (10 digits)"
-      maxlength="10"
-      onkeypress="return event.charCode >= 48 && event.charCode <= 57">
-    <div *ngIf="validationErrors.alternateContact" class="error-message">
-      {{ validationErrors.alternateContact }}
-    </div>
-  </div>
-</div>
-          
-          <div class="form-row">
-        
-          
-            
-            <div class="form-group">
-              <label for="email">Email:</label>
-              <input 
-                type="email" 
-                formControlName="email" 
-                id="email" 
-                placeholder="Enter Email Address" />
-            </div>
+          <div class="form-group">
+            <label>Payment Date:*</label>
+            <input type="datetime-local" class="form-control" formControlName="paidDate" required>
           </div>
-          <!-- Inside your form, add this with other fields -->
-<div class="form-group">
-  <label for="createdAt">Created Date:</label>
-  <input 
-    type="datetime-local" 
-    formControlName="createdAt" 
-    id="createdAt" 
-    required
-    [value]="supplierForm.get('createdAt')?.value || ''">
-</div>
-        
           
-          <!-- More Information Accordion -->
-          <div class="accordion">
-            <div class="accordion-header" (click)="toggleMoreInfo()">
-              <h3>More Information</h3>
-              <span class="accordion-icon">{{ showMoreInfo ? '−' : '+' }}</span>
-            </div>
-            
-            <div class="accordion-content" [class.show]="showMoreInfo">
-              <!-- Tax Information -->
-              <h4>Tax Information</h4>
-              <div class="form-group">
-                <label for="taxNumber">Tax Number:</label>
-                <input 
-                  type="text" 
-                  formControlName="taxNumber" 
-                  id="taxNumber" 
-                  placeholder="Enter Tax Number" />
-              </div>
-              
-              <!-- Financial Information -->
-              <h4>Financial Details</h4>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="openingBalance">Opening Balance:</label>
-                  <input 
-                    type="number" 
-                    formControlName="openingBalance" 
-                    id="openingBalance" 
-                    placeholder="0" />
-                </div>
-                
-                <div class="form-group">
-                  <label for="payTerm">Pay Term:</label>
-                  <select formControlName="payTerm" id="payTerm">
-                    <option value="0">Immediate</option>
-                    <option value="15">15 Days</option>
-                    <option value="30">30 Days</option>
-                    <option value="45">45 Days</option>
-                    <option value="60">60 Days</option>
-                    <option value="90">90 Days</option>
-                  </select>
-                </div>
-              </div>
-              
-              <!-- Address Information -->
-              <h4>Address</h4>
-            <!-- Example for one of the address fields - add similar to others -->
-<div class="form-group">
-  <label for="addressLine1">Address Line 1:</label>
-  <input 
-    type="text" 
-    formControlName="addressLine1" 
-    id="addressLine1" 
-    (input)="onAddressChange()"
-    placeholder="Enter Address Line 1" />
-</div>
-              
-              <div class="form-group">
-                <label for="addressLine2">Address Line 2:</label>
-                <input 
-                  type="text" 
-                  formControlName="addressLine2" 
-                  id="addressLine2" 
-                  placeholder="Enter Address Line 2" />
-              </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="city">City:</label>
-                  <input 
-                    type="text" 
-                    formControlName="city" 
-                    id="city" 
-                    placeholder="Enter City" />
-                </div>
-                
-                <div class="form-group">
-    <label for="state">State:</label>
-    <select formControlName="state" id="state" (change)="onStateChange()">
-      <option value="">Select State</option>
-      <option value="Kerala">Kerala</option>
-      <option value="Tamil Nadu">Tamil Nadu</option>
-    </select>
-  </div>
-               <div class="form-group">
-    <label for="district">District:</label>
-    <select formControlName="district" id="district" [disabled]="!supplierForm.get('state')?.value">
-      <option value="">Select District</option>
-      <option *ngFor="let district of filteredDistricts" [value]="district">
-        {{ district }}
-      </option>
-    </select>
-  </div> </div>
-              
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="country">Country:</label>
-                  <input 
-                    type="text" 
-                    formControlName="country" 
-                    id="country" 
-                    placeholder="Enter Country" />
-                </div>
-                
-                <div class="form-group">
-                  <label for="zipCode">Zip Code:</label>
-                  <input 
-                    type="text" 
-                    formControlName="zipCode" 
-                    id="zipCode" 
-                    placeholder="Enter Zip Code" />
-                </div>
-              </div>
-            </div>
+          <div class="form-group">
+            <label>Payment Note:</label>
+            <textarea class="form-control" formControlName="paymentNote" rows="3"></textarea>
           </div>
-          <!-- Add this in your form, perhaps under the individual address fields -->
-<div class="form-group">
-  <label>Combined Address:</label>
-  <textarea class="form-control" readonly rows="3">{{ combinedAddress }}</textarea>
-</div>
-          <!-- Form Actions -->
+          
           <div class="form-actions">
-            <button type="button" class="btn-cancel" (click)="toggleForm()">Cancel</button>
-            <button type="submit" class="btn-save">Save</button>
+            <button type="button" class="btn btn-cancel" (click)="closePaymentForm()">Cancel</button>
+            <button type="button" class="btn btn-primary" (click)="submitPayment()" 
+                    [disabled]="paymentForm.invalid || paymentAccountsLoading || isSubmitting">
+              <span *ngIf="paymentAccountsLoading || isSubmitting" class="spinner-border spinner-border-sm" 
+                    role="status" aria-hidden="true"></span>
+              {{ isSubmitting ? 'Processing...' : 'Save Payment' }}
+            </button>
           </div>
         </form>
       </div>
-    </div>
-  </div>
-</div>
-
-<div class="modal" [class.show]="showPaymentForm">
-  <div class="modal-content payment-modal">
-    <div class="modal-header">
-      <h2>Record Payment</h2>
-      <span class="close" (click)="closePaymentForm()">&times;</span>
-    </div>
-    
-    <div class="modal-body">
-      <form [formGroup]="paymentForm">
-        <div class="form-group">
-          <label>Supplier:</label>
-          <input type="text" class="form-control" formControlName="supplierName" readonly>
-        </div>
-<div class="form-group">
-  <label>Payment Account:*</label>
-  <select class="form-control" formControlName="paymentAccount" required>
-    <option value="">Select Payment Account</option>
-    <option *ngFor="let account of paymentAccounts" [ngValue]="account"
-            [disabled]="account.openingBalance <= 0">
-      {{account.name}} ({{account.accountNumber}}) - ₹{{account.openingBalance | number:'1.2-2'}}
-    </option>
-  </select>
-  
-  <!-- Loading state -->
-  <div *ngIf="paymentAccountsLoading" class="loading-text">
-    <i class="fas fa-spinner fa-spin"></i> Loading payment accounts...
-  </div>
-  
-  <!-- Empty state -->
-  <div *ngIf="!paymentAccountsLoading && paymentAccounts.length === 0" class="no-accounts">
-    <i class="fas fa-exclamation-circle"></i> No payment accounts available
-    <button (click)="loadPaymentAccounts()" class="btn btn-link">Retry</button>
-  </div>
-  
-  <!-- Validation error -->
-  <div *ngIf="paymentForm.get('paymentAccount')?.invalid && paymentForm.get('paymentAccount')?.touched" 
-       class="error-message">
-    <i class="fas fa-exclamation-circle"></i> Please select a payment account
-  </div>
-</div>
-        <div class="form-group">
-          <label>Payment Method:*</label>
-          <select class="form-control" formControlName="paymentMethod" required>
-            <option value="Cash">Cash</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="Cheque">Cheque</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label>Reference No:</label>
-          <input type="text" class="form-control" formControlName="reference">
-        </div>
-        
-        <div class="payment-summary">
-          <div class="summary-row">
-            <span>Grand Total:</span>
-            <span>₹ {{ (paymentSummary.totalPurchase + paymentSummary.openingBalance) || '0.00' }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Paid Amount:</span>
-            <span>₹ {{ paymentSummary.totalPaid || '0.00' }}</span>
-          </div>
-          <div class="summary-row highlight">
-            <span>Balance Due:</span>
-            <span>₹ {{ (paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue) || '0.00' }}</span>
-          </div>
-        </div>
-        
-        <div class="form-group">
-          <label>Amount:*</label>
-          <input type="number" class="form-control" formControlName="amount" 
-                 [max]="paymentSummary.totalPurchaseDue + paymentSummary.openingBalanceDue"
-                 required>
-        </div>
-        
-        <div class="form-group">
-          <label>Payment Date:*</label>
-          <input type="datetime-local" class="form-control" formControlName="paidDate" required>
-        </div>
-        
-        <div class="form-group">
-          <label>Payment Note:</label>
-          <textarea class="form-control" formControlName="paymentNote" rows="3"></textarea>
-        </div>
-        
-        <div class="form-actions">
-          <button type="button" class="btn btn-cancel" (click)="closePaymentForm()">Cancel</button>
-          <button type="button" class="btn btn-primary" (click)="submitPayment()" 
-        [disabled]="paymentForm.invalid || paymentAccountsLoading || isSubmitting">
-  <span *ngIf="paymentAccountsLoading || isSubmitting" class="spinner-border spinner-border-sm" 
-        role="status" aria-hidden="true"></span>
-  {{ isSubmitting ? 'Processing...' : 'Save Payment' }}
-</button>
-        </div>
-      </form>
     </div>
   </div>
 </div>

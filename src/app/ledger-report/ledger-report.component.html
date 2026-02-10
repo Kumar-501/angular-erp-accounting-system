@@ -1,0 +1,97 @@
+<!-- src/app/ledger-report/ledger-report.component.html -->
+
+<div class="report-page-container">
+<form [formGroup]="filterForm" (ngSubmit)="onSubmit()" class="filter-bar">
+  <select formControlName="ledgerId" class="ledger-select">
+    <option value="All">All Ledgers</option>
+    <ng-container *ngFor="let account of allAccounts">
+      <option [value]="account.id">{{ account.name }}</option>
+    </ng-container>
+  </select>
+
+  <!-- Start Date Wrapper -->
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForDisplay(filterForm.get('startDate')?.value)"
+           (blur)="onManualDateInput($event, 'startDate')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <input #startDatePicker type="date" formControlName="startDate" class="hidden-date-picker">
+  </div>
+
+  <!-- End Date Wrapper -->
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForDisplay(filterForm.get('endDate')?.value)"
+           (blur)="onManualDateInput($event, 'endDate')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+      <i class="fa fa-calendar-alt"></i>
+    </button>
+    <input #endDatePicker type="date" formControlName="endDate" class="hidden-date-picker">
+  </div>
+
+  <button type="submit" class="submit-btn" [disabled]="isLoading">
+    {{ isLoading ? 'Loading...' : 'Submit' }}
+  </button>
+</form>
+
+  <!-- Report Display Area -->
+  <div *ngIf="showReport && reportData" class="report-container">
+    <div class="report-header">
+      <h2>LEDGER REPORT</h2>
+      <h3>{{ selectedLedgerName }}</h3>
+      <p *ngIf="filterForm.value.startDate && filterForm.value.endDate">
+        Ledger showing transactions from
+        {{ filterForm.value.startDate | date:'dd-MM-yyyy' }} to
+        {{ filterForm.value.endDate | date:'dd-MM-yyyy' }}
+      </p>
+    </div>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Voucher</th>
+          <th>Entry</th>
+          <th class="text-right">Debit</th>
+          <th class="text-right">Credit</th>
+          <th class="text-right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="5"><strong>Opening Balance</strong></td>
+          <td class="text-right"><strong>{{ reportData.openingBalance | number:'1.2-2' }}</strong></td>
+        </tr>
+        <tr *ngFor="let tx of reportData.transactions; let i = index">
+          <td>{{ tx.date | date:'dd-MM-yyyy' }}</td>
+          <td>{{ tx.voucher }}</td>
+          <td>{{ tx.entry }}</td>
+          <td class="text-right">{{ (tx.debit > 0) ? (tx.debit | currency:'INR') : '-' }}</td>
+          <td class="text-right">{{ (tx.credit > 0) ? (tx.credit | currency:'INR') : '-' }}</td>
+          <td class="text-right">{{ getRunningBalance(i) | number:'1.2-2' }}</td>
+        </tr>
+        <tr *ngIf="reportData.transactions.length === 0">
+          <td colspan="6" style="text-align: center;">No transactions found for the selected period.</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"><strong>Total</strong></td>
+          <td class="text-right"><strong>{{ reportData.totalDebit | currency:'INR' }}</strong></td>
+          <td class="text-right"><strong>{{ reportData.totalCredit | currency:'INR' }}</strong></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td colspan="5"><strong>Closing Balance</strong></td>
+          <td class="text-right"><strong>{{ reportData.closingBalance | number:'1.2-2' }}</strong></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>

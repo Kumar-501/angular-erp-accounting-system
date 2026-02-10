@@ -356,9 +356,7 @@ export class NewProductsService {
       throw new Error('Product type is required');
     }
 
-    if (!Validators.isNotEmpty(product.sellingPriceTaxType)) {
-      throw new Error('Selling price tax type is required');
-    }
+ 
 
     // Validate email if addedBy contains email
     if (product.addedByName && product.addedByName.includes('@')) {

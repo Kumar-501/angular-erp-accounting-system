@@ -45,23 +45,29 @@ export class AdjustmentService {
     );
   }
 
-  // Add new stock adjustment
-  async addStockAdjustment(adjustment: any): Promise<string> {
-    try {
-      // Add timestamp to the adjustment record
-      const adjustmentToSave = {
-        ...adjustment,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      const docRef = await addDoc(this.adjustmentsCollection, adjustmentToSave);
-      return docRef.id;
-    } catch (error) {
-      console.error('Error adding stock adjustment:', error);
-      throw error;
-    }
-  }
+
+   async addStockAdjustment(adjustment: any): Promise<string> {
+     try {
+       const adjustmentToSave = {
+         ...adjustment,
+
+       date: adjustment.date, // Keep the user-selected date/time
+         createdAt: new Date(),
+         updatedAt: new Date()
+       };
+           console.log('Saving adjustment to Firestore:', {
+        referenceNo: adjustmentToSave.referenceNo,
+       userSelectedDate: adjustmentToSave.date,
+       systemCreatedAt: adjustmentToSave.createdAt
+     });
+     
+       const docRef = await addDoc(this.adjustmentsCollection, adjustmentToSave);
+       return docRef.id;
+     } catch (error) {
+       console.error('Error adding stock adjustment:', error);
+       throw error;
+     }
+   }
 
   // Update existing stock adjustment
   async updateStockAdjustment(adjustmentId: string, updatedData: any): Promise<void> {

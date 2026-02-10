@@ -33,6 +33,9 @@ export interface Supplier {
   addressLine2?: string;
   city?: string;
   state?: string;
+    bankBranchName?: string;      // ADDED
+    identificationCode?: string; // ADDED
+    swiftCode?: string;          // ADDED
   country?: string;
   prefix?: string;
   middleName?: string;
@@ -44,7 +47,18 @@ export interface Supplier {
   paymentDue?: number;
   grandTotal?: number;
   updatedAt?: Date;
+  businessType?: string;
+  billingType?: 'Prepaid' | 'Postpaid';
+  verificationStatus?: 'Verified' | 'Not Verified';
+  creditLimit?: number;
+  bankDetails?: {
+    accountHolderName?: string;
+    accountNumber?: string;
+    bankName?: string;
+  };
 }
+
+
 
 export interface SupplierDocument {
   id?: string;
@@ -117,7 +131,20 @@ export class SupplierService {
       return { unsubscribe };
     });
   }
-
+// In account.service.ts
+getAccounts(): Observable<any[]> {
+  const accountsRef = collection(this.firestore, 'accounts');
+  return new Observable<any[]>(observer => {
+    const unsubscribe = onSnapshot(accountsRef, (snapshot) => {
+      const accounts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      observer.next(accounts);
+    });
+    return { unsubscribe };
+  });
+}
   getSupplierById(id: string): Observable<Supplier | undefined> {
     const supplierDoc = doc(this.firestore, `${this.suppliersCollection}/${id}`);
     
@@ -149,7 +176,49 @@ export class SupplierService {
       return docRef.id;
     }
   }
-
+async updateSupplierPaymentData(
+  supplierId: string, 
+  amount: number, 
+  isPayment: boolean = false
+): Promise<void> {
+  const supplierRef = doc(this.firestore, 'suppliers', supplierId);
+  
+  await runTransaction(this.firestore, async (transaction) => {
+    // 1. Get current supplier data
+    const supplierDoc = await transaction.get(supplierRef);
+    if (!supplierDoc.exists()) {
+      throw new Error('Supplier not found');
+    }
+    
+    const supplier = supplierDoc.data() as Supplier;
+    const currentPaymentAmount = supplier.paymentAmount || 0;
+    const currentPaymentDue = supplier.paymentDue || 0;
+    const currentTotalPurchases = supplier.totalPurchases || 0;
+    
+    // 2. Calculate new values
+    let newPaymentAmount = currentPaymentAmount;
+    let newPaymentDue = currentPaymentDue;
+    let newTotalPurchases = currentTotalPurchases;
+    
+    if (isPayment) {
+      // For payments, increase paid amount and reduce due
+      newPaymentAmount = currentPaymentAmount + amount;
+      newPaymentDue = Math.max(currentPaymentDue - amount, 0);
+    } else {
+      // For new purchases, increase total purchases and due
+      newTotalPurchases = currentTotalPurchases + amount;
+      newPaymentDue = currentPaymentDue + amount;
+    }
+    
+    // 3. Update supplier document
+    transaction.update(supplierRef, {
+      paymentAmount: newPaymentAmount,
+      paymentDue: newPaymentDue,
+      totalPurchases: newTotalPurchases,
+      updatedAt: new Date()
+    });
+  });
+}
   async updateSupplier(id: string, supplier: Partial<Supplier>): Promise<void> {
     const supplierDoc = doc(this.firestore, this.suppliersCollection, id);
     
@@ -263,40 +332,24 @@ export class SupplierService {
     });
   }
 
-async updateSupplierBalance(
-  supplierId: string, 
-  amount: number, 
-  isPayment: boolean = false
-): Promise<void> {
+async updateSupplierBalance(supplierId: string, amount: number, isPayment: boolean): Promise<void> {
   try {
-    const supplierRef = doc(this.firestore, 'suppliers', supplierId);
-    
-    await runTransaction(this.firestore, async (transaction) => {
-      const supplierDoc = await transaction.get(supplierRef);
-      if (!supplierDoc.exists()) {
-        throw new Error('Supplier not found');
-      }
-      
-      const supplier = supplierDoc.data() as Supplier;
-      const currentPaymentAmount = supplier.paymentAmount || 0;
-      const currentPaymentDue = supplier.paymentDue || 0;
-      
-      let newPaymentAmount = currentPaymentAmount;
-      let newPaymentDue = currentPaymentDue;
+    const supplierDoc = await getDoc(doc(this.firestore, 'suppliers', supplierId));
+    if (supplierDoc.exists()) {
+      const supplierData = supplierDoc.data();
+      let newBalance = supplierData['openingBalance'] || 0;
       
       if (isPayment) {
-        newPaymentAmount = currentPaymentAmount + amount;
-        newPaymentDue = Math.max(currentPaymentDue - amount, 0);
+        newBalance -= amount; // Payment reduces the balance
       } else {
-        newPaymentDue = currentPaymentDue + amount;
+        newBalance += amount; // Purchase increases the balance
       }
-      
-      transaction.update(supplierRef, {
-        paymentAmount: newPaymentAmount,
-        paymentDue: newPaymentDue,
-        updatedAt: Timestamp.now()
+
+      await updateDoc(doc(this.firestore, 'suppliers', supplierId), {
+        openingBalance: newBalance,
+        updatedAt: new Date()
       });
-    });
+    }
   } catch (error) {
     console.error('Error updating supplier balance:', error);
     throw error;

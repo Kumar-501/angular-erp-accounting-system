@@ -19,35 +19,35 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatCardModule } from '@angular/material/card';
 import { EndOfDayService } from './services/end-of-day.service';
 
-
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 
-import { AngularFireModule } from '@angular/fire/compat';           // AngularFire compat import
+// ✅ FIXED: Import AngularFireModule for compat initialization
+import { AngularFireModule } from '@angular/fire/compat';
+import { AngularFirestoreModule } from '@angular/fire/compat/firestore';
+import { AngularFireStorageModule } from '@angular/fire/compat/storage'; // ✅ Add this for DocumentService
 
 // ✅ Import RouterModule to fix "router-outlet" issue
 import { RouterModule } from '@angular/router';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms'; 
 import { MatIconModule } from '@angular/material/icon';
 import { DatePipe } from '@angular/common';
-import { CommonModule } from '@angular/common';  // Import this
+import { CommonModule } from '@angular/common';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-// ✅ Import Firebase modules correctly
-// Updated Firebase imports for AngularFire 18.0.1
+
+// ✅ Keep the new Firebase imports if you're using them elsewhere
 import { provideFirebaseApp } from '@angular/fire/app';
 import { initializeApp } from '@angular/fire/app';
-import { provideFirestore } from '@angular/fire/firestore';  // ✅ Correct import
-
+import { provideFirestore } from '@angular/fire/firestore';
 import { getFirestore } from '@angular/fire/firestore';
 
-
-
 import { environment } from '../environments/environment';
+
+// Import all your other components...
 import { BrandsComponent } from './brands/brands.component';
 import { CategoriesComponent } from './categories/categories.component';
-
 import { UnitsComponent } from './units/units.component';
 import { SellingPriceComponent } from './selling-price/selling-price.component';
 import { VariationsComponent } from './variations/variations.component';
@@ -213,7 +213,6 @@ import { SupplierSummaryComponent } from './supplier-summary/supplier-summary.co
 import { ProductSellComponent } from './product-sell/product-sell.component';
 import { SalesReturnComponent } from './sales-return/sales-return.component';
 import { ProductSalesReportComponent } from './product-sales-report/product-sales-report.component';
-import { AngularFirestoreModule } from '@angular/fire/compat/firestore';
 import { InputTaxReportComponent } from './input-tax-report/input-tax-report.component';
 import { OutputTaxReportComponent } from './output-tax-report/output-tax-report.component';
 import { SupplierReportComponent } from './supplier-report/supplier-report.component';
@@ -226,6 +225,23 @@ import { SellReturnReportComponent } from './sell-return-report/sell-return-repo
 import { NotSellingComponent } from './not-selling/not-selling.component';
 import { ListStockPriceLogComponent } from './list-stock-price-log/list-stock-price-log.component';
 import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.component';
+import { ReturnedProductsComponent } from './returned-products/returned-products.component';
+import { AccountSummaryComponent } from './account-summary/account-summary.component';
+import { ImportPatientsComponent } from './import-patients/import-patients.component';
+import { JournalEntryComponent } from './journal-entry/journal-entry.component';
+import { IncomeReceiptsComponent } from './income-receipts/income-receipts.component';
+import { ExpensePaymentsComponent } from './expense-payments/expense-payments.component';
+import { IntercashTransferComponent } from './intercash-transfer/intercash-transfer.component';
+import { AccountHomeComponent } from './account-home/account-home.component';
+import { LedgerReportComponent } from './ledger-report/ledger-report.component';
+import { DayBookComponent } from './day-book/day-book.component';
+import { AccountDashboardComponent } from './account-dashboard/account-dashboard.component';
+import { BalanceSheet2Component } from './balance-sheet-2/balance-sheet-2.component';
+import { GstSummaryComponent } from './gst-summary/gst-summary.component';
+import { ViewContactComponent } from './view-contact/view-contact.component';
+import { ProfitLoss2Component } from './profit-loss2/profit-loss2.component';
+import { ListAccounts2Component } from './list-accounts-2/list-accounts-2.component';
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -234,7 +250,6 @@ import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.co
     CategoriesComponent,
     UnitsComponent,
     SellingPriceComponent,
-
     VariationsComponent,
     AddProductComponent,
     AddCustomerComponent,
@@ -251,9 +266,10 @@ import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.co
     HeaderComponent,
     EditCustomerComponent,
     CodPopupComponent,
+    AccountSummaryComponent,
+    ListGoodsComponent,
     SidebarComponent,
     AddGinTransferComponent,
-
     LayoutComponent,
     PrintLabelsComponent,
     ListPurchaseComponent,
@@ -273,7 +289,7 @@ import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.co
     ShipmentsComponent,
     SuppliersComponent,
     CustomersComponent,
-  PpServicePopupComponent,
+    PpServicePopupComponent,
     ListAdjustmentComponent,
     AddAdjustmentComponent,
     AddStockComponent,
@@ -408,10 +424,21 @@ import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.co
     NotSellingComponent,
     ListStockPriceLogComponent,
     StockMonitoringComponent,
- 
-
-
-
+    ReturnedProductsComponent,
+    ImportPatientsComponent,
+    JournalEntryComponent,
+    IncomeReceiptsComponent,
+    ExpensePaymentsComponent,
+    IntercashTransferComponent,
+    AccountHomeComponent,
+    LedgerReportComponent,
+    DayBookComponent,
+    AccountDashboardComponent,
+    BalanceSheet2Component,
+    GstSummaryComponent,
+    ViewContactComponent,
+    ProfitLoss2Component,
+    ListAccounts2Component,
   ],
   imports: [
     BrowserModule,
@@ -419,53 +446,49 @@ import { StockMonitoringComponent } from './stock-monitoring/stock-monitoring.co
     MatCheckboxModule,
     BrowserAnimationsModule,
     NgbModule,
-        MatTabsModule,
+    MatTabsModule,
     MatProgressSpinnerModule,
     MatCardModule,
-
     NgxDatatableModule,
     MatTableModule,
-        ToastrModule.forRoot({
+    ToastrModule.forRoot({
       timeOut: 3000,
       positionClass: 'toast-top-right',
       preventDuplicates: true,
     }),
-
     MatDialogModule,
     MatDatepickerModule,
     MatFormFieldModule,
-        MatExpansionModule,
-
+    MatExpansionModule,
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
-        HttpClientModule,   // <- include here
-
+    HttpClientModule,
     MatNativeDateModule,
     FormsModule,
     ReactiveFormsModule,
-    ReactiveFormsModule,
-    FormsModule,
     MatIconModule,
-    RouterModule ,
+    RouterModule,
     MatAutocompleteModule,
     MatMenuModule,
     MatDividerModule,
-    MatButtonModule,
-    CommonModule,// ✅ Fix router-outlet issue
-        NgxDaterangepickerMd.forRoot()
-
+    CommonModule,
+    NgxDaterangepickerMd.forRoot(),
+    
+    // ✅ FIXED: Add AngularFire compat modules for your DocumentService
+    AngularFireModule.initializeApp(environment.firebaseConfig),
+    AngularFirestoreModule,
+    AngularFireStorageModule, // Add this for your file upload functionality
   ],
   providers: [
     provideClientHydration(),
     DatePipe,
-
-    // ✅ Corrected Firebase Initialization
+    EndOfDayService,
+    
+    // ✅ You can keep the new Firebase providers if you need them for other services
     provideFirebaseApp(() => initializeApp(environment.firebaseConfig)),
     provideFirestore(() => getFirestore()),
-        AngularFirestoreModule,
-EndOfDayService
   ],
   bootstrap: [AppComponent]
 })
-export class AppModule { }
+export class AppModule { }

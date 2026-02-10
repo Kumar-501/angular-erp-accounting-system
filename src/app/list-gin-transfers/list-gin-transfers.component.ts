@@ -1,14 +1,20 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
+import { MatDialogModule, MatDialog } from '@angular/material/dialog';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { GinTransferService, GinTransfer } from '../services/gin-transfer.service';
 import { LocationService } from '../services/location.service';
 import { Subscription } from 'rxjs';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
-import { MatDialog } from '@angular/material/dialog';
 import { GinTransferViewComponent } from '../gin-transfer-view/gin-transfer-view.component';
 import { Firestore, doc, getDoc } from '@angular/fire/firestore';
+import { StockService } from '../services/stock.service';
+import * as XLSX from 'xlsx';
 
-// Constants for Firestore collections
 const COLLECTIONS = {
   PRODUCT_STOCK: 'product-stock',
   PRODUCTS: 'products',
@@ -27,28 +33,43 @@ export class ListGinTransfersComponent implements OnInit, OnDestroy {
   currentSortColumn: string = 'date';
   isAscending: boolean = false;
   locationMap: Map<string, string> = new Map();
-  // Properties for the status update modal
-showStatusModal: boolean = false;
-selectedTransfer: GinTransfer | null = null;
-selectedStatus: string = '';
-
+  showStatusModal: boolean = false;
+  selectedTransfer: GinTransfer | null = null;
+  selectedStatus: string = '';
   
-  // Pagination
   currentPage = 1;
   itemsPerPage = 15;
   totalItems = 0;
   
-  // Filters
   searchTerm: string = '';
+
+  // Property for column visibility
+  columnVisibility = {
+    date: true,
+    referenceNo: true,
+    locationFrom: true,
+    locationTo: true,
+    products: true,
+    status: true,
+    shippingCharges: true,
+    totalAmount: true,
+    additionalNotes: true,
+    action: true
+  };
+
+  // Add this property to control the dropdown visibility
+  showColumnVisibilityDropdown: boolean = false;
   
-  // Subscriptions
   private ginTransfersSub: Subscription | null = null;
   private locationsSub: Subscription | null = null;
   private routerSub: Subscription | null = null;
+  
   Math = Math;
+
   constructor(
     private ginTransferService: GinTransferService,
     private locationService: LocationService,
+    private stockService: StockService,
     private router: Router,
     private dialog: MatDialog,
     private firestore: Firestore
@@ -60,61 +81,120 @@ selectedStatus: string = '';
     
     this.routerSub = this.router.events.pipe(
       filter(event => event instanceof NavigationEnd)
-    ).subscribe((event: any) => {
-      if (event.url === '/gin-transfers' || event.url === '/') {
-        this.loadGinTransfers();
-      }
-    });
-    
-    this.ginTransferService.getUpdateEmitter().subscribe(() => {
+    ).subscribe(() => {
       this.loadGinTransfers();
     });
+    
+    if (this.ginTransferService.getUpdateEmitter) {
+      this.ginTransferService.getUpdateEmitter().subscribe(() => {
+        this.loadGinTransfers();
+      });
+    }
   }
-// Method to open the status update modal
-openStatusModal(transfer: GinTransfer) {
-  this.selectedTransfer = {...transfer}; // Create a copy of the transfer
-  this.selectedStatus = transfer.status; // Set the current status
-  this.showStatusModal = true;
-}
-
-// Method to close the status update modal
-closeStatusModal() {
-  this.showStatusModal = false;
-  this.selectedTransfer = null;
-}
-
-// Method to update the status
-updateStatus() {
-  if (!this.selectedTransfer || !this.selectedTransfer.id) {
-    console.error('No transfer selected or transfer ID is missing');
-    return;
+  
+  // Helper function to get the count of visible columns for table colspan
+  getVisibleColumnsCount(): number {
+    return Object.values(this.columnVisibility).filter(isVisible => isVisible).length;
   }
 
-  // Update the status in the selected transfer
-  this.selectedTransfer.status = this.selectedStatus;
+  // Add method to toggle column visibility dropdown
+  toggleColumnVisibilityDropdown(): void {
+    this.showColumnVisibilityDropdown = !this.showColumnVisibilityDropdown;
+  }
 
-  // Update the transfer in the database
-  this.ginTransferService.updateGinTransfer(this.selectedTransfer.id, this.selectedTransfer)
-    .then(() => {
-      console.log('Status updated successfully');
-      
-      // Update the status in the local array
-      const index = this.ginTransfers.findIndex(t => t.id === this.selectedTransfer!.id);
-      if (index !== -1) {
-        this.ginTransfers[index].status = this.selectedStatus;
-      }
-      
-      // Reapply filters to update the view
-      this.applyFilters();
-      
-      // Close the modal
-      this.closeStatusModal();
-    })
-    .catch(error => {
-      console.error('Error updating status:', error);
-      alert('Error updating status. Please try again.');
-    });
-}
+  // Add method to close dropdown when clicking outside
+  closeColumnVisibilityDropdown(): void {
+    this.showColumnVisibilityDropdown = false;
+  }
+
+  // Add method to handle column visibility change
+  onColumnVisibilityChange(columnKey: string): void {
+    // Toggle the visibility
+    this.columnVisibility[columnKey as keyof typeof this.columnVisibility] = 
+      !this.columnVisibility[columnKey as keyof typeof this.columnVisibility];
+  }
+
+  // Add method to get column display name
+  getColumnDisplayName(columnKey: string): string {
+    const displayNames: { [key: string]: string } = {
+      date: 'Date',
+      referenceNo: 'Reference No',
+      locationFrom: 'Location (From)',
+      locationTo: 'Location (To)',
+      products: 'Products',
+      status: 'Status',
+      shippingCharges: 'Shipping Charges',
+      totalAmount: 'Total Amount',
+      additionalNotes: 'Additional Notes',
+      action: 'Action'
+    };
+    return displayNames[columnKey] || columnKey;
+  }
+
+  openStatusModal(transfer: GinTransfer) {
+    this.selectedTransfer = {...transfer};
+    this.selectedStatus = transfer.status || '';
+    this.showStatusModal = true;
+  }
+
+  closeStatusModal() {
+    this.showStatusModal = false;
+    this.selectedTransfer = null;
+  }
+
+  async updateStatus() {
+    if (!this.selectedTransfer || !this.selectedTransfer.id) {
+      console.error('No transfer selected or missing ID');
+      return;
+    }
+
+    const oldStatus = this.selectedTransfer.status;
+    const newStatus = this.selectedStatus;
+
+    if (oldStatus === newStatus) {
+        this.closeStatusModal();
+        return; 
+    }
+
+    try {
+        await this.ginTransferService.updateGinTransfer(this.selectedTransfer.id, { 
+            status: newStatus,
+            updatedAt: new Date()
+        });
+
+        if (newStatus === 'Completed' && oldStatus !== 'Completed') {
+            console.log(`Status changed to Completed. Processing stock for GIN: ${this.selectedTransfer.referenceNo}`);
+            try {
+                await this.stockService.processGinTransfer(this.selectedTransfer);
+                console.log('Stock processing completed successfully');
+            } catch (stockError) {
+                console.error('Error processing stock:', stockError);
+                await this.ginTransferService.updateGinTransfer(this.selectedTransfer.id, { 
+                    status: oldStatus,
+                    updatedAt: new Date()
+                });
+                throw new Error(`Stock processing failed: ${stockError instanceof Error ? stockError.message : 'Unknown error'}`);
+            }
+        }
+
+        const index = this.ginTransfers.findIndex(t => t.id === this.selectedTransfer!.id);
+        if (index !== -1) {
+            this.ginTransfers[index].status = newStatus;
+        }
+        
+        const filteredIndex = this.filteredGinTransfers.findIndex(t => t.id === this.selectedTransfer!.id);
+        if (filteredIndex !== -1) {
+            this.filteredGinTransfers[filteredIndex].status = newStatus;
+        }
+
+        this.closeStatusModal();
+        alert('Status updated and stock processed successfully!');
+
+    } catch (error) {
+        console.error('Error updating status or processing stock:', error);
+        alert(`Error: ${error instanceof Error ? error.message : 'Failed to update status'}`);
+    }
+  }
 
   loadLocations() {
     this.locationsSub = this.locationService.getLocations().subscribe({
@@ -151,8 +231,10 @@ updateStatus() {
       filtered = filtered.filter(transfer => 
         (transfer.referenceNo && transfer.referenceNo.toLowerCase().includes(searchLower)) ||
         (transfer.locationFrom && this.getLocationName(transfer.locationFrom).toLowerCase().includes(searchLower)) ||
-        (transfer.locationTo && this.getLocationName(transfer.locationTo).toLowerCase().includes(searchLower)) ||
-        (transfer.status && transfer.status.toLowerCase().includes(searchLower))
+        (transfer.status && transfer.status.toLowerCase().includes(searchLower)) ||
+        (transfer.additionalNotes && transfer.additionalNotes.toLowerCase().includes(searchLower)) ||
+        this.getDestinationLocationsText(transfer).toLowerCase().includes(searchLower) ||
+        this.getProductsText(transfer).toLowerCase().includes(searchLower)
       );
     }
     
@@ -162,8 +244,31 @@ updateStatus() {
     this.currentPage = 1;
   }
 
-  getLocationName(locationId: string): string {
-    return this.locationMap.get(locationId) || locationId || 'Unknown Location';
+  getLocationName(locationId: string | undefined): string {
+    if (!locationId) return 'Unknown Location';
+    return this.locationMap.get(locationId) || locationId;
+  }
+
+  getDestinationLocationsText(transfer: GinTransfer): string {
+    if (transfer.transfers && transfer.transfers.length > 0) {
+      return transfer.transfers.map(t => t.locationName || this.getLocationName(t.locationId)).join(', ');
+    }
+    if (transfer.locationTo) {
+      return this.getLocationName(transfer.locationTo);
+    }
+    return 'Unknown Location';
+  }
+
+  getProductsText(transfer: GinTransfer): string {
+    const products = this.getAllProducts(transfer);
+    return products.map(p => `${p.productName} (x${p.quantity})`).join(', ');
+  }
+
+  getAllProducts(transfer: GinTransfer): any[] {
+    if (transfer.transfers && transfer.transfers.length > 0) {
+      return transfer.transfers.flatMap(t => t.products);
+    }
+    return transfer.items || [];
   }
 
   onSearch() {
@@ -190,32 +295,34 @@ updateStatus() {
     }
 
     this.filteredGinTransfers.sort((a, b) => {
-      if (column === 'date') {
-        const dateA = a.date ? new Date(a.date).getTime() : 0;
-        const dateB = b.date ? new Date(b.date).getTime() : 0;
-        return this.isAscending ? dateA - dateB : dateB - dateA;
+      let aValue: any, bValue: any;
+      
+      switch (column) {
+        case 'date':
+          aValue = a.date ? new Date(a.date).getTime() : 0;
+          bValue = b.date ? new Date(b.date).getTime() : 0;
+          break;
+        case 'locationFrom':
+          aValue = this.getLocationName(a.locationFrom).toLowerCase();
+          bValue = this.getLocationName(b.locationFrom).toLowerCase();
+          break;
+        case 'locationTo':
+          aValue = this.getDestinationLocationsText(a).toLowerCase();
+          bValue = this.getDestinationLocationsText(b).toLowerCase();
+          break;
+        case 'shippingCharges':
+        case 'totalAmount':
+          aValue = (a as any)[column] || 0;
+          bValue = (b as any)[column] || 0;
+          break;
+        default:
+          aValue = String((a as any)[column] || '').toLowerCase();
+          bValue = String((b as any)[column] || '').toLowerCase();
       }
-      else if (column === 'locationFrom' || column === 'locationTo') {
-        const aValue = this.getLocationName(a[column as keyof GinTransfer] as string).toLowerCase();
-        const bValue = this.getLocationName(b[column as keyof GinTransfer] as string).toLowerCase();
-        return this.isAscending 
-          ? aValue.localeCompare(bValue) 
-          : bValue.localeCompare(aValue);
-      }
-      else if (column === 'shippingCharges' || column === 'totalAmount') {
-        const aValue = a[column as keyof GinTransfer] as number;
-        const bValue = b[column as keyof GinTransfer] as number;
-        return this.isAscending 
-          ? aValue - bValue 
-          : bValue - aValue;
-      }
-      else {
-        const aValue = String(a[column as keyof GinTransfer] || '').toLowerCase();
-        const bValue = String(b[column as keyof GinTransfer] || '').toLowerCase();
-        return this.isAscending 
-          ? aValue.localeCompare(bValue) 
-          : bValue.localeCompare(aValue);
-      }
+      
+      if (aValue < bValue) return this.isAscending ? -1 : 1;
+      if (aValue > bValue) return this.isAscending ? 1 : -1;
+      return 0;
     });
 
     this.currentPage = 1;
@@ -231,23 +338,23 @@ updateStatus() {
   }
 
   viewGinTransfer(transfer: GinTransfer) {
-    this.dialog.open(GinTransferViewComponent, {
-      width: '800px',
+    const dialogRef = this.dialog.open(GinTransferViewComponent, {
+      width: '900px',
+      maxHeight: '90vh',
       data: { 
         transfer: transfer,
         getLocationName: (id: string) => this.getLocationName(id)
       },
       panelClass: 'gin-transfer-dialog'
     });
+
+    dialogRef.afterClosed().subscribe(() => {});
   }
 
   deleteGinTransfer(id: string) {
     if (confirm('Are you sure you want to delete this GIN Transfer?')) {
       this.ginTransferService.deleteGinTransfer(id)
-        .then(() => {
-          console.log('GIN Transfer deleted successfully');
-          this.loadGinTransfers();
-        })
+        .then(() => this.loadGinTransfers())
         .catch(error => {
           console.error('Error deleting GIN transfer:', error);
           alert('Error deleting GIN transfer. Please try again.');
@@ -255,183 +362,61 @@ updateStatus() {
     }
   }
 
-  exportToExcel() {
-    // Implement Excel export logic here
-    console.log('Exporting to Excel');
-  }
-
-  exportToCsv() {
-    // Implement CSV export logic here
-    console.log('Exporting to CSV');
-  }
-
-  exportToPdf() {
-    // Implement PDF export logic here
-    console.log('Exporting to PDF');
-  }
-printGinTransfers() {
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank');
-  
-  if (printWindow) {
-    // Start building the HTML content
-    let htmlContent = `
-      <html>
-        <head>
-          <title>GIN Transfers Report</title>
-          <style>
-            body { font-family: Arial, sans-serif; }
-            h1 { color: #333; text-align: center; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background-color: #f2f2f2; text-align: left; padding: 8px; border: 1px solid #ddd; }
-            td { padding: 8px; border: 1px solid #ddd; }
-            .status-badge { 
-              padding: 4px 8px; 
-              border-radius: 12px; 
-              font-size: 12px; 
-              font-weight: bold; 
-              text-transform: capitalize;
-            }
-            .completed { background-color: #d4edda; color: #155724; }
-            .pending { background-color: #fff3cd; color: #856404; }
-            .cancelled { background-color: #f8d7da; color: #721c24; }
-            .header { margin-bottom: 20px; }
-            .date { text-align: right; margin-bottom: 10px; }
-            @media print {
-              .no-print { display: none; }
-              body { padding: 20px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>Goods Issue Note (GIN) Transfers</h1>
-            <div class="date">Generated on: ${new Date().toLocaleString()}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Reference No</th>
-                <th>Location (From)</th>
-                <th>Location (To)</th>
-                <th>Status</th>
-                <th>Shipping Charges</th>
-                <th>Total Amount</th>
-                <th>Additional Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-    `;
-
-    // Add table rows
-    this.filteredGinTransfers.forEach(transfer => {
-      htmlContent += `
-        <tr>
-          <td>${transfer.date}</td>
-          <td>${transfer.referenceNo}</td>
-          <td>${this.getLocationName(transfer.locationFrom)}</td>
-          <td>${this.getLocationName(transfer.locationTo)}</td>
-          <td><span class="status-badge ${transfer.status.toLowerCase()}">${transfer.status}</span></td>
-          <td>₹ ${transfer.shippingCharges.toFixed(2)}</td>
-          <td>₹ ${transfer.totalAmount.toFixed(2)}</td>
-          <td>${transfer.additionalNotes || '-'}</td>
-        </tr>
-      `;
-    });
-
-    // Close HTML tags
-    htmlContent += `
-            </tbody>
-          </table>
-          <div class="no-print" style="margin-top: 20px; text-align: center;">
-            <button onclick="window.print()" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Print</button>
-            <button onclick="window.close()" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Close</button>
-          </div>
-        </body>
-      </html>
-    `;
-
-    // Write the content to the new window
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-
-    // Focus the window (needed for some browsers)
-    printWindow.focus();
-  } else {
-    alert('Popup blocker might be preventing the print window from opening. Please allow popups for this site.');
-  }
-}
-
-/**
-   * Get current stock for a product at a specific location from PRODUCT_STOCK collection
-   * This method can be used in templates or for displaying current stock information
-   */
-  async getCurrentStockAtLocation(productId: string, locationId: string): Promise<number> {
-    try {
-      const stockDocId = `${productId}_${locationId}`;
-      const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-      const stockDoc = await getDoc(stockDocRef);
-      
-      if (stockDoc.exists()) {
-        const data = stockDoc.data();
-        return data?.['quantity'] || 0;
-      }
-      
-      return 0;
-    } catch (error) {
-      console.error('Error getting stock at location:', error);
-      return 0;
+  exportToExcel(): void {
+    if (this.filteredGinTransfers.length === 0) {
+      alert('No data to export.');
+      return;
     }
+
+    const dataToExport = this.filteredGinTransfers.map(transfer => ({
+      'Date': transfer.date,
+      'Reference No': transfer.referenceNo,
+      'Location (From)': this.getLocationName(transfer.locationFrom),
+      'Location (To)': this.getDestinationLocationsText(transfer),
+      'Products': this.getProductsText(transfer),
+      'Status': transfer.status,
+      'Shipping Charges': transfer.shippingCharges || 0,
+      'Total Amount': transfer.totalAmount || 0,
+      'Additional Notes': transfer.additionalNotes || ''
+    }));
+
+    const worksheet: XLSX.WorkSheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook: XLSX.WorkBook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
+    const excelBuffer: any = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    this.saveAsExcelFile(excelBuffer, 'gin_transfers');
   }
 
-  /**
-   * Get stock information for all items in a GIN transfer
-   * Useful for displaying current stock levels in transfer details
-   */
-  async getTransferStockInfo(transfer: GinTransfer): Promise<any[]> {
-    if (!transfer.items) return [];
-    
-    const stockInfo = [];
-    for (const item of transfer.items) {
-      try {
-        const fromStock = await this.getCurrentStockAtLocation(item.productId, transfer.locationFrom);
-        const toStock = await this.getCurrentStockAtLocation(item.productId, transfer.locationTo);
-        
-        stockInfo.push({
-          productId: item.productId,
-          productName: item.productName,
-          sku: item.sku,
-          transferredQuantity: item.quantity,
-          currentStockAtSource: fromStock,
-          currentStockAtDestination: toStock
-        });
-      } catch (error) {
-        console.error(`Error getting stock info for ${item.productName}:`, error);
-        stockInfo.push({
-          productId: item.productId,
-          productName: item.productName,
-          sku: item.sku,
-          transferredQuantity: item.quantity,
-          currentStockAtSource: 'Error',
-          currentStockAtDestination: 'Error'
-        });
-      }
+  private saveAsExcelFile(buffer: any, fileName: string): void {
+    const data: Blob = new Blob([buffer], {type: 'application/octet-stream'});
+    const url = window.URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileName}_${new Date().getTime()}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  printTable(): void {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>GIN Transfers</title>');
+      printWindow.document.write('<style> body { font-family: sans-serif; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } </style>');
+      printWindow.document.write('</head><body>');
+      printWindow.document.write('<h1>GIN Transfers</h1>');
+      
+      const table = document.querySelector('.gin-transfers-table')?.cloneNode(true) as HTMLElement;
+      table.querySelectorAll('.action-column, .action-buttons').forEach(el => el.remove());
+      
+      printWindow.document.write(table.outerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.print();
     }
-    
-    return stockInfo;
   }
 
   ngOnDestroy() {
-    if (this.ginTransfersSub) {
-      this.ginTransfersSub.unsubscribe();
-    }
-    if (this.locationsSub) {
-      this.locationsSub.unsubscribe();
-    }
-    if (this.routerSub) {
-      this.routerSub.unsubscribe();
-    }
+    this.ginTransfersSub?.unsubscribe();
+    this.locationsSub?.unsubscribe();
+    this.routerSub?.unsubscribe();
   }
 }

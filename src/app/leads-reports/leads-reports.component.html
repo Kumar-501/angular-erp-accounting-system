@@ -1,166 +1,260 @@
 <div class="leads-report-container">
-  <div class="report-header">
-    <h2>Leads Report</h2>
-    <div class="report-controls">
-      <div class="date-range-picker">
-        <label>From:</label>
-        <input type="date" [(ngModel)]="filters.fromDate" (change)="applyFilters()">
-        <label>To:</label>
-        <input type="date" [(ngModel)]="filters.toDate" (change)="applyFilters()">
-        <button class="clear-btn" (click)="clearDateFilter()">Clear Dates</button>
+  
+  <!-- Metrics Section -->
+  <div class="metrics-dashboard">
+    <div class="metric-card total">
+      <div class="metric-icon"><i class="fas fa-users"></i></div>
+      <div class="metric-info">
+        <h3>{{ overallMetrics.total }}</h3>
+        <p>Total Leads</p>
       </div>
-      
-      <div class="filter-group">
-        <label>Report Type:</label>
-        <select [(ngModel)]="reportType" (change)="changeReportType()">
-          <option value="department">Department-wise</option>
-          <option value="executive">Executive-wise</option>
-          <option value="detailed">Detailed Report</option>
-        </select>
+    </div>
+    <div class="metric-card new">
+      <div class="metric-icon"><i class="fas fa-star"></i></div>
+      <div class="metric-info">
+        <h3>{{ overallMetrics.new }}</h3>
+        <p>New Leads</p>
       </div>
-      
-      <div class="export-buttons">
-        <button class="export-btn" (click)="exportExcel()">Export Excel</button>
+    </div>
+    <div class="metric-card converted">
+      <div class="metric-icon"><i class="fas fa-check-circle"></i></div>
+      <div class="metric-info">
+        <h3>{{ overallMetrics.converted }}</h3>
+        <p>Converted</p>
+      </div>
+    </div>
+    <div class="metric-card rate">
+      <div class="metric-icon"><i class="fas fa-percentage"></i></div>
+      <div class="metric-info">
+        <h3>{{ overallMetrics.conversionRate }}%</h3>
+        <p>Conversion Rate</p>
       </div>
     </div>
   </div>
 
-  <!-- Department-wise Report -->
+  <div class="report-header-controls">
+    <h2>Leads Analytics</h2>
+    
+    <!-- Filter Controls -->
+    <div class="report-controls-wrapper">
+      
+      <!-- Date Filter (Updated to DD-MM-YYYY Strategy) -->
+      <div class="filter-box date-filter">
+        <div class="date-inputs">
+          <div class="input-group">
+            <label>From Date</label>
+            <div class="date-input-wrapper">
+              <input 
+                type="text" 
+                class="form-control date-input-text" 
+                [value]="getFormattedDate(filters.fromDate)"
+                (blur)="onDateInput($event, 'from')"
+                (keyup.enter)="onDateInput($event, 'from')"
+                placeholder="DD-MM-YYYY"
+                maxlength="10">
+              <button type="button" class="calendar-btn" (click)="openDatePicker('from')">
+                <i class="fas fa-calendar-alt"></i>
+              </button>
+              <input 
+                #fromDatePicker
+                type="date" 
+                class="hidden-date-picker" 
+                [(ngModel)]="filters.fromDate"
+                (change)="applyFilters()">
+            </div>
+          </div>
+          <div class="input-group">
+            <label>To Date</label>
+            <div class="date-input-wrapper">
+              <input 
+                type="text" 
+                class="form-control date-input-text" 
+                [value]="getFormattedDate(filters.toDate)"
+                (blur)="onDateInput($event, 'to')"
+                (keyup.enter)="onDateInput($event, 'to')"
+                placeholder="DD-MM-YYYY"
+                maxlength="10">
+              <button type="button" class="calendar-btn" (click)="openDatePicker('to')">
+                <i class="fas fa-calendar-alt"></i>
+              </button>
+              <input 
+                #toDatePicker
+                type="date" 
+                class="hidden-date-picker" 
+                [(ngModel)]="filters.toDate"
+                (change)="applyFilters()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dropdown & Search Filters -->
+      <div class="filter-box dropdown-filters">
+         <select [(ngModel)]="filters.department" (change)="applyFilters()" class="filter-select">
+           <option value="">All Departments</option>
+           <option *ngFor="let dept of departments" [value]="dept">{{dept}}</option>
+         </select>
+
+         <select [(ngModel)]="filters.source" (change)="applyFilters()" class="filter-select">
+           <option value="">All Sources</option>
+           <option *ngFor="let src of sources" [value]="src.name">{{src.name}}</option>
+         </select>
+
+         <input type="text" [(ngModel)]="filters.searchTerm" 
+                (input)="applyFilters()" 
+                placeholder="Search Name/ID..." 
+                class="search-input">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons">
+        <button class="clear-btn" (click)="clearDateFilter()">Reset Filters</button>
+        <button class="export-btn" (click)="exportExcel()">
+          <i class="fas fa-file-excel"></i> Export Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Type Selector -->
+  <div class="report-type-selector">
+    <button [class.active]="reportType === 'department'" (click)="reportType = 'department'; changeReportType()">Department Wise</button>
+    <button [class.active]="reportType === 'executive'" (click)="reportType = 'executive'; changeReportType()">Executive Wise</button>
+    <button [class.active]="reportType === 'detailed'" (click)="reportType = 'detailed'; changeReportType()">Detailed List</button>
+  </div>
+
+  <!-- Department Table -->
   <div *ngIf="reportType === 'department'" class="report-section">
-    <h3>Department-wise Leads Report</h3>
-    <div class="report-table">
-      <table>
+    <div class="table-responsive">
+      <table class="report-table">
         <thead>
           <tr>
             <th>Department</th>
             <th>Total Leads</th>
-            <th>New Leads</th>
+            <th>New</th>
             <th>Contacted</th>
             <th>Qualified</th>
             <th>Converted</th>
             <th>Lost</th>
-            <th>Conversion Rate</th>
+            <th>Rate</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let dept of departmentReports">
-            <td>{{ dept.department || 'Unassigned' }}</td>
+            <td class="fw-bold">{{ dept.department || 'Unassigned' }}</td>
             <td>{{ dept.total }}</td>
             <td>{{ dept.new }}</td>
             <td>{{ dept.contacted }}</td>
             <td>{{ dept.qualified }}</td>
-            <td>{{ dept.converted }}</td>
-            <td>{{ dept.lost }}</td>
+            <td class="text-success">{{ dept.converted }}</td>
+            <td class="text-danger">{{ dept.lost }}</td>
             <td>{{ dept.conversionRate }}%</td>
           </tr>
           <tr class="total-row">
-            <td><strong>Total</strong></td>
-            <td><strong>{{ getTotal('total') }}</strong></td>
-            <td><strong>{{ getTotal('new') }}</strong></td>
-            <td><strong>{{ getTotal('contacted') }}</strong></td>
-            <td><strong>{{ getTotal('qualified') }}</strong></td>
-            <td><strong>{{ getTotal('converted') }}</strong></td>
-            <td><strong>{{ getTotal('lost') }}</strong></td>
-            <td><strong>{{ getTotalConversionRate() }}%</strong></td>
+            <td>TOTAL</td>
+            <td>{{ overallMetrics.total }}</td>
+            <td>{{ overallMetrics.new }}</td>
+            <td>{{ getTotal('contacted') }}</td>
+            <td>{{ getTotal('qualified') }}</td>
+            <td>{{ overallMetrics.converted }}</td>
+            <td>{{ overallMetrics.lost }}</td>
+            <td>{{ overallMetrics.conversionRate }}%</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Executive-wise Report -->
+  <!-- Executive Table -->
   <div *ngIf="reportType === 'executive'" class="report-section">
-    <h3>Executive-wise Leads Report</h3>
-    <div class="report-table">
-      <table>
+    <div class="table-responsive">
+      <table class="report-table">
         <thead>
           <tr>
             <th>Executive</th>
             <th>Department</th>
-            <th>Total Leads</th>
-            <th>New Leads</th>
+            <th>Total</th>
+            <th>New</th>
             <th>Contacted</th>
-            <th>Qualified</th>
             <th>Converted</th>
-            <th>Lost</th>
-            <th>Conversion Rate</th>
+            <th>Rate</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let exec of executiveReports">
-            <td>{{ exec.executive || 'Unassigned' }}</td>
-            <td>{{ exec.department || 'Unassigned' }}</td>
+            <td class="fw-bold">{{ exec.executive || 'Unassigned' }}</td>
+            <td>{{ exec.department }}</td>
             <td>{{ exec.total }}</td>
             <td>{{ exec.new }}</td>
             <td>{{ exec.contacted }}</td>
-            <td>{{ exec.qualified }}</td>
-            <td>{{ exec.converted }}</td>
-            <td>{{ exec.lost }}</td>
+            <td class="text-success">{{ exec.converted }}</td>
             <td>{{ exec.conversionRate }}%</td>
           </tr>
           <tr class="total-row">
-            <td colspan="2"><strong>Total</strong></td>
-            <td><strong>{{ getTotal('total') }}</strong></td>
-            <td><strong>{{ getTotal('new') }}</strong></td>
-            <td><strong>{{ getTotal('contacted') }}</strong></td>
-            <td><strong>{{ getTotal('qualified') }}</strong></td>
-            <td><strong>{{ getTotal('converted') }}</strong></td>
-            <td><strong>{{ getTotal('lost') }}</strong></td>
-            <td><strong>{{ getTotalConversionRate() }}%</strong></td>
+            <td colspan="2">TOTAL</td>
+            <td>{{ overallMetrics.total }}</td>
+            <td>{{ overallMetrics.new }}</td>
+            <td>{{ getTotal('contacted') }}</td>
+            <td>{{ overallMetrics.converted }}</td>
+            <td>{{ overallMetrics.conversionRate }}%</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Detailed Report -->
+  <!-- Detailed Table (Updated Date format) -->
   <div *ngIf="reportType === 'detailed'" class="report-section">
-    <h3>Detailed Leads Report</h3>
-    <div class="report-table">
-      <table>
+    <div class="pagination-header">
+      <span>Showing {{ paginatedLeads.length }} of {{ filteredLeads.length }} results</span>
+      <div class="pagination-controls">
+        <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+          <option [value]="10">10</option>
+          <option [value]="25">25</option>
+          <option [value]="50">50</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="report-table detailed-table">
         <thead>
           <tr>
-            <th>Contact ID</th>
-            <th>Name</th>
+            <th (click)="onSort('contactId')" class="sortable">ID</th>
+            <th (click)="onSort('createdAt')" class="sortable">Date Added</th>
+            <th (click)="onSort('name')" class="sortable">Name</th>
             <th>Mobile</th>
-            <th>Department</th>
-            <th>Executive</th>
-            <th>Life Stage</th>
+            <th (click)="onSort('department')" class="sortable">Department</th>
+            <th (click)="onSort('assignedTo')" class="sortable">Executive</th>
+            <th (click)="onSort('lifeStage')" class="sortable">Status</th>
             <th>Source</th>
-            <th>Created Date</th>
-            <th>Last Follow Up</th>
-            <th>Status</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let lead of filteredLeads">
-            <td>{{ lead.contactId || '-' }}</td>
+          <tr *ngFor="let lead of paginatedLeads">
+            <td><small>{{ lead.contactId || '-' }}</small></td>
+            <!-- UPDATED: Date Display Format -->
+            <td>{{ lead.createdAt | date:'dd-MM-yyyy' }}</td>
             <td>{{ lead.businessName || (lead.firstName + ' ' + (lead.lastName || '')) }}</td>
             <td>{{ lead.mobile || '-' }}</td>
-            <td>{{ lead.department || 'Unassigned' }}</td>
+            <td><span class="badge dept-badge">{{ lead.department || 'NA' }}</span></td>
             <td>{{ lead.assignedTo || 'Unassigned' }}</td>
-            <td>{{ lead.lifeStage || '-' }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getStatusClass(lead.lifeStage || lead.status)">
+                {{ lead.lifeStage || lead.status || '-' }}
+              </span>
+            </td>
             <td>{{ lead.source || '-' }}</td>
-            <td>{{ lead.createdAt | date:'shortDate' }}</td>
-*ngIf="filteredLeads && filteredLeads.length > 0"
-
-            <td [ngClass]="getStatusClass(lead.lifeStage)">{{ lead.lifeStage || '-' }}</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div class="pagination-controls" *ngIf="reportType === 'detailed'">
-      <button (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
+
+    <div class="pagination-footer">
+      <button (click)="previousPage()" [disabled]="currentPage === 1" class="page-btn">Previous</button>
       <span>Page {{ currentPage }} of {{ totalPages }}</span>
-      <button (click)="nextPage()" [disabled]="currentPage === totalPages">Next</button>
-      <span>Show</span>
-      <select [(ngModel)]="pageSize" (change)="onPageSizeChange()">
-        <option value="10">10</option>
-        <option value="25">25</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-      <span>entries</span>
+      <button (click)="nextPage()" [disabled]="currentPage === totalPages" class="page-btn">Next</button>
     </div>
   </div>
+
 </div>

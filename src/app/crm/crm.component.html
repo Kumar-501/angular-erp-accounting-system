@@ -1,41 +1,30 @@
-<!-- crm.component.html -->
 <div class="crm-wrapper">
-    <div class="crm-content">
-        <!-- Main Title and Navigation -->
-        <div class="main-title">
-            <nav>
-                <a routerLink="/crm/dashboard" routerLinkActive="active-tab">Dashboard</a>
-                <a routerLink="leads" routerLinkActive="active-tab">Leads</a>
-                <a routerLink="follows-up" routerLinkActive="active-tab">Follow ups</a>
-                
-                <!-- Hidden for executives -->
-                <a *ngIf="canViewRestrictedItems()" 
-                   routerLink="sources" 
-                   routerLinkActive="active-tab">Sources</a>
-                
-                <a *ngIf="canViewRestrictedItems()" 
-                   routerLink="life-stage" 
-                   routerLinkActive="active-tab">Life Stage</a>
-                
-                <a *ngIf="canViewRestrictedItems()" 
-                   routerLink="followup-category" 
-                   routerLinkActive="active-tab">Follow Up category</a>
-                
-                <a *ngIf="canViewRestrictedItems()" 
-                   routerLink="crm-settings" 
-                   routerLinkActive="active-tab">Crm Settings</a>
-                
-                <a *ngIf="canViewRestrictedItems()" 
-                   routerLink="sales-call" 
-                   routerLinkActive="active-tab">Sales-call</a>
-                
-                <a routerLink="sales-customers" routerLinkActive="active-tab">Customers</a>
-            </nav>
-        </div>
+  <div class="crm-content">
+    <!-- Main Title and Navigation -->
+    <div class="main-title">
+      <nav>
+        <!-- Visible to non-executives -->
+        <a *ngIf="!isExecutive" routerLink="/crm/dashboard" routerLinkActive="active-tab">Dashboard</a>
+
+        <!-- Visible to all -->
+        <a routerLink="leads" routerLinkActive="active-tab">Leads</a>
+        <a routerLink="sales-customers" routerLinkActive="active-tab">Customers</a>
+        <a routerLink="sales-call" routerLinkActive="active-tab">Sales-call</a>
+
+        <!-- Show only to executive -->
+        <a *ngIf="isExecutive" routerLink="crm-settings" routerLinkActive="active-tab">CRM Settings</a>
+
+        <!-- Hidden from executives -->
+        <a *ngIf="!isExecutive" routerLink="sources" routerLinkActive="active-tab">Sources</a>
+        <a *ngIf="!isExecutive" routerLink="life-stage" routerLinkActive="active-tab">Life Stage</a>
+        <a *ngIf="!isExecutive" routerLink="followup-category" routerLinkActive="active-tab">Follow Up category</a>
+        <a *ngIf="!isExecutive" routerLink="crm-settings" routerLinkActive="active-tab">CRM Settings</a>
+      </nav>
     </div>
-    
-    <!-- Router outlet below menu -->
-    <div class="router-outlet-container">
-        <router-outlet></router-outlet>
-    </div>
+  </div>
+
+  <!-- Router outlet below menu -->
+  <div class="router-outlet-container">
+    <router-outlet></router-outlet>
+  </div>
 </div>

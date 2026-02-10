@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core'; // Add ViewChild, ElementRef
+import { ActivatedRoute, Router } from '@angular/router';
 import { AccountService } from '../services/account.service';
 import { Expense, ExpenseService } from '../services/expense.service';
 import { PurchaseService } from '../services/purchase.service';
@@ -7,7 +7,9 @@ import { DatePipe } from '@angular/common';
 import { SaleService } from '../services/sale.service';
 import { FormGroup, FormBuilder, Validators } from '@angular/forms';
 import { AuthService } from '../auth.service';
-import { Subscription } from 'rxjs';
+import { JournalService, Journal, JournalItem } from '../services/journal.service';
+import { Subscription, Subject } from 'rxjs';
+import { debounceTime, take } from 'rxjs/operators';
 
 interface AccountDetails {
   id: string;
@@ -17,13 +19,15 @@ interface AccountDetails {
   balance: number;
 }
 
-interface Timestamp {
-  toDate(): Date;
-}
-
 interface Transaction {
+  roundingAdjustment: any;
+  exactRefund: any;
+  roundedRefund: any;
   id: string;
+  relatedDocId?: string;
   date: Date;
+  createdAt?: Date;
+  transactionTime?: Date;
   description: string;
   paymentMethod: string;
   paymentDetails: string;
@@ -32,6 +36,7 @@ interface Transaction {
   debit: number;
   credit: number;
   balance: number;
+  
   hasDocument: boolean;
   type?: string;
   attachmentUrl?: string;
@@ -48,6 +53,14 @@ interface Transaction {
   customerName?: string;
   paymentStatus?: string;
   purchaseId?: string;
+  transactionCredit?: boolean;
+  returnId?: string;
+  originalSaleId?: string;
+  hasReturns?: boolean;
+  saleStatus?: string;
+  originalSaleAmount?: number;
+  returnStatus?: string;
+  journalDetails?: string;
 }
 
 interface EditingTransaction extends Omit<Transaction, 'balance'> {
@@ -62,12 +75,23 @@ interface EditingTransaction extends Omit<Transaction, 'balance'> {
 })
 export class AccountBookComponent implements OnInit, OnDestroy {
   openingBalance: number = 0;
+  private isOpeningBalanceLoaded: boolean = false;
   private subscriptions: Subscription[] = [];
+  private legacyList: Transaction[] = [];
+    @ViewChild('fromDatePicker') fromDatePicker!: ElementRef;
+  @ViewChild('toDatePicker') toDatePicker!: ElementRef;
+  private newBookList: Transaction[] = [];
+
+  // Specific unsubscribers
   private accountTransactionsUnsubscribe: () => void = () => { };
   private expensesUnsubscribe: () => void = () => { };
   private incomesUnsubscribe: () => void = () => { };
   private purchasesUnsubscribe: () => void = () => { };
   private salesUnsubscribe: () => void = () => { };
+  private returnsUnsubscribe: () => void = () => { };
+
+  // Subject to handle debouncing for refreshes
+  private updateTrigger = new Subject<void>();
 
   accountId: string = '';
   accountDetails: AccountDetails = {
@@ -77,41 +101,104 @@ export class AccountBookComponent implements OnInit, OnDestroy {
     number: '',
     balance: 0
   };
+
   transactions: Transaction[] = [];
+  
+  // Source lists
+  private accountTransactionList: Transaction[] = [];
+  private saleTransactionList: Transaction[] = [];
+  private expenseTransactionList: Transaction[] = [];
+  private returnTransactionList: Transaction[] = [];
+
   filteredTransactions: Transaction[] = [];
   pagedTransactions: Transaction[] = [];
   recentTransactions: any[] = [];
-showRecentTransactions: boolean = true;
-recentTransactionsLimit: number = 5;
+  showRecentTransactions: boolean = true;
+  recentTransactionsLimit: number = 5;
   allAccounts: any[] = [];
   accounts: any[] = [];
+  
   viewMode: 'table' | 'card' = 'table';
   currentPage: number = 1;
   entriesPerPage: number = 25;
+  
+  // ✅ CHANGED: Added temporary date storage for user input
+  tempDateRange = {
+    from: '',
+    to: ''
+  };
+  
   dateRange = {
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date()
   };
+  
   transactionType: string = 'All';
   searchQuery: string = '';
   totalDebit: number = 0;
   totalCredit: number = 0;
   loading: boolean = false;
   isEmpty: boolean = true;
-  
+
   showEditModal: boolean = false;
   editingTransaction: EditingTransaction = this.getEmptyEditingTransaction();
+
+  // Journal View Modal Properties
+  showJournalViewModal: boolean = false;
+  selectedJournalForView: Journal | null = null;
   
   showFundTransferModal: boolean = false;
   fundTransferForm: FormGroup;
   selectedFile: File | null = null;
+  Math = Math; 
+
+  public convertToDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return dateValue;
+    
+    if (dateValue?.toDate && typeof dateValue.toDate === 'function') {
+      return dateValue.toDate();
+    }
+    
+    if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+      const date = new Date(dateValue.seconds * 1000);
+      if (dateValue.nanoseconds) {
+        date.setMilliseconds(Math.floor(dateValue.nanoseconds / 1000000));
+      }
+      return date;
+    }
+    
+    if (typeof dateValue === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        const [year, month, day] = dateValue.split('-').map(Number);
+        return new Date(year, month - 1, day);
+      }
+      const parsedDate = new Date(dateValue);
+      return isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+    }
+    
+    if (typeof dateValue === 'number') {
+      return new Date(dateValue);
+    }
+    
+    return new Date();
+  }
+
+  formatTransactionDate(transaction: Transaction): string {
+    const displayTime = this.getTransactionDisplayTime(transaction);
+    return this.datePipe.transform(displayTime, 'dd-MM-yyyy') || 'N/A';
+  }
+
+  sortDirection: 'asc' | 'desc' = 'desc'; 
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private accountService: AccountService,
     private saleService: SaleService,
     private expenseService: ExpenseService,
     private purchaseService: PurchaseService,
+    private journalService: JournalService,
     private authService: AuthService,
     private datePipe: DatePipe,
     private formBuilder: FormBuilder
@@ -123,63 +210,212 @@ recentTransactionsLimit: number = 5;
       date: [new Date().toISOString().split('T')[0], Validators.required],
       note: ['']
     });
+
+    this.subscriptions.push(
+      this.updateTrigger.pipe(debounceTime(50)).subscribe(() => {
+        this.processTransactionsInternal();
+      })
+    );
   }
 
   ngOnInit(): void {
     this.accountId = this.route.snapshot.paramMap.get('id') || '';
+
     if (this.accountId) {
+      const navigationState = this.router.getCurrentNavigation()?.extras?.state || history.state;
+      const shouldForceRefresh = navigationState?.forceRefresh ||
+        this.accountService.shouldRefreshAccountBook(this.accountId);
+
+      if (shouldForceRefresh) {
+        this.accountService.clearAccountCache(this.accountId);
+        this.accountService.clearAccountBookRefreshFlag(this.accountId);
+      }
+
+      // ✅ CHANGED: Initialize temp dates from actual date range
+      this.tempDateRange.from = this.formatDateToYYYYMMDD(this.dateRange.from);
+      this.tempDateRange.to = this.formatDateToYYYYMMDD(this.dateRange.to);
+
       this.loadAllAccounts();
       this.loadAccountDetails();
-          this.loadRecentTransactions(); // Add this line
-
+      this.loadRecentTransactions();
       this.setupRealtimeListeners();
     }
   }
 
+  // ✅ NEW: Helper to format Date to yyyy-MM-dd for input fields
+  private formatDateToYYYYMMDD(date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // ✅ NEW: Apply filters button handler
+  applyDateFilters(): void {
+    if (this.tempDateRange.from) {
+      this.dateRange.from = new Date(this.tempDateRange.from);
+    }
+    if (this.tempDateRange.to) {
+      this.dateRange.to = new Date(this.tempDateRange.to);
+    }
+    this.filterTransactions();
+  }
+
+  // ✅ NEW: Reset filters button handler
+  resetFilters(): void {
+    const defaultFrom = new Date(new Date().setDate(new Date().getDate() - 30));
+    const defaultTo = new Date();
+    
+    this.dateRange.from = defaultFrom;
+    this.dateRange.to = defaultTo;
+    this.tempDateRange.from = this.formatDateToYYYYMMDD(defaultFrom);
+    this.tempDateRange.to = this.formatDateToYYYYMMDD(defaultTo);
+    this.transactionType = 'All';
+    this.searchQuery = '';
+    
+    this.filterTransactions();
+  }
+ getFormattedDate(dateString: string): string {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day}-${month}-${year}`;
+  }
+
+  // Opens the hidden native date picker when clicking the calendar icon
+  openDatePicker(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.fromDatePicker.nativeElement.showPicker();
+    } else {
+      this.toDatePicker.nativeElement.showPicker();
+    }
+  }
+
+  // Handles manual typing in DD-MM-YYYY format
+  onDateInput(event: any, type: 'from' | 'to'): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        const formattedDate = `${year}-${month}-${day}`; // Internal format YYYY-MM-DD
+        if (type === 'from') this.tempDateRange.from = formattedDate;
+        else this.tempDateRange.to = formattedDate;
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        // Revert to current value
+        event.target.value = type === 'from' ? this.getFormattedDate(this.tempDateRange.from) : this.getFormattedDate(this.tempDateRange.to);
+      }
+    }
+  }
+  downloadTransactionData(): void {
+    if (this.filteredTransactions.length === 0) {
+      alert('No data to download');
+      return;
+    }
+
+    let csvContent = 'Date,Transaction Time,Description,Payment Method,Payment Details,Note,Added By,Debit,Credit,Balance,Type,Reference No,Category,Source\n';
+    
+    this.filteredTransactions.forEach(t => {
+      const formattedDate = this.formatTransactionDate(t);
+      const formattedTime = this.formatTransactionTime(t);
+      const description = (t.description || '').replace(/,/g, ' ');
+      const paymentMethod = (t.paymentMethod || '').replace(/,/g, ' ');
+      const paymentDetails = (t.paymentDetails || '').replace(/,/g, ' ');
+      const note = (t.note || '').replace(/,/g, ' ');
+      const addedBy = (t.addedBy || '').replace(/,/g, ' ');
+      const debit = t.debit || 0;
+      const credit = t.credit || 0;
+      const balance = t.balance || 0;
+      const type = this.getTransactionTypeDisplay(t.type);
+      const referenceNo = (t.referenceNo || '').replace(/,/g, ' ');
+      const category = (t.category || '').replace(/,/g, ' ');
+      const source = t.source || 'account';
+      
+      csvContent += `"${formattedDate}","${formattedTime}","${description}","${paymentMethod}","${paymentDetails}","${note}","${addedBy}",${debit},${credit},${balance},"${type}","${referenceNo}","${category}","${source}"\n`;
+    });
+    
+    csvContent += `Total,,,,,,,,${this.totalDebit},${this.totalCredit},,,,\n`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = window.URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const dateStr = this.datePipe.transform(new Date(), 'dd-MM-yyyy');
+    link.setAttribute('download', `${this.accountDetails.name}_transactions_${dateStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   ngOnDestroy(): void {
-    // Unsubscribe from all real-time listeners
     this.accountTransactionsUnsubscribe();
     this.expensesUnsubscribe();
     this.incomesUnsubscribe();
     this.purchasesUnsubscribe();
     this.salesUnsubscribe();
-    
-    // Unsubscribe from all subscriptions
+    this.returnsUnsubscribe();
     this.subscriptions.forEach(sub => sub.unsubscribe());
   }
 
-private loadRecentTransactions(): void {
-  this.accountService.getRecentTransactions(this.accountId, this.recentTransactionsLimit)
-    .subscribe({
-      next: (transactions) => {
-        this.recentTransactions = transactions;
-      },
-      error: (error) => {
-        console.error('Error loading recent transactions:', error);
-      }
-    });
-}  private convertToDate(dateValue: any): Date {
-    if (!dateValue) return new Date();
-    if (dateValue instanceof Date) return dateValue;
-    if (dateValue?.toDate && typeof dateValue.toDate === 'function') return dateValue.toDate(); // Handle Firestore Timestamp
-    if (typeof dateValue === 'string') return new Date(dateValue);
-    if (typeof dateValue === 'number') return new Date(dateValue);
-    return new Date();
+  private getTransactionDisplayTime(transaction: any): Date {
+    if (transaction.transactionTime) return this.convertToDate(transaction.transactionTime);
+    if (transaction.createdAt) return this.convertToDate(transaction.createdAt);
+    return this.convertToDate(transaction.date);
+  }
+
+  formatTransactionTime(transaction: Transaction): string {
+    const displayTime = this.getTransactionDisplayTime(transaction);
+    return this.datePipe.transform(displayTime, 'MM/dd/yyyy HH:mm:ss') || 'N/A';
+  }
+
+  onDateInputFocus(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    input.type = 'date';
+    input.showPicker();
+  }
+
+  onDateInputBlur(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    input.type = 'text'; 
+  }
+
+  handleDateFromChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.onDateFromChange(input.value);
+  }
+
+  handleDateToChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.onDateToChange(input.value);
+  }
+
+  // ✅ CHANGED: Only updates temp storage, doesn't trigger filter
+  onDateFromChange(dateString: string): void {
+    if (!dateString) return;
+    this.tempDateRange.from = dateString;
+  }
+
+  // ✅ CHANGED: Only updates temp storage, doesn't trigger filter
+  onDateToChange(dateString: string): void {
+    if (!dateString) return;
+    this.tempDateRange.to = dateString;
   }
 
   getEmptyEditingTransaction(): EditingTransaction {
+    const now = new Date();
     return {
-      id: '',
-      date: new Date(),
-      dateString: '',
-      description: '',
-      paymentMethod: '',
-      paymentDetails: '',
-      note: '',
-      addedBy: '',
-      debit: 0,
-      credit: 0,
-      hasDocument: false
+      id: '', date: now, createdAt: now, transactionTime: now, dateString: now.toISOString().slice(0, 16),
+      description: '', paymentMethod: '', paymentDetails: '', note: '', addedBy: '',
+      debit: 0, credit: 0, hasDocument: false, roundingAdjustment: 0, exactRefund: 0, roundedRefund: 0
     };
   }
 
@@ -202,7 +438,10 @@ private loadRecentTransactions(): void {
             number: account.accountNumber || '',
             balance: account.openingBalance || 0
           };
-         this.openingBalance = account.openingBalance || 0;
+          this.openingBalance = account.openingBalance || 0;
+          this.accountService.setOriginalOpeningBalance(this.accountId, this.openingBalance);
+          this.isOpeningBalanceLoaded = true;
+          this.combineAndProcessTransactions();
         }
         this.loading = false;
       },
@@ -213,729 +452,621 @@ private loadRecentTransactions(): void {
     });
   }
 
-// Correct - move private method to class level
-setupRealtimeListeners(): void {
-  this.loading = true;
-  
-  // Clear existing transactions
-  this.transactions = [];
-  
-  // First load account transactions
-  this.accountTransactionsUnsubscribe = this.accountService.getAllAccountTransactions(
-    this.accountId,
-    (transactions) => {
-      this.processAccountTransactions(transactions);
-      this.loadSalesData(); // Then load sales
-    }
-  );
-}
-private loadSalesData(): void {
-  if (this.saleService.getSalesByPaymentAccount) {
-    const saleSub = this.saleService.getSalesByPaymentAccount(this.accountId).subscribe({
-      next: (sales: any[]) => {
-        // Include all sales for this account
-        const accountSales = sales.map(sale => this.mapSaleToTransaction(sale));
-        this.transactions = [
-          ...this.transactions.filter(t => t.source !== 'sale'),
-          ...accountSales
-        ];
-        this.loadPurchasesData(); // Then load purchases
-      },
-      error: (error) => {
-        console.error('Error loading sales:', error);
-        this.loadPurchasesData(); // Continue with purchases even if sales fail
-      }
-    });
-    this.subscriptions.push(saleSub);
-    this.salesUnsubscribe = () => saleSub.unsubscribe();
-  } else {
-    this.loadPurchasesData();
-  }
-}
-
-private loadPurchasesData(): void {
-  // Purchases are excluded from account book - skip loading
-  this.combineAndProcessTransactions();
-}
-
-private processAccountBookTransactions(transactions: any[]): void {
-  const accountTransactions = transactions.map(t => ({
-    id: t.id,
-    date: t.date,
-    description: t.description,
-    paymentMethod: t.paymentMethod,
-    paymentDetails: t.reference,
-    note: t.note,
-    debit: t.debit,
-    credit: t.credit,
-    balance: 0, // Will be calculated later
-    hasDocument: false,
-    type: t.debit > 0 ? 'expense' : 'income',
-    source: 'accountBook',
-    accountName: t.accountName,
-    addedBy: 'System' // Or you can add this field to your transaction data
-  }));
-  
-  this.transactions = [
-    ...this.transactions.filter(t => t.source !== 'accountBook'),
-    ...accountTransactions
-  ];
-}
-  // Properly define the loadSalesFallback method as a class method
-  private loadSalesFallback(): void {
-    // Listen to sales for this account
-    if (this.saleService.getSalesByPaymentAccount && typeof this.saleService.getSalesByPaymentAccount === 'function') {
-      const salesObservable = this.saleService.getSalesByPaymentAccount(this.accountId);
-      if (salesObservable && typeof salesObservable.subscribe === 'function') {
-        const saleSub = salesObservable.subscribe({
-          next: (sales: any[]) => {
-            const accountSales = sales.map(sale => this.mapSaleToTransaction(sale));
-            this.transactions = [
-              ...this.transactions.filter(t => t.source !== 'sale'),
-              ...accountSales
-            ];
-            this.combineAndProcessTransactions();
-          },
-          error: (error: any) => {
-            console.error('Error fetching sales:', error);
-            this.loading = false;
-          }
-        });
-        this.subscriptions.push(saleSub);
-        this.salesUnsubscribe = () => saleSub.unsubscribe();
-      } else {
-        this.salesUnsubscribe = () => {};
-      }
-    } else if (this.saleService['getSales']) {
-      const saleSub = this.saleService['getSales']().subscribe({
-        next: (sales: any[]) => {
-          const accountSales = sales
-            .filter((sale: any) => 
-              sale.paymentAccount === this.accountId || 
-              sale.paymentAccount?.id === this.accountId
-            )
-            .map(sale => this.mapSaleToTransaction(sale));
-          this.transactions = [
-            ...this.transactions.filter(t => t.source !== 'sale'),
-            ...accountSales
-          ];
-          this.combineAndProcessTransactions();
-        },
-        error: (error: any) => {
-          console.error('Error in fallback sale loading:', error);
-          this.loading = false;
-        }
+  private loadRecentTransactions(): void {
+    this.accountService.getRecentTransactions(this.accountId, this.recentTransactionsLimit)
+      .subscribe({
+        next: (transactions) => { this.recentTransactions = transactions; },
+        error: (error) => { console.error('Error loading recent transactions:', error); }
       });
-      this.subscriptions.push(saleSub);
-      this.salesUnsubscribe = () => saleSub.unsubscribe();
-    } else {
-      this.salesUnsubscribe = () => {};
-    }
+  }
 
-  // Listen to expenses for this account
-  if (this.expenseService.getExpensesByAccount) {
-    this.expensesUnsubscribe = this.expenseService.getExpensesByAccount(
-      this.accountId, 
-      (expenses: Expense[]) => {
-        const accountExpenses = expenses.map(expense => this.mapExpenseToTransaction(expense));
-        this.transactions = [
-          ...this.transactions.filter(t => t.source !== 'expense'),
-          ...accountExpenses
-        ];
+  setupRealtimeListeners(): void {
+    this.loading = true;
+    this.transactions = [];
+    this.accountTransactionList = [];
+    this.saleTransactionList = [];
+    this.expenseTransactionList = [];
+    this.returnTransactionList = [];
+    
+    this.loadAccountTransactions();
+    this.loadSalesTransactions();
+    this.loadExpenseTransactions();
+    this.loadSalesReturns();
+  }
+
+  private loadAccountTransactions(): void {
+    const legacyUnsub = this.accountService.getAllAccountTransactions(
+      this.accountId,
+      (transactions) => {
+        this.legacyList = transactions
+          .map(t => this.mapAccountTransaction(t))
+          .filter(t => t !== null) as Transaction[];
+        
+        this.mergeAndProcessAccountTransactions();
+      }
+    );
+
+    const newBookUnsub = this.accountService.getAccountBookTransactions(
+      this.accountId,
+      (transactions) => {
+        this.newBookList = transactions
+          .map(t => this.mapAccountTransaction(t))
+          .filter(t => t !== null) as Transaction[];
+        
+        this.mergeAndProcessAccountTransactions();
+      }
+    );
+
+    this.accountTransactionsUnsubscribe = () => {
+      legacyUnsub();
+      newBookUnsub();
+    };
+  }
+
+  private mergeAndProcessAccountTransactions(): void {
+    this.accountTransactionList = [...this.legacyList, ...this.newBookList];
+    this.combineAndProcessTransactions();
+  }
+
+  private mapAccountBookReturnToTransaction(accountTransaction: any): Transaction | null {
+    if (!accountTransaction || accountTransaction.source !== 'sales_return') return null;
+    const transactionDate = this.convertToDate(accountTransaction.date);
+    return {
+      id: accountTransaction.id, 
+      date: transactionDate, 
+      createdAt: this.convertToDate(accountTransaction.createdAt),
+      transactionTime: this.getTransactionDisplayTime(accountTransaction),
+      description: accountTransaction.description || 'Sales Return', 
+      paymentMethod: 'Sales Return',
+      paymentDetails: accountTransaction.reference || '', 
+      note: accountTransaction.note || '', 
+      addedBy: 'System',
+      debit: Number(accountTransaction.debit) || 0, 
+      credit: 0, 
+      balance: 0, 
+      type: 'sales_return', 
+      source: 'sales_return', 
+      customerName: accountTransaction.customerName || '', 
+      returnId: accountTransaction.relatedDocId,
+      originalSaleId: accountTransaction.originalSaleId, 
+      relatedDocId: accountTransaction.relatedDocId,
+      roundingAdjustment: 0, exactRefund: 0, roundedRefund: 0
+    } as Transaction;
+  }
+
+  getDisplayDebit(t: Transaction): number { 
+    return Number(t.debit) || 0; 
+  }
+
+  private loadSalesReturns(): void {
+    const accountBookUnsubscribe = this.accountService.getAccountBookTransactions(
+      this.accountId,
+      (transactions) => {
+        this.returnTransactionList = transactions
+          .filter(t => t.source === 'sales_return')
+          .map(t => this.mapAccountBookReturnToTransaction(t))
+          .filter(t => t !== null) as Transaction[];
+        
         this.combineAndProcessTransactions();
       }
     );
-  } else {
-    const expenseSub = this.expenseService.getExpenses().subscribe(expenses => {
-      const accountExpenses = expenses
-        .filter((expense: any) => expense.paymentAccount === this.accountId)
-        .map(expense => this.mapExpenseToTransaction(expense));
-      this.transactions = [
-        ...this.transactions.filter(t => t.source !== 'expense'),
-        ...accountExpenses
-      ];
-      this.combineAndProcessTransactions();
-    });
-    this.subscriptions.push(expenseSub);
-    this.expensesUnsubscribe = () => expenseSub.unsubscribe();
+    this.returnsUnsubscribe = accountBookUnsubscribe;
   }
 
-  // Incomes are now handled through transactions collection only
-  // No need to load from incomes collection separately
-  this.incomesUnsubscribe = () => {};
-
-  // Purchases are excluded from account book
-}
-
-  // Map Expense to Transaction
-  mapExpenseToTransaction(expense: any): Transaction {
-    return {
-      id: expense.id,
-      date: this.convertToDate(expense.paidOn || expense.date),
-      description: `${expense.expenseCategory || 'Expense'}: ${expense.expenseNote || 'No description'}`,
-      paymentMethod: expense.paymentMethod || '',
-      paymentDetails: expense.referenceNo || '',
-      note: expense.expenseNote || '',
-      addedBy: expense.addedByDisplayName || expense.addedBy || 'System',
-      debit: Number(expense.paymentAmount || 0),
-      credit: 0,
-      balance: 0,
-      hasDocument: !!expense.document,
-      type: 'expense',
-      attachmentUrl: expense.document || '',
-      referenceNo: expense.referenceNo,
-      category: expense.expenseCategory,
-      totalAmount: expense.totalAmount,
-      source: 'expense'
-    };
-  }
-  // Map Purchase to Transaction
-  mapPurchaseToTransaction(purchase: any): Transaction {
-    return {
-      id: purchase.id,
-      date: this.convertToDate(purchase.purchaseDate),
-      description: `Purchase: ${purchase.referenceNo || purchase.invoiceNo || 'No reference'}`,
-      paymentMethod: purchase.paymentMethod || '',
-      paymentDetails: purchase.invoiceNo || '',
-      note: purchase.paymentNote || purchase.additionalNotes || '',
-      addedBy: this.getAddedByName(purchase.addedBy),
-      debit: Number(purchase.paymentAmount || purchase.grandTotal || 0),
-      credit: 0,
-      balance: 0,
-      hasDocument: !!purchase.document,
-      type: 'purchase',
-      attachmentUrl: purchase.document || '',
-      referenceNo: purchase.referenceNo || purchase.invoiceNo,
-      supplier: purchase.supplier,
-      source: 'purchase'
-    };
-  }
-
-
-// Update the mapSaleToTransaction method to include more details
-mapSaleToTransaction(sale: any): Transaction {
-  const transactionDate = this.convertToDate(sale.saleDate || sale.createdAt || new Date());
-  const paymentAmount = Number(sale.paymentAmount || sale.totalAmount || sale.total || 0);
-  
-  return {
-    id: sale.id,
-    date: transactionDate,
-    description: `Sale: ${sale.invoiceNo || 'No invoice'}`,
-    paymentMethod: sale.paymentMethod || '',
-    paymentDetails: sale.transactionId || '',
-    note: sale.note || '',
-    addedBy: sale.addedByDisplayName || sale.addedBy || 'System',
-    debit: 0,
-    credit: paymentAmount,
-    balance: 0, // Will be calculated later
-    hasDocument: !!sale.document,
-    type: 'sale',
-    attachmentUrl: sale.document || '',
-    referenceNo: sale.invoiceNo,
-    source: 'sale',
-    customer: sale.customer,
-    saleId: sale.id,
-    invoiceNo: sale.invoiceNo,
-    customerName: sale.customer,
-    totalAmount: paymentAmount,
-    paymentStatus: sale.paymentStatus || 'unpaid'
-  };
-}
-
-
-private getEmptyTransaction(): Transaction {
-  return {
-    id: '',
-    date: new Date(),
-    description: '',
-    paymentMethod: '',
-    paymentDetails: '',
-    note: '',
-    addedBy: '',
-    debit: 0,
-    credit: 0,
-    balance: 0,
-    hasDocument: false,
-    type: '',
-    source: ''
-  };
-}
-  processAccountTransactions(transactions: any[]): void {
-    console.log('Raw account transactions:', transactions); // Debug log
-    const accountTransactions = transactions.map(t => this.mapAccountTransaction(t));
-    console.log('Mapped account transactions:', accountTransactions); // Debug log
-    this.transactions = [
-      ...this.transactions.filter(t => t.source !== 'account'),
-      ...accountTransactions
-    ];
-  }mapAccountTransaction(t: any): Transaction {
-    const transactionDate = this.convertToDate(t.date);
-    
-    let description = t.description;
-    let paymentMethod = t.paymentMethod || '';
-    let type = t.type || '';
-    let debit = 0;
-    let credit = 0;
-    
-    // If transaction already has debit/credit fields, use them
-    if (t.debit !== undefined && t.credit !== undefined) {
-      debit = Number(t.debit || 0);
-      credit = Number(t.credit || 0);
+  private loadSalesTransactions(): void {
+    if (this.saleService.getSalesByPaymentAccount) {
+        const saleSub = this.saleService.getSalesByPaymentAccount(this.accountId).subscribe({
+            next: (sales: any[]) => {
+                this.saleTransactionList = sales
+                    .filter(sale => {
+                        const wasCompleted = ['Completed', 'Returned', 'Partial Return'].includes(sale.status);
+                        const hasPayment = Number(sale.paymentAmount) > 0;
+                        return wasCompleted && hasPayment;
+                    })
+                    .map(sale => this.mapSaleToTransaction(sale))
+                    .filter(t => t !== null) as Transaction[];
+                this.combineAndProcessTransactions();
+            },
+            error: (error) => console.error('Error loading sales:', error)
+        });
+        this.subscriptions.push(saleSub);
+        this.salesUnsubscribe = () => saleSub.unsubscribe();
     } else {
-      // Calculate debit/credit from amount and type
-      const amount = Number(t.amount || 0);
-      
-      // Handle purchase payment transactions
-      if (type === 'purchase_payment') {
-        description = `Purchase Payment: ${t.reference || ''}`;
-        paymentMethod = t.paymentMethod || 'Cash';
-        debit = amount; // Purchase payments are debits (money going out)
-      }
-      // Handle purchase return transactions
-      else if (type === 'purchase_return') {
-        description = `Purchase Return: ${t.reference || ''}`;
-        paymentMethod = t.paymentMethod || 'Purchase Return';
-        credit = amount; // Purchase returns are credits (money coming back)
-      }
-      // Handle expense transactions
-      else if (type === 'expense') {
-        debit = amount; // Expenses are debits (money going out)
-      }
-      // Handle income transactions
-      else if (type === 'income') {
-        credit = amount; // Income is credit (money coming in)
-      }
-      // Handle transfer transactions
-      else if (type === 'transfer' || type === 'transfer_in' || type === 'transfer_out') {
-        if (t.fromAccountId === this.accountId || type === 'transfer_out') {
-          description = `Transfer to ${this.getAccountName(t.toAccountId)}`;
-          paymentMethod = 'Fund Transfer';
-          debit = amount; // Outgoing transfer is debit
-        } else if (t.toAccountId === this.accountId || type === 'transfer_in') {
-          description = `Transfer from ${this.getAccountName(t.fromAccountId)}`;
-          paymentMethod = 'Fund Transfer';
-          credit = amount; // Incoming transfer is credit
+        this.loadSalesFallback();
+    }
+  }
+
+  private loadExpenseTransactions(): void {
+    const processExpenses = (expenses: Expense[]) => {
+      this.expenseTransactionList = expenses
+        .filter(expense => expense.source !== 'journal') 
+        .map(expense => this.mapExpenseToTransaction(expense));
+        
+      this.combineAndProcessTransactions();
+    };
+
+    if (this.expenseService.getExpensesByAccount) {
+      this.expensesUnsubscribe = this.expenseService.getExpensesByAccount(
+        this.accountId,
+        processExpenses
+      );
+    } else {
+      const expenseSub = this.expenseService.getExpenses().subscribe(expenses => {
+        const accountExpenses = expenses
+          .filter((expense: any) => expense.paymentAccount === this.accountId);
+        processExpenses(accountExpenses);
+      });
+      this.subscriptions.push(expenseSub);
+      this.expensesUnsubscribe = () => expenseSub.unsubscribe();
+    }
+  }
+
+  mapExpenseToTransaction(expense: any): Transaction {
+    const expenseDate = this.convertToDate(expense.paidOn || expense.date);
+    const createdAt = this.convertToDate(expense.createdAt || expense.timestamp);
+    return {
+      id: expense.id, date: expenseDate, createdAt: createdAt, transactionTime: expenseDate,
+      description: `${expense.expenseCategory || 'Expense'}: ${expense.expenseNote || 'No description'}`,
+      paymentMethod: expense.paymentMethod || '', paymentDetails: expense.referenceNo || '',
+      note: expense.expenseNote || '', addedBy: expense.addedByDisplayName || expense.addedBy || 'System',
+      debit: Number(expense.paymentAmount || 0), credit: 0, balance: 0,
+      hasDocument: !!expense.document, type: 'expense', attachmentUrl: expense.document || '',
+      referenceNo: expense.referenceNo, category: expense.expenseCategory, totalAmount: expense.totalAmount,
+      source: 'expense', roundingAdjustment: 0, exactRefund: 0, roundedRefund: 0
+    };
+  }
+
+  private processTransactionsInternal(): void {
+    const ledgerTransactions = [...this.accountTransactionList];
+    const recordedDocIds = new Set<string>();
+    
+    ledgerTransactions.forEach(t => {
+        if (t.relatedDocId) recordedDocIds.add(t.relatedDocId);
+        if (t.saleId) recordedDocIds.add(t.saleId);
+        
+        if (t.referenceNo) recordedDocIds.add(t.referenceNo);
+        if (t.paymentDetails) recordedDocIds.add(t.paymentDetails);
+        
+        if (t.referenceNo && t.referenceNo.includes('-')) {
+            const baseRef = t.referenceNo.split('-')[0];
+            recordedDocIds.add(baseRef);
         }
-      }
-      // Default handling for other transaction types
-      else {
-        // If no specific rule, assume expense types are debits, others are credits
-        if (type.includes('expense') || type.includes('payment')) {
-          debit = amount;
+        if (t.paymentDetails && t.paymentDetails.includes('-')) {
+            const baseDetails = t.paymentDetails.split('-')[0];
+            recordedDocIds.add(baseDetails);
+        }
+    });
+
+    const uniqueSalesList = this.saleTransactionList.filter(saleTx => {
+        if (saleTx.id && recordedDocIds.has(saleTx.id)) return false;
+        if (saleTx.relatedDocId && recordedDocIds.has(saleTx.relatedDocId)) return false;
+        if (saleTx.invoiceNo && recordedDocIds.has(saleTx.invoiceNo)) return false;
+        if (saleTx.paymentDetails && recordedDocIds.has(saleTx.paymentDetails)) return false;
+        return true;
+    });
+
+    const allTransactions = [
+        ...ledgerTransactions,
+        ...uniqueSalesList, 
+        ...this.expenseTransactionList,
+        ...this.returnTransactionList
+    ];
+    
+    const transactionMap = new Map<string, Transaction>();
+    allTransactions.forEach(t => {
+        if (!transactionMap.has(t.id)) {
+            transactionMap.set(t.id, t);
+        }
+    });
+
+    this.transactions = Array.from(transactionMap.values());
+    this.calculateRunningBalanceForView();
+
+    if (this.transactions.length > 0) {
+        if (this.sortDirection === 'desc') {
+           this.accountDetails.balance = this.transactions[0].balance;
         } else {
-          credit = amount;
+           this.accountDetails.balance = this.transactions[this.transactions.length - 1].balance;
         }
-      }
+    } else {
+        this.accountDetails.balance = this.openingBalance;
     }
     
+    this.loadJournalContextDetails();
+
+    this.saveCurrentBalanceToDatabase();
+    this.accountService.setCalculatedCurrentBalance(this.accountId, this.accountDetails.balance);
+    this.filterTransactions();
+    this.isEmpty = this.transactions.length === 0;
+    this.loading = false;
+  }
+
+  private loadJournalContextDetails(): void {
+    const journalTransactions = this.transactions.filter(t => 
+      t.source === 'journal' && 
+      t.relatedDocId && 
+      !t.journalDetails
+    );
+
+    const uniqueJournalIds = [...new Set(journalTransactions.map(t => t.relatedDocId))];
+
+    uniqueJournalIds.forEach(journalId => {
+      if (!journalId) return;
+
+      this.journalService.getJournalById(journalId).pipe(take(1)).subscribe(journal => {
+        if (!journal || !journal.items) return;
+
+        const contraItems = journal.items.filter(item => item.accountId !== this.accountId);
+
+        if (contraItems.length > 0) {
+          const detailsString = 'Vs: ' + contraItems.map(item => {
+             const type = item.debit > 0 ? '(Dr)' : '(Cr)'; 
+             return `${item.accountName} ${type}`;
+          }).join(', ');
+
+          this.transactions.forEach(t => {
+            if (t.relatedDocId === journalId) {
+              t.journalDetails = detailsString;
+            }
+          });
+        }
+      });
+    });
+  }
+
+  viewJournalDetails(journalId: string | undefined): void {
+    if (!journalId) return;
+    this.loading = true;
+    this.journalService.getJournalById(journalId).pipe(take(1)).subscribe(journal => {
+      this.selectedJournalForView = journal;
+      this.showJournalViewModal = true;
+      this.loading = false;
+    });
+  }
+
+  closeJournalViewModal(): void {
+    this.showJournalViewModal = false;
+    this.selectedJournalForView = null;
+  }
+
+  getJournalTotalDebit(items: JournalItem[]): number {
+    if (!items) return 0;
+    return items.reduce((sum, item) => sum + (item.debit || 0), 0);
+  }
+
+  getJournalTotalCredit(items: JournalItem[]): number {
+    if (!items) return 0;
+    return items.reduce((sum, item) => sum + (item.credit || 0), 0);
+  }
+
+  private mapSaleToTransaction(sale: any): Transaction | null {
+    if (!sale.paymentAmount || Number(sale.paymentAmount) <= 0) return null;
+    const transactionDate = this.convertToDate(sale.completedAt || sale.saleDate);
+    let creditAmount = Number(sale.paymentAmount);
+    let paymentMethod = sale.paymentMethod || 'Cash';
+
+    if (sale.payments && Array.isArray(sale.payments) && sale.payments.length > 0) {
+        const splitPayment = sale.payments.find((p: any) => p.accountId === this.accountId);
+        if (splitPayment) {
+            creditAmount = Number(splitPayment.amount);
+            paymentMethod = splitPayment.method;
+        }
+    }
+
+    const finalPaymentDetails = sale.invoiceNo || sale.id;
+
     return {
-      id: t.id,
-      date: transactionDate,
-      description: description,
-      paymentMethod: paymentMethod,
-      paymentDetails: t.reference || t.paymentDetails || '',
-      note: t.note || '',
-      addedBy: t.addedBy || 'System',
-      debit: debit,
-      credit: credit,
-      balance: 0,
-      hasDocument: t.hasDocument || false,
-      type: type,
-      attachmentUrl: t.attachmentUrl,
-      fromAccountId: t.fromAccountId,
-      toAccountId: t.toAccountId,
-      referenceNo: t.reference || t.referenceNo || '',
-      source: 'account'
-    };
+        id: sale.id, 
+        date: transactionDate, 
+        transactionTime: transactionDate,
+        description: `Sale: ${sale.invoiceNo || 'N/A'}`, 
+        paymentMethod: paymentMethod,
+        paymentDetails: finalPaymentDetails, 
+        note: sale.note || '',
+        addedBy: sale.addedByDisplayName || 'System', 
+        debit: 0, 
+        credit: creditAmount, 
+        balance: 0,
+        hasDocument: !!sale.document, 
+        type: 'sale', 
+        source: 'sale', 
+        customerName: sale.customer,
+        saleId: sale.id, 
+        invoiceNo: sale.invoiceNo, 
+        hasReturns: sale.hasReturns || false, 
+        relatedDocId: sale.id,
+        roundingAdjustment: 0, 
+        exactRefund: 0, 
+        roundedRefund: 0
+    } as Transaction;
   }
 
   getAddedByName(addedBy: any): string {
     if (typeof addedBy === 'string') return addedBy;
-    if (addedBy && typeof addedBy === 'object') {
-      return addedBy.displayName || addedBy.name || addedBy.email || 'System';
-    }
-    return 'System';
+    return addedBy?.displayName || addedBy?.name || 'System';
   }
-
-  getAccountName(accountId: string | undefined): string {
-    if (!accountId) return 'Unknown Account';
-    const account = this.allAccounts.find(a => a.id === accountId);
-    return account ? account.name : 'Unknown Account';
+  getAccountName(id: string): string {
+    return this.allAccounts.find(a => a.id === id)?.name || 'Unknown Account';
   }
-
-calculateRunningBalance(): void {
-  // Sort by date (oldest first) for balance calculation, excluding purchase transactions
-  const sorted = [...this.transactions]
-    .filter(t => t.type !== 'purchase' && t.source !== 'purchase')
-    .sort((a, b) => a.date.getTime() - b.date.getTime());
-  
-  // Start from the original opening balance, not current accountDetails.balance
-  let balance = this.openingBalance;
-
-  sorted.forEach(t => {
-    // Ensure we're working with numbers
-    const debit = Number(t.debit) || 0;
-    const credit = Number(t.credit) || 0;
-    
-    // Update balance based on transaction type
-    if (t.type === 'transfer' || t.type === 'transfer_in' || t.type === 'transfer_out') {
-      if (t.fromAccountId === this.accountId) {
-        // Outgoing transfer - debit
-        balance -= debit;
-      } else if (t.toAccountId === this.accountId) {
-        // Incoming transfer - credit
-        balance += credit;
-      }
+  private loadSalesFallback(): void {
+    if (this.saleService['getSales']) {
+      const saleSub = this.saleService['getSales']().subscribe({
+        next: (sales: any[]) => {
+          const accountSales = sales
+            .filter((sale: any) => {
+              const paymentAccountId = sale.paymentAccount || sale.paymentAccountId || sale.account || sale.accountId;
+              const matchesAccount = paymentAccountId === this.accountId ||
+                (typeof paymentAccountId === 'object' && paymentAccountId?.id === this.accountId);
+              const wasCompleted = sale.status === 'Completed' || sale.status === 'Returned' || sale.status === 'Partial Return';
+              const hasPayment = Number(sale.paymentAmount) > 0;
+              return matchesAccount && wasCompleted && hasPayment;
+            })
+            .map(sale => this.mapSaleToTransaction(sale))
+            .filter(t => t !== null) as Transaction[];
+          this.saleTransactionList = accountSales;
+          this.combineAndProcessTransactions();
+        },
+        error: (error: any) => console.error('Error in fallback sale loading:', error)
+      });
+      this.subscriptions.push(saleSub);
+      this.salesUnsubscribe = () => saleSub.unsubscribe();
     } else {
-      // Regular transaction
-      balance = balance + credit - debit;
+      console.warn('No sales service method available');
+      this.salesUnsubscribe = () => { };
     }
+  }
+
+  private combineAndProcessTransactions(): void {
+    if (!this.isOpeningBalanceLoaded) return;
+    this.updateTrigger.next();
+  }
+
+  private async saveCurrentBalanceToDatabase(): Promise<void> {
+    try {
+      await this.accountService.updateCurrentBalance(this.accountId, this.accountDetails.balance);
+    } catch (error) {
+      console.error('❌ Error saving current balance:', error);
+    }
+  }
+
+  mapAccountTransaction(t: any): Transaction {
+    const transactionDate = this.convertToDate(t.date);
+    const createdAt = this.convertToDate(t.createdAt || t.timestamp);
+    let description = t.description || 'General Ledger Entry';
+    let paymentMethod = t.paymentMethod || '';
     
-    t.balance = balance;
-  });
+    let type = t.type || 'manual_entry';
+    const source = t.source || 'account';
 
-  // Reverse to show newest first
-  this.transactions = sorted.reverse();
-  this.accountDetails.balance = balance;
-}
-
-combineAndProcessTransactions(): void {
-  // Create a unique key for each transaction to prevent duplicates and exclude purchases
-  const transactionMap = new Map<string, Transaction>();
-    this.accountService.setAccountTransactions(this.accountId, this.transactions);
-
-  this.transactions.forEach(t => {
-    // Skip purchase transactions completely
-    if (t.type === 'purchase' || t.source === 'purchase') {
-      return;
-    }
-    const key = `${t.source}-${t.id}`;
-    if (!transactionMap.has(key)) {
-      transactionMap.set(key, t);
-    }
-  });
-  
-  // Convert back to array and sort
-  this.transactions = Array.from(transactionMap.values())
-    .sort((a, b) => b.date.getTime() - a.date.getTime());
-  
-  this.calculateRunningBalance();
-  this.filterTransactions();
-  this.isEmpty = this.transactions.length === 0;
-  this.loading = false;
-}
-
-filterTransactions(): void {
-  // Apply date filter first and exclude purchase transactions
-  // Properly set date boundaries to ensure consistent filtering
-  const fromDate = new Date(this.dateRange.from);
-  fromDate.setHours(0, 0, 0, 0);
-  
-  const toDate = new Date(this.dateRange.to);
-  toDate.setHours(23, 59, 59, 999);
-  
-  this.filteredTransactions = this.transactions.filter(t => {
-    const transactionDate = t.date;
-    // Exclude purchase transactions completely
-    if (t.type === 'purchase' || t.source === 'purchase') {
-      return false;
-    }
-    return transactionDate >= fromDate && transactionDate <= toDate;
-  });
-  
-  // Apply search filter if exists
-  if (this.searchQuery) {
-    const query = this.searchQuery.toLowerCase();
-    this.filteredTransactions = this.filteredTransactions.filter(t => 
-      t.description?.toLowerCase().includes(query) ||
-      t.paymentMethod?.toLowerCase().includes(query) ||
-      t.addedBy?.toLowerCase().includes(query) ||
-      (t.note && t.note.toLowerCase().includes(query)) ||
-      (t.referenceNo && t.referenceNo.toLowerCase().includes(query)) ||
-      (t.category && t.category.toLowerCase().includes(query)) ||
-      (t.supplier && t.supplier.toLowerCase().includes(query)) ||
-      (t.customer && t.customer.toLowerCase().includes(query))
-    );
-  }
-    // Apply transaction type filter
-  if (this.transactionType !== 'All') {
-    this.filteredTransactions = this.filteredTransactions.filter(t => {
-      switch(this.transactionType) {
-        case 'Debit': 
-          return Number(t.debit) > 0;
-        case 'Credit': 
-          return Number(t.credit) > 0;
-        case 'Transfer': 
-          return t.type === 'transfer' || t.type === 'transfer_in' || t.type === 'transfer_out';
-        case 'Expense': 
-          return t.type === 'expense';
-        case 'Income': 
-          return t.type === 'income';
-        case 'Sale': 
-          return t.type === 'sale';
-        case 'Purchase Return':
-          return t.type === 'purchase_return';
-        default: 
-          return true;
+    if (source === 'sale') {
+      type = 'sale';
+      if (!description || description === 'General Ledger Entry') {
+         description = `Sale: ${t.reference || t.paymentDetails || ''}`;
       }
+    }
+    else if (source === 'journal') { type = 'Journal Entry'; description = t.description; }
+    else if (type.includes('transfer')) { paymentMethod = 'Fund Transfer'; }
+    else if (source === 'deposit') { type = 'Deposit'; }
+    else if (source === 'sale' && (!description || description === 'General Ledger Entry')) {
+      description = `Sale: ${t.reference || t.paymentDetails || ''}`;
+    }
+
+    let debit = 0, credit = 0;
+    if (t.debit !== undefined && t.credit !== undefined) {
+      debit = Number(t.debit || 0); credit = Number(t.credit || 0);
+    } else {
+      const amount = Number(t.amount || 0);
+      if (type.includes('expense') || type.includes('payment') || type.includes('return')) debit = amount;
+      else credit = amount;
+    }
+
+    if (source === 'purchase_return') {
+      const isFull = t.isFullReturn || false;
+      const hasShip = (t.shippingChargesRefunded || 0) > 0;
+      description += isFull && hasShip ? ' (Full Return - shipping included)' : ' (Partial Return)';
+    }
+
+    return {
+      id: t.id, date: transactionDate, createdAt: createdAt, transactionTime: this.getTransactionDisplayTime(t),
+      description: description, paymentMethod: paymentMethod, paymentDetails: t.reference || t.paymentDetails || '',
+      note: t.note || '', addedBy: this.getAddedByName(t.addedBy), debit: debit, credit: credit, balance: 0,
+      hasDocument: t.hasDocument || !!t.attachmentUrl, type: type, attachmentUrl: t.attachmentUrl,
+      fromAccountId: t.fromAccountId, toAccountId: t.toAccountId, referenceNo: t.reference || t.referenceNo || '',
+      source: source, relatedDocId: t.relatedDocId || '', transactionCredit: t.isCapitalTransaction === true,
+      roundingAdjustment: t.roundingAdjustment || 0, exactRefund: t.exactRefund || 0, roundedRefund: t.roundedRefund || 0,
+      customerName: t.customerName || t.customer || '',
+      saleId: t.relatedDocId || t.saleId 
+    };
+  }
+
+  calculateRunningBalanceForView(): void {
+    const sorted = [...this.transactions].sort((a, b) => {
+        const timeA = this.getTransactionDisplayTime(a).getTime();
+        const timeB = this.getTransactionDisplayTime(b).getTime();
+        
+        if (timeA !== timeB) return timeA - timeB;
+
+        const createdA = a.createdAt ? this.convertToDate(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? this.convertToDate(b.createdAt).getTime() : 0;
+        return createdA - createdB;
     });
-  }
-  
-  this.calculateTotals();
-  this.currentPage = 1;
-  this.updatePagedTransactions();
-}
 
-calculateTotals(): void {
-  this.totalDebit = this.filteredTransactions.reduce((sum, t) => sum + Number(t.debit || 0), 0);
-  this.totalCredit = this.filteredTransactions.reduce((sum, t) => sum + Number(t.credit || 0), 0);
-}
-getTransactionTypeDisplay(type: string | undefined): string {
-  if (!type) return 'Unknown';
-  
-  switch(type.toLowerCase()) {
-    case 'income': 
-      return 'Income';
-    case 'sale':
-      return 'Sale';
-    case 'expense': 
-      return 'Expense';
-    case 'purchase': 
-      return 'Purchase';
-    case 'purchase_return':
-      return 'Purchase Return';
-    case 'transfer': 
-      return 'Transfer';
-    case 'transfer_in': 
-      return 'Transfer In';
-    case 'transfer_out': 
-      return 'Transfer Out';
-    case 'deposit': 
-      return 'Deposit';
-    default: 
-      return type;
-  }
-}
+    let runningBalance = this.openingBalance;
+    
+    sorted.forEach(t => {
+        const debit = Number(t.debit) || 0;
+        const credit = Number(t.credit) || 0;
 
+        if (t.source === 'sales_return') {
+            runningBalance = runningBalance - debit;
+        } 
+        else if (t.transactionCredit) { 
+            runningBalance = runningBalance + credit + debit; 
+        } 
+        else {
+            runningBalance = runningBalance + credit - debit;
+        }
+        
+        t.balance = runningBalance;
+    });
+
+    if (this.sortDirection === 'desc') {
+        this.transactions = sorted.reverse(); 
+    } else {
+        this.transactions = sorted;
+    }
+  }
+
+  toggleSortOrder(): void {
+    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    this.calculateRunningBalanceForView();
+    this.filterTransactions();
+  }
+
+  filterTransactions(): void {
+    const fromDate = new Date(this.dateRange.from); fromDate.setHours(0, 0, 0, 0);
+    const toDate = new Date(this.dateRange.to); toDate.setHours(23, 59, 59, 999);
+
+    this.filteredTransactions = this.transactions.filter(t => {
+      const transactionTime = this.getTransactionDisplayTime(t);
+      if (t.type === 'purchase' || t.source === 'purchase') return false;
+      return transactionTime >= fromDate && transactionTime <= toDate;
+    });
+
+    if (this.searchQuery) {
+      const query = this.searchQuery.toLowerCase();
+      this.filteredTransactions = this.filteredTransactions.filter(t =>
+        t.description?.toLowerCase().includes(query) || t.paymentMethod?.toLowerCase().includes(query) ||
+        t.addedBy?.toLowerCase().includes(query) || t.note?.toLowerCase().includes(query) ||
+        t.referenceNo?.toLowerCase().includes(query) || t.customer?.toLowerCase().includes(query)
+      );
+    }
+
+    if (this.transactionType !== 'All') {
+      this.filteredTransactions = this.filteredTransactions.filter(t => {
+        switch (this.transactionType) {
+          case 'Debit': return Number(t.debit) > 0;
+          case 'Credit': return Number(t.credit) > 0;
+          case 'Transfer': return t.type?.includes('transfer');
+          case 'Expense': return t.type === 'expense';
+          case 'Income': return t.type === 'income';
+          case 'Sale': return t.type === 'sale';
+          case 'Sales Return': return t.type === 'sales_return';
+          default: return true;
+        }
+      });
+    }
+
+    this.calculateTotals();
+    this.currentPage = 1;
+    this.updatePagedTransactions();
+  }
+
+  calculateTotals(): void {
+    this.totalDebit = this.filteredTransactions.reduce((sum, t) => sum + this.getDisplayDebit(t), 0);
+    this.totalCredit = this.filteredTransactions.reduce((sum, t) => sum + this.getDisplayCredit(t), 0);
+  }
+
+  getTransactionTypeDisplay(type: string | undefined): string {
+    if (!type) return 'Unknown';
+    if (type === 'income') return 'Income';
+    if (type === 'sale') return 'Sale';
+    if (type === 'sales_return') return 'Sales Return';
+    if (type === 'expense') return 'Expense';
+    if (type.includes('transfer')) return type.includes('in') ? 'Transfer In' : 'Transfer Out';
+    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }
 
   updatePagedTransactions(): void {
     const start = (this.currentPage - 1) * this.entriesPerPage;
     this.pagedTransactions = this.filteredTransactions.slice(start, start + this.entriesPerPage);
   }
 
-  previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-      this.updatePagedTransactions();
-    }
-  }
+  previousPage(): void { if (this.currentPage > 1) { this.currentPage--; this.updatePagedTransactions(); } }
+  nextPage(): void { if (this.currentPage * this.entriesPerPage < this.filteredTransactions.length) { this.currentPage++; this.updatePagedTransactions(); } }
+  
+  onTransactionTypeChange(): void { this.filterTransactions(); }
+  onSearchChange(): void { this.filterTransactions(); }
 
-  nextPage(): void {
-    if (this.currentPage * this.entriesPerPage < this.filteredTransactions.length) {
-      this.currentPage++;
-      this.updatePagedTransactions();
-    }
-  }  onDateRangeChange(): void {
-    // Use the same filtering logic as filterTransactions()
-    this.filterTransactions();
-  }
-
-  onDateFromChange(dateString: string): void {
-    this.dateRange.from = new Date(dateString);
-    this.onDateRangeChange();
-  }
-
-  onDateToChange(dateString: string): void {
-    this.dateRange.to = new Date(dateString);
-    this.onDateRangeChange();
-  }
-
-  onTransactionTypeChange(): void {
-    this.filterTransactions();
-  }
-
-  onSearchChange(): void {
-    this.filterTransactions();
-  }
-
-deleteTransaction(id: string): void {
-  if (confirm('Are you sure you want to delete this transaction?')) {
+  deleteTransaction(id: string): void {
+    if (!confirm('Are you sure?')) return;
     const transaction = this.transactions.find(t => t.id === id);
-    
-    if (transaction) {
-      // Handle accountBook transactions
-      if (transaction.source === 'accountBook') {
-        this.accountService.deleteAccountBookTransaction(id, this.accountId)
-          .then(() => console.log('Transaction deleted successfully'))
-          .catch(error => {
-            console.error('Error deleting transaction:', error);
-            alert('Failed to delete transaction');
-          });
-      }      // Handle expense source transactions
-      else if (transaction.source === 'expense') {
-        if (transaction.type === 'expense') {
-          this.expenseService.deleteExpense(id)
-            .then(() => console.log('Expense deleted successfully'))
-            .catch(error => {
-              console.error('Error deleting expense:', error);
-              alert('Failed to delete expense');
-            });
-        } else if (transaction.type === 'income') {
-          this.expenseService.deleteTransaction(id, 'income')
-            .then(() => console.log('Income deleted successfully'))
-            .catch(error => {
-              console.error('Error deleting income:', error);
-              alert('Failed to delete income');
-            });
-        }
-      }
-      // Income transactions are now handled through the transactions collection only
-      // Purchase transactions are not displayed in account book
-      // Handle sale transactions
-      else if (transaction.source === 'sale') {
-        this.saleService.deleteSale(id)
-          .then(() => console.log('Sale deleted successfully'))
-          .catch(error => {
-            console.error('Error deleting sale:', error);
-            alert('Failed to delete sale');
-          });
-      }
-      // Handle default/other transactions
-      else {
-        if (transaction.type === 'transfer' || transaction.type === 'transfer_in' || transaction.type === 'transfer_out') {
-          this.accountService.deleteFundTransfer(id)
-            .then(() => console.log('Fund transfer deleted successfully'))
-            .catch(error => {
-              console.error('Error deleting fund transfer:', error);
-              alert('Failed to delete fund transfer');
-            });
-        } else {
-          this.accountService.deleteTransaction(id)
-            .then(() => console.log('Transaction deleted successfully'))
-            .catch(error => {
-              console.error('Error deleting transaction:', error);
-              alert('Failed to delete transaction');
-            });
-        }
-      }
+    if (!transaction) return;
+    if (transaction.source === 'sale' || transaction.source === 'sales_return') {
+        alert('Manage sales/returns from Sales module.'); return;
     }
-  }
-}
-
-  downloadDocument(url: string | undefined): void {
-    if (url) {
-      window.open(url, '_blank');
+    if (transaction.type?.startsWith('transfer')) {
+        const related = transaction.paymentDetails?.replace('TRF-', '');
+        if (related) this.accountService.deleteFundTransfer(related);
+    } else {
+        this.accountService.deleteTransaction(id);
     }
   }
 
-  getMinValue(a: number, b: number): number {
-    return Math.min(a, b);
-  }
+  downloadDocument(url: string | undefined): void { if(url) window.open(url, '_blank'); }
+  getMinValue(a: number, b: number): number { return Math.min(a, b); }
 
   editTransaction(transaction: Transaction): void {
-    if (transaction.source === 'expense' || transaction.source === 'income' || 
-        transaction.source === 'purchase' || transaction.source === 'sale') {
-      alert(`This transaction should be edited from the ${transaction.source} module.`);
-      return;
+    if (['expense', 'income', 'purchase', 'sale', 'sales_return', 'journal'].includes(transaction.source || '')) {
+      alert(`Edit from ${transaction.source} module.`); return;
     }
-
-    // Ensure we have a valid date
-    const transactionDate = transaction.date instanceof Date && !isNaN(transaction.date.getTime()) 
-      ? transaction.date 
-      : new Date();
-
-    // Format the date for the datetime-local input
-    const year = transactionDate.getFullYear();
-    const month = (transactionDate.getMonth() + 1).toString().padStart(2, '0');
-    const day = transactionDate.getDate().toString().padStart(2, '0');
-    const hours = transactionDate.getHours().toString().padStart(2, '0');
-    const minutes = transactionDate.getMinutes().toString().padStart(2, '0');
-    const dateString = `${year}-${month}-${day}T${hours}:${minutes}`;
-    
-    this.editingTransaction = {
-      ...transaction,
-      dateString: dateString
-    };
-    
+    const tTime = this.getTransactionDisplayTime(transaction);
+    this.editingTransaction = { ...transaction, dateString: tTime.toISOString().slice(0, 16) };
     this.showEditModal = true;
   }
-  
-saveTransaction(): void {
-  // Parse the datetime-local input value
-  let updatedDate = new Date(this.editingTransaction.dateString);
-  
-  // If invalid, use original date
-  if (isNaN(updatedDate.getTime())) {
-    updatedDate = this.editingTransaction.date instanceof Date ? 
-      this.editingTransaction.date : 
-      new Date();
-  }
 
-  const transactionData = {
-    date: updatedDate,
-    description: this.editingTransaction.description,
-    paymentMethod: this.editingTransaction.paymentMethod,
-    debit: Number(this.editingTransaction.debit) || 0,
-    credit: Number(this.editingTransaction.credit) || 0,
-    note: this.editingTransaction.note,
-    reference: this.editingTransaction.paymentDetails
-  };
-
-  if (this.editingTransaction.id) {
-    // Update existing transaction
-    this.accountService.updateAccountBookTransaction(
-      this.editingTransaction.id,
-      transactionData
-    ).then(() => {
-      this.showEditModal = false;
-    }).catch(error => {
-      console.error('Error updating transaction:', error);
-      alert('Failed to update transaction');
-    });
-  } else {
-    // Add new transaction
-    this.accountService.addAccountBookTransaction({
-      accountId: this.accountId,
-      accountName: this.accountDetails.name,
-      ...transactionData
-    }).then(() => {
-      this.showEditModal = false;
-    }).catch(error => {
-      console.error('Error adding transaction:', error);
-      alert('Failed to add transaction');
-    });
-  }
-}
-  
-  cancelEdit(): void {
-    this.showEditModal = false;
-    this.editingTransaction = this.getEmptyEditingTransaction();
-  }
-
-
-  openFundTransferModal(): void {
-    this.showFundTransferModal = true;
-    this.fundTransferForm.patchValue({
-      fromAccount: this.accountId,
-      date: new Date().toISOString().split('T')[0]
-    });
+  saveTransaction(): void { 
+    let updatedDate = new Date(this.editingTransaction.dateString);
+    if (isNaN(updatedDate.getTime())) {
+      updatedDate = this.editingTransaction.date instanceof Date ? this.editingTransaction.date : new Date();
+    }
+    const transactionData = {
+      date: updatedDate,
+      transactionTime: updatedDate,
+      description: this.editingTransaction.description,
+      paymentMethod: this.editingTransaction.paymentMethod,
+      debit: Number(this.editingTransaction.debit) || 0,
+      credit: Number(this.editingTransaction.credit) || 0,
+      note: this.editingTransaction.note,
+      reference: this.editingTransaction.paymentDetails
+    };
+    if (this.editingTransaction.id) {
+      this.accountService.updateAccountBookTransaction(
+        this.editingTransaction.id,
+        transactionData
+      ).then(() => {
+        this.showEditModal = false;
+      }).catch(error => {
+        console.error('Error updating transaction:', error);
+        alert('Failed to update transaction');
+      });
+    } else {
+      this.accountService.addAccountBookTransaction({
+        accountId: this.accountId,
+        accountName: this.accountDetails.name,
+        ...transactionData
+      }).then(() => {
+        this.showEditModal = false;
+      }).catch(error => {
+        console.error('Error adding transaction:', error);
+        alert('Failed to add transaction');
+      });
+    }
   }
   
-  closeFundTransferForm(): void {
-    this.showFundTransferModal = false;
-    this.fundTransferForm.reset();
-    this.selectedFile = null;
-    this.fundTransferForm.patchValue({
-      date: new Date().toISOString().split('T')[0]
-    });
+  cancelEdit(): void { this.showEditModal = false; }
+  
+  openFundTransferModal(): void { 
+    this.showFundTransferModal = true; 
+    this.fundTransferForm.patchValue({ fromAccount: this.accountId, date: new Date().toISOString().split('T')[0] });
   }
-
-  onFileSelected(event: any): void {
+  closeFundTransferForm(): void { this.showFundTransferModal = false; this.fundTransferForm.reset(); }
+  
+  onFileSelected(event: any): void { 
     const file = event.target.files[0];
     if (file && file.size <= 5 * 1024 * 1024) {
       const allowedTypes = ['.pdf', '.csv', '.zip', '.doc', '.docx', '.jpeg', '.jpg', '.png'];
       const fileExt = '.' + file.name.split('.').pop().toLowerCase();
-      
       if (allowedTypes.includes(fileExt)) {
         this.selectedFile = file;
       } else {
@@ -947,90 +1078,26 @@ saveTransaction(): void {
       event.target.value = null;
     }
   }
-  
+
   submitFundTransfer(): void {
-    if (this.fundTransferForm.invalid) {
-      Object.keys(this.fundTransferForm.controls).forEach(key => {
-        this.fundTransferForm.get(key)?.markAsTouched();
-      });
-      return;
-    }
-    
-    const formValue = this.fundTransferForm.value;
-    const fromAccountName = this.getAccountName(formValue.fromAccount);
-    const toAccountName = this.getAccountName(formValue.toAccount);
+    if (this.fundTransferForm.invalid) return;
+    const val = this.fundTransferForm.value;
     const now = new Date();
-    const transactionDate = new Date(formValue.date);
+    const tDate = new Date(val.date);
+    tDate.setHours(now.getHours(), now.getMinutes());
     
-    transactionDate.setHours(now.getHours());
-    transactionDate.setMinutes(now.getMinutes());
-    transactionDate.setSeconds(now.getSeconds());
-    
-    const transferData = {
-      fromAccountId: formValue.fromAccount,
-      fromAccountName: fromAccountName,
-      toAccountId: formValue.toAccount,
-      toAccountName: toAccountName,
-      amount: Number(formValue.amount),
-      date: transactionDate,
-      note: formValue.note || '',
-      addedBy: this.authService.getCurrentUserName(),
-      type: 'transfer',
-      hasDocument: !!this.selectedFile,
-      timestamp: new Date().getTime()
+    const data = {
+      fromAccountId: val.fromAccount, fromAccountName: this.getAccountName(val.fromAccount),
+      toAccountId: val.toAccount, toAccountName: this.getAccountName(val.toAccount),
+      amount: Number(val.amount), date: tDate, createdAt: now, transactionTime: now,
+      note: val.note || '', addedBy: this.authService.getCurrentUserName(), type: 'transfer',
+      hasDocument: !!this.selectedFile, timestamp: now.getTime()
     };
-    
-    // Create fund transfer data
-    if (this.selectedFile) {
-      console.log('File would be uploaded here:', this.selectedFile.name);
-    }
-    
-    this.accountService.addFundTransfer(transferData).then(() => {
-      this.closeFundTransferForm();
-    }).catch((error) => {
-      console.error('Error adding fund transfer:', error);
-      alert('Failed to add fund transfer');
-    });
+    this.accountService.addFundTransfer(data).then(() => this.closeFundTransferForm());
   }
 
-  downloadTransactionData(): void {
-    if (this.filteredTransactions.length === 0) {
-      alert('No data to download');
-      return;
-    }
-
-    let csvContent = 'Date,Description,Payment Method,Payment Details,Note,Added By,Debit,Credit,Balance,Type,Reference No,Category,Source\n';
-    
-    this.filteredTransactions.forEach(t => {
-      const formattedDate = this.datePipe.transform(t.date, 'MM/dd/yyyy HH:mm') || '';
-      const description = (t.description || '').replace(/,/g, ' ');
-      const paymentMethod = (t.paymentMethod || '').replace(/,/g, ' ');
-      const paymentDetails = (t.paymentDetails || '').replace(/,/g, ' ');
-      const note = (t.note || '').replace(/,/g, ' ');
-      const addedBy = (t.addedBy || '').replace(/,/g, ' ');
-      const debit = t.debit || 0;
-      const credit = t.credit || 0;
-      const balance = t.balance || 0;
-      const type = this.getTransactionTypeDisplay(t.type);
-      const referenceNo = (t.referenceNo || '').replace(/,/g, ' ');
-      const category = (t.category || '').replace(/,/g, ' ');
-      const source = t.source || 'account';
-      
-      csvContent += `${formattedDate},"${description}","${paymentMethod}","${paymentDetails}","${note}","${addedBy}",${debit},${credit},${balance},"${type}","${referenceNo}","${category}","${source}"\n`;
-    });
-    
-    csvContent += `Total,,,,,,,${this.totalDebit},${this.totalCredit},,,,\n`;
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = window.URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${this.accountDetails.name}_all_transactions.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  getDisplayCredit(t: Transaction): number { 
+    if (t.source === 'sales_return') return 0;
+    return Number(t.credit) || 0; 
   }
 }

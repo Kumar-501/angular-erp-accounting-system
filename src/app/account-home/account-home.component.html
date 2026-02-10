@@ -1,0 +1,34 @@
+<!-- src/app/account-home/account-home.component.html -->
+
+<div class="account-home-container">
+  
+  <!-- Left Scroll Button -->
+  <button class="scroll-arrow left-arrow" (click)="scroll('left')">
+    &lt;
+  </button>
+
+  <!-- Horizontally Scrolling Card Container -->
+  <div class="account-cards-container" #scrollContainer>
+    <div *ngIf="isLoading" class="loading-message">Loading Accounts...</div>
+
+    <div *ngIf="!isLoading && assetAccounts.length === 0" class="no-accounts-message">
+      No asset accounts found.
+    </div>
+
+    <!-- Dynamically generate a card for each asset account -->
+    <div *ngFor="let account of assetAccounts" class="account-card">
+      <div class="balance" [class.negative]="account.currentBalance < 0">
+        Rs. {{ account.currentBalance | number:'1.0-0' }}
+      </div>
+      <div class="account-name">{{ account.name }}</div>
+      <button class="check-btn" (click)="checkAccountBook(account.id)">
+        Check
+      </button>
+    </div>
+  </div>
+
+  <!-- Right Scroll Button -->
+  <button class="scroll-arrow right-arrow" (click)="scroll('right')">
+    &gt;
+  </button>
+</div>

@@ -251,13 +251,13 @@
       </span>
     </th>
     <!-- New Ad Code Column -->
-    <th (click)="sortBy('adcode')" [class.hidden]="!columnDefinitions[4].visible">
+    <!-- <th (click)="sortBy('adcode')" [class.hidden]="!columnDefinitions[4].visible">
       Ad Code
       <span class="sort-icon">
         <i class="fa fa-caret-up" [class.active]="sortColumn === 'adcode' && sortDirection === 'asc'"></i>
         <i class="fa fa-caret-down" [class.active]="sortColumn === 'adcode' && sortDirection === 'desc'"></i>
       </span>
-    </th>
+    </th> -->
           <th (click)="sortBy('mobile')" [class.hidden]="!columnDefinitions[2].visible">
             Mobile Number
             <span class="sort-icon">
@@ -342,7 +342,7 @@
           </td>
            <td [class.hidden]="!columnDefinitions[3].visible">{{ customer.alternateContact || '-' }}</td>
     <!-- New Ad Code Column -->
-    <td [class.hidden]="!columnDefinitions[4].visible">{{ customer.adcode || '-' }}</td>
+    <!-- <td [class.hidden]="!columnDefinitions[4].visible">{{ customer.adcode || '-' }}</td> -->
           <td [class.hidden]="!columnDefinitions[2].visible">{{ customer.mobile }}</td>
           <td [class.hidden]="!columnDefinitions[3].visible">{{ customer.assignedTo || 'Not assigned' }}</td>
           <td [class.hidden]="!columnDefinitions[4].visible">
@@ -373,9 +373,7 @@
     <button class="btn-view" (click)="viewCustomerDetails(customer)">
       <i class="fa fa-eye"></i>
     </button>
-    <button class="btn-edit" (click)="openEditCustomerModal(customer)">
-      <i class="fa fa-edit"></i>
-    </button>
+
  <button class="btn-delete" (click)="confirmDeleteCustomer(customer)" *ngIf="!hasRole('executive')">
       <i class="fa fa-trash"></i>
     </button>
@@ -624,10 +622,10 @@
           </div>
         </div>
         
-        <div class="form-group">
+        <!-- <div class="form-group">
           <label>Ad Code</label>
           <input type="text" class="form-control" formControlName="adcode">
-        </div>
+        </div> -->
         
         <div class="form-group">
           <div class="form-check">
@@ -717,10 +715,10 @@
           </div>
         </div>
         
-        <div class="form-group">
+        <!-- <div class="form-group">
           <label>Ad Code</label>
           <input type="text" class="form-control" formControlName="adcode">
-        </div>
+        </div> -->
         
         <div class="form-group">
           <div class="form-check">

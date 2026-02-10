@@ -1,7 +1,7 @@
-// sell-return-report.component.ts
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { SaleService } from '../services/sale.service';
 import { Subscription } from 'rxjs';
+import * as XLSX from 'xlsx';
 
 declare var bootstrap: any;
 
@@ -11,14 +11,14 @@ declare var bootstrap: any;
   styleUrls: ['./sell-return-report.component.scss']
 })
 export class SellReturnReportComponent implements OnInit, OnDestroy {
-printReturn(_t80: any) {
-throw new Error('Method not implemented.');
-}
+  @ViewChild('fromDatePicker') fromDatePicker!: ElementRef;
+  @ViewChild('toDatePicker') toDatePicker!: ElementRef;
+
   returns: any[] = [];
   filteredReturns: any[] = [];
   private returnsSubscription: Subscription | undefined;
   
-  // Filter properties
+  // Filter properties (Internal values kept in YYYY-MM-DD)
   searchTerm: string = '';
   fromDate: string = '';
   toDate: string = '';
@@ -31,13 +31,13 @@ throw new Error('Method not implemented.');
   
   // Modal properties
   selectedReturn: any = null;
-Math: any;
+  Math: any = Math;
 
   constructor(private saleService: SaleService) {
-    // Set default date range (last 30 days)
     const today = new Date();
     const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
     
+    // Default range in YYYY-MM-DD
     this.toDate = today.toISOString().split('T')[0];
     this.fromDate = thirtyDaysAgo.toISOString().split('T')[0];
   }
@@ -52,12 +52,40 @@ Math: any;
     }
   }
 
+  // --- DATE UI HELPERS ---
+  getDisplayDate(dateString: string): string {
+    if (!dateString) return '';
+    const parts = dateString.split('-');
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+
+  openDatePicker(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      this.fromDatePicker.nativeElement.showPicker();
+    } else {
+      this.toDatePicker.nativeElement.showPicker();
+    }
+  }
+
+  onDateInput(event: any, type: 'from' | 'to'): void {
+    const input = event.target.value.trim();
+    const match = input.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (match) {
+      const internalValue = `${match[3]}-${match[2]}-${match[1]}`;
+      if (type === 'from') this.fromDate = internalValue;
+      else this.toDate = internalValue;
+      this.applyFilters();
+    } else if (input === '') {
+      if (type === 'from') this.fromDate = '';
+      else this.toDate = '';
+      this.applyFilters();
+    }
+  }
+
   private loadReturns(): void {
     this.returnsSubscription = this.saleService.getReturns().subscribe({
       next: (returns) => {
-        console.log('Raw returns data:', returns);
         this.returns = this.processReturnsData(returns);
-        console.log('Processed returns data:', this.returns);
         this.applyFilters();
       },
       error: (error) => {
@@ -71,103 +99,42 @@ Math: any;
 
   private processReturnsData(returns: any[]): any[] {
     return returns.map(returnItem => {
-      // Ensure return date is properly set
       let returnDate = null;
-      
-      // Try multiple possible date fields
-      if (returnItem.returnDate) {
-        returnDate = new Date(returnItem.returnDate);
-      } else if (returnItem.createdAt) {
-        returnDate = new Date(returnItem.createdAt);
-      } else if (returnItem.timestamp) {
-        returnDate = new Date(returnItem.timestamp);
-      } else if (returnItem.date) {
-        returnDate = new Date(returnItem.date);
-      } else {
-        // If no date found, use current date as fallback
-        returnDate = new Date();
-        console.warn('No return date found for return, using current date:', returnItem);
-      }
+      if (returnItem.returnDate) returnDate = new Date(returnItem.returnDate);
+      else if (returnItem.createdAt) returnDate = new Date(returnItem.createdAt);
+      else if (returnItem.timestamp) returnDate = new Date(returnItem.timestamp);
+      else returnDate = new Date();
 
-      // Validate the date
-      if (isNaN(returnDate.getTime())) {
-        returnDate = new Date();
-        console.warn('Invalid return date found, using current date:', returnItem);
-      }
+      if (isNaN(returnDate.getTime())) returnDate = new Date();
 
-      // Process returned items to ensure they have proper structure
-      const processedReturnedItems = (returnItem.returnedItems || []).map((item: any) => ({
-        id: item.id || item.productId || item.itemId,
-        name: item.name || item.productName || item.itemName || 'Unknown Item',
-        productName: item.name || item.productName || item.itemName || 'Unknown Item',
+      const processedItems = (returnItem.returnedItems || []).map((item: any) => ({
+        ...item,
+        name: item.name || item.productName || 'Unknown Item',
         quantity: item.quantity || item.returnQuantity || 0,
-        returnQuantity: item.quantity || item.returnQuantity || 0,
-        originalQuantity: item.originalQuantity || item.quantity || 0,
-        unitPrice: parseFloat(item.unitPrice || item.price || item.unit_price || 0),
-        price: parseFloat(item.unitPrice || item.price || item.unit_price || 0),
-        subtotal: item.subtotal || (parseFloat(item.unitPrice || item.price || 0) * (item.quantity || item.returnQuantity || 0)),
-        ...item // Preserve all original fields
+        unitPrice: parseFloat(item.unitPrice || item.price || 0),
+        subtotal: item.subtotal || (parseFloat(item.unitPrice || item.price || 0) * (item.quantity || 0))
       }));
 
       return {
         ...returnItem,
         returnDate: returnDate,
-        createdAt: returnDate, // Ensure we have both fields
-        timestamp: returnDate.getTime(),
-        returnedItems: processedReturnedItems,
-        
-        // Ensure we have customer info
+        returnedItems: processedItems,
         customer: returnItem.customer || returnItem.saleData?.customer || 'Unknown Customer',
-        
-        // Ensure we have invoice number
         invoiceNo: returnItem.invoiceNo || returnItem.saleData?.invoiceNo || 'N/A',
-        
-        // Ensure we have return reason
-        returnReason: returnItem.returnReason || returnItem.reason || '',
-        reason: returnItem.returnReason || returnItem.reason || '',
-        
-        // Calculate total refund if not present
-        totalRefund: returnItem.totalRefund || returnItem.refundAmount || this.calculateTotalRefund(processedReturnedItems),
-        refundAmount: returnItem.totalRefund || returnItem.refundAmount || this.calculateTotalRefund(processedReturnedItems),
-        
-        // Set default status if not present
+        totalRefund: returnItem.totalRefund || this.calculateTotalRefund(processedItems),
         status: returnItem.status || 'Processed'
       };
     });
   }
 
   private calculateTotalRefund(items: any[]): number {
-    return items.reduce((total, item) => {
-      const quantity = item.quantity || item.returnQuantity || 0;
-      const unitPrice = parseFloat(item.unitPrice || item.price || 0);
-      return total + (quantity * unitPrice);
-    }, 0);
+    return items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0);
   }
 
   getReturnDate(returnItem: any): Date {
-    // Try multiple possible date fields with fallbacks
-    let dateValue = returnItem.returnDate || 
-                   returnItem.createdAt || 
-                   returnItem.timestamp || 
-                   returnItem.date ||
-                   new Date();
-
-    // If timestamp is a number, convert to Date
-    if (typeof dateValue === 'number') {
-      dateValue = new Date(dateValue);
-    } else if (typeof dateValue === 'string') {
-      dateValue = new Date(dateValue);
-    } else if (!(dateValue instanceof Date)) {
-      dateValue = new Date();
-    }
-
-    // Validate the date
-    if (isNaN(dateValue.getTime())) {
-      console.warn('Invalid date found, using current date:', returnItem);
-      return new Date();
-    }
-
-    return dateValue;
+    let dateValue = returnItem.returnDate || new Date();
+    if (!(dateValue instanceof Date)) dateValue = new Date(dateValue);
+    return isNaN(dateValue.getTime()) ? new Date() : dateValue;
   }
 
   getReturnStatus(returnItem: any): string {
@@ -177,76 +144,41 @@ Math: any;
   applyFilters(): void {
     let filtered = [...this.returns];
 
-    // Apply search filter
     if (this.searchTerm && this.searchTerm.trim()) {
       const term = this.searchTerm.toLowerCase().trim();
-      filtered = filtered.filter(ret => {
-        const invoiceNo = (ret.invoiceNo || ret.saleData?.invoiceNo || '').toLowerCase();
-        const customer = (ret.customer || ret.saleData?.customer || '').toLowerCase();
-        const reason = (ret.returnReason || ret.reason || '').toLowerCase();
-        
-        return invoiceNo.includes(term) || 
-               customer.includes(term) || 
-               reason.includes(term);
-      });
-    }
-
-    // Apply date filters
-    if (this.fromDate) {
-      const fromDate = new Date(this.fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-      filtered = filtered.filter(ret => {
-        const returnDate = this.getReturnDate(ret);
-        returnDate.setHours(0, 0, 0, 0);
-        return returnDate >= fromDate;
-      });
-    }
-
-    if (this.toDate) {
-      const toDate = new Date(this.toDate);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter(ret => {
-        const returnDate = this.getReturnDate(ret);
-        return returnDate <= toDate;
-      });
-    }
-
-    // Apply status filter
-    if (this.statusFilter) {
       filtered = filtered.filter(ret => 
-        this.getReturnStatus(ret).toLowerCase() === this.statusFilter.toLowerCase()
+        (ret.invoiceNo || '').toLowerCase().includes(term) || 
+        (ret.customer || '').toLowerCase().includes(term)
       );
     }
 
-    // Sort by return date (newest first)
-    filtered.sort((a, b) => {
-      const dateA = this.getReturnDate(a);
-      const dateB = this.getReturnDate(b);
-      return dateB.getTime() - dateA.getTime();
-    });
+    if (this.fromDate) {
+      const from = new Date(this.fromDate);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter(ret => this.getReturnDate(ret) >= from);
+    }
+
+    if (this.toDate) {
+      const to = new Date(this.toDate);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(ret => this.getReturnDate(ret) <= to);
+    }
+
+    if (this.statusFilter) {
+      filtered = filtered.filter(ret => this.getReturnStatus(ret) === this.statusFilter);
+    }
+
+    filtered.sort((a, b) => this.getReturnDate(b).getTime() - this.getReturnDate(a).getTime());
 
     this.filteredReturns = filtered;
     this.totalEntries = this.filteredReturns.length;
-    this.currentPage = 1; // Reset to first page when filters change
+    this.currentPage = 1;
   }
 
   getTotalRefundAmount(returnedItems: any[]): number {
-    if (!returnedItems || !Array.isArray(returnedItems)) {
-      return 0;
-    }
-
-    return returnedItems.reduce((total, item) => {
-      if (item.subtotal && !isNaN(item.subtotal)) {
-        return total + parseFloat(item.subtotal);
-      }
-      
-      const quantity = item.quantity || item.returnQuantity || 0;
-      const unitPrice = parseFloat(item.unitPrice || item.price || item.unit_price || 0);
-      return total + (quantity * unitPrice);
-    }, 0);
+    return (returnedItems || []).reduce((total, item) => total + (item.subtotal || 0), 0);
   }
 
-  // Summary methods
   getProcessedReturnsCount(): number {
     return this.returns.filter(ret => this.getReturnStatus(ret) === 'Processed').length;
   }
@@ -256,40 +188,41 @@ Math: any;
   }
 
   getTotalRefundAmountAll(): number {
-    return this.returns.reduce((total, ret) => {
-      return total + this.getTotalRefundAmount(ret.returnedItems);
-    }, 0);
+    return this.returns.reduce((total, ret) => total + this.getTotalRefundAmount(ret.returnedItems), 0);
   }
 
-  // Pagination methods
-  previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+  previousPage(): void { if (this.currentPage > 1) this.currentPage--; }
+  nextPage(): void { if (this.currentPage * this.entriesPerPage < this.totalEntries) this.currentPage++; }
+  onEntriesPerPageChange(): void { this.currentPage = 1; this.entriesPerPage = Number(this.entriesPerPage); }
+
+  exportToExcel(): void {
+    if (this.filteredReturns.length === 0) return;
+    const dataToExport = this.filteredReturns.map(ret => ({
+      'Return Date': this.datePipeTransform(this.getReturnDate(ret)),
+      'Invoice No': ret.invoiceNo,
+      'Customer Name': ret.customer,
+      'Refund Amount': this.getTotalRefundAmount(ret.returnedItems),
+      'Status': this.getReturnStatus(ret)
+    }));
+    const ws = XLSX.utils.json_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales Returns');
+    XLSX.writeFile(wb, `Sales_Return_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  nextPage(): void {
-    if (this.currentPage * this.entriesPerPage < this.totalEntries) {
-      this.currentPage++;
-    }
+  private datePipeTransform(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${day}-${month}-${date.getFullYear()}`;
   }
 
-  onEntriesPerPageChange(): void {
-    this.currentPage = 1; // Reset to first page
-    this.entriesPerPage = Number(this.entriesPerPage);
-  }
-
-  // Modal and action methods
   viewReturnDetails(returnItem: any): void {
     this.selectedReturn = returnItem;
-    
-    // Use Bootstrap modal if available, or implement your own modal logic
     if (typeof bootstrap !== 'undefined') {
-      const modal = new bootstrap.Modal(document.getElementById('returnDetailsModal'));
-      modal.show();
-    } else {
-      // Fallback: could use Angular Material dialog or other modal library
-      console.log('Return details:', returnItem);
-      alert('Return details logged to console. Implement modal library for better UX.');
+      const element = document.getElementById('returnDetailsModal');
+      if (element) new bootstrap.Modal(element).show();
     }
-  }}
+  }
+
+  printReturn(returnItem: any) { window.print(); }
+}

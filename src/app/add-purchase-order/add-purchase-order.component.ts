@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { FormBuilder, FormGroup, FormArray, Validators, AbstractControl } from '@angular/forms';
 import { Router } from '@angular/router';
 import { PurchaseOrderService } from '../services/purchase-order.service';
@@ -57,7 +57,12 @@ export class AddPurchaseOrderComponent implements OnInit {
   [x: string]: any;
   purchaseOrderForm!: FormGroup;
   suppliers: Supplier[] = [];
+    @ViewChild('orderDatePicker') orderDatePicker!: ElementRef;
+  @ViewChild('deliveryDatePicker') deliveryDatePicker!: ElementRef;
+  @ViewChild('shippingDatePicker') shippingDatePicker!: ElementRef;
+  @ViewChild('requiredDatePicker') requiredDatePicker!: ElementRef;
   businessLocations: any[] = [];
+  
   productsList: Product[] = [];
   lastEditedShippingField: 'before' | 'after' = 'before';
   productFormGroup!: FormGroup; // Direct property declaration
@@ -159,6 +164,53 @@ export class AddPurchaseOrderComponent implements OnInit {
     });
   }
 
+    getFormattedDateForInput(dateString: any): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  openDatePicker(type: 'order' | 'delivery' | 'shipping' | 'required'): void {
+    if (type === 'order') this.orderDatePicker.nativeElement.showPicker();
+    else if (type === 'delivery') this.deliveryDatePicker.nativeElement.showPicker();
+    else if (type === 'shipping') this.shippingDatePicker.nativeElement.showPicker();
+    else if (type === 'required') this.requiredDatePicker.nativeElement.showPicker();
+  }
+
+  onManualDateInput(event: any, controlName: string): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        // Update the reactive form with the YYYY-MM-DD string
+        const formattedDate = `${year}-${month}-${day}`;
+        this.purchaseOrderForm.get(controlName)?.setValue(formattedDate);
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        this.resetVisibleInput(event, controlName);
+      }
+    } else if (input !== '') {
+      alert('Format must be DD-MM-YYYY');
+      this.resetVisibleInput(event, controlName);
+    }
+  }
+
+  private resetVisibleInput(event: any, controlName: string): void {
+    event.target.value = this.getFormattedDateForInput(this.purchaseOrderForm.get(controlName)?.value);
+  }
   loadUsers(): void {
     this.userService.getUsers().subscribe(users => {
       this.users = users;
@@ -386,7 +438,7 @@ export class AddPurchaseOrderComponent implements OnInit {
         discountAmount: [0, [Validators.min(0)]], // Fixed amount discount
         unitCostBeforeTax: [0],
         subtotalBeforeTax: [0],
-        taxPercent: [0, [Validators.min(0), Validators.max(100)]],
+  taxPercent: ['', Validators.required], // empty string as default
         taxAmount: [0],
         netCost: [0],
         lineTotal: [0],
@@ -415,14 +467,9 @@ onProductSelect(index: number) {
   const productId = productFormGroup.get('productId')?.value;
   
   if (productId) {
-    const selectedProduct = this.productsList.find(p => p.id === productId && !p.notForSelling);
+    const selectedProduct = this.productsList.find(p => p.id === productId);
     
     if (!selectedProduct) {
-      if (this.productsList.find(p => p.id === productId)?.notForSelling) {
-        alert('This product is marked as "Not for Selling" and cannot be added to purchase orders.');
-        productFormGroup.get('productId')?.setValue('');
-        return;
-      }
       return;
     }
 
@@ -433,8 +480,8 @@ onProductSelect(index: number) {
     
     productFormGroup.patchValue({
       productName: selectedProduct.productName,
-      unitCost: unitPurchasePrice, // This should be without tax
-      unitCostBeforeTax: unitPurchasePrice, // Same as unitCost since it's before tax
+      unitCost: unitPurchasePrice,
+      unitCostBeforeTax: unitPurchasePrice,
       taxPercent: selectedProduct.taxPercentage || 0,
       currentStock: selectedProduct.currentStock || selectedProduct.totalQuantity || 0
     });
@@ -546,37 +593,32 @@ calculateLineTotal(index: number): void {
     }
   }
 
-  // Update the searchProducts function in your component
-  searchProducts(event: any) {
-    const searchTerm = event.target.value.toLowerCase().trim();
-    this.searchTerm = searchTerm;
+searchProducts(event: any) {
+  const searchTerm = event.target.value.toLowerCase().trim();
+  this.searchTerm = searchTerm;
   
-    if (!searchTerm || searchTerm.length < 2) {
-      this.searchResults = [];
-      this.showSearchResults = false;
-      return;
-    }
-  
-    this.searchResults = this.productsList.filter(product => {
-      // Skip products marked as not for selling
-      if (product.notForSelling) {
-        return false;
-      }
-    
-      const searchString = [
-        product.productName,
-        product.sku,
-        product.barcode
-      ]
-        .filter(field => field)
-        .join(' ')
-        .toLowerCase();
-    
-      return searchString.includes(searchTerm);
-    });
-  
-    this.showSearchResults = this.searchResults.length > 0;
+  if (!searchTerm || searchTerm.length < 2) {
+    this.searchResults = [];
+    this.showSearchResults = false;
+    return;
   }
+  
+  // Remove the notForSelling filter to include all products
+  this.searchResults = this.productsList.filter(product => {
+    const searchString = [
+      product.productName,
+      product.sku,
+      product.barcode
+    ]
+      .filter(field => field)
+      .join(' ')
+      .toLowerCase();
+    
+    return searchString.includes(searchTerm);
+  });
+  
+  this.showSearchResults = this.searchResults.length > 0;
+}
 
   onSearchFocus() {
     this.showSearchResults = true;
@@ -677,61 +719,54 @@ calculateLineTotal(index: number): void {
     }
   }
 
-  addProductFromSearch(product: Product) {
-    // Double-check that the product is not marked as "not for selling"
-    if (product.notForSelling) {
-      alert('This product is marked as "Not for Selling" and cannot be added to purchase orders.');
-      return;
-    }
+addProductFromSearch(product: Product) {
+  const existingIndex = this.productsFormArray.controls.findIndex(
+    control => control.get('productId')?.value === product.id
+  );
 
-    const existingIndex = this.productsFormArray.controls.findIndex(
-      control => control.get('productId')?.value === product.id
-    );
+  const unitCost = product.defaultPurchasePriceIncTax ||
+    product.defaultPurchasePriceExcTax ||
+    product.unitPurchasePrice ||
+    0;
+
+  const sellingPrice = product.defaultSellingPriceIncTax ||
+    product.unitSellingPrice ||
+    0;
+
+  const currentStock = product.currentStock || product.totalQuantity || 0;
+
+  if (existingIndex >= 0) {
+    const currentQty = this.productsFormArray.at(existingIndex).get('quantity')?.value || 0;
+    this.productsFormArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
+    this.productsFormArray.at(existingIndex).get('currentStock')?.setValue(currentStock);
+    this.calculateLineTotal(existingIndex);
+  } else {
+    const productFormGroup = this.fb.group({
+      productId: [product.id, Validators.required],
+      productName: [product.productName],
+      quantity: [1, [Validators.required, Validators.min(1)]],
+      unitCost: [unitCost, [Validators.required, Validators.min(0)]],
+      sellingPrice: [sellingPrice],
+      currentStock: [currentStock],
+      discountType: ['percent'],
+      discountPercent: [0, [Validators.min(0), Validators.max(100)]],
+      discountAmount: [0, [Validators.min(0)]],
+      unitCostBeforeTax: [product.defaultPurchasePriceExcTax || unitCost],
+      subtotalBeforeTax: [unitCost],
+      taxPercent: [product.taxPercentage || 0, [Validators.min(0), Validators.max(100)]],
+      taxAmount: [0],
+      netCost: [unitCost],
+      lineTotal: [unitCost],
+      selected: [false]
+    });
   
-    const unitCost = product.defaultPurchasePriceIncTax ||
-      product.defaultPurchasePriceExcTax ||
-      product.unitPurchasePrice ||
-      0;
-
-    const sellingPrice = product.defaultSellingPriceIncTax ||
-      product.unitSellingPrice ||
-      0;
-
-    // Get the correct stock value
-    const currentStock = product.currentStock || product.totalQuantity || 0;
-
-    if (existingIndex >= 0) {
-      const currentQty = this.productsFormArray.at(existingIndex).get('quantity')?.value || 0;
-      this.productsFormArray.at(existingIndex).get('quantity')?.setValue(currentQty + 1);
-      this.productsFormArray.at(existingIndex).get('currentStock')?.setValue(currentStock); // Update stock
-      this.calculateLineTotal(existingIndex);
-    } else {
-      const productFormGroup = this.fb.group({
-        productId: [product.id, Validators.required],
-        productName: [product.productName],
-        quantity: [1, [Validators.required, Validators.min(1)]],
-        unitCost: [unitCost, [Validators.required, Validators.min(0)]],
-        sellingPrice: [sellingPrice],
-        currentStock: [currentStock], // Set correct stock value
-        discountType: ['percent'],
-        discountPercent: [0, [Validators.min(0), Validators.max(100)]],
-        discountAmount: [0, [Validators.min(0)]],
-        unitCostBeforeTax: [product.defaultPurchasePriceExcTax || unitCost],
-        subtotalBeforeTax: [unitCost],
-        taxPercent: [product.taxPercentage || 0, [Validators.min(0), Validators.max(100)]],
-        taxAmount: [0],
-        netCost: [unitCost],
-        lineTotal: [unitCost],
-        selected: [false]
-      });
-    
-      this.productsFormArray.push(productFormGroup);
-      this.calculateLineTotal(this.productsFormArray.length - 1);
-    }
-  
-    this.updateTotals();
-    this.clearSearch();
+    this.productsFormArray.push(productFormGroup);
+    this.calculateLineTotal(this.productsFormArray.length - 1);
   }
+
+  this.updateTotals();
+  this.clearSearch();
+}
 
   clearSearch() {
     this.searchTerm = '';

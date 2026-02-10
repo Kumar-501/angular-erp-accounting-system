@@ -1,253 +1,335 @@
 <div class="container-fluid py-4">
-  <div class="card mb-4">
+  <!-- Loading Indicator -->
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3">Loading product history...</p>
+  </div>
+
+  <!-- Filters Section -->
+  <div *ngIf="!isLoading && product" class="card mb-4">
     <div class="card-header bg-light">
-      <h5 class="mb-0">
-        <i class="fas fa-box me-2"></i>
-        Product Details - {{ product?.productName }}
-      </h5>
+      <h6 class="mb-0">
+        <i class="fas fa-filter me-2"></i>
+        Filters
+      </h6>
     </div>
     <div class="card-body">
-      <div class="row">
-        <div class="col-md-6">
-          <div class="mb-3">
-            <h6 class="text-muted">Basic Information</h6>
-            <hr class="mt-1">
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Product Name:</div>
-              <div class="col-8">{{ product?.productName || '-' }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">SKU:</div>
-              <div class="col-8">{{ product?.sku || '-' }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Location:</div>
-              <div class="col-8">
-                <span *ngIf="product?.locationNames?.length > 0">
-                  <span *ngFor="let locName of product?.locationNames" class="badge bg-light text-dark me-1">
-                    {{ locName }}
-                  </span>
-                </span>
-                <span *ngIf="!product?.locationNames?.length">-</span>
-              </div>
-            </div>
-       
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Selling Price:</div>
-              <div class="col-8">₹{{ product?.defaultSellingPriceExcTax || 0 | number:'1.2-2' }}</div>
-            </div>
- 
-
-          </div>
+      <div class="row g-3">
+        <!-- Location Filter -->
+        <div class="col-md-4">
+          <label for="locationFilter" class="form-label">Business Location</label>
+          <select 
+            id="locationFilter" 
+            class="form-select" 
+            [(ngModel)]="selectedLocationId" 
+            (change)="onLocationFilterChange()">
+            <option value="">All Locations</option>
+            <option *ngFor="let location of locations" [value]="location.id">
+              {{ location.name }}
+            </option>
+          </select>
         </div>
-        <div class="col-md-6">
-          <div class="mb-3">
-            <h6 class="text-muted">Purchase & Sales Information</h6>
-            <hr class="mt-1">
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Purchase Price:</div>
-              <div class="col-8">₹{{ product?.defaultPurchasePriceExcTax || 0 | number:'1.2-2' }}</div>
-            </div>            <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Purchases:</div>
-              <div class="col-8">{{ purchaseLogs.length }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Total Purchased Qty:</div>
-              <div class="col-8">{{ getTotalPurchasedQuantity() }}</div>
-            </div>
-            <div class="row mb-2">
-              <div class="col-4 fw-medium">Avg Purchase Price:</div>
-              <div class="col-8">₹{{ getAveragePurchasePrice() | number:'1.2-2' }}</div>
-            </div>
-      
-          </div>
+
+        <!-- Date From -->
+        <div class="col-md-3">
+          <label for="dateFrom" class="form-label">Date From</label>
+          <input 
+            type="date" 
+            id="dateFrom" 
+            class="form-control" 
+            [(ngModel)]="dateFromFilter" 
+            (change)="onDateFilterChange()">
+        </div>
+
+        <!-- Date To -->
+        <div class="col-md-3">
+          <label for="dateTo" class="form-label">Date To</label>
+          <input 
+            type="date" 
+            id="dateTo" 
+            class="form-control" 
+            [(ngModel)]="dateToFilter" 
+            (change)="onDateFilterChange()">
+        </div>
+
+        <!-- Reset Filters Button -->
+        <div class="col-md-2 d-flex align-items-end">
+          <button 
+            type="button" 
+            class="btn btn-outline-secondary w-100" 
+            (click)="resetFilters()">
+            <i class="fas fa-times me-2"></i>
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Filters Display -->
+      <div class="mt-3" *ngIf="hasActiveFilters()">
+        <small class="text-muted">Active filters:</small>
+        <div class="d-flex flex-wrap gap-2 mt-1">
+          <span class="badge bg-primary" *ngIf="selectedLocationId">
+            Location: {{ getLocationName(selectedLocationId) }}
+            <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" (click)="clearLocationFilter()"></button>
+          </span>
+          <span class="badge bg-info" *ngIf="dateFromFilter">
+            From: {{ dateFromFilter }}
+            <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" (click)="clearDateFromFilter()"></button>
+          </span>
+          <span class="badge bg-info" *ngIf="dateToFilter">
+            To: {{ dateToFilter }}
+            <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" (click)="clearDateToFilter()"></button>
+          </span>
         </div>
       </div>
     </div>
   </div>
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">
-            <i class="fas fa-file-invoice me-2"></i>
-            Purchase History
-        </h5>
-    </div>
-    <h5 class="opening-stock">
-        <span class="label">Opening Stock:</span>
-        <span class="value">{{ product?.currentStock || '0' }}</span>
-    </h5>
-    <div class="card-body">        <div class="table-responsive">
-            <table class="table table-sm table-hover purchase-history-table">                <thead class="table-light">
-                    <tr>
-                        <th>Date</th>
-                        <th>Purchase Ref</th>
-                        <th>Location</th>
-                        <th>Quantity</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                    </tr>
-                </thead><tbody>
-                    <tr *ngFor="let log of purchaseLogs">
-                        <td>
-                            {{ formatPurchaseDate(log.grnCreatedDate) }}
-                        </td>
-                        <td>{{ log.purchaseRefNo || '-' }}</td>
-                        <td>{{ log.locationName || '-' }}</td>
-                        <td>{{ getPurchaseLogQuantity(log) }}</td>
-                        <td>₹{{ getPurchaseLogUnitPrice(log) | number:'1.2-2' }}</td>
-                        <td>₹{{ getPurchaseLogTotal(log) | number:'1.2-2' }}</td>
-                        <td>
-                            <span class="status-badge status-paid">
-                                Received
-                            </span>
-                        </td>
-                    </tr>
-                    <tr *ngIf="purchaseLogs.length === 0">
-                        <td colspan="7" class="text-center py-4 text-muted">
-                            No purchase history found for this product
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
 
-<!-- Sales History Section -->
-<div class="card mb-4">
-    <div class="card-header bg-light">
-        <h5 class="mb-0">
-            <i class="fas fa-shopping-cart me-2"></i>
-            Sales History
-        </h5>
-    </div>
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <div class="mb-3">
-                    <h6 class="text-muted">Sales Summary</h6>
-                    <hr class="mt-1">
-                    <div class="row mb-2">
-                        <div class="col-4 fw-medium">Total Sales:</div>
-                        <div class="col-8">{{ salesLogs.length }}</div>
-                    </div>
-                    <div class="row mb-2">
-                        <div class="col-4 fw-medium">Total Sold Qty:</div>
-                        <div class="col-8">{{ getTotalSalesQuantity() }}</div>
-                    </div>
-                    <div class="row mb-2">
-                        <div class="col-4 fw-medium">Total Sales Value:</div>
-                        <div class="col-8">₹{{ getTotalSalesValue() | number:'1.2-2' }}</div>
-                    </div>
-                    <div class="row mb-2">
-                        <div class="col-4 fw-medium">Avg Selling Price:</div>
-                        <div class="col-8">₹{{ getAverageSalesPrice() | number:'1.2-2' }}</div>
-                    </div>
-                </div>
+  <!-- Main Content -->
+  <div *ngIf="!isLoading && product">
+    <!-- Summary Card -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="mb-0">{{ product?.productName }} ({{ product?.sku }})</h5>
+              <small class="text-muted" *ngIf="hasActiveFilters()">
+                Filtered results - {{ getFilteredTransactionsCount() }} transactions shown
+              </small>
             </div>
-        </div>
-        
-        <div class="table-responsive">
-            <table class="table table-sm table-hover sales-history-table">
-                <thead class="table-light">
-                    <tr>
-                        <th>Date</th>
-                        <th>Invoice No</th>
-                        <th>Location</th>
-                        <th>Quantity</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
-                        <th>Payment Type</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr *ngFor="let log of salesLogs">
-                        <td>
-                            {{ formatSalesDate(log.saleCreatedDate) }}
-                        </td>
-                        <td>{{ log.invoiceNo || '-' }}</td>
-                        <td>{{ log.location || '-' }}</td>
-                        <td>{{ getSalesLogQuantity(log) }}</td>
-                        <td>₹{{ getSalesLogUnitPrice(log) | number:'1.2-2' }}</td>
-                        <td>₹{{ getSalesLogTotal(log) | number:'1.2-2' }}</td>
-                        <td>{{ log.paymentType || '-' }}</td>
-                        <td>
-                            <span class="status-badge status-completed">
-                                Sold
-                            </span>
-                        </td>
-                    </tr>
-                    <tr *ngIf="salesLogs.length === 0">
-                        <td colspan="8" class="text-center py-4 text-muted">
-                            No sales history found for this product
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-
-</div><!-- GIN Transfers Section -->
-<div class="card mb-4" *ngIf="ginTransfers.length > 0">
-  <div class="card-header bg-light">
-    <h5 class="mb-0">
-      <i class="fas fa-exchange-alt me-2"></i>
-      Stock Transfers (GIN)
-    </h5>
-  </div>
-  <div class="card-body">
-    <div class="row mb-3">
-      <div class="col-md-6">
-        <div class="mb-3">
-          <h6 class="text-muted">Transfer Summary</h6>
-          <hr class="mt-1">
-          <div class="row mb-2">
-            <div class="col-4 fw-medium">Total Transfers:</div>
-            <div class="col-8">{{ ginTransfers.length }}</div>
-          </div>
-          <div class="row mb-2">
-            <div class="col-4 fw-medium">Total Transferred Out:</div>
-            <div class="col-8">{{ getTotalTransferredOutQuantity() }}</div>
-          </div>
-          <!-- <div class="row mb-2">
-            <div class="col-4 fw-medium">Total Transferred In:</div>
-            <div class="col-8">{{ getTotalTransferredInQuantity() }}</div>
-          </div> -->
-        </div>
-      </div>
-    </div>
-    
-    <div class="table-responsive">
-      <table class="table table-sm table-hover gin-transfers-table">
-        <thead class="table-light">
-          <tr>
-            <th>Date</th>
-            <th>Reference No</th>
-            <th>From Location</th>
-            <th>To Location</th>
-            <th>Quantity</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let transfer of ginTransfers">
-            <td>{{ formatPurchaseDate(transfer.date) }}</td>
-            <td>{{ transfer.referenceNo || '-' }}</td>
-            <td>{{ getLocationName(transfer.locationFrom) }}</td>
-            <td>{{ getLocationName(transfer.locationTo) }}</td>
-  <td>{{ getTransferQuantity(transfer) }}</td>
-            <td>
-              <span class="status-badge" [ngClass]="transfer.status.toLowerCase()">
-                {{ transfer.status }}
+            <div>
+              <span class="p-2 border rounded me-2" *ngIf="selectedLocationId">
+                Business Location: <strong>{{ getLocationName(selectedLocationId) }}</strong>
               </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <span class="p-2 border rounded me-2" *ngIf="!selectedLocationId">
+                Business Location: <strong>All Locations</strong>
+              </span>
+              <span class="p-2 border rounded" *ngIf="dateFromFilter || dateToFilter">
+                Date Range: <strong>{{ getDateRangeDisplay() }}</strong>
+              </span>
+              <span class="p-2 border rounded" *ngIf="!dateFromFilter && !dateToFilter">
+                Date Range: <strong>All Time</strong>
+              </span>
+            </div>
+        </div>
+
+        <div class="row">
+          <!-- Quantities In -->
+          <div class="col-md-4 border-end">
+            <h6 class="text-muted mb-3">Quantities In</h6>
+            <table class="table table-sm table-borderless">
+              <tbody>
+                <tr>
+                  <td>Total Purchase</td>
+                  <td class="text-end fw-bold">{{ getTotalPurchaseQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Opening Stock</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                <tr>
+                  <td>Total Sell Return</td>
+                  <td class="text-end fw-bold">{{ getTotalSalesReturnQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Goods Issue Note (In)</td>
+                  <td class="text-end fw-bold">{{ getTotalGoodsIssueInQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Total Manufactured (In)</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                <tr>
+                  <td>Total Production for Sale from DC (In)</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                <tr>
+                  <td>Job Work (In)</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                 <tr>
+                  <td>Bill of Receipt</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Quantities Out -->
+          <div class="col-md-4 border-end">
+            <h6 class="text-muted mb-3">Quantities Out</h6>
+            <table class="table table-sm table-borderless">
+              <tbody>
+                <tr>
+                  <td>Total Sold</td>
+                  <td class="text-end fw-bold">{{ getTotalSoldQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Total Stock Adjustment</td>
+                  <td class="text-end fw-bold">{{ getTotalStockAdjustmentQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Total Purchase Return</td>
+                   <td class="text-end fw-bold">{{ getTotalPurchaseReturnQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Goods Issue Note (Out)</td>
+                  <td class="text-end fw-bold">{{ getTotalGoodsIssueOutQuantity() | number:'1.2-2' }} Nos.</td>
+                </tr>
+                <tr>
+                  <td>Used for Manufacturing (Out)</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                 <tr>
+                  <td>Job Work (Out)</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                 <tr>
+                  <td>Bill of Supply</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+                 <tr>
+                  <td>Delivery Challan</td>
+                  <td class="text-end fw-bold">0.00 Nos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Totals -->
+          <div class="col-md-4">
+            <h6 class="text-muted mb-3">Totals</h6>
+            <table class="table table-sm table-borderless">
+              <tbody>
+                <tr>
+                  <td>Current stock</td>
+                  <td class="text-end fw-bold h5 text-primary">{{ getCurrentStock() | number:'1.2-2' }} Nos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unified Transaction History -->
+    <div class="card">
+      <div class="card-header bg-light">
+        <h5 class="mb-0">
+          <i class="fas fa-history me-2"></i>
+          Unified Transaction History
+          <small class="text-muted ms-2">({{ getFilteredProductHistory().length }} transactions)</small>
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-hover table-sm">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Reference</th>
+                <th>Location</th>
+                <th>Qty Change</th>
+                <th>New Qty</th>
+                <th>Unit Price</th>
+                <th>Total Value</th>
+                <th>Details</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let history of getDisplayedHistory(); trackBy: trackHistoryItem">
+                <!-- Date -->
+                <td>
+                  {{ formatDate(history.date) }}
+                  <small class="text-info d-block">{{ formatTime(history.date) }}</small>
+                </td>
+                
+                <!-- Type -->
+                <td>
+                  <span class="badge" [ngClass]="getTypeBadgeClass(history.type)">
+                    <i class="fas" [ngClass]="getTypeIcon(history.type)"></i>
+                    {{ getTypeDisplayName(history.type) }}
+                  </span>
+                </td>
+                
+                <!-- Reference -->
+                <td>
+                  <span class="text-primary">{{ history.referenceNo || '-' }}</span>
+                </td>
+                
+                <!-- Location -->
+                <td>
+                  <span class="badge bg-secondary">
+                    {{ history.locationName || 'Unknown' }}
+                  </span>
+                </td>
+                
+                <!-- Quantity Change -->
+                <td [ngClass]="getQuantityChangeClass(history.quantityChange)">
+                  {{ history.quantityChange > 0 ? '+' : '' }}{{ history.quantityChange | number:'1.2-2' }}
+                </td>
+                
+                <!-- New Quantity -->
+                <td>
+                  <strong>{{ history.newQuantity | number:'1.2-2' }}</strong>
+                </td>
+                
+                <!-- Unit Price -->
+                <td>₹{{ history.unitPrice | number:'1.2-2' }}</td>
+                
+                <!-- Total Value -->
+                <td>
+                  ₹{{ history.totalValue | number:'1.2-2' }}
+                  <small *ngIf="history.taxAmount > 0" class="text-muted d-block">
+                    (Tax: ₹{{ history.taxAmount | number:'1.2-2' }})
+                  </small>
+                </td>
+                
+                <!-- Details -->
+                <td>
+                  <small>{{ history.details }}</small>
+                  <div *ngIf="history.type === 'adjustment_in' || history.type === 'adjustment_out'">
+                    <small class="text-muted" *ngIf="history.originalData?.reason">
+                      Reason: {{ history.originalData?.reason }}
+                    </small>
+                  </div>
+                </td>
+                
+                <!-- Status -->
+                <td>
+                  <span class="badge" [ngClass]="getStatusBadgeClass(history.status)">
+                    {{ history.status }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- View More Button -->
+        <div class="text-center mt-3" *ngIf="hasMoreTransactions()">
+          <button class="btn btn-outline-primary" (click)="loadMoreTransactions()">
+            <i class="fas fa-chevron-down me-2"></i>
+            View More ({{ getRemainingTransactionsCount() }} more)
+          </button>
+        </div>
+
+        <!-- No History Message -->
+        <div *ngIf="getFilteredProductHistory().length === 0" class="text-center py-5">
+          <i class="fas fa-history fa-3x text-muted mb-3"></i>
+          <h5 class="text-muted">No transaction history found</h5>
+          <p class="text-muted" *ngIf="hasActiveFilters()">
+            No transactions found for the selected filters. Try adjusting your filter criteria.
+          </p>
+          <p class="text-muted" *ngIf="!hasActiveFilters()">
+            This product has no recorded transactions yet.
+          </p>
+        </div>
+      </div>
     </div>
   </div>
 </div>

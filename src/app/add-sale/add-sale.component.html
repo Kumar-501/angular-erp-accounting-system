@@ -8,9 +8,7 @@
       <div class="col-md-5">
         <!-- Separate div for Location and Customer Search -->
      <div class="card mb-3">           
-  <div class="card-header bg-light">             
-    <h5 class="mb-0">Location & Customer Search</h5>           
-  </div>           
+          
   <div class="card-body">             
     <!-- Business Location Field -->             
 <div class="card mb-3">           
@@ -132,6 +130,51 @@
                 </div>
               </div>
             </div>
+            <!-- Age and Date of Birth Fields -->
+<div class="row mb-3">
+  <!-- <div class="col-md-6">
+    <label for="customerAge" class="form-label">Age</label>
+    <input type="number" id="customerAge" formControlName="customerAge" 
+           class="form-control" min="0" max="120">
+  </div> -->
+<!--   
+  <div class="col-md-6">
+    <label for="customerDob" class="form-label">Date of Birth</label>
+    <input type="date" id="customerDob" formControlName="customerDob" 
+           class="form-control">
+  </div> -->
+</div>
+
+<!-- Gender and Occupation Fields -->
+<div class="row mb-3">
+  <!-- <div class="col-md-6">
+    <label class="form-label">Gender</label>
+    <div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" id="genderMale" 
+               formControlName="customerGender" value="Male">
+        <label class="form-check-label" for="genderMale">Male</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" id="genderFemale" 
+               formControlName="customerGender" value="Female">
+        <label class="form-check-label" for="genderFemale">Female</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" id="genderOther" 
+               formControlName="customerGender" value="Other">
+        <label class="form-check-label" for="genderOther">Other</label>
+      </div>
+    </div>
+  </div>
+   -->
+  <!-- <div class="col-md-6">
+    <label for="customerOccupation" class="form-label">Occupation</label>
+    <input type="text" id="customerOccupation" formControlName="customerOccupation" 
+           class="form-control" placeholder="Enter occupation">
+  </div> -->
+</div>
+
 <!-- Age Field -->
 <!-- <div class="row mb-3">
   <div class="col-md-6">
@@ -175,21 +218,34 @@
             <!-- Billing & Shipping Address -->
 <!-- Billing & Shipping Address -->
 <div class="row mb-3">
-  <div class="col-12">
+ <div class="col-12">
     <div class="form-group">
       <label for="billingAddress" class="form-label">Billing Address:</label>
-      <textarea id="billingAddress" formControlName="billingAddress" class="form-control" rows="2"
-                (input)="onAddressChange('billing')" readonly></textarea>
+      <textarea id="billingAddress" formControlName="billingAddress" class="form-control" rows="4"
+                readonly>
+{{selectedCustomer?.displayName || selectedCustomer?.businessName || ''}}
+{{selectedCustomer?.addressLine1 || ''}}
+{{selectedCustomer?.addressLine2 || ''}}
+{{selectedCustomer?.city || ''}}, {{selectedCustomer?.district || ''}} 
+{{selectedCustomer?.state || ''}} - {{selectedCustomer?.zipCode || ''}}
+      </textarea>
     </div>
   </div>
 </div>
 
+
 <div class="row mb-3">
-  <div class="col-12">
+<div class="col-12">
     <div class="form-group">
       <label for="shippingAddress" class="form-label">Shipping Address:</label>
-      <textarea id="shippingAddress" formControlName="shippingAddress" class="form-control" rows="2"
-                (input)="onAddressChange('shipping')" readonly></textarea>
+      <textarea id="shippingAddress" formControlName="shippingAddress" class="form-control" rows="4"
+                readonly>
+{{selectedCustomer?.displayName || selectedCustomer?.businessName || ''}}
+{{selectedCustomer?.addressLine1 || ''}}
+{{selectedCustomer?.addressLine2 || ''}}
+{{selectedCustomer?.city || ''}}, {{selectedCustomer?.district || ''}} 
+{{selectedCustomer?.state || ''}} - {{selectedCustomer?.zipCode || ''}}
+      </textarea>
     </div>
   </div>
 </div>
@@ -223,15 +279,22 @@
       </div>
       <div class="card-body">
         <div class="row">
-          <div class="col-md-6">
-            <div class="form-group mb-3">
-              <label for="saleDate" class="form-label">Sales Order Date</label>
-              <input type="date" id="saleDate" formControlName="saleDate" class="form-control" required />
-              <div *ngIf="saleForm.get('saleDate')?.invalid && saleForm.get('saleDate')?.touched" class="text-danger">
-                Sale date is required
-              </div>
-            </div>
-          </div>
+<div class="col-md-6">
+  <div class="form-group mb-3">
+    <label for="saleDate" class="form-label">Sales Order Date *</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(saleForm.get('saleDate')?.value)"
+             (blur)="onManualDateInput($event, 'saleDate')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('saleDate')">
+        <i class="far fa-calendar-alt"></i>
+      </button>
+      <input #saleDatePicker type="date" formControlName="saleDate" class="hidden-date-picker">
+    </div>
+  </div>
+</div>
     <div class="col-md-6">
   <div class="form-group mb-3">
     <label for="addedBy" class="form-label">Incentive User:</label>
@@ -254,8 +317,22 @@
     </div>
   </div>
 </div>
+
+
         </div>
 
+        <div class="col-md-6">
+          <div class="form-group mb-3">
+            <label for="department" class="form-label">Department:</label>
+            <input 
+              type="text" 
+              id="department" 
+              formControlName="department" 
+              class="form-control" 
+              readonly 
+              placeholder="Auto-selected based on user"/>
+          </div>
+        </div>
 
 
 <div class="row">
@@ -410,7 +487,9 @@
                          [(ngModel)]="searchTerm"
                          [ngModelOptions]="{standalone: true}"
                   />
-               <div *ngIf="showSearchResults" 
+<!-- File: src/app/add-sale/add-sale.component.html -->
+
+<div *ngIf="showSearchResults" 
      class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm" 
      style="top: 100%; z-index: 1050; max-height: 300px; overflow-y: auto;">
   <div class="list-group">
@@ -420,20 +499,29 @@
             (mousedown)="addProductFromSearch(product); $event.preventDefault()"
             (keydown.enter)="addProductFromSearch(product); $event.preventDefault()"
             tabindex="0">
-      <div class="d-flex justify-content-between align-items-center">
+      <div class="d-flex justify-content-between">
         <div>
-          <strong [innerHTML]="highlightMatch(product.productName || '', searchTerm)"></strong>
-          <small *ngIf="product.sku" class="text-muted ms-2">
-            SKU: <span [innerHTML]="highlightMatch(product.sku, searchTerm)"></span>
-          </small>
+          <strong [innerHTML]="highlightMatch(product.productName || product.name, searchTerm)"></strong>
+          <span *ngIf="product.isCombination" class="badge bg-info ms-2">Combo</span>
         </div>
         <div class="text-end">
+          
+          <!-- =================== THE FIX =================== -->
+          <!-- This new badge displays the current stock for each product. -->
           <span class="badge me-1" [ngClass]="{'bg-primary': (product?.currentStock ?? 0) > 0, 'bg-danger': (product?.currentStock ?? 0) <= 0}">
             Stock: {{ product?.currentStock ?? 0 }}
           </span>
+          <!-- ================= END OF THE FIX ================ -->
+
           <span class="badge bg-success">₹{{ product?.defaultSellingPriceExcTax || 0 | number:'1.2-2'}}</span>
         </div>
       </div>
+      <small *ngIf="product.combinationProducts?.length" class="text-muted d-block">
+        Contains: 
+        <span *ngFor="let combo of product.combinationProducts; let last = last">
+          {{combo.quantity}} × {{combo.name}}{{last ? '' : ', '}}
+        </span>
+      </small>
       <small *ngIf="product.barcode" class="text-muted d-block">
         Barcode: {{ product.barcode }}
       </small>
@@ -447,8 +535,6 @@
               </div>
             </div>
 
-            <!-- Product Table -->
-  <!-- Product Table -->
 <div class="table-responsive">
   <table class="table table-bordered align-middle">
     <thead class="table-light">
@@ -461,45 +547,15 @@
         <th>Tax %</th>
         <th>Tax Amount</th>
         <th>Selling Price (MRP)</th>
+        <th>Discount %</th>
         <th>Discount Amount</th>
         <th>Subtotal</th>
         <th *ngIf="products.length > 0">Action</th>
       </tr>
     </thead>
     <tbody>
-      <!-- Product Search Row -->
-      <!-- <tr>
-        <td colspan="11">
-          <div class="input-group">
-            <input type="text" class="form-control" 
-                   [(ngModel)]="productSearchTerm" 
-                   (input)="onProductSearchInput($event)"
-                   placeholder="Search and add products..."
-                   [ngModelOptions]="{standalone: true}">
-            <button class="btn btn-primary" (click)="addProductFromSearch()">
-              <i class="fas fa-plus"></i> Add
-            </button>
-          </div>
-          
-          <div class="search-results-dropdown mt-2" *ngIf="showSearchResults">
-            <div class="list-group">
-              <a *ngFor="let product of searchResults; let i = index" 
-                 class="list-group-item list-group-item-action"
-                 (click)="addProductFromSearch(product)"
-                 [innerHTML]="highlightMatch(product.productName || product.name, productSearchTerm)">
-                <small class="text-muted">
-                  (Price: {{product.defaultSellingPriceIncTax | currency:'INR'}} | 
-                  Stock: {{product.currentStock || product.totalQuantity || 0}})
-                </small>
-              </a>
-            </div>
-          </div>
-        </td>
-      </tr> -->
-
-      <!-- Dynamic Product Rows -->
       <tr *ngFor="let product of products; let i = index">
-      
+        <td>
           <select class="form-control" 
                   [(ngModel)]="product.name" 
                   [ngModelOptions]="{standalone: true}"
@@ -509,11 +565,14 @@
                     [value]="prod.productName" 
                     [disabled]="prod.currentStock <= 0">
               {{prod.productName}} 
-              <span *ngIf="prod.currentStock > 0">(Stock: {{prod.currentStock}})</span>
-              <span *ngIf="prod.currentStock <= 0" style="color: red;">(Out of Stock)</span>
             </option>
           </select>
-      
+          <div *ngIf="product.isCombination" class="text-muted small">
+            <div *ngFor="let combo of product.combinationProducts">
+              {{combo.quantity}} × {{combo.name}}
+            </div>
+          </div>
+        </td>
         <td>
           <input type="text" class="form-control" 
                  [(ngModel)]="product.batchNumber" 
@@ -538,11 +597,22 @@
                 (input)="updateProduct(i)">
         </td>
         <!-- Tax Percentage -->
-        <td>
-          <input type="number" class="form-control" min="0" max="100" step="0.01" placeholder="0.00"
-                [(ngModel)]="product.taxRate" [ngModelOptions]="{standalone: true}"
-                (input)="updateProduct(i)">
-        </td>
+      <!-- In src/app/add-sale/add-sale.component.html -->
+<!-- Find the product table and locate the tax selection dropdown -->
+
+<!-- Tax Percentage -->
+<td>
+  <select class="form-control" 
+          [(ngModel)]="product.taxRateObject" 
+          [ngModelOptions]="{standalone: true}"
+          (change)="onTaxSelect(i)">
+    <option [ngValue]="null">No Tax (0%)</option>
+    <option *ngFor="let rate of availableTaxRates" 
+            [ngValue]="rate">
+      {{rate.name}} ({{rate.rate}}%)
+    </option>
+  </select>
+</td>
         <td>
           <input type="number" class="form-control" 
                  [(ngModel)]="product.taxAmount" 
@@ -550,18 +620,24 @@
                  readonly>
         </td>
         <!-- Selling Price (Inc Tax/MRP) -->
-        <td>
+     <td>
           <input type="number" class="form-control" min="0" step="0.01" placeholder="0.00"
                 [(ngModel)]="product.unitPrice" [ngModelOptions]="{standalone: true}"
                 (input)="updateProduct(i)">
         </td>
+        <!-- Discount Percentage -->
+        <td>
+          <input type="number" class="form-control" min="0" max="100" step="0.01" placeholder="0"
+                [(ngModel)]="product.discountPercentage" [ngModelOptions]="{standalone: true}"
+                (input)="updateProductDiscount(i, 'Percentage')">
+        </td>
+        <!-- Discount Amount -->
         <td>
           <input type="number" class="form-control" min="0" step="0.01" placeholder="0.00"
-                [(ngModel)]="product.discount" [ngModelOptions]="{standalone: true}"
-                (input)="updateProduct(i)">
+                [(ngModel)]="product.discountAmount" [ngModelOptions]="{standalone: true}"
+                (input)="updateProductDiscount(i, 'Amount')">
         </td>
-        <td class="text-nowrap">{{ product.subtotal | currency:'INR' }}</td>
-        <td>
+<td class="text-nowrap">{{ product.subtotal | currency:'INR' }}</td>        <td>
           <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
             <i class="fas fa-trash"></i>
           </button>
@@ -570,14 +646,13 @@
     </tbody>
     <tfoot>
       <tr>
-        <td colspan="8" class="text-end fw-semibold">Total:</td>
+        <td colspan="10" class="text-end fw-semibold">Total:</td>
         <td class="fw-bold text-nowrap">{{ itemsTotal | currency:'INR' }}</td>
         <td *ngIf="products.length > 0"></td>
       </tr>
     </tfoot>
   </table>
 </div>
-
             <!-- Add Product Button -->
             <div class="mt-2">
             
@@ -586,9 +661,9 @@
   <button type="button" class="btn btn-info me-2" (click)="openPrescriptionModal()">
     <i class="fas fa-file-prescription"></i> Add Prescription
   </button>
-  <button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="openPrescriptionModal()">
-    <i class="fas fa-plus"></i> Add Another Prescription
-  </button>
+<button *ngIf="prescriptions.length > 0" type="button" class="btn btn-success" (click)="addNewPrescription()">
+  <i class="fas fa-plus"></i> Add Another Prescription
+</button>
 </div>
 
 <div class="prescription-list mt-3" *ngIf="prescriptions.length > 0">
@@ -605,10 +680,10 @@
           </div>
         </div>
         <div>
-  <button class="btn btn-sm btn-outline-secondary me-1" 
-        (click)="editPrescription(i); $event.preventDefault()">
-  <i class="fas fa-edit"></i>
-</button>
+          <button class="btn btn-sm btn-outline-secondary me-1" 
+                  (click)="editPrescription(i); $event.preventDefault()">
+            <i class="fas fa-edit"></i>
+          </button>
           <button class="btn btn-sm btn-outline-danger" (click)="deletePrescription(i)">
             <i class="fas fa-trash"></i>
           </button>
@@ -617,7 +692,6 @@
     </div>
   </div>
 </div>
-
 
 
 
@@ -634,16 +708,20 @@
       <div class="modal-body">
         <div class="prescription-template">
           <div class="text-center mb-4">
-            <h4>ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h4>
-            <p>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
+                 <div class="logo-container">
+            <img src="/assets/logo2.png">
+          </div>
+            <h4>HERBALLY TOUCH AYURVEDA PRODUCTS PVT.LTD.</h4>
+           First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt.,Kerala - 683 579
             <p>E-mail: contact&#64;herballytouch.com | Ph: 7034110999</p>
-            <p>ഡോ. രാജന പി.ആർ., BAMS</p>
+            <p> DR RANJANA P.R.BAMS
+</p>
           </div>
           
           <div class="d-flex justify-content-between mb-4">
             <div>
               <p>പേര്: <span class="editable-field" contenteditable="true" id="patientName"></span></p>
-              <p>Age: <span class="editable-field" contenteditable="true" id="patientAge"></span></p>
+<p>പ്രായം: <span class="editable-field" contenteditable="true" id="patientAge"></span></p>
             </div>
             <p>തീയതി: <span class="editable-field" contenteditable="true" id="prescriptionDate">{{todayDate}}</span></p>
           </div>
@@ -663,16 +741,16 @@
               </div>
               
               <div class="input-group" *ngIf="selectedMedicineType">
-                <select class="form-select" [(ngModel)]="selectedMedicineName" [ngModelOptions]="{standalone: true}">
+                <!-- <select class="form-select" [(ngModel)]="selectedMedicineName" [ngModelOptions]="{standalone: true}">
                   <option value="">Select Medicine</option>
                   <option *ngFor="let med of availableMedicines[selectedMedicineType]" [value]="med">{{med}}</option>
-                </select>
+                </select> -->
                 <button class="btn btn-primary" type="button" (click)="addMedicineByType()">
                   <i class="fas fa-plus"></i> Add
                 </button>
-                <button class="btn btn-secondary ms-2" type="button" (click)="addSameMedicineType()">
+                <!-- <button class="btn btn-secondary ms-2" type="button" (click)="addSameMedicineType()">
                   <i class="fas fa-copy"></i> Add Another
-                </button>
+                </button> -->
               </div>
             </div>
           </div>
@@ -688,112 +766,135 @@
               </div>
 
               <!-- Dynamic Medicine Templates -->
-              <div [ngSwitch]="medicine.type">
-                <!-- Kasayam Template -->
-                <div *ngSwitchCase="'kasayam'" class="kasayam-template">
+     <div [ngSwitch]="medicine.type">
+  <!-- Kasayam Template -->
+<div *ngSwitchCase="'kasayam'" class="kasayam-template">
+  <p>
+    <span class="editable-field" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
+    കഷായം <span class="editable-field" contenteditable="true" [id]="'kasayamInstructions_'+i">{{medicine.instructions || ''}}</span>ml എടുത്ത് 
+    <span class="editable-field" contenteditable="true" [id]="'kasayamQuantity_'+i">{{medicine.quantity || ''}}</span> ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
+    <span class="editable-field" contenteditable="true" [id]="'kasayamPowder_'+i">{{medicine.powder || ''}}</span> ഗുളിക . പൊടിച്ച്ചേർത്ത് 
+    <span class="editable-field" contenteditable="true" [id]="'kasayamPills_'+i">{{medicine.pills || ''}}</span> നേരം 
+    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
+
+
+            <!-- Kasayam Combination Template -->
+                <div *ngSwitchCase="'kasayam_combination'" class="kasayam-combination-template">
                   <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamName_'+i">{{medicine.name || ''}}</span>
-                    കഷായം <span class="editable-field underlined" contenteditable="true" [id]="'kasayamInstructions_'+i">{{medicine.instructions||''}}</span>ml എടുത്ത് 
-                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamQuantity_'+i">{{medicine.quantity || ''}}</span> ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
-                    <span class="editable-field underlined" contenteditable="true" [id]="'kasayamPowder_'+i">{{medicine.powder || ''}}</span> ഗുളിക . പൊടിച്ച്ചേർത്ത് 
-                    <span class="editable-field underlined" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>നേരം
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
-                      <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
+                    <span class="editable-field" contenteditable="true" [id]="'combkasayamName_'+i">
+                      {{medicine.name || ''}}
+                    </span>കഷായം
+                     <span class="editable-field" contenteditable="true" [id]="'combquantity_'+i">
+                      {{medicine.quantity || ''}}
+                    </span> ml എടുത്ത്
+                   <span class="editable-field" contenteditable="true" [id]="'combquantity2_'+i">
+                      {{medicine.combinationQuantity || ''}}
+                    </span> ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത്
+                  <span class="editable-field" contenteditable="true" [id]="'combMedicineNam_'+i">
+                      {{medicine.combinationName || ''}}
+                    </span>ഗുളിക പൊടിച്ച്ചേർത്ത്
+                  <span class="editable-field" contenteditable="true" [id]="'combfrequency_'+i">
+                      {{medicine.frequency || ''}}
+                    </span>നേരം
+                  <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
+                
 
-                <!-- Buligha Template -->
-                <div *ngSwitchCase="'buligha'" class="buligha-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'bulighaName_'+i">{{medicine.name || ''}}</span>
-                    ഗുളിക <span class="editable-field underlined" contenteditable="true" [id]="'bulighaInstructions_'+i">{{medicine.instructions || ''}}</span>
-                    എണ്ണം എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'bulighaPowder_'+i">{{medicine.powder || ''}}</span>
-                    നേരം
+  <!-- Buligha Template -->
+  <div *ngSwitchCase="'buligha'" class="buligha-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'bulighaName_'+i">{{medicine.name || ''}}</span>
+      ഗുളിക <span class="editable-field" contenteditable="true" [id]="'bulighaInstructions_'+i">{{medicine.instructions || ''}}</span>
+      എണ്ണം എടുത്ത് <span class="editable-field" contenteditable="true" [id]="'bulighaPowder_'+i">{{medicine.powder || ''}}</span>
+      നേരം
+     <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
 
+  <!-- Bhasmam Template -->
+  <div *ngSwitchCase="'bhasmam'" class="bhasmam-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'bhasmamName_'+i">{{medicine.name || ''}}</span>
+      ഭസ്മം <span class="editable-field" contenteditable="true" [id]="'bhasmamDosage_'+i">{{medicine.dosage ||''}}</span>
+      നുള്ള് എടുത്ത് <span class="editable-field" contenteditable="true" [id]="'bhasmamQuantity_'+i">{{medicine.quantity || ''}}</span> ml.
+      <span class="editable-field" contenteditable="true" [id]="'bhasmamInstructions_'+i">{{medicine.instructions || ''}}</span> ചേർത്ത് 
+      <span class="editable-field" contenteditable="true" [id]="'bhasmamPowder_'+i">{{medicine.powder || ''}}</span>
+      നേരം
+    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
 
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
-                     <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
+  <!-- Krudham Template -->
+  <div *ngSwitchCase="'krudham'" class="krudham-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
+      ഘൃതം <span class="editable-field" contenteditable="true" [id]="'krudhamInstructions_'+i">{{medicine.instructions ||''}}</span> 
+      ടീ - സ്പൂൺ എടുത്ത് <span class="editable-field" contenteditable="true" [id]="'krudhamFrequency_'+i">{{medicine.frequency ||''}}</span> നേരം
+      <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
 
-                <!-- Bhasmam Template -->
-                <div *ngSwitchCase="'bhasmam'" class="bhasmam-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamName_'+i">{{medicine.name || ''}}</span>
-                    ഭസ്മം <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamDosage_'+i">{{medicine.dosage ||''}}</span>
-                    നുള്ള് എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamQuantity_'+i">{{medicine.quantity || ''}}</span>
-                    ml. <span class="editable-field underlined" contenteditable="true" [id]="'bhasmamInstructions_'+i">{{medicine.instructions || ''}}</span> ചേർത്ത് 
- <span class="editable-field underlined" contenteditable="true" [id]="'bulighaPowder_'+i">{{medicine.powder || ''}}</span>
-                    നേരം
+  <!-- Suranam Template -->
+  <div *ngSwitchCase="'suranam'" class="suranam-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'suranamName_'+i">{{medicine.name || ''}}</span>
+      ചൂർണ്ണം <span class="editable-field" contenteditable="true" [id]="'suranamInstructions_'+i">{{medicine.instructions || ''}}</span> 
+      ടീ - സ്പൂൺ എടുത്ത്.
+      <span class="editable-field" contenteditable="true" [id]="'suranamPowder_'+i">{{medicine.powder || ''}}</span> വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് 
+      <span class="editable-field" contenteditable="true" [id]="'suranamFrequency_'+i">{{medicine.frequency || ''}}</span>നേരം
+    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
 
+  <!-- Rasayanam Template -->
+  <div *ngSwitchCase="'rasayanam'" class="rasayanam-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'rasayanamName_'+i">{{medicine.name || ''}}</span>
+      രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് 
+      <span class="editable-field" contenteditable="true" [id]="'rasayanamInstructions_'+i">{{medicine.instructions || ''}}</span>നേരം
+      <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
 
+  <!-- Lagium Template -->
+  <div *ngSwitchCase="'lagium'" class="lagium-template">
+    <p>
+      <span class="editable-field" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>
+      ലേഹ്യം <span class="editable-field" contenteditable="true" [id]="'lagiumInstructions_'+i">{{medicine.instructions || ''}}</span> 
+      ടീ - സ്പൂൺ എടുത്ത്
+      <span class="editable-field" contenteditable="true" [id]="'lagiumFrequency_'+i">{{medicine.frequency || ''}}</span>നേരം
+     <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}" [name]="'timing_'+i">
+      <option value="before">ഭക്ഷണത്തിനു മുമ്പ്</option>
+      <option value="after">ഭക്ഷണത്തിനു ശേഷം</option>
+    </select> സേവിക്കുക
+  </p>
+</div>
+</div>
 
-
-
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
-      <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
-
-                <!-- Krudham Template -->
-                <div *ngSwitchCase="'krudham'" class="krudham-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span>
-                    ഘൃതം  <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span> ടീ - സ്പൂൺ എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'krudhamName_'+i">{{medicine.name ||''}}</span> നേരം
-
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">നേരം
-                        <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
-
-                <!-- Suranam Template -->
-                <div *ngSwitchCase="'suranam'" class="suranam-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'suranamName_'+i">{{medicine.name || ''}}</span>
-                    ചൂർണ്ണം <span class="editable-field underlined" contenteditable="true" [id]="'suranamInstructions_'+i">{{medicine.instructions || ''}}</span> ടീ - സ്പൂൺ എടുത്ത്.
-                    <span class="editable-field underlined" contenteditable="true" [id]="'suranamPowder_'+i">{{medicine.powder || ''}}</span> വെള്ളത്തിൽ ചേർത്ത് തിളപ്പിച്ച് <span class="editable-field underlined" contenteditable="true" [id]="'suranamPowder_'+i">{{medicine.powder || ''}}</span>നേരം
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
-                   <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
-
-                <!-- Rasayanam Template -->
-                <div *ngSwitchCase="'rasayanam'" class="rasayanam-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'rasayanamName_'+i">{{medicine.name || ''}}</span>
-                    രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് <span class="editable-field underlined" contenteditable="true" [id]="'rasayanamInstructions_'+i">{{medicine.instructions || ''}}</span>നേരം
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">നേരം
-                <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
-
-                <!-- Lagium Template -->
-                <div *ngSwitchCase="'lagium'" class="lagium-template">
-                  <p>
-                    <span class="editable-field underlined" contenteditable="true" [id]="'lagiumName_'+i">{{medicine.name || ''}}</span>
-                    ലേഹ്യം <span class="editable-field underlined" contenteditable="true" [id]="'lagiumInstructions_'+i">{{medicine.instructions || ''}}</span> ടീ - സ്പൂൺ എടുത്ത്
-<span class="editable-field underlined" contenteditable="true" [id]="'lagiumInstructions_'+i">{{medicine.instructions || ''}}</span>നേരം
-
-
-                    <select class="form-select d-inline w-auto" [(ngModel)]="medicine.timing" [ngModelOptions]="{standalone: true}">
-     <option value="before">ഭക്ഷണത്തിനുമുൻപ് </option>
-                      <option value="after">(ശേഷംസേവിക്കുക)</option>
-                    </select>
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
           
@@ -898,19 +999,16 @@
               <!-- Shipping Status -->
               <div class="col-md-6">
                 <label for="shippingStatus" class="form-label">Shipping Status:</label>
-                <select id="shippingStatus" formControlName="shippingStatus" class="form-control">
-           <option value="Processing">Processing</option>
-  <option value="Packed">Packed</option>
-  <option value="Pending">Pending</option>
-  <option value="Shipped">Shipped</option>
-  <option value="Onhold">Onhold</option>
-  <option value="Ordered">Ordered</option>
-  <option value="Print">Print</option>
-  <option value="Reached hub">Reached hub</option>
-  <option value="Out for delivery">Out for delivery</option>
-  <option value="Returned">Returned</option>
-  <option value="Cancelled">Cancelled</option>
-  <option value="Delivered">Delivered</option>
+              <select id="shippingStatus" formControlName="shippingStatus" class="form-control">
+                  <option value="Pending">On hold</option>
+                  <option value="Ordered">Ordered</option>
+                  <option value="Print">Print</option>
+                  <option value="Processing">Processing</option>
+                  <option value="Packed">Packed</option>
+                  <option value="Shipped">Shipped</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Returned">Returned</option>
+                  <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
 
@@ -945,63 +1043,64 @@
         <div class="col-md-6">
           <div class="border rounded p-3 h-100">
             <h6 class="mb-3 border-bottom pb-2">Tax & Payment</h6>
-            <div class="col-12">
-              <label for="orderTax" class="form-label">Shipping Tax:</label>
-              <select id="orderTax" formControlName="orderTax" class="form-control" 
-                      (change)="onTaxChange($any($event.target).value)">
-                <option value="0">No Tax</option>
-                <option *ngFor="let tax of availableTaxRates" [value]="tax.rate">
-                  {{ tax.name }} ({{ tax.rate }}%)
-                </option>
-                <option *ngFor="let group of availableTaxGroups" [value]="group.calculatedRate">
-                  {{ group.name }} ({{ group.calculatedRate }}%)
-                </option>
-              </select>
-            </div>
+ <div class="col-12">
+  <label for="orderTax" class="form-label">Shipping Tax:</label>
+  <div class="input-group">
+    <input type="text" 
+           id="orderTax" 
+           class="form-control" 
+           value="18% GST " 
+           readonly
+           style="background-color: #f8f9fa;">
+    <input type="hidden" formControlName="orderTax" value="18">
+  </div>
+</div>
 
             <div class="row g-3">
               <!-- Order Status -->
-              <div class="col-md-6">
+              <!-- <div class="col-md-6">
                 <label for="status" class="form-label">Status:</label>
-                <select id="status" formControlName="status" class="form-control" required>
-                  <option value="Pending" selected>Pending</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Cancelled">Cancelled</option>
+<select id="status" formControlName="status" class="form-control" required [disabled]="true">                  
+                  <option value="Completed" selected>Completed</option>
+               
                 </select>
                 <div *ngIf="saleForm.get('status')?.invalid && saleForm.get('status')?.touched" class="text-danger small">
                   Status is required
                 </div>
-              </div>
-
+              </div> -->
+<div class="col-md-6">
+  <div class="form-group mb-3">
+    <label for="orderStatus" class="form-label">Status:</label>
+    <select id="orderStatus" formControlName="orderStatus" class="form-control">
+      <option value="Pending" selected>Pending</option>
+      <option value="Completed">Completed</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+  </div>
+</div>
               <!-- Payment Type -->
-              <div class="col-md-6">
-                <label for="paymentMethod" class="form-label">Payment Type: <span class="text-danger">*</span></label>
-                <select id="paymentMethod" formControlName="paymentMethod" class="form-control" required>
-                  <option value="">Select Method</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="Other">Other</option>
-                </select>
-                <div *ngIf="saleForm.get('paymentMethod')?.invalid && saleForm.get('paymentMethod')?.touched" class="text-danger small">
-                  Payment method is required
-                </div>
-              </div>
+    <div class="col-md-6">
+  <label for="paymentMethod" class="form-label">Payment Type:</label>
+  <select id="paymentMethod" formControlName="paymentMethod" class="form-control">
+    <option value="">Select Method</option>
+    <option value="Cash">Cash</option>
+    <option value="Card">Card</option>
+    <option value="Bank Transfer">Bank Transfer</option>
+    <option value="Cheque">Cheque</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
 
-              <!-- Payment Account -->
-              <div class="col-md-6">
-                <label for="paymentAccount" class="form-label">Payment Account: <span class="text-danger">*</span></label>
-                <select id="paymentAccount" formControlName="paymentAccount" class="form-control" required>
-                  <option value="">Select Payment Account</option>
-                  <option *ngFor="let account of paymentAccounts" [value]="account.id">
-                    {{ account.name }} ({{ account.accountNumber }})
-                  </option>
-                </select>
-                <div *ngIf="saleForm.get('paymentAccount')?.invalid && saleForm.get('paymentAccount')?.touched" class="text-danger small">
-                  Payment account is required
-                </div>
-              </div>
+<!-- Payment Account -->
+<div class="col-md-6">
+  <label for="paymentAccount" class="form-label">Payment Account:</label>
+  <select id="paymentAccount" formControlName="paymentAccount" class="form-control">
+    <option value="">Select Payment Account</option>
+    <option *ngFor="let account of paymentAccounts" [value]="account.id">
+      {{ account.name }} ({{ account.accountNumber }})
+    </option>
+  </select>
+</div>
 
               <!-- Payment Status -->
               <div class="col-md-6">
@@ -1099,12 +1198,22 @@
   
   </div>
 
-          <div class="col-md-4">
-            <div class="form-group mb-3">
-              <label for="paidOn" class="form-label">Paid On:</label>
-              <input type="date" id="paidOn" formControlName="paidOn" class="form-control" />
-            </div>
-          </div>
+<div class="col-md-4">
+  <div class="form-group mb-3">
+    <label for="paidOn" class="form-label">Paid On:</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(saleForm.get('paidOn')?.value)"
+             (blur)="onManualDateInput($event, 'paidOn')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('paidOn')">
+        <i class="far fa-calendar-alt"></i>
+      </button>
+      <input #paidOnDatePicker type="date" formControlName="paidOn" class="hidden-date-picker">
+    </div>
+  </div>
+</div>
           <div class="col-md-4">
             <div class="form-group mb-3">
               <label for="changeReturn" class="form-label">Change Return:</label>
@@ -1113,14 +1222,7 @@
           </div>
         </div>
         
-        <div class="row">
-          <div class="col-md-12">
-            <div class="form-group mb-3">
-              <label for="paymentNote" class="form-label">Payment Note:</label>
-              <textarea id="paymentNote" formControlName="paymentNote" class="form-control"></textarea>
-            </div>
-          </div>
-        </div>
+
             <div class="col-12 text-center">
 <button type="submit" class="btn btn-primary btn-lg me-2" 
         [disabled]="isSubmitting || !saleForm.valid || products.length === 0">
@@ -1150,25 +1252,15 @@
     <span class="summary-value">{{ itemsTotal | currency:'INR' }}</span>
   </div>
 
-  <!-- Shipping Charge (before tax) -->
+  <!-- Shipping -->
   <div class="summary-item">
-    <span class="summary-label">Shipping Charge:</span>
+    <span class="summary-label">Shipping & Tax:</span>
     <span class="summary-value">
-      {{ saleForm.get('shippingCharges')?.value | currency:'INR' }}
+      {{ (saleForm.get('shippingCharges')?.value + (saleForm.get('shippingTaxAmount')?.value || 0)) | currency:'INR' }}
     </span>
   </div>
 
-  <!-- Shipping Tax -->
-  <div class="summary-item" *ngIf="saleForm.get('orderTax')?.value > 0">
-    <span class="summary-label">
-      Shipping Tax ({{ saleForm.get('orderTax')?.value }}%):
-    </span>
-    <span class="summary-value">
-      {{ ((saleForm.get('shippingCharges')?.value || 0) * ((saleForm.get('orderTax')?.value || 0) / 100)) | currency:'INR' }}
-    </span>
-  </div>
-
-  <!-- Packing Charge (if any) -->
+  <!-- Packing Charge -->
   <div class="summary-item" *ngIf="ppServiceData?.packingCharge || codData?.packingCharge">
     <span class="summary-label">Packing Charge:</span>
     <span class="summary-value">
@@ -1176,7 +1268,13 @@
     </span>
   </div>
 
-  <!-- Total Payable -->
+  <!-- ADD THIS: Round Off Display -->
+  <div class="summary-item" *ngIf="saleForm.get('roundOff')?.value !== 0">
+    <span class="summary-label">Round Off:</span>
+    <span class="summary-value">{{ saleForm.get('roundOff')?.value > 0 ? '+' : '' }}{{ saleForm.get('roundOff')?.value | number:'1.2-2' }}</span>
+  </div>
+
+  <!-- Total Payable (This will now show 785.00) -->
   <div class="summary-item total-payable">
     <span class="summary-label">Total Payable:</span>
     <span class="summary-value">

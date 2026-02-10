@@ -110,7 +110,8 @@
                 </div>
               </td>
           
-              <td>{{ getProductDetails(item.productId).taxPercentage|| 'N/A' }}</td>
+              <!-- FIX: Display tax from item first, then fallback to product details -->
+              <td>{{ (item.taxPercent !== undefined ? item.taxPercent : item.taxRate !== undefined ? item.taxRate : getProductDetails(item.productId).taxPercentage) || 0 }}%</td>
               <td>{{ item.quantity || item.requiredQuantity || 0 }}</td>
               <td>{{ (item.unitCost || item.unitPurchasePrice || getProductDetails(item.productId).defaultPurchasePrice || 0) | currency:'INR' }}</td>
               <!-- Fixed: Safe navigation with proper null checks -->
@@ -120,10 +121,19 @@
               <td>{{ getProductDetails(item.productId).alertQuantity || 0 }}</td>
               <td>{{ calculateLineTotal(item) | currency:'INR' }}</td>
             </tr>
-            <tr class="total-row">
-              <td colspan="9" class="text-right"><strong>Total:</strong></td>
-              <td><strong>{{ getTotalAmount() | currency:'INR' }}</strong></td>
-            </tr>
+          
+  <tr class="total-row">
+    <td colspan="7" class="text-right"><strong>Subtotal:</strong></td>
+    <td><strong>{{ (getTotalAmount() - getShippingAmount()) | currency:'INR' }}</strong></td>
+  </tr>
+  <tr class="shipping-row">
+    <td colspan="7" class="text-right"><strong>Shipping Charges:</strong></td>
+    <td><strong>{{ getShippingAmount() | currency:'INR' }}</strong></td>
+  </tr>
+  <tr class="grand-total-row">
+    <td colspan="7" class="text-right"><strong>Total:</strong></td>
+    <td><strong>{{ getTotalAmount() | currency:'INR' }}</strong></td>
+  </tr>
           </tbody>
         </table>
       </div>
@@ -158,4 +168,4 @@
       </div>
     </div>
   </div>
-</div>
+</div>a

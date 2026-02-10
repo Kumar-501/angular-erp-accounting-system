@@ -1,5 +1,4 @@
-import { Component, OnInit } from '@angular/core';
-import { Firestore, collection, onSnapshot, doc, deleteDoc } from '@angular/fire/firestore';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';import { Firestore, collection, onSnapshot, doc, deleteDoc } from '@angular/fire/firestore';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -24,6 +23,8 @@ export class ShippingSummaryComponent implements OnInit {
   filteredShipments: ShippingSummary[] = [];
   isLoading = true;
   isDeleting = false;
+  @ViewChild('startDatePicker') startDatePicker!: ElementRef;
+@ViewChild('endDatePicker') endDatePicker!: ElementRef;
   searchTerm = '';
   currentPage = 1;
   entriesPerPage = 10;
@@ -114,7 +115,61 @@ export class ShippingSummaryComponent implements OnInit {
     this.filteredShipments = filtered;
     this.currentPage = 1;
   }
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
+// 2. Trigger the hidden native picker
+openDatePicker(type: 'start' | 'end'): void {
+  if (type === 'start') {
+    this.startDatePicker.nativeElement.showPicker();
+  } else {
+    this.endDatePicker.nativeElement.showPicker();
+  }
+}
+
+// 3. Handle manual entry with validation
+onManualDateInput(event: any, type: 'start' | 'end'): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    if (dateObj && dateObj.getDate() === parseInt(day) && 
+        dateObj.getMonth() + 1 === parseInt(month)) {
+      
+      const formattedDate = `${year}-${month}-${day}`;
+      if (type === 'start') {
+        this.startDate = formattedDate;
+      } else {
+        this.endDate = formattedDate;
+      }
+      this.applyFilters();
+    } else {
+      alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+      this.resetVisibleInput(event, type);
+    }
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    this.resetVisibleInput(event, type);
+  }
+}
+
+private resetVisibleInput(event: any, type: 'start' | 'end'): void {
+  const value = type === 'start' ? this.startDate : this.endDate;
+  event.target.value = this.getFormattedDateForInput(value);
+}
   clearDateFilter(): void {
     this.startDate = '';
     this.endDate = '';

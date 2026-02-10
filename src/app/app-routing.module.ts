@@ -11,6 +11,7 @@ import { VariationsComponent } from './variations/variations.component';
 import { AddProductComponent } from './add-product/add-product.component';
 import { ListProductsComponent } from './list-products/list-products.component';
 import { UpdatePriceComponent } from './update-price/update-price.component';
+import { AccountSummaryComponent } from './account-summary/account-summary.component';
 import { ImportProductsComponent } from './import-products/import-products.component';
 import { ImportOpeningComponent } from './import-opening/import-opening.component';
 import { PurchaseOrderComponent } from './purchase-order/purchase-order.component';
@@ -167,7 +168,21 @@ import { LeadsReportsComponent } from './leads-reports/leads-reports.component';
 import { CustomerReportComponent } from './customer-report/customer-report.component';
 import { SellReturnReportComponent } from './sell-return-report/sell-return-report.component';
 import { NotSellingComponent } from './not-selling/not-selling.component';
-
+import { ReturnedProductsComponent } from './returned-products/returned-products.component';
+import { FreshDataGuard } from './fresh-data.guard';
+import { JournalEntryComponent } from './journal-entry/journal-entry.component';
+import { IncomeReceiptsComponent } from './income-receipts/income-receipts.component';
+import { ExpensePaymentsComponent } from './expense-payments/expense-payments.component';
+import { IntercashTransferComponent } from './intercash-transfer/intercash-transfer.component';
+import { AccountHomeComponent } from './account-home/account-home.component';
+import { LedgerReportComponent } from './ledger-report/ledger-report.component';
+import { DayBookComponent } from './day-book/day-book.component';
+import { AccountDashboardComponent } from './account-dashboard/account-dashboard.component';
+import { BalanceSheet2Component } from './balance-sheet-2/balance-sheet-2.component';
+import { GstSummaryComponent } from './gst-summary/gst-summary.component';
+import { ViewContactComponent } from './view-contact/view-contact.component';
+import { ProfitLoss2Component } from './profit-loss2/profit-loss2.component';
+import { ListAccounts2Component } from './list-accounts-2/list-accounts-2.component';
 const routes: Routes = [
 
 {path:'warranties',component:WarrantiesComponent},
@@ -185,9 +200,16 @@ const routes: Routes = [
   { path: 'purchase-order', component: PurchaseOrderComponent },
 {path:'profit-loss',component:ProfitLossComponent},
 {path:'add-purchase',component:AddPurchaseComponent},
+{path:'account-summary',component:AccountSummaryComponent},
 {path:'purchase-requisition',component:PurchaseRequisitionComponent},
 { path: 'add-purchase-requisition', component: AddPurchaseRequisitionComponent},
 {path:'print-labels',component:PrintLabelsComponent},
+{path:'list-accounts-2',component:ListAccounts2Component},
+ { 
+    path: 'leave', 
+    component: LeaveComponent,
+    canActivate: [FreshDataGuard]
+  },
 {path:'list-purchase',component:ListPurchaseComponent},
 {path:'purchase-return',component:PurchaseReturnComponent},
 {path:'sales-order',component:SalesOrderComponent},
@@ -198,6 +220,7 @@ const routes: Routes = [
   { path: 'sales-view/:id', component: SalesViewComponent },
 {path:'supplier-report',component:SupplierReportComponent},
   { path: 'list-draft', component: ListDraftComponent },
+  {path:'returned-product',component:ReturnedProductsComponent},
 {path:'add-quotation',component:AddQuotationComponent},
 {path:'list-quotations',component:ListQuotationsComponent},
 {path:'sell-return',component:SellReturnComponent},
@@ -272,6 +295,8 @@ const routes: Routes = [
   { path: 'shipping-summary', component: ShippingSummaryComponent },
   { path: 'list-report', component: ListReportComponent },
   { path: 'outstanding-report',component:OutstandingReportComponent},
+     {path:'journal-entry',component:JournalEntryComponent},
+
 {path:'reports',component:ReportsComponent},
 {path:'summary-report',component:SummaryReportComponent},
 {path:'import-shipping',component:ImportShippingComponent},
@@ -313,7 +338,19 @@ const routes: Routes = [
   { path: 'product-sales', component: ProductSalesComponent },
   { path: 'shopping', component: ShoppingComponent },
 {path:'input-tax-report',component:InputTaxReportComponent},
+{path:'ledger-report',component:LedgerReportComponent},
+{path:'day-book',component:DayBookComponent},
+{path:'profit-loss2',component:ProfitLoss2Component},
+{path:'account-dashboard',component:AccountDashboardComponent},
+{path:'balance-sheet-2',component:BalanceSheet2Component},
+{ path: 'income-receipts', component:IncomeReceiptsComponent},
+{path:'intercash-transfer',component:IntercashTransferComponent},
+{path:'account-home',component:AccountHomeComponent},
+{path:'expense-payments',component:ExpensePaymentsComponent},
 {path:'sell-return-report',component:SellReturnReportComponent},
+{path:'gst-summary',component:GstSummaryComponent},   
+  { path: 'view-contact/:id', component: ViewContactComponent},
+
 { 
   path: 'purchase-orders/edit/:id', 
   component: EditPurchaseOrderComponent 
@@ -346,7 +383,7 @@ const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', component: CrmDashboardComponent},
     { path: 'leads', component: LeadsComponent },
- 
+
     { path: 'follows-up', component:FollowsUpComponent},
     {path:'followup-category',component:FollowupCategoryComponent},
     {path:'life-stage',component:LifeStageComponent},
@@ -392,7 +429,7 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes)],
+ imports: [RouterModule.forRoot(routes, { useHash: true })], 
   exports: [RouterModule]
 })
 export class AppRoutingModule { }

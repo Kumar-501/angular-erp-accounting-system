@@ -9,7 +9,8 @@ import {
   deleteDoc,
   getDocs,
   query,
-  where
+  where,
+  getDoc
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 
@@ -28,7 +29,26 @@ export class LocationService {
       createdAt: new Date()
     });
   }
-
+// Add this method to your LocationService
+async getLocationById(id: string): Promise<any> {
+  try {
+    const locationDoc = doc(this.firestore, 'locations', id);
+    const locationSnap = await getDoc(locationDoc);
+    
+    if (locationSnap.exists()) {
+      return { 
+        id: locationSnap.id, 
+        ...locationSnap.data() 
+      };
+    } else {
+      console.warn(`Location with ID ${id} not found`);
+      return null;
+    }
+  } catch (error) {
+    console.error('Error getting location by ID:', error);
+    throw error;
+  }
+}
   // Get locations with real-time updates (only active ones)
   getLocations(): Observable<any[]> {
     const locationsCollection = collection(this.firestore, 'locations');

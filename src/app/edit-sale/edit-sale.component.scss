@@ -5,6 +5,62 @@
   padding: 20px 15px;
   max-width: 1600px;
 }
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .date-input {
+    padding-right: 40px; // Space for the icon
+  }
+
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px;
+    z-index: 5;
+    
+    &:hover {
+      color: #007bff;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    width: 0;
+    height: 0;
+    visibility: hidden;
+    border: none;
+    padding: 0;
+  }
+}
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background-color: #ffffff; // or any background you prefer
+  border-bottom: 1px solid #e0e0e0;
+
+  img {
+    max-width: 150px;
+    height: auto;
+    object-fit: contain;
+  }
+
+  // Optional hover effect
+  &:hover img {
+    opacity: 0.9;
+    transform: scale(1.02);
+    transition: all 0.3s ease-in-out;
+  }
+}
 
 /* Form Header Styles */
 h2 {
@@ -550,20 +606,4 @@ select.form-control {
     padding: 10px;
     font-size: 0.9rem;
   }
-}/* Hide the Action column header and cells */
-th:last-child,
-td:last-child {
-  display: none !important;
-}
-
-/* Alternative approach - hide only when it contains the trash button */
-th:has(+ td button.btn-danger),
-td:has(button.btn-danger) {
-  display: none !important;
-}
-
-/* If the above doesn't work in all browsers, use this more specific approach */
-.table th:nth-last-child(1),
-.table td:nth-last-child(1) {
-  display: none !important;
 }

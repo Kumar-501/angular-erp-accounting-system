@@ -1,12 +1,13 @@
 <div class="dialog-header">
   <h2 mat-dialog-title>GIN Transfer Details - {{data.transfer.referenceNo}}</h2>
-  <button mat-icon-button mat-dialog-close class="close-button">
+  <button mat-icon-button (click)="closeDialog()" class="close-button">
     <mat-icon>close</mat-icon>
   </button>
 </div>
 
 <mat-dialog-content>
   <div class="transfer-details-container">
+    <!-- Basic Information Section -->
     <div class="details-section">
       <h3>Basic Information</h3>
       <table class="gin-details-table">
@@ -14,16 +15,26 @@
           <th>Reference No:</th>
           <td>{{data.transfer.referenceNo}}</td>
         </tr>
-       
+        <tr>
+          <th>Date:</th>
+          <td>{{ transferDate | date:'dd-MM-yyyy HH:mm' }}</td>
+        </tr>
         <tr>
           <th>Status:</th>
           <td>
-            <span class="status-badge" [ngClass]="data.transfer.status.toLowerCase()">
-              {{data.transfer.status}}
+            <span class="status-badge" [ngClass]="(data.transfer.status || 'draft').toLowerCase()">
+              {{data.transfer.status || 'Draft'}}
             </span>
           </td>
         </tr>
-       
+        <tr>
+          <th>Total Amount:</th>
+<td>{{ data.transfer.totalAmount | currency:'INR':'symbol' }}</td>
+        </tr>
+        <tr>
+          <th>Shipping Charges:</th>
+          <td>{{data.transfer.shippingCharges | currency:'INR':'symbol'}}</td>
+        </tr>
         <tr *ngIf="data.transfer.additionalNotes">
           <th>Additional Notes:</th>
           <td>{{data.transfer.additionalNotes}}</td>
@@ -31,21 +42,27 @@
       </table>
     </div>
 
+    <!-- Locations Section -->
     <div class="locations-section">
       <h3>Locations</h3>
       <table class="gin-details-table">
         <tr>
           <th>From Location:</th>
-          <td>{{data.getLocationName(data.transfer.locationFrom)}}</td>
+          <td>{{data.transfer.locationFromName || data.getLocationName(data.transfer.locationFrom)}}</td>
         </tr>
         <tr>
-          <th>To Location:</th>
-          <td>{{data.getLocationName(data.transfer.locationTo)}}</td>
+          <th>To Location(s):</th>
+          <td>
+            <div *ngFor="let location of getDestinationLocations(); let i = index">
+              {{location}}
+            </div>
+          </td>
         </tr>
       </table>
     </div>
 
-    <div class="products-section" *ngIf="data.transfer.items && data.transfer.items.length > 0">
+    <!-- Products Section -->
+    <div class="products-section" *ngIf="getAllProducts().length > 0">
       <h3>Products</h3>
       <table class="products-table">
         <thead>
@@ -55,20 +72,32 @@
             <th>SKU</th>
             <th>Quantity</th>
             <th>Unit</th>
-          
+            <th>Unit Price</th>
+            <th>Subtotal</th>
+            <th *ngIf="data.transfer.transfers && data.transfer.transfers.length > 0">Destination</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of data.transfer.items; let i = index">
+          <tr *ngFor="let product of getAllProducts(); let i = index">
             <td>{{i + 1}}</td>
-            <td>{{item.productName}}</td>
-            <td>{{item.sku || 'N/A'}}</td>
-            <td>{{item.quantity}}</td>
-            <td>{{item.unit || 'pcs'}}</td>
-            
+            <td>{{product.productName}}</td>
+            <td>{{product.sku || 'N/A'}}</td>
+            <td>{{product.quantity}}</td>
+            <td>{{product.unit || 'pcs'}}</td>
+            <td>{{product.unitPrice |currency:'INR':'symbol'}}</td>
+            <td>{{product.subtotal | currency:'INR':'symbol'}}</td>
+            <td *ngIf="data.transfer.transfers && data.transfer.transfers.length > 0">
+              {{product.destinationLocation}}
+            </td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- No Products Message -->
+    <div *ngIf="getAllProducts().length === 0" class="no-products-section">
+      <h3>Products</h3>
+      <p>No products found for this transfer.</p>
     </div>
   </div>
 </mat-dialog-content>
@@ -77,5 +106,5 @@
   <button mat-raised-button color="primary" (click)="print()">
     <mat-icon>print</mat-icon> Print
   </button>
-  <button mat-button mat-dialog-close>Close</button>
+  <button mat-button (click)="closeDialog()">Close</button>
 </mat-dialog-actions>

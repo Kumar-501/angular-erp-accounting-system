@@ -11,13 +11,17 @@ import 'jspdf-autotable';
   styleUrls: ['./leave-type.component.scss']
 })
 export class LeaveTypeComponent implements OnInit {
+[x: string]: any;
   leaveForm!: FormGroup;
   showPopup = false;
+    Math = Math; // ✅ expose Math to the template
+
   leaveTypes: any[] = [];
   filteredLeaveTypes: any[] = [];
   isEditMode = false;
   editingId: string | null = null;
-  
+currentPage = 1;
+itemsPerPage = 10;
   // Filter properties
   showFilterSidebar = false;
   searchTerm = '';
@@ -102,6 +106,11 @@ export class LeaveTypeComponent implements OnInit {
     this.selectedInterval = '';
     this.filteredLeaveTypes = [...this.leaveTypes];
   }
+getPaginatedData() {
+  const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+  const endIndex = startIndex + this.itemsPerPage;
+  return this.filteredLeaveTypes.slice(startIndex, endIndex);
+}
 
   // New Export Methods
   exportToCsv() {
@@ -206,6 +215,55 @@ export class LeaveTypeComponent implements OnInit {
     doc.text('Leave Types Report', 14, 15);
     doc.save('leave_types.pdf');
   }
+
+getTotalPages(): number {
+  return Math.ceil(this.filteredLeaveTypes.length / this.itemsPerPage);
+}
+getPageNumbers(): number[] {
+  const totalPages = this.getTotalPages();
+  const maxVisiblePages = 5; // Show up to 5 page numbers
+  const pages: number[] = [];
+  
+  if (totalPages <= maxVisiblePages) {
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i);
+    }
+  } else {
+    const half = Math.floor(maxVisiblePages / 2);
+    let start = Math.max(1, this.currentPage - half);
+    let end = Math.min(totalPages, start + maxVisiblePages - 1);
+    
+    if (end - start + 1 < maxVisiblePages) {
+      start = Math.max(1, end - maxVisiblePages + 1);
+    }
+    
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+  }
+  
+  return pages;
+  }
+  onItemsPerPageChange() {
+  this.currentPage = 1; // Reset to first page when changing items per page
+}previousPage() {
+  if (this.currentPage > 1) {
+    this.currentPage--;
+  }
+}
+
+nextPage() {
+  if (this.currentPage < this.getTotalPages()) {
+    this.currentPage++;
+  }
+}
+
+goToPage(page: number) {
+  if (page >= 1 && page <= this.getTotalPages()) {
+    this.currentPage = page;
+  }
+}
+
 
 print() {
   const originalContent = document.getElementById('leaveTypeTable');

@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { FollowUpService } from '../../services/follow-up.service';
 import { LeadService } from '../../services/leads.service';
 import { UserService } from '../../services/user.service';
-import { FollowupCategoryService } from '../../services/followup-category.service';
+import { FollowupCategory, FollowupCategoryService } from '../../services/followup-category.service';
 import { FollowUp } from '../../models/follow-up.model';
 import { Subscription } from 'rxjs';
 import { Router } from '@angular/router';
@@ -22,12 +22,14 @@ interface LeadContact {
   styleUrls: ['./follows-up.component.scss']
 })
 export class FollowsUpComponent implements OnInit, OnDestroy {
+[x: string]: any;
   title = 'All Follow ups';
   entriesPerPage = 25;
   currentPage = 1;
   totalEntries = 0;
   sortColumnName: string = 'createdAt';
 sortDirection: 'asc' | 'desc' = 'desc';
+activePopup: string | null = null;
 
   totalPages = 1;
   showColumnVisibilityOptions = false;
@@ -100,7 +102,7 @@ originalFollowUps: FollowUp[] = []; // To store the original unfiltered data
   followUpTypeOptions = ['Call', 'Email', 'Meeting', 'Task'];
   followupCategoryOptions: string[] = [];
   logStatusOptions = ['Scheduled', 'Completed', 'Cancelled', 'Pending'];
-
+popupPosition = { top: '0', left: '0' };
   followUps: FollowUp[] = [];
   paginatedFollowUps: FollowUp[] = [];
   leadsList: LeadContact[] = [];
@@ -147,6 +149,14 @@ originalFollowUps: FollowUp[] = []; // To store the original unfiltered data
     this.cleanupSubscriptions();
     document.removeEventListener('click', this.closeDropdowns.bind(this));
   }
+  
+openActionPopup(item: any): void {
+  this.activePopup = item.id;
+}
+
+closeActionPopup(): void {
+  this.activePopup = null;
+}
   getContactDisplay(customerLeadId: string): string {
     if (!customerLeadId) return '-';
     
@@ -322,15 +332,17 @@ resetFilters(): void {
   // Close the filter sidebar if needed
   this.showFilterSidebar = false;
 }
-  loadFollowupCategories(): void {
-    this.followupCategoryService.getFollowupCategories()
-      .then((categories: any[]) => {
-        this.followupCategoryOptions = categories.map((category: any) => category.name);
-      })
-      .catch((err: any) => {
+loadFollowupCategories(): void {
+  this.followupCategoryService.getFollowupCategories()
+    .subscribe({
+      next: (categories: FollowupCategory[]) => {
+        this.followupCategoryOptions = categories.map((category: FollowupCategory) => category.name);
+      },
+      error: (err: any) => {
         console.error('Error loading followup categories:', err);
-      });
-  }
+      }
+    });
+}
   sortColumn(columnName: string): void {
     if (this.sortColumnName === columnName) {
       // Reverse the sort direction if clicking the same column
@@ -520,9 +532,10 @@ resetFilters(): void {
     this.activeDropdown = id;
   }
 
-  closeDropdowns(): void {
-    this.activeDropdown = null;
-  }
+closeDropdowns(): void {
+  this.activeDropdown = null;
+  this.activePopup = null;
+}
 
   addNewFollowUp(): void {
     this.editingFollowUpId = null;
@@ -568,6 +581,10 @@ resetFilters(): void {
     }
   }
 
+
+closeActionPopups(): void {
+  this.activePopup = null;
+}
   openAddLogFormWithItem(item: any): void {
     this.newFollowUpLog = {
       subject: `Follow up for ${item.title || 'item'}`,

@@ -44,5 +44,7 @@ export const COLLECTIONS = {
     TRANSACTIONS: 'transactions',
     UNITS: 'units',
     USERS: 'users',
-    WARRANTIES: 'warranties'
+    WARRANTIES: 'warranties',
+      SALES_STOCK_PRICE_LOGS: 'sales-stock-price-log',
+
 };

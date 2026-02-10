@@ -14,7 +14,7 @@
       </div>
       <div class="search-control">
         <label for="searchInput" class="sr-only">Search customers</label>
-        <input type="text" id="searchInput" [(ngModel)]="searchTerm" placeholder="Search by name or mobile..." 
+        <input type="text" id="searchInput" [(ngModel)]="searchTerm" placeholder="Search by name or mobile..."
                (keyup.enter)="applyFilters()">
         <button (click)="applyFilters()" class="search-button">
           <i class="fa fa-search"></i> Search
@@ -47,7 +47,7 @@
       <div class="column-options">
         <div *ngFor="let column of allColumns" class="column-option">
           <label>
-            <input type="checkbox" 
+            <input type="checkbox"
                    [checked]="isColumnVisible(column.key)"
                    (change)="toggleColumnVisibility(column.key)">
             {{column.label}}
@@ -68,14 +68,14 @@
         <option value="Follow-up">Follow-up</option>
         <option value="Not Interested">Not Interested</option>
       </select>
-      
+
       <select #bulkAssign (change)="bulkAssignTo(bulkAssign.value); bulkAssign.value=''" class="bulk-assign-select">
         <option value="">Assign To...</option>
         <option *ngFor="let user of availableUsers" [value]="user.id">
           {{ user.firstName }} {{ user.lastName }}
         </option>
       </select>
-      
+
       <button (click)="clearSelection()" class="btn-clear">
         <i class="fa fa-times"></i> Clear
       </button>
@@ -90,7 +90,7 @@
         <i class="fa fa-times"></i>
       </button>
     </div>
-    
+
     <div class="sidebar-content">
       <div class="filter-group">
         <label>Status</label>
@@ -103,15 +103,16 @@
         </select>
       </div>
 
-      <div class="filter-group">
-        <label>Assigned To</label>
-        <select [(ngModel)]="filters.assignedTo" class="form-control">
-          <option value="">All</option>
-          <option *ngFor="let agent of salesAgents" [value]="agent">
-            {{ agent }}
-          </option>
-        </select>
-      </div>
+   <div class="filter-group">
+      <label>Assigned To</label>
+      <select [(ngModel)]="filters.assignedTo" class="form-control">
+        <option value="">All Agents</option>
+        <!-- This ngFor loops through the users loaded from your UserService -->
+        <option *ngFor="let user of availableUsers" [value]="user.displayName || user.username">
+          {{ user.displayName || user.username }}
+        </option>
+      </select>
+    </div>
 
       <div class="filter-group">
         <label>Date Range</label>
@@ -161,13 +162,13 @@
       <thead>
         <tr>
           <th *ngIf="isColumnVisible('select')" width="40px">
-            <input type="checkbox" [(ngModel)]="selectAll" 
+            <input type="checkbox" [(ngModel)]="selectAll"
                    (change)="toggleSelectAll()" class="select-all-checkbox">
           </th>
           <th *ngIf="isColumnVisible('customerName')" (click)="sort('customerName')">
             Customer Name
             <span class="sort-icon">
-              <i class="fa" 
+              <i class="fa"
                  [class.fa-sort]="sortColumn !== 'customerName'"
                  [class.fa-sort-up]="sortColumn === 'customerName' && sortDirection === 'asc'"
                  [class.fa-sort-down]="sortColumn === 'customerName' && sortDirection === 'desc'"></i>
@@ -176,7 +177,7 @@
           <th *ngIf="isColumnVisible('mobile')" (click)="sort('mobile')">
             Mobile
             <span class="sort-icon">
-              <i class="fa" 
+              <i class="fa"
                  [class.fa-sort]="sortColumn !== 'mobile'"
                  [class.fa-sort-up]="sortColumn === 'mobile' && sortDirection === 'asc'"
                  [class.fa-sort-down]="sortColumn === 'mobile' && sortDirection === 'desc'"></i>
@@ -185,7 +186,7 @@
           <th *ngIf="isColumnVisible('lastTransactionDate')" (click)="sort('lastTransactionDate')">
             Last Transaction
             <span class="sort-icon">
-              <i class="fa" 
+              <i class="fa"
                  [class.fa-sort]="sortColumn !== 'lastTransactionDate'"
                  [class.fa-sort-up]="sortColumn === 'lastTransactionDate' && sortDirection === 'asc'"
                  [class.fa-sort-down]="sortColumn === 'lastTransactionDate' && sortDirection === 'desc'"></i>
@@ -194,7 +195,7 @@
           <th *ngIf="isColumnVisible('department')" (click)="sort('department')">
             Department
             <span class="sort-icon">
-              <i class="fa" 
+              <i class="fa"
                  [class.fa-sort]="sortColumn !== 'department'"
                  [class.fa-sort-up]="sortColumn === 'department' && sortDirection === 'asc'"
                  [class.fa-sort-down]="sortColumn === 'department' && sortDirection === 'desc'"></i>
@@ -203,7 +204,7 @@
           <th *ngIf="isColumnVisible('assignedTo')" (click)="sort('assignedTo')">
             Assigned To
             <span class="sort-icon">
-              <i class="fa" 
+              <i class="fa"
                  [class.fa-sort]="sortColumn !== 'assignedTo'"
                  [class.fa-sort-up]="sortColumn === 'assignedTo' && sortDirection === 'asc'"
                  [class.fa-sort-down]="sortColumn === 'assignedTo' && sortDirection === 'desc'"></i>
@@ -217,69 +218,65 @@
       <tbody>
         <tr *ngFor="let call of paginatedCalls; trackBy: trackByFn" [class.selected]="isSelected(call.customerId)">
           <td *ngIf="isColumnVisible('select')">
-            <input type="checkbox" [checked]="isSelected(call.customerId)" 
+            <input type="checkbox" [checked]="isSelected(call.customerId)"
                    (change)="toggleCallSelection(call.customerId)">
           </td>
-          
+
           <td *ngIf="isColumnVisible('customerName')" class="customer-name-cell">
             <div class="customer-name-wrapper">
               <span class="customer-name">{{ call.customerName }}</span>
               <small *ngIf="call.businessName" class="business-name">({{ call.businessName }})</small>
             </div>
           </td>
-          
+
           <td *ngIf="isColumnVisible('mobile')" class="mobile-cell">
             <a [href]="'tel:' + call.mobile">{{ call.mobile }}</a>
           </td>
-          
+
           <td *ngIf="isColumnVisible('lastTransactionDate')" class="transaction-date-cell">
             {{ call.lastTransactionDate ? (call.lastTransactionDate | date:'dd-MM-yyyy') : 'None' }}
           </td>
-          
+
           <td *ngIf="isColumnVisible('department')" class="department-cell">
             {{ call.department || 'Not assigned' }}
           </td>
-          
+
           <td *ngIf="isColumnVisible('assignedTo')" class="assigned-cell">
             <span>{{ call.assignedTo || 'Not assigned' }}</span>
           </td>
-          
-          <!-- FIXED: Added proper status dropdown for individual calls -->
-<td *ngIf="isColumnVisible('callStatus')" class="status-cell">
-  <select 
-    [(ngModel)]="call.callStatus"
-    (change)="updateIndividualCallStatus(call.customerId, call.callStatus)"
-    [disabled]="isUpdatingStatus.has(call.customerId)"
-    class="status-select"
-    [ngClass]="'status-' + (call.callStatus || 'pending').toLowerCase().replace(' ', '-')">
-    <option value="Pending">Pending</option>
-    <option value="Completed">Completed</option>
-    <option value="Follow-up">Follow-up</option>
-    <option value="Not Interested">Not Interested</option>
-  </select>
-  <i *ngIf="isUpdatingStatus.has(call.customerId)" class="fa fa-spinner fa-spin updating-icon"></i>
-</td>
-          
+
+          <td *ngIf="isColumnVisible('callStatus')" class="status-cell">
+            <select
+              [(ngModel)]="call.callStatus"
+              (change)="updateIndividualCallStatus(call.customerId, call.callStatus)"
+              [disabled]="isUpdatingStatus.has(call.customerId)"
+              class="status-select"
+              [ngClass]="'status-' + (call.callStatus || 'pending').toLowerCase().replace(' ', '-')">
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Not Interested">Not Interested</option>
+            </select>
+            <i *ngIf="isUpdatingStatus.has(call.customerId)" class="fa fa-spinner fa-spin updating-icon"></i>
+          </td>
+
           <td *ngIf="isColumnVisible('notes')" class="notes-cell">
-            <textarea [(ngModel)]="call.notes" 
+            <textarea [(ngModel)]="call.notes"
                       (blur)="updateCallNotes(call.customerId, call.notes)"
                       placeholder="Add notes..."
                       [title]="call.notes"
                       rows="2"></textarea>
           </td>
-          
+
           <td *ngIf="isColumnVisible('actions')" class="actions-cell">
-            <button (click)="viewCustomerDetails(call.customerId)" 
+            <button (click)="viewCustomerDetails(call.customerId)"
                     class="btn-action btn-view" title="View Customer">
               <i class="fa fa-eye"></i>
             </button>
-            <button (click)="addNewCallLog(call.customerId)" 
-                    class="btn-action btn-call" title="Add Call Log">
-              <i class="fa fa-phone"></i>
-            </button>
+
           </td>
         </tr>
-        
+
         <tr *ngIf="filteredCalls.length === 0">
           <td [attr.colspan]="getVisibleColumnCount()" class="no-data">
             <div class="no-data-content">
@@ -296,7 +293,7 @@
   <!-- Pagination -->
   <div class="pagination-controls" *ngIf="filteredCalls.length > 0">
     <div class="pagination-info">
-      Showing {{ (currentPage - 1) * itemsPerPage + 1 }} - 
+      Showing {{ (currentPage - 1) * itemsPerPage + 1 }} -
       {{ Math.min(currentPage * itemsPerPage, filteredCalls.length) }} of {{ filteredCalls.length }} calls
     </div>
     <div class="pagination-buttons">
@@ -307,7 +304,7 @@
         <i class="fa fa-angle-left"></i> Previous
       </button>
       <div class="page-numbers">
-        <span *ngFor="let page of getPageNumbers()" 
+        <span *ngFor="let page of getPageNumbers()"
               (click)="pageChanged(page)"
               [class.active]="page === currentPage"
               class="page-number">

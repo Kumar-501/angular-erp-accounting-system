@@ -36,6 +36,7 @@ export interface Lead {
   saleid?: string;
     // ... other properties ...
   lastName?: string;
+  
   orderStatus?: string; 
   mobileExists?: boolean; 
   isDuplicate?: boolean;
@@ -63,6 +64,8 @@ export interface Lead {
   productInterested?: any; // Changed to any to handle various product formats
   source?: string;
   lifeStage?: string;
+    occupation?: string;
+
   contactType?: string;
   status?: string;
   createdAt?: Date;
@@ -78,7 +81,6 @@ export interface Lead {
   state?: string;
   country?: string;
   zipCode?: string;
-  occupation?: string;
   creditLimit?: number;
 }
 
@@ -141,6 +143,7 @@ export interface ConvertedCustomer {
   providedIn: 'root'
 })
 export class LeadService {
+  [x: string]: any;
   private leadsCollection: CollectionReference<DocumentData>;
   private customersCollection: CollectionReference<DocumentData>;
   private followUpsCollection: CollectionReference<DocumentData>;
@@ -193,7 +196,7 @@ getLeadsAssignedToUser(userId: string): Observable<Lead[]> {
 
 
 // In leads.service.ts
-getLeads(currentUserRole?: string, currentUsername?: string): Observable<Lead[]> {
+getLeads(currentUserRole?: string, currentUsername?: string, currentUserDepartment?: string): Observable<Lead[]> {
   return new Observable((observer) => {
     let q;
     
@@ -312,6 +315,8 @@ getLeads(currentUserRole?: string, currentUsername?: string): Observable<Lead[]>
         createdAt: new Date(),
         updatedAt: new Date(),
         convertedAt: null,
+          occupation: lead.occupation || '', // Add this line
+
         productFileUrl: lead.productFileUrl || '',
         alternateContact: lead.alternateContact || '',
         addedBy: {
@@ -357,53 +362,88 @@ private async findDuplicateLeads(mobile: string | undefined): Promise<Lead[]> {
     ...doc.data()
   } as Lead));
 }
-async convertLeadToCustomer(leadData: any): Promise<any> {
-  try {
-    // Prepare customer data from lead
-    const customerData = {
-      contactId: this.generateCustomerId(),
-      businessName: leadData.businessName || '',
-      firstName: leadData.firstName || '',
-      lastName: leadData.lastName || '',
-      isIndividual: !leadData.businessName,
-      email: leadData.email || '',
-      mobile: leadData.mobile,
-      landline: leadData.landline || '',
-      alternateContact: leadData.alternateContact || '',
-      assignedTo: leadData.assignedTo,
-      assignedToId: leadData.assignedToId,
-      status: 'Active',
-      addressLine1: leadData.addressLine1 || '',
-      addressLine2: leadData.addressLine2 || '',
-      city: leadData.city || '',
-      state: leadData.state || '',
-      country: leadData.country || 'India',
-      zipCode: leadData.zipCode || '',
-      contactType: 'Customer',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      convertedFromLead: leadData.id, // Store reference to original lead
-      notes: leadData.notes || '',
-      source: leadData.source || '',
-      lifeStage: leadData.lifeStage || '',
-      leadStatus: leadData.leadStatus || '',
-      department: leadData.department || ''
-    };
+// In leads.service.ts
 
-    // Add to customers collection
-    const customerRef = await addDoc(collection(this.firestore, 'customers'), customerData);
-    
-    // Return customer data with ID
-    return { id: customerRef.id, ...customerData };
-  } catch (error) {
-    console.error('Error converting lead to customer:', error);
-    throw error;
+// ... inside the LeadService class
+
+// --- REPLACE this method with the updated version ---
+// in lead.service.ts
+// ... inside the LeadService class
+
+// File: src/app/services/lead.service.ts
+
+// REPLACE your existing convertLeadToCustomer method with this complete version.
+// File: src/app/services/lead.service.ts
+
+// REPLACE your existing convertLeadToCustomer method with this one.
+// File: src/app/services/lead.service.ts
+
+// REPLACE your existing convertLeadToCustomer method with this one.
+ async convertLeadToCustomer(leadData: any): Promise<any> {
+    try {
+      // Prepare the new customer data object
+      const customerData = {
+        // ... (all other existing fields like contactId, firstName, mobile, etc. remain the same)
+        contactId: this.generateCustomerId(),
+        isIndividual: !leadData.businessName,
+        businessName: leadData.businessName || '',
+        prefix: leadData.prefix || '',
+        firstName: leadData.firstName || '',
+        middleName: leadData.middleName || '',
+        lastName: leadData.lastName || '',
+        email: leadData.email || '',
+        mobile: leadData.mobile,
+        landline: leadData.landline || '',
+        alternateContact: leadData.alternateContact || '',
+        gender: leadData.gender || '',
+        age: leadData.age || null,
+        occupation: leadData.occupation || '',
+        dob: leadData.dateOfBirth || null,
+        addressLine1: leadData.addressLine1 || '',
+        addressLine2: leadData.addressLine2 || '',
+        state: leadData.state || '',
+        country: leadData.country || 'India',
+        zipCode: leadData.zipCode || '',
+        district: leadData.city || '',
+
+        // ======================= THE FIX =======================
+        // The field names here are now corrected to match what the form expects.
+        leadStatus: leadData.leadStatus || '',      // SAVING AS 'leadStatus'
+        lifeStage: leadData.lifeStage || '',       // SAVING AS 'lifeStage'
+        leadCategory: leadData.leadCategory || '',
+        dealStatus: leadData.dealStatus || '',
+        priority: leadData.priority || '',
+        estimatedValue: leadData.estimatedValue || '',
+        // ===================== END OF THE FIX ====================
+
+        // --- CRM & SYSTEM DATA ---
+        assignedTo: leadData.assignedTo || '',
+        assignedToId: leadData.assignedToId || '',
+        department: leadData.department || '',
+        source: leadData.source || '',
+        contactType: 'Customer',
+        status: 'Active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        convertedFromLead: leadData.id,
+        notes: leadData.notes || '',
+      };
+
+      const customerRef = await addDoc(this.customersCollection, customerData);
+      return { id: customerRef.id, ...customerData };
+
+    } catch (error) {
+      console.error('Error in convertLeadToCustomer:', error);
+      throw error;
+    }
   }
-}
 
-private generateCustomerId(): string {
-  return 'CUST' + Math.floor(1000 + Math.random() * 9000).toString();
-}
+
+  private generateCustomerId(): string {
+    const prefix = 'CUS';
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    return `${prefix}${randomNum}`;
+  }
 // async convertLeadToCustomer(leadData: any, isExistingCustomer: boolean = false): Promise<any> {
 //   if (isExistingCustomer) {
 //     return {
@@ -464,6 +504,8 @@ private generateCustomerId(): string {
     return await updateDoc(leadDocRef, {
       ...lead,
       updatedAt: new Date(),
+        occupation: lead.occupation || '', // Add this line
+
       productFileUrl: lead.productFileUrl || '',
           alternateContact: lead.alternateContact || '', // Add this line
 
@@ -602,7 +644,44 @@ private generateCustomerId(): string {
       return () => unsubscribe();
     });
   }
-
+async getUserLeaveBalance(userId: string, leaveTypeId: string): Promise<{total: number, used: number, remaining: number}> {
+  // Get all approved leaves for this user and leave type
+  const q = query(
+    collection(this.firestore, 'leaves'),
+    where('employeeId', '==', userId),
+    where('leaveTypeId', '==', leaveTypeId),
+    where('status', '==', 'approved')
+  );
+  
+  const querySnapshot = await getDocs(q);
+  let totalUsedDays = 0;
+  
+  querySnapshot.forEach(doc => {
+    const leave = doc.data();
+    totalUsedDays += this.calculateLeaveDays(leave['startDate'].toDate(), leave['endDate'].toDate(), leave['session']);
+  });
+  
+  // Get the leave type to know the max allowed
+  const leaveTypeDoc = await getDoc(doc(this.firestore, 'leaveTypes', leaveTypeId));
+  const maxLeaveCount = leaveTypeDoc.exists() ? leaveTypeDoc.data()['maxLeaveCount'] : 0;
+  
+  return {
+    total: maxLeaveCount,
+    used: totalUsedDays,
+    remaining: Math.max(maxLeaveCount - totalUsedDays, 0)
+  };
+}
+private calculateLeaveDays(startDate: Date, endDate: Date, session: string): number {
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both dates
+  
+  // Adjust for half-day sessions
+  if (session === 'First Half' || session === 'Second Half') {
+    days -= 0.5;
+  }
+  
+  return days;
+}
 async assignLeads(leadIds: string[], userId: string, userName: string): Promise<void> {
   const batch = writeBatch(this.firestore);
   

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { PurchaseRequisitionService } from '../services/purchase-requisition.service';
@@ -50,6 +50,9 @@ export class AddPurchaseRequisitionComponent implements OnInit, OnDestroy {
   categories: any[] = [];
   private referenceNumberGenerated = false;
 
+    @ViewChild('datePicker') datePicker!: ElementRef;
+  @ViewChild('requiredByDatePicker') requiredByDatePicker!: ElementRef;
+  @ViewChild('shippingDatePicker') shippingDatePicker!: ElementRef;
   businessLocations: any[] = [];
   productsList: any[] = [];
   users: any[] = [];
@@ -116,9 +119,7 @@ async searchProducts(event: any) {
   }
   
   // Filter products first
-  const filtered = this.productsList.filter(product => {
-    if (product.notForSelling) return false;
-    
+ const filtered = this.productsList.filter(product => {
     const searchString = [
       product.productName,
       product.sku,
@@ -130,6 +131,7 @@ async searchProducts(event: any) {
     
     return searchString.includes(searchTerm);
   });
+
 
   // Get current location
   const locationId = this.purchaseForm.get('location')?.value;
@@ -148,6 +150,54 @@ async searchProducts(event: any) {
   
   this.showSearchResults = this.searchResults.length > 0;
 }
+
+
+getFormattedDateForInput(dateString: any): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  openDatePicker(type: 'date' | 'requiredBy' | 'shipping'): void {
+    if (type === 'date') this.datePicker.nativeElement.showPicker();
+    else if (type === 'requiredBy') this.requiredByDatePicker.nativeElement.showPicker();
+    else if (type === 'shipping') this.shippingDatePicker.nativeElement.showPicker();
+  }
+
+  onManualDateInput(event: any, controlName: string): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        // Update the reactive form with the YYYY-MM-DD string
+        const formattedDate = `${year}-${month}-${day}`;
+        this.purchaseForm.get(controlName)?.setValue(formattedDate);
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        this.resetVisibleInput(event, controlName);
+      }
+    } else if (input !== '') {
+      alert('Format must be DD-MM-YYYY');
+      this.resetVisibleInput(event, controlName);
+    }
+  }
+
+  private resetVisibleInput(event: any, controlName: string): void {
+    event.target.value = this.getFormattedDateForInput(this.purchaseForm.get(controlName)?.value);
+  }
 onSearchFocus() {
   if (this.searchTerm && this.searchTerm.length >= 2) {
     this.showSearchResults = true;
@@ -288,29 +338,22 @@ private async getCurrentStockAtLocation(productId: string, locationId: string): 
     return 0;
   }
 }
-async addProductFromSearch(product: any) {
-  // Double-check that the product is not marked as "not for selling"
-  if (product.notForSelling) {
-    alert('This product is marked as "Not for Selling" and cannot be added to purchase requisitions.');
-    return;
-  }
+// In add-purchase-requisition.component.ts
 
+async addProductFromSearch(product: any) {
   const existingIndex = this.products.controls.findIndex(
     control => control.get('productId')?.value === product.id
   );
 
   if (existingIndex >= 0) {
-    // If product already exists, just increase the quantity
     const currentQty = this.products.at(existingIndex).get('requiredQuantity')?.value || 0;
     this.products.at(existingIndex).get('requiredQuantity')?.setValue(currentQty + 1);
     this.calculateSubtotal(existingIndex);
   } else {
-    // Get current stock at the selected location
     const selectedLocationId = this.purchaseForm.get('location')?.value;
     const currentStock = selectedLocationId ? 
       await this.getCurrentStockAtLocation(product.id, selectedLocationId) : 0;
 
-    // Calculate purchase price including tax
     const unitPurchasePrice = product.unitPurchasePrice || 
                             product.defaultPurchasePrice || 
                             0;
@@ -318,21 +361,21 @@ async addProductFromSearch(product: any) {
     const purchasePriceIncTax = product.defaultPurchasePriceIncTax || 
                               (unitPurchasePrice * (1 + (taxPercentage / 100)));
     
-    // Add new product
     const productGroup = this.fb.group({
       productId: [product.id, Validators.required],
       productName: [product.productName, Validators.required],
       alertQuantity: [product.alertQuantity || 0, [Validators.required, Validators.min(0)]],
-      currentStock: [currentStock, [Validators.required, Validators.min(0)]],
+      // ↓↓↓ CHANGE IS HERE ↓↓↓
+      currentStock: [currentStock], // Removed min(0) validator
+      // ↑↑↑ CHANGE IS HERE ↑↑↑
       unitPurchasePrice: [unitPurchasePrice, [Validators.required, Validators.min(0)]],
       purchasePriceIncTax: [purchasePriceIncTax, [Validators.required, Validators.min(0)]],
       requiredQuantity: [1, [Validators.required, Validators.min(1)]],
-      subtotal: [purchasePriceIncTax * 1] // Initial subtotal
+      subtotal: [purchasePriceIncTax * 1]
     });
     
     this.products.push(productGroup);
     
-    // Mark all controls as touched to show validation immediately
     Object.keys(productGroup.controls).forEach(key => {
       productGroup.get(key)?.markAsTouched();
     });
@@ -340,6 +383,7 @@ async addProductFromSearch(product: any) {
   
   this.clearSearch();
 }
+
 clearSearch() {
   this.searchTerm = '';
   this.searchResults = [];
@@ -450,7 +494,8 @@ onSupplierChange(supplierId: string): void {
     }
   });
 }
-async generateReferenceNumber(): Promise<void> {
+
+private async generateReferenceNumber(): Promise<void> {
   // Only generate if we haven't already
   if (this.referenceNumberGenerated) return;
 
@@ -458,28 +503,34 @@ async generateReferenceNumber(): Promise<void> {
     const latestRequisition = await this.requisitionService.getLatestRequisition();
     
     let nextPrNumber = 1;
-    if (latestRequisition) {
-      const match = latestRequisition.referenceNo.match(/PR-(\d+)/);
+    if (latestRequisition && latestRequisition.referenceNo) {
+      // Extract the numeric part from reference numbers like "PR-001 001" or "PR-001"
+      const refNo = latestRequisition.referenceNo.split(' ')[0]; // Get "PR-001" part
+      const match = refNo.match(/PR-(\d+)/);
       if (match) {
         nextPrNumber = parseInt(match[1], 10) + 1;
       }
     }
 
-    const formattedPrNumber = `PR-${nextPrNumber.toString().padStart(3, '0')} 001`;
+    // Generate a 3-digit PR number with leading zeros
+    const prNumber = nextPrNumber.toString().padStart(3, '0');
+    const formattedPrNumber = `PR-${prNumber} 001`; // Adding 001 as default item number
     
     this.purchaseForm.patchValue({
       referenceNo: formattedPrNumber
     });
     
     console.log('Generated reference number:', formattedPrNumber);
-    this.referenceNumberGenerated = true; // Mark as generated
+    this.referenceNumberGenerated = true;
   } catch (error) {
     console.error('Error generating reference number:', error);
-    const fallbackRef = `PR-001 001`;
+    // Fallback with timestamp to ensure uniqueness
+    const timestamp = new Date().getTime().toString().slice(-3);
+    const fallbackRef = `PR-${timestamp} 001`;
     this.purchaseForm.patchValue({
       referenceNo: fallbackRef
     });
-    this.referenceNumberGenerated = true; // Mark as generated even if fallback
+    this.referenceNumberGenerated = true;
   }
 }
 
@@ -488,19 +539,23 @@ async generateReferenceNumber(): Promise<void> {
     return this.purchaseForm.get('products') as FormArray;
   }
 
+// In add-purchase-requisition.component.ts
+
 addProduct(): void {
   this.products.push(
     this.fb.group({
       productId: ['', Validators.required],
       productName: ['', Validators.required],
       alertQuantity: ['', [Validators.required, Validators.min(0)]],
-      currentStock: ['', [Validators.required, Validators.min(0)]], // Add this line
+      // ↓↓↓ CHANGE IS HERE ↓↓↓
+      currentStock: [''], // Removed validators
+      // ↑↑↑ CHANGE IS HERE ↑↑↑
       unitPurchasePrice: ['', [Validators.required, Validators.min(0)]],
       purchasePriceIncTax: ['', [Validators.required, Validators.min(0)]],
       requiredQuantity: ['', [Validators.required, Validators.min(1)]],
-      subtotal: [0] // Initialize subtotal to 0
-    })
-  );
+      subtotal: [0] // Initialize subtotal to 0
+    })
+  );
 }
  calculateSubtotal(index: number): void {
   const productGroup = this.products.at(index);
@@ -538,14 +593,9 @@ calculateTotal(): number {
   }
 async onProductSelect(index: number): Promise<void> {
   const selectedProductId = this.products.at(index).get('productId')?.value;
-  const selectedProduct = this.productsList.find(p => p.id === selectedProductId && !p.notForSelling);
+  const selectedProduct = this.productsList.find(p => p.id === selectedProductId);
   
   if (!selectedProduct) {
-    if (this.productsList.find(p => p.id === selectedProductId)?.notForSelling) {
-      alert('This product is marked as "Not for Selling" and cannot be added to purchase requisitions.');
-      this.products.at(index).get('productId')?.setValue('');
-      return;
-    }
     return;
   }
   
@@ -566,7 +616,7 @@ async onProductSelect(index: number): Promise<void> {
   this.products.at(index).patchValue({
     productName: selectedProduct.productName,
     alertQuantity: selectedProduct.alertQuantity || 0,
-    currentStock: currentStock, // This will update the table
+    currentStock: currentStock,
     unitPurchasePrice: unitPurchasePrice,
     purchasePriceIncTax: purchasePriceIncTax,
     requiredQuantity: 1
@@ -577,8 +627,8 @@ async onProductSelect(index: number): Promise<void> {
   
 
 async savePurchase(): Promise<void> {
-  if (this.isSaving) return; // Prevent multiple clicks
-  
+  if (this.isSaving) return;
+
   if (this.purchaseForm.invalid) {
     alert('Please fill all required fields!');
     return;
@@ -593,12 +643,13 @@ async savePurchase(): Promise<void> {
 
   try {
     const formData = this.purchaseForm.getRawValue();
-        formData.supplierAddress = this.purchaseForm.get('supplierAddress')?.value; // Add this line
+    formData.supplierAddress = this.purchaseForm.get('supplierAddress')?.value;
 
+    // Get the base PR number (e.g., "PR-001" from "PR-001 001")
+    const basePrNumber = formData.referenceNo.split(' ')[0];
     
     formData.items = formData.products.map((product: any, index: number) => {
-      const refParts = formData.referenceNo.split(' ');
-      const prNumber = refParts[0];
+      // Generate item number with 3 digits (001, 002, etc.)
       const itemNumber = (index + 1).toString().padStart(3, '0');
       
       return {
@@ -610,7 +661,7 @@ async savePurchase(): Promise<void> {
         unitPurchasePrice: product.unitPurchasePrice,
         purchasePriceIncTax: product.purchasePriceIncTax,
         subtotal: product.subtotal,
-        itemReference: `${prNumber} ${itemNumber}`
+        itemReference: `${basePrNumber} ${itemNumber}`
       };
     });
     
@@ -626,7 +677,7 @@ async savePurchase(): Promise<void> {
   } finally {
     this.isSaving = false;
   }
-  }
+}
   // Add this helper method to mark all controls as touched
 private markAllAsTouched(): void {
   // Mark main form controls

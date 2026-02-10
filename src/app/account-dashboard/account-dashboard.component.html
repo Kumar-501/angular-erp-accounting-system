@@ -1,0 +1,100 @@
+<!-- src/app/account-dashboard/account-dashboard.component.html -->
+
+<div class="dashboard-container">
+  <div class="header">
+    <h1>Dashboard</h1>
+    <p>Overview of your financial data</p>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-message">
+    Loading financial data...
+  </div>
+
+  <div *ngIf="!isLoading" class="dashboard-grid">
+    <!-- Top Summary Cards -->
+    <div class="card summary-card">
+      <div class="card-header">
+        <span>Total Assets</span>
+        <i class="icon-up"></i>
+      </div>
+      <div class="card-body">
+        <div class="amount">{{ summary.assets | currency:'INR' }}</div>
+      </div>
+    </div>
+
+    <div class="card summary-card">
+      <div class="card-header">
+        <span>Total Liabilities</span>
+        <i class="icon-down"></i>
+      </div>
+      <div class="card-body">
+        <div class="amount negative">{{ summary.liabilities | currency:'INR' }}</div>
+      </div>
+    </div>
+
+    <div class="card summary-card">
+      <div class="card-header">
+        <span>Net Profit</span>
+        <i class="icon-profit"></i>
+      </div>
+      <div class="card-body">
+        <div class="amount" [class.negative]="summary.netProfit < 0">{{ summary.netProfit | currency:'INR' }}</div>
+      </div>
+    </div>
+
+    <div class="card summary-card">
+      <div class="card-header">
+        <span>Active Accounts</span>
+        <i class="icon-accounts"></i>
+      </div>
+      <div class="card-body">
+        <div class="amount-plain">{{ activeAccountsCount }}</div>
+      </div>
+    </div>
+
+    <!-- Account Summary Card -->
+    <div class="card account-summary-card">
+      <div class="card-header">
+        <i class="icon-chart"></i>
+        <h3>Account Summary</h3>
+      </div>
+      <div class="card-body">
+        <ul class="summary-list">
+          <li><span>Assets</span><span class="positive">{{ summary.assets | currency:'INR' }}</span></li>
+          <li><span>Liabilities</span><span class="negative">{{ summary.liabilities | currency:'INR' }}</span></li>
+          <li><span>Equity</span><span>{{ summary.equity | currency:'INR' }}</span></li>
+          <li class="separator"></li>
+          <li><span>Income</span><span class="positive">{{ summary.income | currency:'INR' }}</span></li>
+          <li><span>Expenses</span><span class="negative">{{ summary.expenses | currency:'INR' }}</span></li>
+          <li class="separator"></li>
+          <li><strong>Net Profit</strong><strong [class.positive]="summary.netProfit >= 0" [class.negative]="summary.netProfit < 0">{{ summary.netProfit | currency:'INR' }}</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Recent Transactions Card -->
+    <div class="card recent-transactions-card">
+      <div class="card-header">
+        <h3>Recent Transactions</h3>
+      </div>
+      <div class="card-body">
+        <ul class="transactions-list">
+          <li *ngFor="let tx of recentTransactions">
+            <div class="tx-info">
+              <span class="tx-description">{{ tx.description }}</span>
+              <span class="tx-meta">{{ tx.date | date:'yyyy-MM-dd' }} • {{ tx.source | titlecase }}</span>
+            </div>
+            <div class="tx-amount" [class.positive]="tx.type === 'credit'" [class.negative]="tx.type === 'debit'">
+              {{ tx.amount | currency:'INR' }}
+            </div>
+          </li>
+          <li *ngIf="recentTransactions.length === 0">
+            <div class="tx-info">
+              <span class="tx-description">No recent transactions found.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

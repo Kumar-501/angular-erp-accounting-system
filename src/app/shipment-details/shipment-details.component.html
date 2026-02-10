@@ -6,9 +6,8 @@
       </button>
       <h2>Shipment Details</h2>
     </div>
-  
   </div>
-  
+
   <div *ngIf="isLoading" class="text-center py-5">
     <div class="spinner-border text-primary" role="status">
       <span class="visually-hidden">Loading...</span>
@@ -22,6 +21,7 @@
     </div>
     <div class="card-body">
       <div class="row">
+        <!-- Left Column -->
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Invoice Number</label>
@@ -39,8 +39,8 @@
             <label class="form-label fw-bold">Contact Number</label>
             <p>{{ shipment.contactNumber }}</p>
           </div>
-        
         </div>
+        <!-- Right Column -->
         <div class="col-md-6">
           <div class="mb-3">
             <label class="form-label fw-bold">Type of Service</label>
@@ -50,11 +50,14 @@
             <label class="form-label fw-bold">Location</label>
             <p>{{ shipment.location }}</p>
           </div>
-      
-    
-              <div class="mb-3">
+          <div class="mb-3">
             <label class="form-label fw-bold">Billing Address</label>
             <p>{{ shipment.billingAddress || 'N/A' }}</p>
+          </div>
+          <!-- FIXED: Added Shipping Address display -->
+          <div class="mb-3">
+            <label class="form-label fw-bold">Shipping Address</label>
+            <p>{{ shipment.shippingAddress || 'N/A' }}</p>
           </div>
           <div class="mb-3">
             <label class="form-label fw-bold">Payment Status</label>
@@ -73,65 +76,64 @@
     </div>
   </div>
 
-
-
- <div *ngIf="shipment && !isLoading" class="card mb-4">
-  <div class="card-header bg-primary text-white">
-    <h5 class="mb-0">Products</h5>
-  </div>
-  <div class="card-body">
-    <div class="table-responsive">
-      <table class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Product Name</th>
-            <th>Quantity</th>
-            <th>Unit Price</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <ng-container *ngIf="shipment.products && shipment.products.length > 0; else noProducts">
-            <tr *ngFor="let product of shipment.products; let i = index">
-              <td>{{ i + 1 }}</td>
-              <td>{{ product.productName || product.name || 'N/A' }}</td>
-              <td>{{ product.quantity || 1 }}</td>
-              <td>{{ (product.price || product.unitPrice || 0) | currency:'INR':'symbol':'1.2-2' }}</td>
-              <td>{{ ((product.quantity || 1) * (product.price || product.unitPrice || 0)) | currency:'INR':'symbol':'1.2-2' }}</td>
-            </tr>
-          </ng-container>
-          <ng-template #noProducts>
+  <div *ngIf="shipment && !isLoading" class="card mb-4">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0">Products</h5>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped">
+          <thead>
             <tr>
-              <td colspan="5" class="text-center">No products found</td>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total</th>
             </tr>
-          </ng-template>
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="4" class="text-end fw-bold">Subtotal:</td>
-            <td class="fw-bold">
-              {{ getProductsSubtotal() | currency:'INR':'symbol':'1.2-2' }}
-            </td>
-          </tr>
-          <tr>
-            <td colspan="4" class="text-end fw-bold">Shipping Charge:</td>
-            <td class="fw-bold">{{ shipment.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</td>
-          </tr>
-          <tr>
-            <td colspan="4" class="text-end fw-bold">Total Payable:</td>
-            <td class="fw-bold">{{ shipment.totalPayable | currency:'INR':'symbol':'1.2-2' }}</td>
-          </tr>
-          <tr>
-            <td colspan="4" class="text-end fw-bold">Amount Paid:</td>
-            <td class="fw-bold">{{ shipment.paymentAmount | currency:'INR':'symbol':'1.2-2' }}</td>
-          </tr>
-          <tr>
-            <td colspan="4" class="text-end fw-bold">Balance Due:</td>
-            <td class="fw-bold">{{ shipment.balance | currency:'INR':'symbol':'1.2-2' }}</td>
-          </tr>
-        </tfoot>
-      </table>
+          </thead>
+          <tbody>
+            <ng-container *ngIf="shipment.products && shipment.products.length > 0; else noProducts">
+              <tr *ngFor="let product of shipment.products; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ product.productName || product.name || 'N/A' }}</td>
+                <td>{{ product.quantity || 1 }}</td>
+                <td>{{ (product.price || product.unitPrice || 0) | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ ((product.quantity || 1) * (product.price || product.unitPrice || 0)) | currency:'INR':'symbol':'1.2-2' }}</td>
+              </tr>
+            </ng-container>
+            <ng-template #noProducts>
+              <tr>
+                <td colspan="5" class="text-center">No products found</td>
+              </tr>
+            </ng-template>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="text-end fw-bold">Subtotal:</td>
+              <td class="fw-bold">
+                {{ getProductsSubtotal() | currency:'INR':'symbol':'1.2-2' }}
+              </td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end fw-bold">Shipping Charge:</td>
+              <td class="fw-bold">{{ shipment.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end fw-bold">Total Payable:</td>
+              <td class="fw-bold">{{ shipment.totalPayable | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end fw-bold">Amount Paid:</td>
+              <td class="fw-bold">{{ shipment.paymentAmount | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-end fw-bold">Balance Due:</td>
+              <td class="fw-bold">{{ shipment.balance | currency:'INR':'symbol':'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   </div>
 </div>

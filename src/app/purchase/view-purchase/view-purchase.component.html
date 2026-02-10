@@ -126,9 +126,6 @@
                 <td>₹{{ product.taxAmount | number:'1.2-2' }}</td>
                 <td>₹{{ product.lineTotal | number:'1.2-2' }}</td>
               </tr>
-              <tr *ngIf="!purchase.products || purchase.products.length === 0">
-                <td colspan="7" class="text-center">No products</td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -158,35 +155,36 @@
                     <td class="fw-bold text-end">Subtotal:</td>
                     <td class="text-end">₹{{ (purchase.grandTotal! - (purchase.totalTax || 0) - (purchase.shippingCharges || 0)) | number:'1.2-2' }}</td>
                   </tr>
+                  <tr class="shipping-row">
+                    <td class="fw-bold text-end">Shipping Charges:</td>
+                    <td class="text-end">₹{{ purchase.shippingCharges | number:'1.2-2' }}</td>
+                  </tr>
+                   <tr *ngIf="purchase.isInterState">
+                    <td class="fw-bold text-end">IGST:</td>
+                    <td class="text-end">₹{{ purchase.igst | number:'1.2-2' }}</td>
+                  </tr>
+                  <tr *ngIf="!purchase.isInterState">
+                    <td class="fw-bold text-end">CGST:</td>
+                    <td class="text-end">₹{{ purchase.cgst | number:'1.2-2' }}</td>
+                  </tr>
+                  <tr *ngIf="!purchase.isInterState">
+                    <td class="fw-bold text-end">SGST:</td>
+                    <td class="text-end">₹{{ purchase.sgst | number:'1.2-2' }}</td>
+                  </tr>
                   <tr>
                     <td class="fw-bold text-end">Total Tax:</td>
                     <td class="text-end">₹{{ purchase.totalTax | number:'1.2-2' }}</td>
                   </tr>
-                  <tr *ngIf="purchase.cgst">
-                    <td class="fw-bold text-end">CGST:</td>
-                    <td class="text-end">₹{{ purchase.cgst | number:'1.2-2' }}</td>
-                  </tr>
-                  <tr *ngIf="purchase.sgst">
-                    <td class="fw-bold text-end">SGST:</td>
-                    <td class="text-end">₹{{ purchase.sgst | number:'1.2-2' }}</td>
-                  </tr>
-                  <tr *ngIf="purchase.igst">
-                    <td class="fw-bold text-end">IGST:</td>
-                    <td class="text-end">₹{{ purchase.igst | number:'1.2-2' }}</td>
-                  </tr>
-                
                   <tr>
                     <td class="fw-bold text-end">Grand Total:</td>
                     <td class="text-end fw-bold">₹{{ purchase.grandTotal | number:'1.2-2' }}</td>
                   </tr>
-            
                 </tbody>
               </table>
             </div>
           </div>
         </div>
       </div>
-
     </div>
-
-   
+  </div>
+</div>

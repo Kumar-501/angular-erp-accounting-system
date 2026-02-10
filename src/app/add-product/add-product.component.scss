@@ -216,7 +216,7 @@ body {
         color: white;
         border: none;
         border-radius: 4px;
-        padding: 6px 12px;
+        padding: 6px 25px;
         font-size: 0.85rem;
         cursor: pointer;
         transition: background-color 0.2s;
@@ -870,4 +870,292 @@ select {
 
 .dropdown-options div.selected {
   background-color: #e8f4ff;
+}
+/* Component selection area */
+.component-selection {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.component-selection input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.available-products-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.product-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.product-item:hover {
+  background-color: #f0f0f0;
+}
+
+.product-item.selected {
+  background-color: #e0f7fa;
+}
+
+.product-item input[type="checkbox"] {
+  margin-right: 10px;
+}
+
+.product-price {
+  margin-left: auto;
+  color: #666;
+}
+
+.btn-add-selected {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-add-selected:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+/* Selected components list */
+.selected-components {
+  margin-top: 20px;
+}
+
+.component-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.component-info {
+  flex-grow: 1;
+}
+
+.product-name {
+  font-weight: bold;
+}
+
+.product-sku {
+  color: #666;
+  margin-left: 5px;
+}
+
+.quantity-control {
+  margin: 0 15px;
+  display: flex;
+  align-items: center;
+}
+
+.quantity-control input {
+  width: 60px;
+  margin-left: 5px;
+}
+
+.btn-remove {
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}.component-details {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.component-price-stock {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9em;
+  color: #666;
+}
+
+.component-price-stock span {
+  margin: 2px 0;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+}
+
+.quantity-control input {
+  width: 60px;
+  margin-left: 5px;
+}/* Add these styles to your component's CSS file */
+.component-search-container {
+  margin-bottom: 20px;
+}
+
+.searchable-multiselect {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.searchable-multiselect input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.dropdown {
+  position: absolute;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+.dropdown-item:hover {
+  background-color: #f5f5f5;
+}
+
+.stock-info {
+  float: right;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.selected-components-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tag {
+  display: flex;
+  align-items: center;
+  background: #e9ecef;
+  padding: 5px 10px;
+  border-radius: 20px;
+  gap: 5px;
+}
+
+.tag input {
+  width: 50px;
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.remove-tag {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 1.2em;
+  line-height: 1;
+  padding: 0 0 0 5px;
+}
+
+.remove-tag:hover {
+  color: #dc3545;
+}.warning {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.warning-icon {
+  margin-left: 5px;
+}.not-selling-info {
+  color: #666;
+  font-style: italic;
+  margin-top: 10px;
+}
+
+input[disabled] {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  .date-input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    height: 38px;
+    box-sizing: border-box;
+
+    &:disabled {
+      background-color: #f5f5f5;
+      cursor: not-allowed;
+    }
+  }
+
+  .calendar-btn {
+    background-color: #eee;
+    border: 1px solid #ccc;
+    border-left: none;
+    padding: 0 12px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    color: #555;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+
+    &:hover:not(:disabled) {
+      background-color: #ddd;
+    }
+    
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
 }

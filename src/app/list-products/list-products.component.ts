@@ -11,18 +11,19 @@ import 'jspdf-autotable';
 import { BrandsService } from '../services/brands.service';
 import { CategoriesService } from '../services/categories.service';
 import { TaxService } from '../services/tax.service';
-import { Component, HostListener, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { EventEmitter } from '@angular/core';
 import { PurchaseService } from '../services/purchase.service';
-import { Firestore, doc, getDoc, collection, getDocs, query, where } from '@angular/fire/firestore';
+import { Firestore, doc, getDoc, collection, getDocs, query, where, onSnapshot } from '@angular/fire/firestore';
 import { COLLECTIONS } from '../../utils/constants';
+import { TaxRate } from '../tax/tax.model';
 
 @Component({
   selector: 'app-list-products',
   templateUrl: './list-products.component.html',
   styleUrls: ['./list-products.component.scss']
 })
-export class ListProductsComponent implements OnInit {
+export class ListProductsComponent implements OnInit, OnDestroy {
   products: any[] = [];
   filteredProducts: any[] = [];
   selectedStatus: string = '';
@@ -31,14 +32,21 @@ export class ListProductsComponent implements OnInit {
   brands: any[] = [];
   taxRates: any[] = [];
 
-  // Image modal propertie  locations: any[] = [];
-  private locationsSubscription: Subscription | undefined;s: any
+  // Image modal properties
+  locations: any[] = [];
+  private locationsSubscription: Subscription | undefined;
+  private stockSubscription: Subscription | undefined;
+  private productStockSubscriptions: Map<string, () => void> = new Map();
+  
   showImageModal = false;
   selectedProductForImage: any = null;
   selectedProductImageUrl: string = '';
-
+  // In your component class
   showInactiveProducts = false;
   filtersChanged = new EventEmitter<any>();
+      percentage?: number; // For backward compatibility
+  taxRateObject?: TaxRate | null; // ✅ CRITICAL: This is the key property
+
   fromDate: Date | null = null;
   toDate: Date | null = null;
   isDateDrawerOpen = false;
@@ -46,6 +54,7 @@ export class ListProductsComponent implements OnInit {
   isDateFilterActive = false;
   selectedRange = '';
   dateRangeLabel = '';
+  itemsPerPage: number = 10;
 
   selectedBrand: string = '';
   selectedTax: string = '';
@@ -61,7 +70,6 @@ export class ListProductsComponent implements OnInit {
   isDeactivating: boolean = false;
   searchText: string = '';
   currentPage: number = 1;
-  itemsPerPage: number = 25;
   Math = Math;
   originalProducts: any[] = [];
   showProductDetailsModal = false;
@@ -71,12 +79,12 @@ export class ListProductsComponent implements OnInit {
   showHistoryModal: boolean = false;
   productHistory: any[] = [];
   
-  locations: any[] = [];
   showStockHistoryModal = false;
   stockHistory: any[] = [];
   users: any[] = [];
 
   filterOptions: {
+    [x: string]: any;
     brandId: string;
     categoryId: string;
     taxId: string;
@@ -95,6 +103,7 @@ export class ListProductsComponent implements OnInit {
   };
 
   searchTimeout: any = null;
+  totalPages!: number;
 
   constructor(
     private productService: ProductsService,
@@ -108,6 +117,7 @@ export class ListProductsComponent implements OnInit {
     private fileUploadService: FileUploadService,
     private firestore: Firestore
   ) {}
+
   ngOnInit(): void {
     this.loadUsers();
     this.loadLocations().then(() => {
@@ -115,15 +125,318 @@ export class ListProductsComponent implements OnInit {
       this.loadBrands();
       this.loadCategories();
       this.loadTaxRates();
+      this.subscribeToStockUpdates();
     });
+  }
+
+ ngOnDestroy(): void {
+    if (this.locationsSubscription) {
+      this.locationsSubscription.unsubscribe();
+    }
+    // Correctly unsubscribe from the main stock update listener
+    if (this.stockSubscription) {
+      this.stockSubscription.unsubscribe();
+    }
+    this.productStockSubscriptions.forEach(unsubscribe => unsubscribe());
+    this.productStockSubscriptions.clear();
+  }
+  private async refreshAllProductStockData(): Promise<void> {
+    if (this.products.length === 0) return;
+
+    console.log('Refreshing stock for all loaded products...');
+
+    const stockUpdatePromises = this.products.map(product =>
+      this.fetchAuthoritativeStockForProduct(product.id).then(stockData => ({
+        productId: product.id,
+        ...stockData
+      }))
+    );
+
+    try {
+      const updatedStocks = await Promise.all(stockUpdatePromises);
+      const stockMap = new Map(updatedStocks.map(s => [s.productId, s]));
+
+      // Update the main products array with the new stock data
+      this.products = this.products.map(p => {
+        const newStockData = stockMap.get(p.id);
+        if (newStockData) {
+          return {
+            ...p,
+            locationStocks: newStockData.locationStocks,
+            totalStock: newStockData.totalStock,
+            displayStock: newStockData.totalStock,
+          };
+        }
+        return p;
+      });
+
+      // Update the arrays that depend on the main product list
+      this.originalProducts = [...this.products].filter(p => !p.notForSelling);
+
+      // Re-apply filters to ensure the UI reflects the changes
+      this.applyFilters();
+      console.log('Product stock data refreshed successfully.');
+
+    } catch (error) {
+      console.error('Error during bulk stock refresh:', error);
+    }
+  }
+  getProductTaxDisplay(product: any): string {
+  if (!product.applicableTax) {
+    return '-';
+  }
+
+  // Handle different tax formats
+  if (typeof product.applicableTax === 'string') {
+    // If it's a string ID, find the tax rate
+    const taxRate = this.taxRates.find(tax => tax.id === product.applicableTax);
+    if (taxRate) {
+      return `${taxRate.name} (${taxRate.rate}%)`;
+    }
+    return '-';
+  } else if (typeof product.applicableTax === 'object') {
+    // If it's already an object with rate information
+    const name = product.applicableTax.name || 'Tax';
+    const rate = product.applicableTax.rate || product.applicableTax.percentage || 0;
+    return `${name} (${rate}%)`;
+  }
+
+  return '-';
+}
+  private subscribeToStockUpdates(): void {
+    this.stockSubscription = this.stockService.stockUpdated$.subscribe(() => {
+      console.log('Stock update detected. Refreshing stock data for all products.');
+      this.refreshAllProductStockData();
+    });
+  }
+
+  // UPDATED: Enhanced method to refresh stock data considering purchase returns
+  private async refreshProductStockDataWithReturns(): Promise<void> {
+    if (this.products.length === 0) return;
+
+    try {
+      console.log('Refreshing product stock data with returns consideration...');
+      
+      // Get purchase returns data to ensure stock reflects returns
+      const purchaseReturnsMap = await this.getPurchaseReturnsData();
+      
+      const productStockUpdates = await Promise.all(
+        this.products.map(async (product) => {
+          if (product.id) {
+            // Get fresh stock data from database
+            const locationStocks = await this.getProductStockAtAllLocationsWithReturns(product.id, purchaseReturnsMap);
+            const totalStock = this.getTotalStockAcrossLocations({ locationStocks });
+            
+            return {
+              ...product,
+              locationStocks,
+              totalStock,
+              displayStock: totalStock
+            };
+          }
+          return product;
+        })
+      );
+
+      this.products = productStockUpdates;
+      this.originalProducts = [...this.products].filter(p => !p.notForSelling);
+      this.applyFilters();
+      
+      console.log('Product stock data refreshed successfully with returns');
+      
+    } catch (error) {
+      console.error('Error refreshing product stock data with returns:', error);
+    }
+  }
+
+  // NEW: Get purchase returns data to adjust stock calculations
+  private async getPurchaseReturnsData(): Promise<{ [productId: string]: number }> {
+    try {
+      const purchaseReturnsMap: { [productId: string]: number } = {};
+
+      console.log('Fetching purchase returns data for stock adjustment...');
+
+      const purchaseReturnLogsSnapshot = await getDocs(collection(this.firestore, 'purchase-return-log'));
+      
+      purchaseReturnLogsSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data['productId']) {
+          purchaseReturnsMap[data['productId']] = (purchaseReturnsMap[data['productId']] || 0) + (data['returnQuantity'] || 0);
+        }
+      });
+
+      console.log('Purchase returns data fetched:', Object.keys(purchaseReturnsMap).length, 'products have returns');
+      return purchaseReturnsMap;
+    } catch (error) {
+      console.error('Error fetching purchase returns data:', error);
+      return {};
+    }
+  }
+
+  // UPDATED: Enhanced method to get product stock considering returns
+  private async getProductStockAtAllLocationsWithReturns(
+    productId: string, 
+    purchaseReturnsMap: { [productId: string]: number }
+  ): Promise<{[key: string]: number}> {
+    try {
+      const stockQuery = query(
+        collection(this.firestore, COLLECTIONS.PRODUCT_STOCK),
+        where('productId', '==', productId)
+      );
+      const stockSnapshot = await getDocs(stockQuery);
+      
+      const locationStocks: {[key: string]: number} = {};
+      const productReturns = purchaseReturnsMap[productId] || 0;
+      
+      stockSnapshot.forEach((doc: any) => {
+        const stockData = doc.data() as any;
+        if (stockData.locationId && stockData.quantity !== undefined) {
+          // Subtract returns from stock to get actual current stock
+          const actualStock = Math.max(0, stockData.quantity - productReturns);
+          locationStocks[stockData.locationId] = actualStock;
+        }
+      });
+      
+      return locationStocks;
+    } catch (error) {
+      console.error('Error fetching product stock with returns consideration:', error);
+      return {};
+    }
+  }
+
+  // Subscribe to real-time stock updates for a specific product
+  private subscribeToProductStock(productId: string): void {
+    if (this.productStockSubscriptions.has(productId)) {
+      return; // Already subscribed
+    }
+
+    const stockQuery = query(
+      collection(this.firestore, COLLECTIONS.PRODUCT_STOCK),
+      where('productId', '==', productId)
+    );
+
+    const unsubscribe = onSnapshot(stockQuery, async (snapshot) => {
+      // Get purchase returns to adjust stock calculation
+      const purchaseReturnsMap = await this.getPurchaseReturnsData();
+      const productReturns = purchaseReturnsMap[productId] || 0;
+      
+      const locationStocks: {[key: string]: number} = {};
+      
+      snapshot.forEach((doc) => {
+        const stockData = doc.data() as any;
+        if (stockData.locationId && stockData.quantity !== undefined) {
+          // Adjust stock considering returns
+          const actualStock = Math.max(0, stockData.quantity - productReturns);
+          locationStocks[stockData.locationId] = actualStock;
+        }
+      });
+
+      // Update the specific product in the products array
+      const productIndex = this.products.findIndex(p => p.id === productId);
+      if (productIndex !== -1) {
+        this.products[productIndex].locationStocks = locationStocks;
+        this.products[productIndex].totalStock = this.getTotalStockAcrossLocations(this.products[productIndex]);
+        this.products[productIndex].displayStock = this.products[productIndex].totalStock;
+
+        // Update filtered products if necessary
+        const filteredIndex = this.filteredProducts.findIndex(p => p.id === productId);
+        if (filteredIndex !== -1) {
+          this.filteredProducts[filteredIndex] = { ...this.products[productIndex] };
+        }
+
+        // Update original products if necessary
+        const originalIndex = this.originalProducts.findIndex(p => p.id === productId);
+        if (originalIndex !== -1) {
+          this.originalProducts[originalIndex] = { ...this.products[productIndex] };
+        }
+      }
+    }, (error) => {
+      console.error(`Error subscribing to stock updates for product ${productId}:`, error);
+    });
+
+    this.productStockSubscriptions.set(productId, unsubscribe);
+  }
+
+  // Method to calculate unit purchase price excluding tax
+  calculateUnitPurchasePriceExcTax(product: any): number {
+    if (!product.defaultPurchasePriceIncTax) {
+      return 0;
+    }
+
+    const priceIncTax = Number(product.defaultPurchasePriceIncTax) || 0;
+    
+    // Get tax rate for this product
+    const taxRate = this.getProductTaxRate(product);
+    
+    if (taxRate === 0) {
+      return priceIncTax; // If no tax, price inc tax = price exc tax
+    }
+    
+    // Calculate price excluding tax: Price Exc Tax = Price Inc Tax / (1 + Tax Rate/100)
+    const priceExcTax = priceIncTax / (1 + (taxRate / 100));
+    
+    return Math.round(priceExcTax * 100) / 100; // Round to 2 decimal places
+  }
+
+  // Method to get tax rate for a product
+  getProductTaxRate(product: any): number {
+    if (!product.applicableTax) {
+      return 0;
+    }
+
+    // Handle different tax formats
+    if (typeof product.applicableTax === 'string') {
+      // If it's a string, try to find the tax rate by ID
+      const taxRate = this.taxRates.find(tax => tax.id === product.applicableTax);
+      return taxRate ? Number(taxRate.rate || taxRate.percentage || 0) : 0;
+    } else if (typeof product.applicableTax === 'object') {
+      // If it's an object, get the rate directly
+      return Number(product.applicableTax.rate || product.applicableTax.percentage || 0);
+    }
+
+    return 0;
+  }
+
+  // Method to format currency display
+  formatCurrency(amount: number): string {
+    if (!amount && amount !== 0) return '0.00';
+    return Number(amount).toFixed(2);
+  }
+
+  // Add these navigation methods
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+    }
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+    }
+  }
+
+  // Update the calculateTotalPages method
+  calculateTotalPages(): void {
+    this.totalPages = Math.ceil(this.filteredProducts.length / this.itemsPerPage);
+    if (this.currentPage > this.totalPages && this.totalPages > 0) {
+      this.currentPage = this.totalPages;
+    } else if (this.totalPages === 0) {
+      this.currentPage = 1;
+    }
   }
 
   // File and image methods
   hasProductImage(product: any): boolean {
-    return !!(product?.productImageBase64 || 
-              product?.productImage?.url || 
-              product?.productImage?.downloadURL ||
-              (typeof product?.productImage === 'string' && product?.productImage.startsWith('http')));
+    if (!product) return false;
+    
+    // This now checks for the object format { data: '...' } that you are saving
+    return !!(
+      (product.productImage && typeof product.productImage === 'object' && product.productImage.data) ||
+      product.productImage?.url ||
+      product.productImage?.downloadURL ||
+      (typeof product.productImage === 'string' && product.productImage.startsWith('http'))
+    );
   }
 
   hasProductBrochure(product: any): boolean {
@@ -134,22 +447,34 @@ export class ListProductsComponent implements OnInit {
   }
 
   getProductImageUrl(product: any): string {
-    if (!product) return '';
-    
-    if (product.productImageBase64) {
-      return product.productImageBase64;
-    } else if (product.productImageThumbnail) {
-      return product.productImageThumbnail;
-    } else if (product.productImage?.url) {
-      return product.productImage.url;
-    } else if (product.productImage?.downloadURL) {
-      return product.productImage.downloadURL;
-    } else if (typeof product.productImage === 'string' && product.productImage.startsWith('http')) {
-      return product.productImage;
+    if (!product || !product.productImage) {
+      return 'path/to/your/default/placeholder-image.png'; // Return a placeholder if no image
     }
-    
-    return '';
+
+    const image = product.productImage;
+
+    // 1. Check for the new object format with base64 data first.
+    //    This is what the edit page saves.
+    if (typeof image === 'object' && image.data) {
+      return image.data;
+    }
+
+    // 2. Fallback for other possible formats (like a direct URL from cloud storage)
+    if (image.url) {
+      return image.url;
+    }
+    if (image.downloadURL) {
+      return image.downloadURL;
+    }
+    if (typeof image === 'string' && image.startsWith('http')) {
+      return image;
+    }
+
+    // Return placeholder if no valid format is found
+    return 'path/to/your/default/placeholder-image.png';
   }
+  // +++ END: UPDATE THIS METHOD +++
+
 
   getProductBrochureUrl(product: any): string {
     if (!product) return '';
@@ -227,6 +552,12 @@ export class ListProductsComponent implements OnInit {
 
   // Component product methods
   getComponentProductName(productId: string): string {
+    const product = this.products.find(p => p.id === productId);
+    return product ? product.productName : 'Unknown Product';
+  }
+
+  // Method to get not-selling product name for Single type products
+  getNotSellingProductName(productId: string): string {
     const product = this.products.find(p => p.id === productId);
     return product ? product.productName : 'Unknown Product';
   }
@@ -327,70 +658,85 @@ export class ListProductsComponent implements OnInit {
     }
   }
 
-async loadProducts(): Promise<void> {
-  this.isLoading = true;
-  
-  try {
-    this.productService.getProductsRealTime().subscribe(async (data: any[]) => {
-      // Process each product and load its stock per location
-      const processedProducts = await Promise.all(data.map(async (product) => {
-        if (product.isActive === undefined) {
-          product.isActive = true;
+  private async fetchAuthoritativeStockForProduct(productId: string): Promise<{ locationStocks: { [key: string]: number }, totalStock: number }> {
+    if (!productId) {
+      return { locationStocks: {}, totalStock: 0 };
+    }
+
+    try {
+      const stockQuery = query(
+        collection(this.firestore, COLLECTIONS.PRODUCT_STOCK),
+        where('productId', '==', productId)
+      );
+      const stockSnapshot = await getDocs(stockQuery);
+
+      const locationStocks: { [key: string]: number } = {};
+      let totalStock = 0;
+
+      stockSnapshot.forEach((doc) => {
+        const stockData = doc.data() as any;
+        if (stockData.locationId && typeof stockData.quantity === 'number') {
+          const currentStock = stockData.quantity;
+          locationStocks[stockData.locationId] = currentStock;
+          totalStock += currentStock;
         }
-        
-        if (!product.status) {
-          product.status = product.isActive ? 'Active' : 'Inactive';
-        }
-        
-        product.formattedExpiryDate = this.formatExpiryDate(product.expiryDate);
-        
-        if (product.applicableTax) {
-          if (typeof product.applicableTax === 'string') {
-            product.displayTax = product.applicableTax;
-          } else if (product.applicableTax.name) {
-            product.displayTax = `${product.applicableTax.name} (${product.applicableTax.percentage}%)`;
-          } else {
-            product.displayTax = '-';
-          }
-        } else {
-          product.displayTax = '-';
-        }
-        
-        // Load stock per location for this product
-        if (product.id) {
-          try {
-            product.locationStocks = await this.getProductStockAtAllLocations(product.id);
-            product.totalStock = this.getTotalStockAcrossLocations(product);
-            
-            // Set displayStock to show total across all locations
-            product.displayStock = product.totalStock;
-          } catch (error) {
-            console.error(`Error loading stock for product ${product.id}:`, error);
-            product.locationStocks = {};
-            product.totalStock = 0;
-            product.displayStock = '0';
-          }
-        }
-        
-        return product;
-      }));
-      
-      this.products = processedProducts;
-      
-      // Filter out "Not for Selling" products by default
-      this.originalProducts = [...this.products].filter(p => !p.notForSelling);
-      this.filteredProducts = [...this.originalProducts];
-      
-      this.isLoading = false;
-    }, error => {
-      console.error('Error loading products:', error);
-      this.isLoading = false;
-    });
-  } catch (error) {
-    console.error('Error in loadProducts:', error);
-    this.isLoading = false;
+      });
+
+      return { locationStocks, totalStock };
+    } catch (error) {
+      console.error(`Error fetching authoritative stock for product ${productId}:`, error);
+      return { locationStocks: {}, totalStock: 0 };
+    }
   }
-}
+
+  async loadProducts(): Promise<void> {
+    this.isLoading = true;
+    try {
+      this.productService.getProductsRealTime().subscribe(async (data: any[]) => {
+
+        const processedProducts = await Promise.all(data.map(async (product) => {
+          if (product.isActive === undefined) product.isActive = true;
+          if (!product.status) product.status = product.isActive ? 'Active' : 'Inactive';
+          
+          product.formattedExpiryDate = this.formatExpiryDate(product.expiryDate);
+          product.displayTax = product.applicableTax?.name ? `${product.applicableTax.name} (${product.applicableTax.percentage}%)` : '-';
+          product.calculatedUnitPurchasePrice = this.calculateUnitPurchasePriceExcTax(product);
+
+          // UPDATED: Use the new authoritative stock fetch method
+          if (product.id) {
+            try {
+              const stockData = await this.fetchAuthoritativeStockForProduct(product.id);
+              product.locationStocks = stockData.locationStocks;
+              product.totalStock = stockData.totalStock;
+              product.displayStock = stockData.totalStock;
+            } catch (error) {
+              console.error(`Error loading initial stock for product ${product.id}:`, error);
+              product.locationStocks = {};
+              product.alertQuantity = product.alertQuantity || 0;
+              product.totalStock = 0;
+              product.displayStock = '0';
+            }
+          }
+          return product;
+        }));
+
+        this.products = processedProducts;
+        this.originalProducts = [...this.products].filter(p => !p.notForSelling);
+        
+        // Apply filters to initialize the view correctly
+        this.applyFilters();
+        
+        this.isLoading = false;
+        console.log('Products loaded with current stock data.');
+      }, error => {
+        console.error('Error loading products:', error);
+        this.isLoading = false;
+      });
+    } catch (error) {
+      console.error('Error in loadProducts:', error);
+      this.isLoading = false;
+    }
+  }
 
   // Toggle all products selection
   toggleAllProducts(event: Event): void {
@@ -471,16 +817,35 @@ async loadProducts(): Promise<void> {
   sortBy(column: string): void {
     if (this.currentSortColumn === column) {
       this.isAscending = !this.isAscending;
-    } else {
+
+    } 
+    else {
       this.currentSortColumn = column;
       this.isAscending = true;
     }
+    
 
     this.filteredProducts.sort((a, b) => {
       const valA = a[column] === undefined || a[column] === null ? '' : a[column];
-      const valB = b[column] === undefined || b[column] === null ? '' : b[column];      // Special handling for numeric fields
+      const valB = b[column] === undefined || b[column] === null ? '' : b[column];
+
+      // Special handling for calculated unit purchase price
+      if (column === 'calculatedUnitPurchasePrice') {
+        const numA = this.calculateUnitPurchasePriceExcTax(a);
+        const numB = this.calculateUnitPurchasePriceExcTax(b);
+        return this.isAscending ? numA - numB : numB - numA;
+      }
+  if (column === 'alertQuantity') {
+      const numA = Number(valA) || 0;
+      const numB = Number(valB) || 0;
+      return this.isAscending ? numA - numB : numB - numA;
+    }
+      // Special handling for numeric fields
       if (column === 'defaultPurchasePriceExcTax' || 
           column === 'defaultSellingPriceExcTax' || 
+          column === 'defaultPurchasePriceIncTax' ||
+          column === 'defaultSellingPriceIncTax' ||
+          column === 'unitPurchasePrice' ||
           column === 'currentStock' || 
           column === 'totalStock') {
         const numA = Number(valA) || 0;
@@ -823,7 +1188,9 @@ async loadProducts(): Promise<void> {
   // Helper method for template to access Object.keys
   getObjectKeys(obj: any): string[] {
     return Object.keys(obj || {});
-  }  // Fetch stock data for a product at all locations
+  }
+
+  // UPDATED: Fetch stock data for a product at all locations with real-time updates and returns consideration
   async getProductStockAtAllLocations(productId: string): Promise<{[key: string]: number}> {
     try {
       const stockQuery = query(
@@ -834,10 +1201,16 @@ async loadProducts(): Promise<void> {
       
       const locationStocks: {[key: string]: number} = {};
       
+      // Get purchase returns for this product
+      const purchaseReturnsMap = await this.getPurchaseReturnsData();
+      const productReturns = purchaseReturnsMap[productId] || 0;
+      
       stockSnapshot.forEach((doc: any) => {
         const stockData = doc.data() as any;
         if (stockData.locationId && stockData.quantity !== undefined) {
-          locationStocks[stockData.locationId] = stockData.quantity;
+          // Adjust for returns - subtract returns from stock to get actual current stock
+          const actualStock = Math.max(0, stockData.quantity - productReturns);
+          locationStocks[stockData.locationId] = actualStock;
         }
       });
       
@@ -854,7 +1227,7 @@ async loadProducts(): Promise<void> {
     
     return Object.values(product.locationStocks)
       .filter(stock => typeof stock === 'number')
-      .reduce((total: number, stock: number) => total + stock, 0);
+      .reduce((total: number, stock: number) => total + Math.max(0, stock), 0);
   }
 
   // Format date helper method
@@ -923,6 +1296,7 @@ async loadProducts(): Promise<void> {
     this.showInactiveProducts = !this.showInactiveProducts;
     this.loadProducts();
   }
+
   applyLocationFilter(): void {
     if (!this.selectedLocation) {
       this.filteredProducts = [...this.originalProducts];
@@ -1070,8 +1444,8 @@ async loadProducts(): Promise<void> {
 
   // Main filtering method
   applyFilters(): void {
-    this.currentPage = 1;
-    
+    this.currentPage = 1; // Always reset to first page when filters change
+      
     // Start with all products that are not marked as "Not for Selling"
     let filtered = this.originalProducts.filter(p => !p.notForSelling);
     
@@ -1165,7 +1539,12 @@ async loadProducts(): Promise<void> {
       
       return true;
     });
-
+// In your applyFilters() method
+if (this.filterOptions['lowStockOnly']) {
+  filtered = filtered.filter(product => 
+    product.alertQuantity && product.totalStock <= product.alertQuantity
+  );
+}
     // Apply search filter
     if (this.searchText && this.searchText.trim() !== '') {
       const searchLower = this.searchText.toLowerCase().trim();
@@ -1239,8 +1618,13 @@ async loadProducts(): Promise<void> {
 
   // Product action methods
   editProduct(productId: string): void {
+    // This correctly closes the modal before navigating
+    if (this.showProductDetailsModal) {
+      this.closeProductDetailsModal();
+    }
     this.router.navigate(['/products/edit', productId]);
   }
+
 
   deleteProduct(productId: string): void {
     if (confirm('Are you sure you want to delete this product?')) {
@@ -1327,15 +1711,9 @@ async loadProducts(): Promise<void> {
     }
   }
 
-  closeProductDetailsModal(): void {
+ closeProductDetailsModal(): void {
     this.showProductDetailsModal = false;
     this.selectedProduct = null;
-  }
-
-  // Pagination method
-  getPages(): number[] {
-    const pageCount = Math.ceil(this.filteredProducts.length / this.itemsPerPage);
-    return Array.from({length: pageCount}, (_, i) => i + 1);
   }
 
   // Export methods
@@ -1349,12 +1727,16 @@ async loadProducts(): Promise<void> {
       const data = this.filteredProducts.map(product => ({
         'Product Name': product.productName || '',
         'SKU': product.sku || '',
-        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
-        'Alert Quantity': product.alertQuantity || 0,
-        'Selling Price': product.defaultSellingPriceExcTax || 0,
+        'Unit Purchase Price (Exc Tax)': this.formatCurrency(this.calculateUnitPurchasePriceExcTax(product)),
+        'Purchase Price (Inc Tax)': this.formatCurrency(product.defaultPurchasePriceIncTax || 0),
+        'Selling Price (Exc Tax)': this.formatCurrency(product.defaultSellingPriceExcTax || 0),
+        'Selling Price (Inc Tax)': this.formatCurrency(product.defaultSellingPriceIncTax || 0),
         'Total Stock': product.totalStock || 0,
         'Stock by Location': this.getLocationStockSummary(product),
         'Category': product.category || '-',
+        'Alert Quantity': product.alertQuantity || '-',
+'Stock Status': product.totalStock <= product.alertQuantity ? 'Low Stock' : 'OK',
+
         'Brand': product.brand || '-',
         'Tax': product.displayTax || '-',
         'Expiry Date': product.formattedExpiryDate || 'No expiry'
@@ -1375,7 +1757,6 @@ async loadProducts(): Promise<void> {
     
       const csvString = csvRows.join('\n');
       const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      // saveAs(blob, 'products_' + new Date().toISOString().slice(0, 10) + '.csv');
       
       // Create download link
       const url = window.URL.createObjectURL(blob);
@@ -1400,12 +1781,16 @@ async loadProducts(): Promise<void> {
       const data = this.filteredProducts.map(product => ({
         'Product Name': product.productName || '',
         'SKU': product.sku || '',
-        'Purchase Price': product.defaultPurchasePriceExcTax || 0,
-        'Selling Price': product.defaultSellingPriceExcTax || 0,
+        'Unit Purchase Price (Exc Tax)': this.formatCurrency(this.calculateUnitPurchasePriceExcTax(product)),
+        'Purchase Price (Inc Tax)': this.formatCurrency(product.defaultPurchasePriceIncTax || 0),
+        'Selling Price (Exc Tax)': this.formatCurrency(product.defaultSellingPriceExcTax || 0),
+        'Selling Price (Inc Tax)': this.formatCurrency(product.defaultSellingPriceIncTax || 0),
         'Total Stock': product.totalStock || 0,
         'Stock by Location': this.getLocationStockSummary(product),
         'Category': product.category || '-',
         'Brand': product.brand || '-',
+              'Alert Quantity': product.alertQuantity || '-',
+'Stock Status': product.totalStock <= product.alertQuantity ? 'Low Stock' : 'OK',
         'Tax': product.displayTax || '-',
         'Expiry Date': product.formattedExpiryDate || 'No expiry'
       }));
@@ -1416,6 +1801,63 @@ async loadProducts(): Promise<void> {
       console.error('Error exporting Excel:', error);
       alert('Failed to export Excel. Please try again.');
     }
+  }
+// Pagination methods
+getTotalPages(): number {
+  return Math.ceil(this.filteredProducts.length / this.itemsPerPage);
+}
+
+getStartIndex(): number {
+  return (this.currentPage - 1) * this.itemsPerPage + 1;
+}
+
+getEndIndex(): number {
+  return Math.min(this.currentPage * this.itemsPerPage, this.filteredProducts.length);
+}
+
+goToPage(page: number | string): void {
+  if (typeof page === 'number' && page >= 1 && page <= this.getTotalPages()) {
+    this.currentPage = page;
+  }
+}
+
+
+getPaginationPages(): (number | string)[] {
+  const totalPages = this.getTotalPages();
+  const currentPage = this.currentPage;
+  const pages: (number | string)[] = [];
+  
+  // Always show first page
+  pages.push(1);
+  
+  // Show ellipsis if current page is more than 3 pages away from start
+  if (currentPage > 4) {
+    pages.push('...');
+  }
+  
+  // Show pages around current page
+  const startPage = Math.max(2, currentPage - 2);
+  const endPage = Math.min(totalPages - 1, currentPage + 2);
+  
+  for (let i = startPage; i <= endPage; i++) {
+    pages.push(i);
+  }
+  
+  // Show ellipsis if current page is more than 3 pages away from end
+  if (currentPage < totalPages - 3) {
+    pages.push('...');
+  }
+  
+  // Always show last page if there's more than one page
+  if (totalPages > 1) {
+    pages.push(totalPages);
+  }
+  
+  return pages;
+}
+  getPages(): number[] {
+    const pageCount = Math.ceil(this.filteredProducts.length / this.itemsPerPage);
+    return Array.from({length: pageCount}, (_, i) => i + 1);
   }
 
   print(): void {
@@ -1434,6 +1876,8 @@ async loadProducts(): Promise<void> {
           <tr>
             <th>Product</th>
             <th>SKU</th>
+            <th>Unit Purchase Price (Exc Tax)</th>
+            <th>Purchase Price (Inc Tax)</th>
             <th>Total Stock</th>
             <th>Stock by Location</th>
             <th>Category</th>
@@ -1447,6 +1891,8 @@ async loadProducts(): Promise<void> {
             <tr>
               <td>${product.productName || ''}</td>
               <td>${product.sku || '-'}</td>
+              <td>₹${this.formatCurrency(this.calculateUnitPurchasePriceExcTax(product))}</td>
+              <td>₹${this.formatCurrency(product.defaultPurchasePriceIncTax || 0)}</td>
               <td>${product.totalStock || '0'}</td>
               <td>${this.getLocationStockSummary(product) || '-'}</td>
               <td>${product.category || '-'}</td>

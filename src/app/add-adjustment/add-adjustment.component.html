@@ -7,7 +7,8 @@
       <div class="form-header-grid">
         <div class="col-md-6">
           <div class="form-group">
-            <label>Business Location:</label>            <select formControlName="businessLocation" class="form-control" required>
+            <label>Business Location:</label>
+            <select formControlName="businessLocation" class="form-control" required>
               <option value="">Select Business Location</option>
               <option *ngFor="let location of businessLocations" [value]="location.id">
                 {{ location.name }} ({{ location.locationId || 'BL000' + (businessLocations.indexOf(location) + 1) }})
@@ -21,16 +22,30 @@
           <input id="referenceNo" type="text" formControlName="referenceNo" class="form-control">
         </div>
         
-        <div class="form-group">
-          <label for="date">Date:<span class="required">*</span></label>
-          <div class="date-input-wrapper">
-            <input id="date" type="datetime-local" formControlName="date" class="form-control">
-            <span class="calendar-icon"><i class="fa fa-calendar"></i></span>
-          </div>
-          <div class="error-message" *ngIf="submitted && f['date'].errors">
-            Date is required
-          </div>
-        </div>
+<div class="form-group">
+  <label for="date">Date:<span class="required">*</span></label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(adjustmentForm.get('date')?.value)"
+           (blur)="onManualDateInput($event, 'date')"
+           placeholder="DD-MM-YYYY">
+    
+    <button type="button" class="calendar-btn" (click)="openDatePicker()">
+      <i class="fa fa-calendar"></i>
+    </button>
+    
+    <!-- Hidden native picker -->
+    <input #datePicker 
+           type="date" 
+           formControlName="date" 
+           class="hidden-date-picker">
+  </div>
+  
+  <div class="error-message" *ngIf="submitted && f['date'].errors">
+    Date is required
+  </div>
+</div>
         
         <div class="form-group">
           <label for="adjustmentType">Adjustment type:<span class="required">*</span>
@@ -50,17 +65,10 @@
       <!-- Products Section -->
       <div class="products-section">
         <div class="search-container">
-          <div class="search-box">
-            <span class="search-icon"><i class="fa fa-search"></i></span>
-            <input 
-              type="text" 
-              placeholder="Search products for stock adjustment" 
-              (keyup)="onProductSearch($event)"
-              [formControl]="productSearchControl">
-          </div>
+          
           
           <div class="table-container">
-            <table>
+            <table class="table table-bordered">
               <thead>
                 <tr>
                   <th>Product</th>
@@ -73,44 +81,85 @@
               <tbody formArrayName="products">
                 <tr *ngFor="let product of products.controls; let i = index" [formGroupName]="i">
                   <td>
-                    <!-- Product Dropdown -->
-                    <div class="dropdown w-100">
-                      <input type="text" class="form-control" formControlName="name" 
-                             placeholder="Select or search product" 
-                             (click)="onInputClick($event)"
-                             (input)="onProductSearch($event)"
-                             [attr.list]="'productList-' + i">                      <datalist [id]="'productList-' + i">
-                        <option *ngFor="let product of filteredProducts" [value]="product.productName"></option>
-                      </datalist>
-                      <div class="dropdown-menu w-100" [class.show]="filteredProducts.length > 0">                        <button type="button" class="dropdown-item" 
-                                *ngFor="let prod of filteredProducts" 
-                                (click)="selectProduct(prod, i)">
-                          {{ prod.productName }} ({{ prod.sku }}) - ₹{{ prod.defaultSellingPriceExcTax || 0 }}
-                        </button>
+                    <!-- Improved Product Dropdown -->
+                    <div class="product-dropdown-container position-relative">
+                      <input 
+                        type="text" 
+                        class="form-control product-search-input" 
+                        formControlName="name" 
+                        placeholder="Select or search product" 
+                        (focus)="onProductInputFocus(i)"
+                        (blur)="onProductInputBlur(i)"
+                        (input)="onProductInputChange($event, i)"
+                        autocomplete="off">
+                      
+                      <!-- Custom Dropdown with proper null checks -->
+                      <div class="product-dropdown" 
+                           [class.show]="isDropdownVisible(i)">
+                        <div class="dropdown-item" 
+                             *ngFor="let prod of getFilteredProductsForRow(i)" 
+                             (mousedown)="selectProduct(prod, i)">
+                          <div class="product-item">
+                            <div class="product-name">{{ prod?.productName || 'Unknown Product' }}</div>
+                            <div class="product-details">
+                              <span class="sku">SKU: {{ prod?.sku || 'N/A' }}</span>
+                              <span class="price">₹{{ prod?.defaultSellingPriceExcTax || 0 }}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <!-- No products found message -->
+                        <div class="dropdown-item no-products" 
+                             *ngIf="getFilteredProductsForRow(i).length === 0 && isDropdownVisible(i)">
+                          <div class="product-item">
+                            <div class="product-name text-muted">No products found</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div *ngIf="submitted && product.get('name')?.errors" class="text-danger">
+                    
+                    <div *ngIf="submitted && product.get('name')?.errors" class="text-danger mt-1">
                       Product name is required
                     </div>
                   </td>
                   
                   <td>
-                    <input type="number" formControlName="quantity" (input)="updateSubtotal(i)" min="1" placeholder="0">
+                    <input type="number" 
+                           formControlName="quantity" 
+                           (input)="updateSubtotal(i)" 
+                           min="1" 
+                           placeholder="0"
+                           class="form-control">
                   </td>
+                  
                   <td>
-                    <input type="number" formControlName="unitPrice" (input)="updateSubtotal(i)" min="0" step="0.01" placeholder="0.00">
+                    <input type="number" 
+                           formControlName="unitPrice" 
+                           (input)="updateSubtotal(i)" 
+                           min="0" 
+                           step="0.01" 
+                           placeholder="0.00"
+                           class="form-control">
                   </td>
+                  
                   <td>
-                    <input type="text" [value]="product.get('subtotal')?.value | number:'1.2-2'" readonly>
+                    <input type="text" 
+                           [value]="(product.get('subtotal')?.value || 0) | number:'1.2-2'" 
+                           readonly
+                           class="form-control">
                   </td>
+                  
                   <td class="actions-column">
-                    <button type="button" class="btn btn-danger" (click)="removeProduct(i)">
+                    <button type="button" 
+                            class="btn btn-danger btn-sm" 
+                            (click)="removeProduct(i)">
                       <i class="fa fa-trash"></i>
                     </button>
                   </td>
                 </tr>
+                
                 <tr *ngIf="products.controls.length === 0">
-                  <td colspan="5" class="no-data">No products added</td>
+                  <td colspan="5" class="no-data text-center">No products added</td>
                 </tr>
               </tbody>
             </table>
@@ -118,7 +167,7 @@
           
           <div class="total-section">
             <div class="total-label">Total Amount:</div>
-            <div class="total-amount">{{ totalAmount | number:'1.2-2' }}</div>
+            <div class="total-amount">₹{{ totalAmount | number:'1.2-2' }}</div>
           </div>
         </div>
       </div>
@@ -131,25 +180,36 @@
               Total amount recovered:
               <i class="fa fa-question-circle info-icon" title="Amount recovered for deducted stock"></i>
             </label>
-            <input id="totalAmountRecovered" type="number" formControlName="totalAmountRecovered" class="form-control">
+            <input id="totalAmountRecovered" 
+                   type="number" 
+                   formControlName="totalAmountRecovered" 
+                   class="form-control">
           </div>
           
           <div class="form-group reason-group">
             <label for="reason">Reason:</label>
-            <textarea id="reason" formControlName="reason" class="form-control" rows="4"></textarea>
+            <textarea id="reason" 
+                      formControlName="reason" 
+                      class="form-control" 
+                      rows="4"></textarea>
           </div>
         </div>
       </div>
       
       <!-- Form Actions -->
       <div class="form-actions">
-<!-- In your template, update the submit button -->
-<button type="submit" class="btn btn-primary" [disabled]="isSaving || adjustmentForm.invalid">
-  <span *ngIf="!isSaving">Save Adjustment</span>
-  <span *ngIf="isSaving">
-    <i class="fa fa-spinner fa-spin"></i> Saving...
-  </span>
-</button>        <button type="button" class="btn btn-secondary" (click)="router.navigate(['/list-adjustment'])">
+        <button type="submit" 
+                class="btn btn-primary" 
+                [disabled]="isSaving || adjustmentForm.invalid">
+          <span *ngIf="!isSaving">Save Adjustment</span>
+          <span *ngIf="isSaving">
+            <i class="fa fa-spinner fa-spin"></i> Saving...
+          </span>
+        </button>
+        
+        <button type="button" 
+                class="btn btn-secondary" 
+                (click)="router.navigate(['/list-adjustment'])">
           Go to List
         </button>
       </div>

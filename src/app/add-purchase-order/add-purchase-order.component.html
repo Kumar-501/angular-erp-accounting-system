@@ -12,7 +12,7 @@
   <label>Supplier *</label>
   <div class="input-group">
     <input type="text" 
-           class="form-control" 
+           class="form-control" z
            placeholder="Search supplier..."
            [(ngModel)]="supplierSearchTerm"
            [ngModelOptions]="{standalone: true}"
@@ -47,37 +47,55 @@
             </div>
           </div>
          
-          <div class="col-md-3 form-group">
-            <label>Order date *</label>
-            <div class="input-group">
-              <input type="date" formControlName="orderDate" class="form-control" required />
-              <span class="input-group-text">
-                <i class="far fa-calendar-alt"></i>
-              </span>
-            </div>
-          </div>
+<div class="col-md-3 form-group">
+  <label>Order date *</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseOrderForm.get('orderDate')?.value)"
+           (blur)="onManualDateInput($event, 'orderDate')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('order')">
+      <i class="far fa-calendar-alt"></i>
+    </button>
+    <input #orderDatePicker type="date" formControlName="orderDate" class="hidden-date-picker">
+  </div>
+</div>
 
-          <div class="col-md-3 form-group">
-            <label>Required Date *</label>
-            <div class="input-group">
-              <input type="date" formControlName="requiredDate" class="form-control" required />
-              <span class="input-group-text">
-                <i class="far fa-calendar-alt"></i>
-              </span>
-            </div>
-          </div>
+  <div class="col-md-3 form-group">
+  <label>Required Date *</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseOrderForm.get('requiredDate')?.value)"
+           (blur)="onManualDateInput($event, 'requiredDate')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('required')">
+      <i class="far fa-calendar-alt"></i>
+    </button>
+    <input #requiredDatePicker type="date" formControlName="requiredDate" class="hidden-date-picker">
+  </div>
+</div>
         </div>
 
         <div class="row mt-3">
-          <div class="col-md-3 form-group">
-            <label>Shipping Date</label>
-            <div class="input-group">
-              <input type="date" formControlName="shippingDate" class="form-control" />
-              <span class="input-group-text">
-                <i class="far fa-calendar-alt"></i>
-              </span>
-            </div>
-          </div>
+<div class="col-md-3 form-group">
+  <label>Shipping Date</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(purchaseOrderForm.get('shippingDate')?.value)"
+           (blur)="onManualDateInput($event, 'shippingDate')"
+           placeholder="DD-MM-YYYY"
+           maxlength="10">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('shipping')">
+      <i class="far fa-calendar-alt"></i>
+    </button>
+    <input #shippingDatePicker type="date" formControlName="shippingDate" class="hidden-date-picker">
+  </div>
+</div>
 
           <div class="col-md-3 form-group">
             <label>Business Location *</label>
@@ -173,9 +191,9 @@
             </div>
           </div>
           <div class="col-md-4 text-end">
-            <button type="button" class="btn btn-primary" (click)="addEmptyProduct()">
+            <!-- <button type="button" class="btn btn-primary" (click)="addEmptyProduct()">
               <i class="fas fa-plus"></i> Add new product
-            </button>
+            </button> -->
           </div>
         </div>
       </div>
@@ -184,113 +202,114 @@
           <p class="text-muted">No products added yet. Search for products above to add them to your order.</p>
         </div>
         
-        <div class="table-responsive" *ngIf="productsFormArray.length > 0">
-          <table class="table table-bordered">
-            <thead class="bg-success text-white">
-              <tr>
-                <th width="40px">
-                  <input type="checkbox" (change)="selectAllProducts($event)" />
-                </th>
-                <th>S.No</th>
-                <th>Product Name</th>
-                <th>Order quantity</th>
-                <th>Unit Purchase Price</th>
-                <th>Discount %</th>
-                <th>Unit Cost (Before Tax)</th>
-                <th>Subtotal before tax</th>
-                <th>Product tax (%)</th>
-                <th>Tax Amount</th>
-                <th>Net Cost</th>
-                <th>Line Total</th>
-                <th>
-                  <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody formArrayName="products">
-              <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i">
-                <td>
-                  <input type="checkbox" [checked]="item.get('selected')?.value" (change)="toggleProductSelection(i)" />
-                </td>
-                <td>{{ i + 1 }}</td>
-                <td>
-                  <select formControlName="productId" class="form-control" (change)="onProductSelect(i)" required>
-                    <option value="">Select Product</option>
-                    <option *ngFor="let product of productsList" [value]="product.id">
-                      {{ product.productName }}
-                    </option>
-                  </select>
-                </td>
-                <td>
-                  <input type="number" formControlName="quantity" class="form-control" min="1" (change)="calculateLineTotal(i)" required>
-                </td>
-            <td>
-  <input type="number" formControlName="unitCost" class="form-control" min="0" step="0.01" (change)="calculateLineTotal(i)" required>
+      <div class="table-responsive purchase-items-table" *ngIf="productsFormArray.length > 0">
+  <table class="table table-bordered">
+    <thead class="bg-success text-white">
+      <tr>
+        <th width="40px">
+          <input type="checkbox" (change)="selectAllProducts($event)" />
+        </th>
+        <th width="50px">S.No</th>
+        <th width="200px">Product Name</th>
+        <th width="100px">Order quantity</th>
+        <th width="120px">Unit Purchase Price</th>
+        <th width="150px">Discount %</th>
+        <th width="150px">Unit Cost (Before Tax)</th>
+        <th width="150px">Subtotal before tax</th>
+        <th width="120px">Product tax (%)</th>
+        <th width="120px">Tax Amount</th>
+        <th width="120px">Net Cost</th>
+        <th width="150px">Line Total</th>
+        <th width="60px">
+          <button type="button" class="btn btn-sm btn-danger" (click)="deleteSelectedProducts()">
+            <i class="fas fa-trash"></i>
+          </button>
+        </th>
+      </tr>
+    </thead>
+    <tbody formArrayName="products">
+      <tr *ngFor="let item of productsFormArray.controls; let i = index" [formGroupName]="i">
+        <td>
+          <input type="checkbox" [checked]="item.get('selected')?.value" (change)="toggleProductSelection(i)" />
+        </td>
+        <td>{{ i + 1 }}</td>
+        <td>
+          <select formControlName="productId" class="form-control" (change)="onProductSelect(i)" required>
+            <option value="">Select Product</option>
+            <option *ngFor="let product of productsList" [value]="product.id">
+              {{ product.productName }}
+            </option>
+          </select>
+        </td>
+        <td>
+          <input type="number" formControlName="quantity" class="form-control" min="1" (change)="calculateLineTotal(i)" required>
+        </td>
+        <td>
+          <input type="number" formControlName="unitCost" class="form-control" min="0" step="0.01" (change)="calculateLineTotal(i)" required>
+        </td>
+        <td>
+          <div class="input-group">
+            <select class="form-select form-select-sm discount-type-select" 
+                    formControlName="discountType" 
+                    (change)="onDiscountTypeChange(i)">
+              <option value="percent">Percentage</option>
+              <option value="amount">Amount</option>
+            </select>
+            
+            <input *ngIf="productsFormArray.at(i).get('discountType')?.value === 'percent'"
+                   type="number" 
+                   formControlName="discountPercent" 
+                   class="form-control discount-input" 
+                   min="0" 
+                   max="100"
+                   step="1"
+                   placeholder="0-100%"
+                   (input)="calculateLineTotal(i)">
+                   
+            <input *ngIf="productsFormArray.at(i).get('discountType')?.value === 'amount'"
+                   type="number" 
+                   formControlName="discountAmount" 
+                   class="form-control discount-input" 
+                   min="0"
+                   [max]="productsFormArray.at(i).get('unitCost')?.value"
+                   step="0.01"
+                   placeholder="Enter amount"
+                   (input)="calculateLineTotal(i)">
+          </div>
+        </td>
+        <td>
+          <input type="number" formControlName="unitCostBeforeTax" class="form-control large-number" >
+        </td>
+        <td>
+          <input type="number" formControlName="subtotalBeforeTax" class="form-control large-number" >
+        </td>
+      <td>
+  <select formControlName="taxPercent" class="form-control" (change)="calculateLineTotal(i)">
+    <option value="">Please Select</option>
+    <option value="0">No Tax (0%)</option>
+    <option *ngFor="let tax of taxRates" [value]="tax.rate">
+      {{tax.name}} ({{tax.rate}}%)
+    </option>
+  </select>
 </td>
-                <td>
-                  <div class="input-group">
-                    <select class="form-select form-select-sm" style="width: 120px;" 
-                            formControlName="discountType" 
-                            (change)="onDiscountTypeChange(i)">
-                      <option value="percent">Percentage</option>
-                      <option value="amount">Amount</option>
-                    </select>
-                    
-                    <input *ngIf="productsFormArray.at(i).get('discountType')?.value === 'percent'"
-                           type="number" 
-                           formControlName="discountPercent" 
-                           class="form-control" 
-                           min="0" 
-                           max="100"
-                           step="1"
-                           placeholder="0-100%"
-                           (input)="calculateLineTotal(i)">
-                           
-                    <input *ngIf="productsFormArray.at(i).get('discountType')?.value === 'amount'"
-                           type="number" 
-                           formControlName="discountAmount" 
-                           class="form-control" 
-                           min="0"
-                           [max]="productsFormArray.at(i).get('unitCost')?.value"
-                           step="0.01"
-                           placeholder="Enter amount"
-                           (input)="calculateLineTotal(i)">
-                  </div>
-                </td>
-             <td>
-  <input type="number" formControlName="unitCostBeforeTax" class="form-control" readonly>
-</td>
-                <td>
-                  <input type="number" formControlName="subtotalBeforeTax" class="form-control" readonly>
-                </td>
-                <td>
-                  <select formControlName="taxPercent" class="form-control" (change)="calculateLineTotal(i)">
-                    <option value="0">No Tax (0%)</option>
-                    <option *ngFor="let tax of taxRates" [value]="tax.rate">
-                      {{tax.name}} ({{tax.rate}}%)
-                    </option>
-                  </select>
-                </td>
-                <td>
-                  <input type="number" formControlName="taxAmount" class="form-control" readonly>
-                </td>
-                <td>
-                  <input type="number" formControlName="netCost" class="form-control" readonly>
-                </td>
-                <td>
-                  <input type="number" formControlName="lineTotal" class="form-control" readonly>
-                </td>
-                <td>
-                  <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
-                    <i class="fas fa-trash"></i>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <td>
+          <input type="number" formControlName="taxAmount" class="form-control large-number" >
+        </td>
+        <td>
+          <input type="number" formControlName="netCost" class="form-control large-number" >
+        </td>
+        <td>
+          <input type="number" formControlName="lineTotal" class="form-control large-number" >
+        </td>
+        <td>
+          <button type="button" class="btn btn-danger btn-sm" (click)="removeProduct(i)">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
         
         <div class="row justify-content-end mt-3" *ngIf="productsFormArray.length > 0">
           <div class="col-md-6">
@@ -416,14 +435,15 @@
         
       </div>
       <div class="col-md-6 text-end">
-        <div class="row">
-          <div class="col-md-6 text-end">
-            <strong>Order Total:</strong>
-          </div>
-          <div class="col-md-6 text-end">
-            ₹ {{ (netTotalAmount + (purchaseOrderForm.get('shippingDetails')?.get('shippingCharges')?.value || 0)).toFixed(2) }}
-          </div>
-        </div>
+       <div class="row order-total-row">
+  <div class="col-md-6 text-end">
+    <strong>Order Total:</strong>
+  </div>
+  <div class="col-md-6 text-end">
+    ₹ {{ (netTotalAmount + (purchaseOrderForm.get('shippingDetails')?.get('shippingCharges')?.value || 0)).toFixed(2) }}
+  </div>
+</div>
+
       </div>
     </div>
 

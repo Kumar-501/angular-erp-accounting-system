@@ -63,10 +63,10 @@
               Order No
               <i class="fas fa-sort sort-icon"></i>
             </th>
-            <th class="sortable">
+            <!-- <th class="sortable">
               Incentive User
               <i class="fas fa-sort sort-icon"></i>
-            </th>
+            </th> -->
           </tr>
         </thead>
         <tbody class="table-body">
@@ -80,12 +80,12 @@
               <span class="amount">{{ sale.totalPayable | currency:'INR':'symbol':'1.2-2' }}</span>
             </td>
             <td class="cell-content">{{ sale.orderNo || 'N/A' }}</td>
-            <td class="cell-content user-cell">
+            <!-- <td class="cell-content user-cell">
               <div class="user-info">
                 <span class="user-avatar">{{ (sale.addedByDisplayName || sale.addedBy || 'N/A').charAt(0).toUpperCase() }}</span>
                 <span class="user-name">{{ sale.addedByDisplayName || sale.addedBy || 'N/A' }}</span>
               </div>
-            </td>
+            </td> -->
        
           </tr>
           <tr *ngIf="(filteredSales$ | async)?.length === 0" class="no-data-row">
@@ -102,16 +102,5 @@
   </div>
 
   <!-- Summary Footer -->
-  <div class="summary-footer" *ngIf="(filteredSales$ | async)?.length! > 0">
-    <div class="summary-content">
-      <div class="summary-item">
-        <span class="summary-label">Total Records:</span>
-        <span class="summary-value">{{ (filteredSales$ | async)?.length || 0 }}</span>
-      </div>
-      <div class="summary-item total-sales">
-        <span class="summary-label">Total Sales:</span>
-        <span class="summary-value amount">{{ getTotalSales() | currency:'INR':'symbol':'1.2-2' }}</span>
-      </div>
-    </div>
-  </div>
+
 </div>

@@ -9,6 +9,10 @@ import { SourceService } from '../../services/source.service';
 export class SourcesComponent implements OnInit {
   // To toggle form visibility
   showForm = false;
+  currentPage = 1;
+itemsPerPage = 10; // Number of items to show per page
+totalPages = 1;
+paginatedSources: any[] = [];
   isSaving = false; // Add this to your component class
 // Add these properties for column visibility
 showColumnVisibility = false;
@@ -59,11 +63,36 @@ columns = [
       console.error("Error fetching sources: ", error);
     });
   }
+  
+nextPage(): void {
+  if (this.currentPage < this.totalPages) {
+    this.currentPage++;
+    this.updatePaginatedSources();
+  }
+}
+
+updatePaginatedSources(): void {
+  const startIndex = (this.currentPage - 1) * this.itemsPerPage;
+  const endIndex = startIndex + this.itemsPerPage;
+  this.paginatedSources = this.filteredSources.slice(startIndex, endIndex);
+}
+prevPage(): void {
+  if (this.currentPage > 1) {
+    this.currentPage--;
+    this.updatePaginatedSources();
+  }
+}
 // Toggle column visibility dropdown
 toggleColumnVisibility(event: Event): void {
   event.stopPropagation();
   this.showColumnVisibility = !this.showColumnVisibility;
+  }
+  calculatePagination(): void {
+  this.totalPages = Math.ceil(this.filteredSources.length / this.itemsPerPage);
+  this.currentPage = Math.min(this.currentPage, this.totalPages || 1);
+  this.updatePaginatedSources();
 }
+
 
 // Update visible columns
 updateVisibleColumns(): void {

@@ -120,7 +120,7 @@ export class StockDetailsComponent implements OnInit {
           alertQuantity: product.alertQuantity || 0,
           unitPurchasePrice: product.defaultPurchasePriceExcTax || product.unitPurchasePrice || 0,
           unitSellingPrice: product.defaultSellingPriceExcTax || product.unitSellingPrice || 0,
-        } as Product;
+        } as unknown as Product;
       }
     } catch (error) {
       console.error('Error loading product details:', error);

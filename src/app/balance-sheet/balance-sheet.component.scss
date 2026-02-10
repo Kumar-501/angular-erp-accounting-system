@@ -1,357 +1,363 @@
-.balance-sheet {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  color: #333;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+:host {
+  display: block;
+  background-color: #f8f9fa; // Light grey background for the whole page
+}/* Add to your component's CSS */
+.trade-summary {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border-left: 4px solid #007bff;
+}
 
-  .sheet-header {
-    background-color: #f8f9fa;
-    padding: 15px 20px;
-    border-radius: 5px;
-    margin-bottom: 20px;
+.trade-summary h5 {
+  margin-bottom: 15px;
+  color: #495057;
+  font-weight: 600;
+}
+/* Date Input UI Wrapper */
+.date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 180px; /* Standardize width for balance sheet header */
 
-    .header-content {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-
-      h1 {
-        margin: 0;
-        color: #2c3e50;
-        font-size: 24px;
-      }
-    }
-
-    .header-controls {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-      margin-top: 10px;
-
-      .date-control {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-
-        label {
-          font-weight: 500;
-        }
-
-        input {
-          padding: 5px 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-        }
-
-        button {
-          padding: 5px 15px;
-          background-color: #3498db;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-
-          &:hover {
-            background-color: #2980b9;
-          }
-
-          &:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-          }
-        }
-      }
-
-      .export-controls {
-        display: flex;
-        gap: 10px;
-
-        .export-btn {
-          padding: 5px 12px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 5px;
-          font-size: 13px;
-          transition: opacity 0.2s;
-
-          i {
-            font-size: 14px;
-          }
-
-          &.excel {
-            background-color: #2e7d32;
-            color: white;
-          }
-
-          &.pdf {
-            background-color: #d32f2f;
-            color: white;
-          }
-
-          &.print {
-            background-color: #455a64;
-            color: white;
-          }
-
-          &:hover {
-            opacity: 0.9;
-          }
-        }
-      }
-    }
+  .date-input {
+    padding-right: 35px !important;
+    width: 100%;
+    background-color: #fff !important;
+    height: 35px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
   }
 
-  .loading-indicator {
+  .calendar-btn {
+    position: absolute;
+    right: 5px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 5px;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 30px;
-    gap: 10px;
-    color: #555;
 
-    .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #3498db;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    &:hover {
+      color: #0d6efd;
     }
   }
 
-  .sheet-content {
-    .company-info {
-      text-align: center;
-      margin-bottom: 25px;
+  .hidden-date-picker {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    border: none;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
 
-      h2 {
-        margin: 0 0 5px 0;
-        color: #2c3e50;
-        font-size: 20px;
-      }
+/* Ensure label and input align well in header */
+.date-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  
+  label {
+    margin-bottom: 0;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+}
 
-      .report-title {
-        font-weight: 500;
-        margin: 0 0 5px 0;
-        color: #555;
-      }
+.trade-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
 
-      .report-period {
-        margin: 0;
-        font-size: 13px;
-        color: #777;
-        font-style: italic;
-      }
-    }
+.trade-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #dee2e6;
+}
 
-    .financial-sections {
-      display: flex;
-      flex-direction: column;
-      gap: 25px;
-      margin-bottom: 30px;
+.trade-item:last-child {
+  border-bottom: none;
+}
 
-      .financial-section {
-        border: 1px solid #e0e0e0;
-        border-radius: 5px;
-        overflow: hidden;
+.balance-sheet {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: #ffffff;
+  position: relative;
+  border-left: 1px solid #dee2e6;
+  border-right: 1px solid #dee2e6;
+  border-bottom: 1px solid #dee2e6;
 
-        .section-header {
-          background-color: #f1f8e9;
-          padding: 8px 15px;
-          border-bottom: 1px solid #e0e0e0;
+  // Green top bar
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background-color: #28a745;
+  }
+}
 
-          h3 {
-            margin: 0;
-            color: #33691e;
-            font-size: 16px;
-          }
-        }
+// --- HEADER STYLES ---
+.sheet-header {
+  padding-top: 1rem;
+  border-bottom: 2px solid #dee2e6;
+  margin-bottom: 2rem;
+}
 
-        &.equity .section-header {
-          background-color: #e8f5e9;
-        }
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
 
-        &.liabilities .section-header {
-          background-color: #fff3e0;
-          h3 { color: #e65100; }
-        }
+  h1 {
+    font-size: 2rem;
+    color: #343a40;
+    margin: 0;
+  }
+}
 
-        &.assets .section-header {
-          background-color: #e3f2fd;
-          h3 { color: #0d47a1; }
-        }
+.header-controls {
+  display: flex;
+  gap: 0.5rem;
 
-        .section-table {
-          overflow-x: auto;
+  .date-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: #495057;
 
-          table {
-            width: 100%;
-            border-collapse: collapse;
-
-            th {
-              background-color: #f5f5f5;
-              padding: 8px 12px;
-              text-align: left;
-              font-weight: 500;
-              font-size: 13px;
-              color: #555;
-            }
-
-            td {
-              padding: 8px 12px;
-              border-bottom: 1px solid #eee;
-              font-size: 13px;
-            }
-
-            .account-name {
-              min-width: 150px;
-            }
-
-            .account-number {
-              min-width: 80px;
-            }
-
-            .account-head {
-              min-width: 120px;
-            }
-
-            .amount {
-              text-align: right;
-              min-width: 100px;
-              font-family: 'Courier New', monospace;
-            }
-
-            .profit-loss-row {
-              font-weight: 500;
-
-              &.profit {
-                background-color: #e8f5e9;
-                color: #2e7d32;
-              }
-
-              &.loss {
-                background-color: #ffebee;
-                color: #c62828;
-              }
-            }
-
-            .total-row {
-              font-weight: 600;
-              background-color: #f5f5f5;
-
-              td {
-                border-top: 1px solid #ddd;
-                border-bottom: none;
-              }
-            }
-
-            .category-row {
-              background-color: #f8f9fa;
-              font-style: italic;
-              color: #6c757d;
-
-              .category-name {
-                font-weight: 500;
-              }
-
-              .category-amount {
-                font-style: italic;
-              }
-            }
-
-            tr:not(.category-row):not(.total-row) {
-              &:hover {
-                background-color: #f5f5f5;
-              }
-            }
-          }
-        }
-      }
-    }
-
-    .summary-section {
-      border: 1px solid #e0e0e0;
-      border-radius: 5px;
-      padding: 15px;
-      background-color: #f9f9f9;
-
-      h3 {
-        margin-top: 0;
-        margin-bottom: 15px;
-        color: #2c3e50;
-        font-size: 16px;
-        border-bottom: 1px solid #ddd;
-        padding-bottom: 5px;
-      }
-
-      table {
-        width: 100%;
-        max-width: 500px;
-        margin: 0 auto;
-
-        td {
-          padding: 8px 12px;
-        }
-
-        .summary-label {
-          font-weight: 500;
-          color: #555;
-        }
-
-        .summary-amount {
-          text-align: right;
-          font-family: 'Courier New', monospace;
-          font-weight: 500;
-        }
-
-        .summary-total {
-          font-weight: 600;
-          background-color: #f0f0f0;
-
-          td {
-            border-top: 1px solid #ddd;
-          }
-        }
-      }
+    input[type="date"] {
+      padding: 0.375rem 0.75rem;
+      border: 1px solid #ced4da;
+      border-radius: 0.25rem;
     }
   }
 
-  .no-data-message {
-    text-align: center;
-    padding: 40px 20px;
-    color: #777;
+  .export-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ced4da;
+    background-color: #fff;
+    color: #495057;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+
+    &:hover {
+      background-color: #e9ecef;
+    }
 
     i {
-      font-size: 40px;
-      margin-bottom: 15px;
-      color: #bdc3c7;
-    }
-
-    p {
-      margin: 5px 0;
+      color: #6c757d;
     }
   }
 }
 
-@media print {
-  .balance-sheet {
-    box-shadow: none;
-    padding: 0;
+.company-info {
+  margin-bottom: 1.5rem;
 
-    .sheet-header, .export-controls {
-      display: none;
+  h2 {
+    font-size: 1.5rem;
+    margin: 0 0 0.5rem 0;
+    color: #212529;
+  }
+
+  p {
+    margin: 0.25rem 0;
+    color: #6c757d;
+  }
+}
+
+.summary-info {
+  display: flex;
+  gap: 2rem;
+  padding-bottom: 1.5rem;
+  color: #495057;
+
+  strong {
+    color: #212529;
+    font-weight: 600;
+  }
+}
+
+// --- MAIN CONTENT: TWO COLUMNS ---
+.financial-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  padding-bottom: 2rem;
+}
+
+.financial-column {
+  flex: 1;
+  min-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.financial-section {
+  h3 {
+    font-size: 1.25rem;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+    color: #343a40;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 0.75rem 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid #e9ecef;
     }
+
+    th {
+      font-size: 0.75rem;
+      color: #6c757d;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+    
+    td {
+      font-size: 0.9rem;
+      color: #495057;
+    }
+
+    .amount {
+      text-align: right;
+      font-family: 'Menlo', 'Courier New', monospace;
+    }
+    
+    .category-row {
+      font-weight: bold;
+      background-color: #f8f9fa;
+    }
+    
+    .total-row {
+      font-weight: bold;
+      color: #212529;
+      background-color: #f1f3f5;
+      border-top: 2px solid #dee2e6;
+    }
+  }
+}
+
+
+// --- FOOTER: FINANCIAL SUMMARY ---
+.financial-summary {
+  border-top: 2px solid #dee2e6;
+  padding-top: 2rem;
+  width: 350px;
+
+  h4 {
+    font-size: 1.2rem;
+    margin: 0 0 1rem 0;
+    color: #343a40;
+  }
+}
+
+.summary-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+
+    span:last-child {
+      font-weight: 600;
+      font-family: 'Menlo', 'Courier New', monospace;
+    }
+  }
+}
+
+.balance-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+
+  .status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .status-text {
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  &.balanced {
+    .status-dot { background-color: #28a745; }
+    .status-text { color: #28a745; }
+  }
+  &.unbalanced {
+    .status-dot { background-color: #dc3545; }
+    .status-text { color: #dc3545; }
+  }
+}
+
+.balance-totals {
+  .total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+
+    strong {
+      font-size: 1rem;
+    }
+  }
+}
+
+// --- RESPONSIVE STYLES ---
+@media (max-width: 992px) {
+  .financial-sections {
+    flex-direction: column;
+  }
+}
+@media (max-width: 768px) {
+  .balance-sheet {
+    padding: 1rem;
+  }
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .summary-info {
+    flex-direction: column;
+    gap: 0.5rem;
   }
 }

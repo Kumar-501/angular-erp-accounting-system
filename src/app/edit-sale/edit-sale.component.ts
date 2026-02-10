@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators } from '@angular/forms';
 import { SaleService } from '../services/sale.service';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -17,7 +17,6 @@ import { AuthService } from '../auth.service';
 import * as bootstrap from 'bootstrap';
 import { ToastrService } from 'ngx-toastr';
 import { defaultIfEmpty, lastValueFrom } from 'rxjs';
-import { getDocs, limit, query, where } from '@angular/fire/firestore';
 
 interface Product {
   id?: string;
@@ -34,13 +33,11 @@ interface Product {
   sgstAmount?: number;
   igstAmount?: number;
   lastNumber?: string;
-  
   lastNumbers?: string[];
   currentStock?: number;
   defaultSellingPriceExcTax?: number;
   defaultSellingPriceIncTax?: number;
   batchNumber?: string;
-  
   expiryDate?: string;
   batches?: {
     batchNumber: string;
@@ -70,15 +67,16 @@ interface Medicine {
   pills?: string;
   powder?: string;
   time: string;
-  
   frequency?: string;
-  [key: string]: any;
+  timing?: string;
   quantity?: string;
-  foodTiming?: string;
+  combinationName?: string; // For kashayam combination
+  combinationQuantity?: string; // For kashayam combination
+  [key: string]: any;
 }
 
 interface PrescriptionData {
-  patientName: string;
+  patientName: any;
   date: string;
   medicines: Medicine[];
   patientAge?: string;
@@ -91,40 +89,33 @@ interface PrescriptionData {
   styleUrls: ['./edit-sale.component.scss'],
   providers: [DatePipe],
 })
-export class EditSaleComponent implements OnInit {
+export class EditSaleComponent implements OnInit, OnDestroy {
+  @ViewChild('prescriptionModal', { static: false }) prescriptionModalRef!: ElementRef;
+  
   saleForm!: FormGroup;
   todayDate: string;
+  @ViewChild('saleDatePicker') saleDatePicker!: ElementRef;
+@ViewChild('paidOnDatePicker') paidOnDatePicker!: ElementRef;
   products: Product[] = [];
-  
-  isSubmitting = false;
-  allProductsSelected: boolean = false;
   lastInteractionTime = 0;
+  // In the component class
+availableTaxRates: TaxRate[] = [];
+availableTaxGroups: (TaxGroup & { calculatedRate: number })[] = [];
+
   showProductsInterestedDropdown = false;
   productInterestedSearch = '';
+  isSubmitting = false;
   filteredProductsForInterested: any[] = [];
   prescriptions: PrescriptionData[] = [];
-
-// Set a flag to track initial load
-isInitialLoad = true;
   editingPrescriptionIndex: number | null = null;
   currentPrescriptionModal: any;
-  currentViewModal: any;
-  viewPrescriptionContent: string = '';
-  discount: number | undefined;
-  discountType: 'Amount' | 'Percentage' | undefined; 
   selectedProductsForInterested: any[] = [];
   selectedPaymentAccount: any = null;
-  isFromLead: boolean = false;
   taxAmount: number = 0;
-  availableTaxRates: TaxRate[] = [];
   shippingDocuments: File[] = [];
   afterTaxShippingControl: FormControl<number | null> = new FormControl<number | null>(null);
-  productsCollection: any;
   showTransactionIdField = false;
-  selected?: boolean;
-  leadIdToDelete: string | null = null;
   dropdownFilterFocused = false;
-  availableTaxGroups: (TaxGroup & { calculatedRate: number })[] = [];
   allProducts: any[] = [];
   filteredProducts: any[] = [];
   customers: any[] = [];
@@ -132,23 +123,28 @@ isInitialLoad = true;
   Date = Date; 
   showCustomerEditPopup = false;
 
-  // Food timing options
-  foodTimingOptions = [
-    { value: 'before_food', label: 'ഭക്ഷണത്തിനുമുൻപ്' },
-    { value: 'after_food', label: 'ഭക്ഷണത്തിന് ശേഷം' },
-    { value: 'before_after_food', label: 'ഭക്ഷണത്തിനുമുൻപ് / ശേഷം' },
-    { value: 'empty_stomach', label: 'വെറും വയറ്റിൽ' },
-    { value: 'with_food', label: 'ഭക്ഷണത്തോടൊപ്പം' },
-    { value: 'morning_empty', label: 'രാവിലെ വെറും വയറ്റിൽ' },
-    { value: 'night_before_sleep', label: 'രാത്രി ഉറങ്ങുന്നതിനു മുൻപ്' }
-  ];
-
+  // Edit mode specific properties
+  saleId: string = '';
+  isEditing: boolean = true;
+  originalTotalPayable: number = 0;
+  originalBalance: number = 0;
+  originalPaymentAmount: number = 0;
+  preserveOriginalTotals: boolean = false; // CHANGED: Set to false by default to allow calculations
+  
+  // Prescription data
   prescriptionData: PrescriptionData = {
-    medicines: [],
-    patientName: '',
-    date: '',
-    patientAge: '',
-    additionalNotes: ''
+    medicines: [{
+      name: '',
+      dosage: '',
+      instructions: '',
+      ingredients: '',
+      pills: '',
+      powder: '',
+      time: '',
+      type: ''
+    }],
+    patientName: undefined,
+    date: ''
   };
 
   selectedCustomerForEdit: any = null;
@@ -159,9 +155,7 @@ isInitialLoad = true;
   showCodPopup = false;
   codData: any = null;
   serviceTypes: Service[] = [];
-  latestInvoiceNumber: number = 0;
   productSearchTerm: string = '';
-  isFromQuotation: boolean = false;
   currentUser: string = '';
   selectedMedicineType: string = '';
   customerSearchInput: string = '';
@@ -172,8 +166,6 @@ isInitialLoad = true;
   searchTerm: string = '';
   searchResults: Product[] = [];
   showSearchResults: boolean = false;
-
-  // Filter options
   filterOptions = {
     inStockOnly: false,
     priceRange: {
@@ -182,8 +174,16 @@ isInitialLoad = true;
     }
   };
 
+
+  // FIXED: Add tracking for manual prescription edits
+  private hasManualPrescriptionEdit = false;
+  private manualPatientName = '';
+  private manualPatientAge = '';
+
   private searchTimeout: any;
   private closeDropdownTimeout: any;
+  private modalInstance: any = null;
+  private isModalProcessing = false;
 
   defaultProduct: Product = {
     name: '',
@@ -207,27 +207,23 @@ isInitialLoad = true;
     igstAmount: 0,
     taxType: ''
   };
-
+  
   itemsTotal: number = 0;
   filteredCustomers: any[] = [];
+  productTaxAmount: number = 0;
+  shippingTaxAmount: number = 0;
+  isLoading: boolean = false;
 
-  // Edit mode specific properties
-  saleId: string = '';
-  isEditing: boolean = true;
-  originalTotalPayable: number = 0;
-  originalBalance: number = 0;
-  originalPaymentAmount: number = 0;
-  preserveOriginalTotals: boolean = false; // Changed to false for recalculation
-
-  // Medicine types
+  // Medicine types - Updated to include kasayam_combination
   medicineTypes = [
-    { value: 'kasayam', label: 'Kasayam (കഷായം)' },
-    { value: 'buligha', label: 'Buligha (ഗുളിക)' },
-    { value: 'bhasmam', label: 'Bhasmam (ഭസ്മം)' },
-    { value: 'krudham', label: 'Krudham (ഘൃതം)' },
-    { value: 'suranam', label: 'Suranam (ചൂർണ്ണം)' },
-    { value: 'rasayanam', label: 'Rasayanam (രസായനം)' },
-    { value: 'lagium', label: 'Lagium (ലേഹ്യം)' }
+    { value: 'kasayam', label: ' കഷായം' },
+    { value: 'kasayam_combination', label: 'കഷായം ' }, // Added this line
+    { value: 'buligha', label: 'ഗുളിക' },
+    { value: 'bhasmam', label: 'ഭസ്മം' },
+    { value: 'krudham', label: 'ഘൃതം' },
+    { value: 'suranam', label: 'ചൂർണ്ണം' },
+    { value: 'rasayanam', label: 'രസായനം' },
+    { value: 'lagium', label: 'ലേഹ്യം' }
   ];
 
   constructor(
@@ -252,742 +248,466 @@ isInitialLoad = true;
     this.todayDate = this.datePipe.transform(new Date(), 'yyyy-MM-dd') || '';
     this.currentUser = this.getCurrentUser();
   }
+// Converts internal date (YYYY-MM-DD) to DD-MM-YYYY for display in text box
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
-  private showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
-    const toastOptions = {
-      timeOut: 5000,
-      progressBar: true,
-      closeButton: true,
-      positionClass: 'toast-top-center'
-    };
+// Triggers the hidden native date picker
+openDatePicker(type: 'saleDate' | 'paidOn'): void {
+  if (type === 'saleDate') this.saleDatePicker.nativeElement.showPicker();
+  else if (type === 'paidOn') this.paidOnDatePicker.nativeElement.showPicker();
+}
+calculateItemsTotal(): void {
+  // Use the product subtotal (which includes tax and row discount)
+  this.itemsTotal = this.products.reduce((sum, product) => {
+    return sum + (product.subtotal || 0);
+  }, 0);
+  
+  console.log('Total Items (Incl. Tax & Row Discount):', this.itemsTotal);
+}
 
-    switch(type) {
-      case 'success':
-        this.toastr.success(message, 'Success', toastOptions);
-        break;
-      case 'error':
-        this.toastr.error(message, 'Error', toastOptions);
-        break;
-      default:
-        this.toastr.info(message, 'Info', toastOptions);
-    }
+// Handles manual typing in DD-MM-YYYY format
+onManualDateInput(event: any, controlName: string): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    const isoDate = `${year}-${month}-${day}`;
+    this.saleForm.get(controlName)?.setValue(isoDate);
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    event.target.value = this.getFormattedDateForInput(this.saleForm.get(controlName)?.value);
   }
-
-  async getProductByName(productName: string): Promise<Product | null> {
-    try {
-      const q = query(
-        this.productsCollection, 
-        where("productName", "==", productName),
-        limit(1)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const productData = querySnapshot.docs[0].data() as Product;
-        return {
-          id: querySnapshot.docs[0].id,
-          ...productData,
-          lastNumber: productData.lastNumber || ''
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting product by Name:', error);
-      throw error;
-    }
-  }
-
-  debugCustomerPhones() {
-    console.group('Customer Phone Data');
-    this.customers.forEach(customer => {
-      console.log({
-        name: customer.displayName,
-        id: customer.id,
-        mobile: customer.mobile,
-        phone: customer.phone,
-        altContact: customer.alternateContact
+}
+  ngOnInit(): void {
+    this.initializeForm();
+    this.setupValueChanges();
+    
+    // Load all required data
+    Promise.all([
+      this.loadCustomers(),
+      this.loadProducts(),
+      this.loadBusinessLocations(),
+      this.loadServiceTypes(),
+      this.loadUsers(),
+      this.loadTaxRates(),
+      this.loadTaxGroups(),
+      this.loadPaymentAccounts()
+    ]).then(() => {
+      // Get sale ID from route and load sale data
+      this.route.params.subscribe(params => {
+        this.saleId = params['id'];
+        if (this.saleId) {
+          this.loadSaleData(this.saleId);
+        }
       });
     });
-    console.groupEnd();
   }
 
-  getMedicineTypeName(type: string): string {
-    const typeNames: {[key: string]: string} = {
-      'kasayam': 'Kasayam (കഷായം)',
-      'buligha': 'Buligha (ഗുളിക)',
-      'bhasmam': 'Bhasmam (ഭസ്മം)',
-      'krudham': 'Krudham (ഘൃതം)',
-      'suranam': 'Suranam (ചൂർണ്ണം)',
-      'rasayanam': 'Rasayanam (രസായനം)',
-      'lagium': 'Lagium (ലേഹ്യം)'
-    };
-    return typeNames[type] || 'Medicine';
-  }
-
-  getTaxBreakdown(type: 'cgst' | 'sgst' | 'igst'): number {
-    if (!this.products) return 0;
+  ngOnDestroy(): void {
+    // Clean up timeouts
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout);
+    }
+    if (this.closeDropdownTimeout) {
+      clearTimeout(this.closeDropdownTimeout);
+    }
     
-    return this.products.reduce((sum, product) => {
-      switch(type) {
-        case 'cgst': return sum + (product.cgstAmount || 0);
-        case 'sgst': return sum + (product.sgstAmount || 0);
-        case 'igst': return sum + (product.igstAmount || 0);
-        default: return sum;
-      }
-    }, 0);
+    // Clean up modal
+    this.cleanupModal();
+  }
+// --- Find and Replace these specific methods in edit-sale.component.ts ---
+
+/**
+ * UPDATED: Combined calculation logic to ensure decimals are handled 
+ * and rounded consistently with the Add Sale component.
+ */
+recalculateAllTotals(): void {
+  console.log('🔄 Recalculating all totals with rounding');
+  
+  // 1. Basic Items Total (Sum of priceBeforeTax * quantity)
+  this.calculateItemsTotal();
+
+  // 2. Apply Order-level Discount
+  const discountedTotal = this.calculateDiscountedTotal();
+
+  // 3. Calculate Product Taxes
+  this.calculateProductTaxes();
+
+  // 4. Calculate Shipping with Tax
+  const shippingWithTax = this.calculateShippingWithTax();
+
+  // 5. Finalize and Round
+  this.calculateFinalTotals(discountedTotal, shippingWithTax);
+}
+
+/**
+ * UPDATED: This is the core rounding logic.
+ * It sets the totalPayable to a whole number and stores the difference in roundOff.
+ */
+
+
+/**
+ * UPDATED: Simple balance calculation using the rounded totalPayable.
+ */
+calculateBalance(): void {
+  const totalPayable = this.saleForm.get('totalPayable')?.value || 0; // This is now the whole number
+  const paymentAmount = this.saleForm.get('paymentAmount')?.value || 0;
+  const roundOff = this.saleForm.get('roundOff')?.value || 0;
+
+  // Since totalPayable is already the rounded sum, calculation is direct
+  if (paymentAmount > totalPayable) {
+    this.saleForm.patchValue({
+      changeReturn: parseFloat((paymentAmount - totalPayable).toFixed(2)),
+      balance: 0
+    }, { emitEvent: false });
+  } else {
+    this.saleForm.patchValue({
+      changeReturn: 0,
+      balance: parseFloat((totalPayable - paymentAmount).toFixed(2))
+    }, { emitEvent: false });
+  }
+}
+
+/**
+ * UPDATED: Link the totalPayable trigger to the full recalculation flow.
+ */
+calculateTotalPayable(): void {
+  this.recalculateAllTotals();
+}
+
+/**
+ * UPDATED: Integrated rounding into the preservation toggle.
+ */
+togglePreservationMode(): void {
+  this.preserveOriginalTotals = !this.preserveOriginalTotals;
+  
+  if (!this.preserveOriginalTotals) {
+    this.recalculateAllTotals();
+  } else {
+    // Revert to original data stored when sale was first loaded
+    this.saleForm.patchValue({
+      totalPayable: this.originalTotalPayable,
+      balance: this.originalBalance
+    });
+    this.calculateBalance();
+  }
+}
+
+/**
+ * UPDATED: Modified the save logic to ensure roundOff is explicitly sent to Firestore.
+ */
+updateSale(): void {
+  if (this.isSubmitting) return;
+  
+  if (this.saleForm.invalid) {
+    this.markFormGroupTouched(this.saleForm);
+    this.showToast('Please fill all required fields correctly', 'error');
+    return;
   }
 
-  getTaxRate(type: 'cgst' | 'sgst' | 'igst'): number {
-    switch(type) {
-      case 'cgst': return 9;
-      case 'sgst': return 9;
-      case 'igst': return 18;
-      default: return 0;
+  // Ensure calculations are fresh before saving
+  this.recalculateAllTotals();
+  this.isSubmitting = true;
+
+  const formValue = this.saleForm.getRawValue();
+  const selectedCustomerId = formValue.customer; 
+  const customerObject = this.customers.find(c => c.id === selectedCustomerId);
+  const customerNameToSave = customerObject ? customerObject.displayName : (formValue.customerName || 'Unknown Customer');
+
+  const productsToSave = [...this.products].map(product => ({
+    // ... (map logic same as before)
+    ...product,
+    subtotal: product.subtotal // Ensure row-level subtotals are preserved
+  }));
+
+  const saleData = {
+    ...formValue,
+    customer: customerNameToSave,
+    customerId: selectedCustomerId,
+    products: productsToSave,
+    // Explicitly confirm these are numbers for the DB
+    totalPayable: Number(formValue.totalPayable),
+    roundOff: Number(formValue.roundOff),
+    balance: Number(formValue.balance),
+    prescriptions: this.prescriptions.length > 0 ? this.prescriptions : null,
+    updatedAt: new Date(),
+    isEditOperation: true,
+    skipStockValidation: true
+  };
+
+  const cleanedSaleData = this.cleanObjectForFirestore(saleData);
+
+  this.saleService.updateSaleWithStockHandling(this.saleId, cleanedSaleData)
+    .then(() => {
+      this.isSubmitting = false;
+      this.showToast('Sale updated successfully! 🎉', 'success');
+      this.router.navigate(['/sales-order']);
+    })
+    .catch((error: any) => { 
+      this.isSubmitting = false;
+      this.showToast(error.message || 'Error updating sale.', 'error');
+    });
+}
+  private cleanupModal(): void {
+    try {
+      if (this.modalInstance) {
+        this.modalInstance.dispose();
+        this.modalInstance = null;
+      }
+      
+      // Remove any remaining modal backdrops
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      backdrops.forEach(backdrop => backdrop.remove());
+      
+      // Remove modal-open class from body
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+      
+      this.isModalProcessing = false;
+    } catch (error) {
+      console.warn('Error cleaning up modal:', error);
     }
   }
 
-  addSameMedicineType(): void {
-    if (!this.selectedMedicineType) return;
+loadSaleData(saleId: string): void {
+  this.isLoading = true;
+  this.saleService.getSaleById(saleId).subscribe({
+    next: (sale) => {
+        console.log('🔍 Loading sale data for editing:', sale);
 
-    const sameTypeMedicines = this.prescriptionData.medicines.filter(med => med.type === this.selectedMedicineType);
-    
-    if (sameTypeMedicines.length === 0) {
-      this.addMedicineByType();
-      return;
-    }
+        // Store original values
+        this.originalTotalPayable = sale.totalPayable || 0;
+        this.originalBalance = sale.balance || 0;
+        this.originalPaymentAmount = sale.paymentAmount || 0;
 
-    const lastMedicine = sameTypeMedicines[sameTypeMedicines.length - 1];
-    const newMedicine: Medicine = JSON.parse(JSON.stringify(lastMedicine));
-    
-    this.prescriptionData.medicines.push(newMedicine);
-    
-    setTimeout(() => {
-      const lastIndex = this.prescriptionData.medicines.length - 1;
-      const firstField = document.getElementById(`medicineName_${lastIndex}`);
-      if (firstField) {
-        firstField.focus();
+        // Correctly format the sale date before patching the form
+        let formattedSaleDate = this.todayDate;
+        if (sale.saleDate) {
+            try {
+                let saleDateObject: Date;
+
+                // FIXED: Add a more robust type check for Firestore Timestamps
+                if (sale.saleDate && typeof sale.saleDate === 'object' && typeof (sale.saleDate as any).toDate === 'function') {
+                    // It's a Firestore Timestamp, so call toDate()
+                    saleDateObject = (sale.saleDate as any).toDate();
+                } else {
+                    // It's likely an ISO string or a Date object already
+                    saleDateObject = new Date(sale.saleDate as string | number | Date);
+                }
+
+                // Ensure the date is valid before transforming
+                if (!isNaN(saleDateObject.getTime())) {
+                    formattedSaleDate = this.datePipe.transform(saleDateObject, 'yyyy-MM-dd') || this.todayDate;
+                }
+            } catch (error) {
+                console.error("Could not parse sale date, defaulting to today.", error);
+                formattedSaleDate = this.todayDate;
+            }
+        }
+
+        // Populate form with sale data
+        this.saleForm.patchValue({
+          customer: sale.customerId || sale.customer || '',
+          customerName: sale.customerName || '',
+          customerPhone: sale.customerPhone || '',
+          customerEmail: sale.customerEmail || '',
+          alternateContact: sale.alternateContact || '',
+          customerAge: sale.customerAge || null,
+                    // orderStatus: sale.orderStatus || '', // <-- Removed: orderStatus does not exist on SalesOrder
+
+          customerDob: sale.customerDob || null,
+          customerOccupation: sale.customerOccupation || '',
+          customerGender: sale.customerGender || '',
+          billingAddress: sale.billingAddress || '',
+          shippingAddress: sale.shippingAddress || '',
+          saleDate: formattedSaleDate, // Use the correctly formatted date here
+          businessLocation: sale.businessLocationId || sale.businessLocation || '',
+          invoiceNo: sale.invoiceNo || '',
+          orderNo: sale.orderNo || '',
+          typeOfService: sale.typeOfService || '',
+          transactionId: sale.transactionId || '',
+          invoiceScheme: sale.invoiceScheme || '',
+          document: sale.document || null,
+          discountType: sale.discountType || 'Percentage',
+          discountAmount: sale.discountAmount || 0,
+          orderTax: sale.orderTax || 18,
+          sellNote: sale.sellNote || '',
+          shippingCharges: sale.shippingCharges || 0,
+                  orderStatus: 'Pending',
+
+          shippingStatus: sale.shippingStatus || '',
+          deliveryPerson: sale.deliveryPerson || '',
+          shippingDetails: sale.shippingDetails || '',
+          status: sale.status || 'Pending',
+          paymentStatus: sale.paymentStatus || 'Due',
+          paymentMethod: sale.paymentMethod || '',
+          paymentAccount: sale.paymentAccountId || sale.paymentAccount || '',
+          totalPayable: this.originalTotalPayable,
+          paymentAmount: this.originalPaymentAmount,
+          balance: this.originalBalance,
+          paidOn: sale.paidOn || this.todayDate,
+          paymentNote: sale.paymentNote || '',
+          changeReturn: sale.changeReturn || 0,
+          roundOff: sale.roundOff || 0,
+          addedBy: sale.addedBy || '',
+          productTaxAmount: sale.productTaxAmount || 0,
+          shippingTaxAmount: sale.shippingTaxAmount || 0
+        });
+      this.products = [];
+
+        // Load products only if they exist in the sale
+      if (sale.products && sale.products.length > 0) {
+        this.products = sale.products.map(product => ({
+          id: product.id || '',
+          name: product.name || product.productName || '',
+          productName: product.productName || product.name || '',
+          sku: product.sku || '',
+          quantity: product.quantity || 1,
+          unitPrice: product.unitPrice || 0,
+          discount: product.discount || 0,
+          discountType: product.discountType || 'Amount',
+          subtotal: product.subtotal || 0,
+          batchNumber: product.batchNumber || '',
+          expiryDate: product.expiryDate || '',
+          taxRate: product.taxRate || 0,
+          taxAmount: product.taxAmount || 0,
+          cgstAmount: product.cgstAmount || 0,
+          sgstAmount: product.sgstAmount || 0,
+          igstAmount: product.igstAmount || 0,
+          taxType: product.taxType || '',
+          priceBeforeTax: product.priceBeforeTax || 0,
+          taxIncluded: product.taxIncluded || false,
+          commissionPercent: product.commissionPercent || 0,
+          commissionAmount: product.commissionAmount || 0
+        }));
       }
-    });
-  }
 
-  addMedicineByType(): void {
-    if (!this.selectedMedicineType) return;
+        if (sale.prescriptions && sale.prescriptions.length > 0) {
+          this.prescriptions = sale.prescriptions;
+        }
 
-    const newMedicine: Medicine = {
-      name: '',
-      type: this.selectedMedicineType,
-      time: 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി',
-      foodTiming: 'before_after_food'
-    };
+        // Load service data
+        if (sale.ppServiceData) {
+          this.ppServiceData = sale.ppServiceData;
+          this.showPpServicePopup = false;
+        }
+        if (sale.codData) {
+          this.codData = sale.codData;
+          this.showCodPopup = false;
+        }
 
-    switch(this.selectedMedicineType) {
-      case 'kasayam':
-        newMedicine.instructions = '';
-        newMedicine.quantity = '';
-        newMedicine.powder = '';
-        newMedicine.pills = '';
-        break;
-      case 'buligha':
-        newMedicine.instructions = '';
-        newMedicine.powder = '';
-        break;
-      case 'bhasmam':
-        newMedicine.dosage = '';
-        newMedicine.quantity = '';
-        newMedicine.instructions = '';
-        newMedicine.powder = '';
-        break;
-      case 'krudham':
-        newMedicine.instructions = '';
-        break;
-      case 'suranam':
-        newMedicine.instructions = '';
-        newMedicine.powder = '';
-        newMedicine.dosage = '';
-        break;
-      case 'rasayanam':
-        newMedicine.instructions = '';
-        break;
-      case 'lagium':
-        newMedicine.instructions = '';
-        newMedicine.dosage = '';
-        break;
+        // Set customer search input
+        if (sale.customerName) {
+          this.customerSearchInput = sale.customerName;
+        }
+
+        // Calculate totals
+        this.calculateItemsTotal();
+        this.calculateProductTaxes();
+        this.calculateShippingTax();
+        this.calculateBalanceOnly();
+
+        this.isLoading = false;
+        console.log('✅ Sale data loaded successfully');
+      },
+      error: (error) => {
+      console.error('Error loading sale data:', error);
+      this.showToast('Error loading sale data. Please try again.', 'error');
+      this.isLoading = false;
     }
-
-    this.prescriptionData.medicines.push(newMedicine);
-    this.selectedMedicineType = '';
-    
-    setTimeout(() => {
-      const lastIndex = this.prescriptionData.medicines.length - 1;
-      const firstField = document.getElementById(`medicineName_${lastIndex}`);
-      if (firstField) {
-        firstField.focus();
-      }
-    });
-  }
-
-  getFoodTimingLabel(value: string): string {
-    const option = this.foodTimingOptions.find(opt => opt.value === value);
-    return option ? option.label : 'ഭക്ഷണത്തിനുമുൻപ് / ശേഷം';
-  }
-
-  onFoodTimingChange(medicineIndex: number, event: any): void {
-    const selectedValue = event.target.value;
-    if (this.prescriptionData.medicines[medicineIndex]) {
-      this.prescriptionData.medicines[medicineIndex].foodTiming = selectedValue;
-    }
-  }
-
-  addMedicine(): void {
-    this.prescriptionData.medicines.push({
-      name: '',
-      dosage: '',
-      instructions: '',
-      ingredients: '',
-      pills: '',
-      powder: '',
-      time: '',
-      type: '',
-      foodTiming: 'before_after_food'
-    });
-
-    setTimeout(() => {
-      const lastIndex = this.prescriptionData.medicines.length - 1;
-      const firstField = document.getElementById(`medicineName_${lastIndex}`);
-      if (firstField) {
-        firstField.focus();
-      }
-    });
-  }
-
-  removeMedicine(index: number): void {
-    this.prescriptionData.medicines.splice(index, 1);
-  }
+  });
+}
 
   getCurrentUser(): string {
     const currentUser = this.authService.currentUserValue;
     return currentUser?.displayName || currentUser?.email || 'Current User';
   }
 
-ngOnInit(): void {
-  console.log('Initializing EditSaleComponent - products array:', this.products); // Should be empty initially
-  
-  this.initializeForm();
-  this.setupValueChanges();
-  this.loadTaxRates();
-  this.loadPaymentAccounts();
-  this.prefillCurrentUser();
-  this.todayDate = this.datePipe.transform(this.currentDate, 'yyyy-MM-dd') || '';
-
-  console.log('After initialization - products array:', this.products); // Should still be empty
-this.route.params.subscribe(params => {
-    this.saleId = params['id'];
-    if (this.saleId) {
-      this.loadSaleData(this.saleId);
-    }
-  });
-
-  this.saleForm.get('totalPayable')?.valueChanges.subscribe(() => {
-    this.calculateRoundOff();
-  });
-  
-  Promise.all([
-    this.loadCustomers(),
-    this.loadProducts(),
-    this.loadBusinessLocations(),
-    this.loadServiceTypes(),
-    this.loadUsers(),
-    this.loadTaxRates(),
-    this.loadTaxGroups(),
-    this.loadPaymentAccounts()
-  ]).then(() => {
-    console.log('All data loaded - products array:', this.products); // Should still be empty
-    this.route.params.subscribe(params => {
-      this.saleId = params['id'];
-      if (this.saleId) {
-        console.log('Loading sale data for ID:', this.saleId);
-        this.loadSaleData(this.saleId);
-      }
-    });
-  });
-}
-
-loadSaleData(saleId: string): void {
-    console.log('Loading sale data - products array before:', this.products); // Should be empty
-
-  this.saleService.getSaleById(saleId).subscribe({
-    next: (sale) => {
-      console.log('Loading sale data for editing:', sale);
-      
-      // Store original values
-      this.originalTotalPayable = sale.totalPayable || 0;
-      this.originalBalance = sale.balance || 0;
-      this.originalPaymentAmount = sale.paymentAmount || 0;
-      
-      // Format date fields properly
-      const formatDate = (dateValue: any) => {
-        if (!dateValue) return this.todayDate;
-        
-        let date: Date;
-        if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-          date = dateValue.toDate();
-        } else if (dateValue instanceof Date) {
-          date = dateValue;
-        } else {
-          date = new Date(dateValue);
-        }
-        
-        return this.datePipe.transform(date, 'yyyy-MM-dd') || this.todayDate;
-      };
-
-      // Populate form with sale data including all fields
-      this.saleForm.patchValue({
-        customer: sale.customerId || sale.customer || '',
-        customerName: sale.customerName || '',
-        customerPhone: sale.customerPhone || '',
-        customerEmail: sale.customerEmail || '',
-        alternateContact: sale.alternateContact || '',
-        customerAge: sale.customerAge || null,
-        customerDob: sale.customerDob ? formatDate(sale.customerDob) : null,
-        customerGender: sale.customerGender || '',
-        customerOccupation: sale.customerOccupation || '',
-        creditLimit: sale.creditLimit || 0,
-        otherData: sale.otherData || '',
-        billingAddress: sale.billingAddress || '',
-        shippingAddress: sale.shippingAddress || '',
-        saleDate: formatDate(sale.saleDate),
-        businessLocation: sale.businessLocationId || sale.businessLocation || '',
-        invoiceNo: sale.invoiceNo || '',
-        orderNo: sale.orderNo || '',
-        typeOfService: sale.typeOfService || '',
-        transactionId: sale.transactionId || '',
-        invoiceScheme: sale.invoiceScheme || '',
-        document: sale.document || null,
-        discountType: sale.discountType || 'Percentage',
-        discountAmount: sale.discountAmount || 0,
-        orderTax: sale.orderTax || 18,
-        sellNote: sale.sellNote || '',
-        shippingCharges: sale.shippingCharges || 0,
-        shippingChargesAfterTax: sale.shippingChargesAfterTax || 0,
-        shippingStatus: sale.shippingStatus || '',
-        deliveryPerson: sale.deliveryPerson || '',
-        shippingDetails: sale.shippingDetails || '',
-        status: sale.status || 'Pending',
-        paymentStatus: sale.paymentStatus || 'Due',
-        paymentMethod: sale.paymentMethod || '',
-        paymentAccount: sale.paymentAccountId || sale.paymentAccount || '',
-        totalPayable: sale.totalPayable || 0,
-        paymentAmount: sale.paymentAmount || 0,
-        balance: sale.balance || 0,
-        paidOn: formatDate(sale.paidOn),
-        paymentNote: sale.paymentNote || '',
-        changeReturn: sale.changeReturn || 0,
-        roundOff: sale.roundOff || 0,
-        addedBy: sale.addedBy || '',
-        productTaxAmount: sale.productTaxAmount || 0,
-        shippingTaxAmount: sale.shippingTaxAmount || 0,
-        codTaxAmount: sale.codTaxAmount || 0,
-        ppTaxAmount: sale.ppTaxAmount || 0
-      });
-
-      // Initialize products array only if sale has products
-      this.products = sale.products && sale.products.length > 0 
-        ? sale.products.map((product: any) => ({
-            id: product.id || '',
-            name: product.name || product.productName || '',
-            productName: product.productName || product.name || '',
-            sku: product.sku || '',
-            quantity: product.quantity || 1,
-            unitPrice: product.unitPrice || 0,
-            discount: product.discount || 0,
-            discountType: product.discountType || 'Amount',
-            subtotal: product.subtotal || 0,
-            batchNumber: product.batchNumber || '',
-            expiryDate: product.expiryDate || '',
-            taxRate: product.taxRate || 0,
-            taxAmount: product.taxAmount || 0,
-            cgstAmount: product.cgstAmount || 0,
-            sgstAmount: product.sgstAmount || 0,
-            igstAmount: product.igstAmount || 0,
-            taxType: product.taxType || '',
-            priceBeforeTax: product.priceBeforeTax || 0,
-            taxIncluded: product.taxIncluded || false,
-            commissionPercent: product.commissionPercent || 0,
-            commissionAmount: product.commissionAmount || 0,
-            currentStock: product.currentStock || 0,
-            defaultSellingPriceExcTax: product.defaultSellingPriceExcTax || 0,
-            defaultSellingPriceIncTax: product.defaultSellingPriceIncTax || 0
-          }))
-        : []; // Initialize as empty array if no products
-
-      // Load prescriptions if available
-      if (sale.prescriptions && sale.prescriptions.length > 0) {
-        this.prescriptions = sale.prescriptions.map((prescription: any) => ({
-          patientName: prescription.patientName || '',
-          patientAge: prescription.patientAge || '',
-          date: formatDate(prescription.date),
-          medicines: prescription.medicines || [],
-          additionalNotes: prescription.additionalNotes || ''
-        }));
-      }
-
-      // Load service data
-      if (sale.ppServiceData) {
-        this.ppServiceData = sale.ppServiceData;
-      }
-      if (sale.codData) {
-        this.codData = sale.codData;
-      }
-
-      // Set customer search input
-      if (sale.customerName) {
-        this.customerSearchInput = sale.customerName;
-      }
-
-      // Set interested products if any
-if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length > 0) {
-  const interestedIds: string[] = sale.interestedProductIds;
-  this.selectedProductsForInterested = this.allProducts.filter(product => 
-    product.id && interestedIds.includes(product.id)
-  );
-}
-
-      // Calculate shipping after tax
-      this.calculateAfterTaxShipping();
-      
-      // Calculate totals
-      this.calculateItemsTotal();
-      this.calculateTotalPayable();
-
-      console.log('Sale data loaded successfully');
-    },
-    error: (error) => {
-      console.error('Error loading sale data:', error);
-      this.showToast('Error loading sale data. Please try again.', 'error');
-    }
-  });
-}
-
-  private async prefillCurrentUser(): Promise<void> {
-    try {
-      const currentUser = this.authService.currentUserValue;
-      if (currentUser) {
-        this.currentUser = currentUser.displayName || currentUser.email;
-        
-        this.users = await this.loadUsers();
-        const loggedInUser = this.users.find(u => u.id === currentUser.uid);
-        
-        if (loggedInUser) {
-          this.saleForm.patchValue({
-            addedBy: loggedInUser.id
-          });
-          
-          const commissionPercent = await this.getAgentCommission(loggedInUser.id);
-          this.defaultProduct.commissionPercent = commissionPercent;
-          this.updateDefaultProduct();
-        }
-      }
-    } catch (error) {
-      console.error('Error prefilling current user:', error);
-    }
-  }
-
-  filterProductsForInterested(): void {
-    let filtered = [...this.allProducts];
-    
-    if (this.productInterestedSearch) {
-      const searchTerm = this.productInterestedSearch.toLowerCase();
-      filtered = filtered.filter(product => 
-        (product.productName?.toLowerCase().includes(searchTerm) ||
-         product.sku?.toLowerCase().includes(searchTerm))
-      );
-    }
-    
-    if (this.filterOptions.inStockOnly) {
-      filtered = filtered.filter(product => product.currentStock > 0);
-    }
-    
-    filtered = filtered.filter(product => 
-      product.defaultSellingPriceExcTax >= this.filterOptions.priceRange.min &&
-      product.defaultSellingPriceExcTax <= this.filterOptions.priceRange.max
-    );
-    
-    filtered.forEach(p => p.selected = p.selected || false);
-    
-    this.filteredProductsForInterested = filtered.slice(0, 50);
-  }
-
-  private loadTaxRates(): Promise<void> {
-    return new Promise((resolve) => {
-      this.taxService.getTaxRates().subscribe(rates => {
-        this.availableTaxRates = rates;
-        resolve();
-      });
-    });
-  }
-
-  loadPaymentAccounts(): Promise<void> {
+  // Load methods (same as add-sale component)
+  loadCustomers(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.accountService.getAccounts((accounts: any[]) => {
-        this.paymentAccounts = accounts;
-        resolve();
-      });
-    });
-  }
-
-  private loadTaxGroups(): Promise<void> {
-    return new Promise((resolve) => {
-      this.taxService.getTaxGroups().subscribe(groups => {
-        this.availableTaxGroups = groups.map(group => ({
-          ...group,
-          calculatedRate: this.calculateGroupRate(group.taxRates)
-        }));
-        resolve();
-      });
-    });
-  }
-
-  private calculateGroupRate(taxRates: TaxRate[]): number {
-    return taxRates.reduce((total, rate) => total + rate.rate, 0);
-  }
-
-  calculateTaxes(): void {
-    this.products.forEach(product => {
-      this.calculateProductTax(product);
-    });
-    
-    if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
-      this.calculateProductTax(this.defaultProduct);
-    }
-
-    const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
-    const shippingTaxRate = this.saleForm.get('orderTax')?.value || 0;
-    const shippingTax = shippingBeforeTax * (shippingTaxRate / 100);
-    
-    this.saleForm.patchValue({
-      shippingTaxAmount: shippingTax
-    });
-
-    const productTax = this.products.reduce((sum, p) => sum + (p.taxAmount || 0), 0);
-    const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-      ? (this.defaultProduct.taxAmount || 0) 
-      : 0;
-    
-    this.taxAmount = productTax + defaultProductTax + shippingTax;
-    
-    this.calculateTotalPayable();
-  }
-
-  private calculateProductTax(product: Product): void {
-    const taxRate = product.taxRate || 0;
-    const taxableAmount = product.priceBeforeTax * product.quantity;
-    
-    product.taxAmount = (taxableAmount * taxRate) / 100;
-    
-    if (taxRate === 18) {
-      product.taxType = 'CGST+SGST';
-      product.cgstAmount = product.taxAmount / 2;
-      product.sgstAmount = product.taxAmount / 2;
-      product.igstAmount = 0;
-    } else if (taxRate === 28) {
-      product.taxType = 'IGST';
-      product.igstAmount = product.taxAmount;
-      product.cgstAmount = 0;
-      product.sgstAmount = 0;
-    } else if (taxRate === 12) {
-      product.taxType = 'CGST+SGST';
-      product.cgstAmount = product.taxAmount / 2;
-      product.sgstAmount = product.taxAmount / 2;
-      product.igstAmount = 0;
-    } else if (taxRate === 5) {
-      product.taxType = 'CGST+SGST';
-      product.cgstAmount = product.taxAmount / 2;
-      product.sgstAmount = product.taxAmount / 2;
-      product.igstAmount = 0;
-    } else if (taxRate > 0) {
-      product.taxType = 'CGST+SGST';
-      product.cgstAmount = product.taxAmount / 2;
-      product.sgstAmount = product.taxAmount / 2;
-      product.igstAmount = 0;
-    } else {
-      product.taxType = 'None';
-      product.cgstAmount = 0;
-      product.sgstAmount = 0;
-      product.igstAmount = 0;
-    }
-  }
-
-  calculateTotalPayable(): void {
-    const discount = this.saleForm.get('discountAmount')?.value || 0;
-    const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
-    const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    const shippingTax = shippingBeforeTax * (taxRate / 100);
-
-    const packingCharge = this.ppServiceData?.packingCharge || this.codData?.packingCharge || 0;
-
-    let productsTotal = this.itemsTotal;
-    
-    if (this.saleForm.get('discountType')?.value === 'Percentage') {
-      productsTotal -= (this.itemsTotal * discount / 100);
-    } else {
-      productsTotal -= discount;
-    }
-
-    const shippingWithTax = this.calculateShippingWithTax();
-    let totalBeforePacking = productsTotal + shippingWithTax;
-    let totalPayable = totalBeforePacking + packingCharge;
-    
-    this.saleForm.patchValue({ 
-      totalPayable: parseFloat(totalPayable.toFixed(2)),
-      itemsTotal: parseFloat(productsTotal.toFixed(2)),
-      shippingTotal: parseFloat(shippingWithTax.toFixed(2)),
-      packingCharge: parseFloat(packingCharge.toFixed(2))
-    });
-    
-    this.calculateRoundOff();
-    this.calculateBalance();
-  }
-
-  onTaxChange(selectedRate: string): void {
-    this.saleForm.patchValue({ orderTax: parseFloat(selectedRate) || 0 });
-    this.calculateTotalPayable();
-    this.calculateTaxes();
-  }
-
-  searchCustomerByPhone(): void {
-    const inputPhone = this.saleForm.get('customerPhone')?.value?.trim();
-    console.log('Searching for phone:', inputPhone);
-
-    if (!inputPhone || inputPhone.length < 5) {
-      this.clearNonPhoneFields();
-      return;
-    }
-
-    const cleanPhone = inputPhone.replace(/\D/g, '');
-
-    const foundCustomer = this.customers.find(customer => {
-      const customerPhones = [
-        customer.mobile,
-        customer.phone,
-        customer.alternateContact,
-        customer.landline
-      ].filter(phone => phone);
-
-      return customerPhones.some(phone => {
-        const cleanCustomerPhone = phone?.replace(/\D/g, '') || '';
-        return phone === inputPhone || cleanCustomerPhone === cleanPhone;
-      });
-    });
-
-    if (foundCustomer) {
-      console.log('Customer found:', foundCustomer);
-      
-      let formattedDob = '';
-      if (foundCustomer.dob) {
-        const dobDate = foundCustomer.dob instanceof Date ? foundCustomer.dob : new Date(foundCustomer.dob);
-        if (!isNaN(dobDate.getTime())) {
-          formattedDob = this.datePipe.transform(dobDate, 'yyyy-MM-dd') || '';
-        }
-      }
-      
-      this.saleForm.patchValue({
-        customer: foundCustomer.id,
-        customerName: foundCustomer.displayName,
-        customerPhone: foundCustomer.mobile || foundCustomer.phone || '',
-        alternateContact: foundCustomer.alternateContact || '',
-        customerEmail: foundCustomer.email || '',
-        customerAge: foundCustomer.age || null,
-        customerDob: formattedDob,
-        customerGender: foundCustomer.gender || '',
-        billingAddress: foundCustomer.addressLine1 || '',
-        shippingAddress: foundCustomer.addressLine1 || '',
-        creditLimit: foundCustomer.creditLimit || 0
-      });
-      this.customerSearchInput = foundCustomer.displayName;
-    } else {
-      console.log('No customer found with phone:', inputPhone);
-      this.clearNonPhoneFields();
-    }
-  }
-
-  clearNonPhoneFields() {
-    const currentPhone = this.saleForm.get('customerPhone')?.value;
-    this.saleForm.patchValue({
-      customer: '',
-      customerName: '',
-      customerEmail: '',
-      billingAddress: '',
-      shippingAddress: '',
-      alternateContact: '',
-      customerAge: null,
-      customerDob: null,
-      customerGender: '',
-      customerPhone: currentPhone
-    });
-  }
-
-  private async getAgentCommission(userId: string): Promise<number> {
-    return new Promise((resolve) => {
-      const unsubscribe = this.commissionService.listenToSalesAgents((agents) => {
-        const agent = agents.find(a => a.userId === userId);
-        unsubscribe();
-        resolve(agent ? agent.commissionPercentage : 0);
-      });
-    });
-  }
-
-  async onUserSelect(userId: string): Promise<void> {
-    if (!userId) return;
-    
-    const commissionPercent = await this.getAgentCommission(userId);
-    
-    this.products.forEach(product => {
-      product.commissionPercent = commissionPercent;
-      this.updateProduct(this.products.indexOf(product));
-    });
-    
-    this.defaultProduct.commissionPercent = commissionPercent;
-    this.updateDefaultProduct();
-  }
-
-  filterCustomers(): void {
-    if (!this.customerSearchInput) {
-      this.filteredCustomers = [...this.customers];
-      return;
-    }
-
-    const filter = this.customerSearchInput.toUpperCase();
-    
-    this.filteredCustomers = this.customers.filter(customer => {
-      const searchString = [
-        customer.displayName || '',
-        customer.contactId || '',
-        customer.mobile || '',
-        customer.phone || '',
-        customer.alternateContact || '',
-        customer.landline || ''
-      ]
-      .filter(field => field)
-      .join(' ')
-      .toUpperCase();
-      
-      return searchString.includes(filter);
-    });
-  }
-
-  private loadUsers(): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      this.userService.getUsers().subscribe({
-        next: (users: any[]) => {
-          const formattedUsers = users.map(user => ({
-            ...user,
-            displayName: user.displayName || `${user.firstName} ${user.lastName}`.trim() || user.email
+      this.customerService.getCustomers().subscribe({
+        next: (customers: any[]) => {
+          this.customers = customers.map(customer => ({
+            ...customer,
+            displayName: customer.businessName || 
+                       `${customer.firstName || ''} ${customer.middleName ? customer.middleName + ' ' : ''}${customer.lastName || ''}`.trim(),
+            contactId: customer.contactId || '',
+            landline: customer.landline || ''
           }));
-          this.users = formattedUsers;
-          resolve(formattedUsers);
+          
+          this.filteredCustomers = [...this.customers];
+          resolve();
         },
         error: (error: any) => {
-          console.error('Error loading users:', error);
+          console.error('Error loading customers:', error);
+          reject(error);
+        }
+      });
+    });
+  }
+
+addNewPrescription(): void {
+  console.log('➕ Adding new prescription');
+  
+  // Reset the editing index and manual edit tracking
+  this.editingPrescriptionIndex = null;
+  this.hasManualPrescriptionEdit = false;
+  this.manualPatientName = '';
+  this.manualPatientAge = '';
+  
+  // Auto-fetch and set customer details
+  this.autoFetchCustomerDetails();
+  
+  // Reset prescription data with fresh customer info from form
+  this.resetPrescriptionDataWithCustomerInfo();
+  
+  // Open the modal
+  this.openPrescriptionModal();
+}
+
+
+  loadProducts(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.productService.getProductsRealTime().subscribe({
+        next: (products: any[]) => {
+          this.allProducts = products.map(p => ({
+            ...p,
+            productName: p.name || p.productName
+          }));
+          this.filteredProducts = [...this.allProducts];
+          resolve();
+        },
+        error: (error: any) => {
+          console.error('Error loading products:', error);
+          reject(error);
+        }
+      });
+    });
+  }
+
+  loadBusinessLocations(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.locationService.getLocations().subscribe({
+        next: (locations: any[]) => {
+          this.businessLocations = locations;
+          resolve();
+        },
+        error: (error: any) => {
+          console.error('Error loading business locations:', error);
           reject(error);
         }
       });
@@ -1009,184 +729,419 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     });
   }
 
-  onServiceTypeChange(event: any): void {
-    const serviceId = event.target.value;
-    
-    if (this.showPpServicePopup && serviceId !== this.saleForm.get('typeOfService')?.value) {
-      this.ppServiceData = null;
-    }
-    if (this.showCodPopup && serviceId !== this.saleForm.get('typeOfService')?.value) {
-      this.codData = null;
-    }
-  
-    const selectedService = this.serviceTypes.find(s => s.id === serviceId);
-    const serviceName = selectedService?.name?.toLowerCase() || '';
-  
-    this.showPpServicePopup = false;
-    this.showCodPopup = false;
-  
-    if (serviceName.includes('pp')) {
-      this.showPpServicePopup = true;
-      this.codData = null;
-      this.saleForm.patchValue({ typeOfService: serviceId });
-    } 
-    else if (serviceId === 'COD' || serviceName.includes('cod')) {
-      this.showCodPopup = true;
-      this.ppServiceData = null;
-      this.saleForm.patchValue({ typeOfService: serviceId });
-    } 
-    else {
-      this.saleForm.patchValue({ typeOfService: serviceId });
-    }
-  
-    this.showTransactionIdField = !!selectedService?.name && 
-                              (serviceName.includes('pp') || 
-                               serviceName.includes('payment'));
-    
-    const transactionIdControl = this.saleForm.get('transactionId');
-    if (transactionIdControl) {
-      if (this.showTransactionIdField) {
-        transactionIdControl.setValidators([Validators.required]);
-      } else {
-        transactionIdControl.clearValidators();
-      }
-      transactionIdControl.updateValueAndValidity();
-    }
-  }
-
-  onCodFormSubmit(formData: any): void {
-    this.codData = formData;
-    this.showCodPopup = false;
-    
-    if (formData.packingCharge) {
-      const currentShipping = this.saleForm.get('shippingCharges')?.value || 0;
-      this.saleForm.patchValue({
-        shippingCharges: currentShipping + formData.packingCharge
-      });
-    }
-  }
-
-  onCodClose(): void {
-    this.showCodPopup = false;
-    
-    if (!this.codData) {
-      this.saleForm.patchValue({
-        typeOfService: ''
-      });
-    }
-  }
-
-  onPpServiceFormSubmit(formData: any): void {
-    this.ppServiceData = formData;
-    this.showPpServicePopup = false;
-    
-    if (formData.transactionId && !this.saleForm.get('transactionId')?.value) {
-      this.saleForm.patchValue({
-        transactionId: formData.transactionId
-      });
-    }
-  }
-
-  onPpServiceClose(): void {
-    this.showPpServicePopup = false;
-    
-    if (!this.ppServiceData) {
-      this.saleForm.patchValue({
-        typeOfService: ''
-      });
-    }
-  }
-
-  loadBusinessLocations(): Promise<void> {
+  loadUsers(): Promise<any[]> {
     return new Promise((resolve, reject) => {
-      this.locationService.getLocations().subscribe({
-        next: (locations: any[]) => {
-          this.businessLocations = locations;
-          if (locations.length > 0) {
-            this.saleForm.patchValue({ businessLocation: locations[0].id });
-          }
-          resolve();
+      this.userService.getUsers().subscribe({
+        next: (users: any[]) => {
+          const formattedUsers = users.map(user => ({
+            ...user,
+            displayName: user.displayName || `${user.firstName} ${user.lastName}`.trim() || user.email
+          }));
+          this.users = formattedUsers;
+          resolve(formattedUsers);
         },
         error: (error: any) => {
-          console.error('Error loading business locations:', error);
+          console.error('Error loading users:', error);
           reject(error);
         }
       });
     });
   }
+private loadTaxRates(): Promise<void> {
+  return new Promise((resolve) => {
+    this.taxService.getTaxRates().subscribe(rates => {
+      this.availableTaxRates = rates;
+      resolve();
+    });
+  });
+}
 
-  toggleCustomerDropdown(): void {
-    this.showCustomerDropdown = !this.showCustomerDropdown;
-    if (this.showCustomerDropdown) {
-      this.filterCustomers();
-    }
+  loadPaymentAccounts(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.accountService.getAccounts((accounts: any[]) => {
+        this.paymentAccounts = accounts;
+        resolve();
+      });
+    });
+  }
+  
+private loadTaxGroups(): Promise<void> {
+  return new Promise((resolve) => {
+    this.taxService.getTaxGroups().subscribe(groups => {
+      this.availableTaxGroups = groups.map(group => ({
+        ...group,
+        calculatedRate: this.calculateGroupRate(group.taxRates)
+      }));
+      resolve();
+    });
+  });
+}
+
+
+private calculateGroupRate(taxRates: TaxRate[]): number {
+  return taxRates.reduce((total, rate) => total + rate.rate, 0);
+}
+
+  initializeForm(): void {
+    this.saleForm = this.fb.group({
+      customer: ['', Validators.required],
+      customerName: [''],
+      invoiceNo: ['', Validators.required],
+      orderNo: ['', Validators.required],
+      customerPhone: ['', Validators.required],
+      transactionId: [''],
+          orderStatus: ['', Validators.required], // <-- FIX: Add this line
+
+      productInterested: [''],
+      status: ['Pending', Validators.required],
+      paymentStatus: ['Due'],
+      alternateContact: [''],
+      customerAge: [null],
+      customerDob: [null],
+      customerGender: [''],
+      customerEmail: [''],
+      shippingDetails: [''],
+      roundOff: [0],
+      productTaxAmount: [0],
+      shippingTaxAmount: [0],
+      codTaxAmount: [0],
+      ppTaxAmount: [0],
+      customerSearch: [''],
+      customerOccupation: [''],
+      creditLimit: [0],
+      otherData: [''],
+      paymentAccount: [''],
+      prescriptions: [[]],
+      typeOfService: [''],
+      billingAddress: [''],
+      shippingAddress: [''],
+      saleDate: [this.todayDate, Validators.required],
+      businessLocation: ['', Validators.required],
+      invoiceScheme: [''],
+      document: [null],
+      discountType: ['Percentage'],
+      discountAmount: [0, [Validators.min(0)]],
+      orderTax: [18, [Validators.min(0), Validators.max(100)]],
+      sellNote: [''],
+      shippingCharges: [0, [Validators.min(0)]],
+      shippingStatus: [''],
+      deliveryPerson: [''],
+      shippingDocuments: [null],
+      totalPayable: [0],
+      paymentAmount: [0, [Validators.required, Validators.min(0)]],
+      paidOn: [this.todayDate],
+      paymentMethod: [''],
+      paymentNote: [''],
+      changeReturn: [0],
+      balance: [0],
+      addedBy: ['', Validators.required]
+    });
+
+    this.afterTaxShippingControl.valueChanges.subscribe(value => {
+      this.onAfterTaxShippingChange(value);
+    });
   }
 
-  selectCustomer(customer: any): void {
-    const addressParts = [
-      customer.addressLine1,
-      customer.addressLine2,
-      customer.city,
-      customer.state,
-      customer.country,
-      customer.zipCode
-    ].filter(part => part);
-    
-    const fullAddress = addressParts.join(', ');
-    const phoneNumber = customer.mobile || customer.phone || customer.alternateContact || customer.landline || '';
+  setupValueChanges(): void {
+    this.saleForm.get('paymentAmount')?.valueChanges.subscribe(() => {
+      this.calculateBalanceOnly();
+    });
 
-    let formattedDob = '';
-    if (customer.dob) {
-      const dobDate = customer.dob instanceof Date ? customer.dob : new Date(customer.dob);
-      if (!isNaN(dobDate.getTime())) {
-        formattedDob = this.datePipe.transform(dobDate, 'yyyy-MM-dd') || '';
-      }
+    // UPDATED: Make discount and shipping changes trigger recalculation
+    this.saleForm.get('discountAmount')?.valueChanges.subscribe(() => {
+      this.recalculateAllTotals();
+    });
+
+    this.saleForm.get('orderTax')?.valueChanges.subscribe(() => {
+      this.recalculateAllTotals();
+    });
+
+    this.saleForm.get('shippingCharges')?.valueChanges.subscribe(() => {
+      this.recalculateAllTotals();
+    });
+
+    this.saleForm.get('discountType')?.valueChanges.subscribe(() => {
+      this.recalculateAllTotals();
+    });
+  }
+
+calculateDiscountedTotal(): number {
+  const discountAmount = this.saleForm.get('discountAmount')?.value || 0;
+  const discountType = this.saleForm.get('discountType')?.value || 'Percentage';
+  
+  let finalAmount = this.itemsTotal; // This is now sum of subtotals
+  
+  if (discountType === 'Percentage') {
+    finalAmount = this.itemsTotal - (this.itemsTotal * discountAmount / 100);
+  } else {
+    finalAmount = this.itemsTotal - discountAmount;
+  }
+  
+  return Math.max(0, finalAmount);
+}
+// In your component class, add this method:
+calculateSubtotalsTotal(): number {
+  return this.products.reduce((sum, product) => {
+    return sum + (product.subtotal || 0);
+  }, 0);
+}
+  calculateProductTaxes(): void {
+    this.productTaxAmount = 0;
+    for (const product of this.products) {
+      this.calculateProductTax(product);
+      this.productTaxAmount += product.taxAmount || 0;
     }
-
+    
     this.saleForm.patchValue({
-      customer: customer.id,
-      customerName: customer.displayName,
-      customerPhone: phoneNumber,
-      customerEmail: customer.email || '',
-      billingAddress: fullAddress,
-      shippingAddress: fullAddress,
-      alternateContact: customer.alternateContact || '',
-      customerAge: customer.age || null,
-      customerDob: formattedDob, 
-      customerGender: customer.gender || '',
-      customerOccupation: customer.occupation || '',
-      creditLimit: customer.creditLimit || 0,
-      otherData: customer.otherData || customer.notes || '',
-    });
+      productTaxAmount: this.productTaxAmount
+    }, { emitEvent: false });
+  }
+calculateShippingTax(): void {
+  const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
+  const taxRate = this.saleForm.get('orderTax')?.value || 0;
+  
+  this.shippingTaxAmount = parseFloat((shippingBeforeTax * (taxRate / 100)).toFixed(2));
+  
+  this.saleForm.patchValue({
+    shippingTaxAmount: this.shippingTaxAmount
+  }, { emitEvent: false });
+  
+  // Update the after-tax shipping control value with rounded number
+  const afterTaxValue = parseFloat((shippingBeforeTax + this.shippingTaxAmount).toFixed(2));
+  this.afterTaxShippingControl.setValue(afterTaxValue, { emitEvent: false });
+}
+
+  calculateBalanceOnly(): void {
+    const totalPayable = this.saleForm.get('totalPayable')?.value || 0;
+    const paymentAmount = this.saleForm.get('paymentAmount')?.value || 0;
+    const roundOff = this.saleForm.get('roundOff')?.value || 0;
     
-    this.customerSearchInput = customer.displayName;
-    this.showCustomerDropdown = false;
+    const roundedTotal = totalPayable + roundOff;
+
+    if (paymentAmount > roundedTotal) {
+      this.saleForm.patchValue({
+        changeReturn: parseFloat((paymentAmount - roundedTotal).toFixed(2)),
+        balance: 0
+      }, { emitEvent: false });
+    } else {
+      this.saleForm.patchValue({
+        changeReturn: 0,
+        balance: parseFloat((roundedTotal - paymentAmount).toFixed(2))
+      }, { emitEvent: false });
+    }
   }
 
-  findCustomerByPhone(phone: string): any {
-    let customer = this.customers.find(c => 
-      c.mobile === phone || 
-      c.phone === phone ||
-      c.alternateContact === phone ||
-      c.landline === phone
-    );
-    if (customer) return customer;
 
-    const cleanPhone = phone.replace(/\D/g, '');
-    customer = this.customers.find(c => {
-      const custMobile = c.mobile?.replace(/\D/g, '') || '';
-      const custPhone = c.phone?.replace(/\D/g, '') || '';
-      const custAlt = c.alternateContact?.replace(/\D/g, '') || '';
-      const custLandline = c.landline?.replace(/\D/g, '') || '';
-      return custMobile === cleanPhone || 
-             custPhone === cleanPhone || 
-             custAlt === cleanPhone ||
-             custLandline === cleanPhone;
-    });
+
+calculateFinalTotals(discountedTotal: number, shippingWithTax: number): void {
+  const serviceCharge = this.ppServiceData?.packingCharge || this.codData?.packingCharge || 0;
+  
+  /* 
+     CRITICAL CHANGE: 
+     We no longer add this.productTaxAmount here because it is 
+     already inside the 'discountedTotal' (which came from itemsTotal/subtotals)
+  */
+  const rawTotal = discountedTotal + shippingWithTax + serviceCharge;
+  
+  const roundedTotal = Math.round(rawTotal);
+  const roundOff = roundedTotal - rawTotal;
+  
+  this.saleForm.patchValue({
+    roundOff: parseFloat(roundOff.toFixed(2)),
+    totalPayable: roundedTotal 
+  }, { emitEvent: false });
+  
+  this.calculateBalance();
+}
+
+ calculateProductTax(product: Product): void {
+  const taxRate = product.taxRate || 0;
+  const taxableAmount = (product.priceBeforeTax || 0) * product.quantity;
+  
+  product.taxAmount = (taxableAmount * taxRate) / 100;
+  
+  if (taxRate === 18) {
+    product.taxType = 'GST'; // Changed from 'CGST+SGST' to just 'GST'
+    product.cgstAmount = product.taxAmount / 2;
+    product.sgstAmount = product.taxAmount / 2;
+    product.igstAmount = 0;
+  } else if (taxRate === 28) {
+    product.taxType = 'IGST';
+    product.igstAmount = product.taxAmount;
+    product.cgstAmount = 0;
+    product.sgstAmount = 0;
+  } else if (taxRate > 0) {
+    product.taxType = 'GST'; // Changed from 'CGST+SGST' to just 'GST'
+    product.cgstAmount = product.taxAmount / 2;
+    product.sgstAmount = product.taxAmount / 2;
+    product.igstAmount = 0;
+  } else {
+    product.taxType = 'None';
+    product.cgstAmount = 0;
+    product.sgstAmount = 0;
+    product.igstAmount = 0;
+  }
+}
+
+  calculateShippingWithTax(): number {
+    const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
+    const taxRate = this.saleForm.get('orderTax')?.value || 0;
     
-    return customer;
+    const shippingTax = shippingBeforeTax * (taxRate / 100);
+    const shippingWithTax = shippingBeforeTax + shippingTax;
+    
+    this.saleForm.patchValue({
+      shippingTaxAmount: shippingTax
+    }, { emitEvent: false });
+    
+    return shippingWithTax;
   }
 
+
+
+  calculateRoundOff(): void {
+    const totalPayable = this.saleForm.get('totalPayable')?.value || 0;
+    const roundedTotal = Math.round(totalPayable);
+    const roundOff = roundedTotal - totalPayable;
+    
+    this.saleForm.patchValue({
+      roundOff: parseFloat(roundOff.toFixed(2)),
+      totalPayable: parseFloat(totalPayable.toFixed(2))
+    }, { emitEvent: false });
+    
+    this.calculateBalance();
+  }
+
+
+
+
+
+
+
+  logCalculationDetails(): void {
+    console.log('🔍 CALCULATION DETAILS:');
+    console.log('Edit Mode:', this.isEditing);
+    console.log('Preserve Original Totals:', this.preserveOriginalTotals);
+    console.log('Original Total Payable:', this.originalTotalPayable);
+    console.log('Current Total Payable:', this.saleForm.get('totalPayable')?.value);
+    console.log('Products:', this.products);
+    console.log('Items Total:', this.itemsTotal);
+  }
+
+  // Product management methods
+  updateProduct(index: number): void {
+    const product = this.products[index];
+    
+    if (product.priceBeforeTax !== undefined && product.taxRate !== undefined) {
+      product.unitPrice = product.priceBeforeTax * (1 + (product.taxRate / 100));
+    } else if (product.unitPrice !== undefined && product.taxRate !== undefined) {
+      product.priceBeforeTax = product.unitPrice / (1 + (product.taxRate / 100));
+    }
+
+    this.calculateProductTax(product);
+
+    const subtotalBeforeDiscount = product.quantity * product.unitPrice;
+    let discountAmount = 0;
+    if (product.discountType === 'Percentage') {
+      discountAmount = (subtotalBeforeDiscount * product.discount) / 100;
+    } else {
+      discountAmount = product.discount;
+    }
+
+    const discountedSubtotal = subtotalBeforeDiscount - discountAmount;
+    product.commissionAmount = (product.commissionPercent || 0) / 100 * discountedSubtotal;
+    product.subtotal = discountedSubtotal - product.commissionAmount;
+
+    // UPDATED: Always recalculate totals when products change
+    this.recalculateAllTotals();
+  }
+
+  addProduct(): void {
+    this.products.push({
+      name: '',
+      quantity: 1,
+      unitPrice: 0,
+      discount: 0,
+      discountType: 'Amount',
+      commissionPercent: 0,
+      commissionAmount: 0,
+      subtotal: 0,
+      priceBeforeTax: 0,
+      taxIncluded: false,
+      batchNumber: '',
+      expiryDate: '',
+      taxRate: 0,
+      taxAmount: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: 0,
+      taxType: ''
+    });
+    
+    // UPDATED: Always recalculate totals when products are added
+    this.recalculateAllTotals();
+  }
+
+  private showToast(message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') {
+    const toastOptions = {
+      timeOut: 5000,
+      progressBar: true,
+      closeButton: true
+    };
+
+    switch(type) {
+      case 'success':
+        this.toastr.success(message, 'Success', toastOptions);
+        break;
+      case 'error':
+        this.toastr.error(message, 'Error', toastOptions);
+        break;
+      case 'warning':
+        this.toastr.warning(message, 'Warning', toastOptions);
+        break;
+      default:
+        this.toastr.info(message, 'Info', toastOptions);
+    }
+  }
+
+  removeProduct(index: number): void {
+    if (this.products.length <= 1) {
+      this.showToast('At least one product is required', 'error');
+      return;
+    }
+    
+    this.products.splice(index, 1);
+    
+    // UPDATED: Always recalculate totals when products are removed
+    this.recalculateAllTotals();
+  }
+
+  onDynamicProductSelect(productName: string, index: number): void {
+    if (!productName) {
+      this.products[index].unitPrice = 0;
+      this.products[index].quantity = 0;
+      this.updateProduct(index);
+      return;
+    }
+
+    const selectedProduct = this.allProducts.find(p => p.productName === productName);
+    if (selectedProduct) {
+      this.products[index].name = selectedProduct.productName;
+      this.products[index].productName = selectedProduct.productName;
+      this.products[index].unitPrice = selectedProduct.defaultSellingPriceExcTax || 0;
+      this.products[index].priceBeforeTax = selectedProduct.defaultSellingPriceExcTax || 0;
+      this.products[index].taxRate = selectedProduct.taxRate || 0;
+      this.products[index].id = selectedProduct.id;
+      
+      if (this.products[index].quantity <= 0) {
+        this.products[index].quantity = 1;
+      }
+      
+      this.updateProduct(index);
+    }
+  }
+
+  // Search and filter methods
   onSearchInput(event: any): void {
     if (this.searchTimeout) {
       clearTimeout(this.searchTimeout);
@@ -1209,15 +1164,6 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     
     this.searchResults = this.allProducts
       .filter(product => {
-        if (this.filterOptions.inStockOnly && 
-            (product.currentStock <= 0 && product.totalQuantity <= 0)) {
-          return false;
-        }
-        if (product.defaultSellingPriceExcTax < this.filterOptions.priceRange.min || 
-            product.defaultSellingPriceExcTax > this.filterOptions.priceRange.max) {
-          return false;
-        }
-        
         const searchString = [
           product.productName || product.name,
           product.sku,
@@ -1233,8 +1179,7 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
         ...product,
         productName: product.productName || product.name,
         currentStock: product.currentStock || product.totalQuantity || 0,
-        defaultSellingPriceExcTax: product.defaultSellingPriceExcTax || 0,
-        selected: product.selected || false
+        defaultSellingPriceExcTax: product.defaultSellingPriceExcTax || 0
       }));
     
     this.showSearchResults = this.searchResults.length > 0;
@@ -1247,102 +1192,10 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     }
   }
 
-  openCustomerEditPopup(): void {
-    const customerId = this.saleForm.get('customer')?.value;
-    if (!customerId) {
-      this.showToast('Please select a customer first', 'error');
-      return;
-    }
-
-    const customer = this.customers.find(c => c.id === customerId);
-    if (customer) {
-      const formBillingAddress = this.saleForm.get('billingAddress')?.value;
-      const formShippingAddress = this.saleForm.get('shippingAddress')?.value;
-      const formAlternateContact = this.saleForm.get('alternateContact')?.value;
-
-      this.selectedCustomerForEdit = { 
-        ...customer,
-        isIndividual: !customer.businessName,
-        firstName: customer.firstName || '',
-        lastName: customer.lastName || '',
-        billingAddress: formBillingAddress || customer.billingAddress || customer.addressLine1 || '',
-        shippingAddress: formShippingAddress || customer.shippingAddress || customer.addressLine1 || '',
-        alternateContact: formAlternateContact || customer.alternateContact || '',
-        email: this.saleForm.get('customerEmail')?.value || customer.email || '',
-        mobile: this.saleForm.get('customerPhone')?.value || customer.mobile || '',
-        age: this.saleForm.get('customerAge')?.value || customer.age || null,
-        dob: this.saleForm.get('customerDob')?.value || customer.dob || null,
-        gender: this.saleForm.get('customerGender')?.value || customer.gender || ''
-      };
-      this.showCustomerEditPopup = true;
-    } else {
-      this.showToast('Customer not found in local list', 'error');
-    }
-  }
-
-  onCustomerSave(updatedCustomer: any): void {
-    try {
-      this.customerService.updateCustomer(updatedCustomer.id, updatedCustomer)
-        .then(() => {
-          this.saleForm.patchValue({
-            customer: updatedCustomer.id,
-            customerName: updatedCustomer.displayName,
-            customerPhone: updatedCustomer.mobile || updatedCustomer.phone || '',
-            customerEmail: updatedCustomer.email || '',
-            billingAddress: updatedCustomer.billingAddress || updatedCustomer.addressLine1 || '',
-            shippingAddress: updatedCustomer.shippingAddress || updatedCustomer.addressLine1 || '',
-            alternateContact: updatedCustomer.alternateContact || ''
-          });
-          
-          const index = this.customers.findIndex(c => c.id === updatedCustomer.id);
-          if (index >= 0) {
-            this.customers[index] = updatedCustomer;
-          } else {
-            this.customers.push(updatedCustomer);
-          }
-          
-          this.customerSearchInput = updatedCustomer.displayName;
-          this.showCustomerEditPopup = false;
-          this.changeDetectorRef.detectChanges();
-        })
-        .catch(error => {
-          console.error('Error updating customer:', error);
-          this.showToast('Failed to save customer changes. Please try again.', 'error');
-        });
-    } catch (error) {
-      console.error('Error handling customer save:', error);
-      this.showToast('An unexpected error occurred. Please try again.', 'error');
-    }
-  }
-
-  onCustomerEditClose(): void {
-    this.showCustomerEditPopup = false;
-  }
-
-  onAddressChange(type: 'billing' | 'shipping') {
-    const billingValue = this.saleForm.get('billingAddress')?.value;
-    const shippingValue = this.saleForm.get('shippingAddress')?.value;
-    
-    if (type === 'billing') {
-      this.saleForm.patchValue({ billingAddress: billingValue });
-    } else {
-      this.saleForm.patchValue({ shippingAddress: shippingValue });
-    }
-  }
-
   onSearchBlur() {
     setTimeout(() => {
       this.showSearchResults = false;
     }, 200);
-  }
-
-  highlightMatch(text: string, searchTerm: string): string {
-    if (!text || !searchTerm) return text;
-    
-    const regex = new RegExp(searchTerm, 'gi');
-    return text.replace(regex, match => 
-      `<span class="highlight">${match}</span>`
-    );
   }
 
   handleKeyDown(event: KeyboardEvent) {
@@ -1397,10 +1250,10 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
         currentStock: product.currentStock || product.totalQuantity || 0,
         defaultSellingPriceExcTax: product.defaultSellingPriceExcTax,
         defaultSellingPriceIncTax: product.defaultSellingPriceIncTax,
-        taxRate: product.taxRate || (product.applicableTax?.percentage || 0),
+        taxRate: product.taxRate || 0,
         quantity: 1,
         discount: 0,
-        commissionPercent: this.defaultProduct.commissionPercent || 0,
+        commissionPercent: 0,
         commissionAmount: 0,
         subtotal: unitPrice,
         batchNumber: product.batchNumber || '',
@@ -1422,350 +1275,801 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     this.clearSearch();
   }
 
-  onProductSelect(productName: string): void {
-    if (!productName) {
-      this.resetDefaultProduct();
-      return;
-    }
-
-    const selectedProduct = this.allProducts.find(p => p.productName === productName);
-    if (selectedProduct) {
-      this.populateDefaultProduct(selectedProduct);
-    }
-  }
-
-  private resetDefaultProduct(): void {
-    this.defaultProduct = {
-      name: '',
-      quantity: 1,
-      unitPrice: 0,
-      discount: 0,
-      subtotal: 0,
-      commissionPercent: 0,
-      commissionAmount: 0,
-      priceBeforeTax: 0,
-      taxIncluded: false,
-      discountType: 'Amount',
-      batchNumber: '',
-      lastNumber: '',
-      lastNumbers: [],
-      batches: [],
-      taxRate: 0,
-      taxAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      igstAmount: 0,
-      taxType: ''
-    };
-    this.updateDefaultProduct();
-  }
-
-  private populateDefaultProduct(selectedProduct: any): void {
-    this.defaultProduct.name = selectedProduct.productName;
-    this.defaultProduct.priceBeforeTax = selectedProduct.defaultSellingPriceExcTax || 0;
-    
-    const taxRate = selectedProduct.taxRate !== undefined
-      ? selectedProduct.taxRate
-      : (selectedProduct.applicableTax ? selectedProduct.applicableTax.percentage : 0);
-    
-    this.defaultProduct.taxRate = taxRate;
-    this.defaultProduct.unitPrice = selectedProduct.defaultSellingPriceIncTax ||
-      (this.defaultProduct.priceBeforeTax * (1 + (taxRate / 100)));
-    this.defaultProduct.quantity = 1;
-    
-    this.defaultProduct.batchNumber = selectedProduct.batchNumber || '';
-    this.defaultProduct.lastNumber = selectedProduct.lastNumber || '';
-    this.defaultProduct.lastNumbers = selectedProduct.lastNumbers || [];
-    
-    this.updateDefaultProduct();
-  }
-
   clearSearch() {
     this.searchTerm = '';
     this.searchResults = [];
     this.showSearchResults = false;
   }
 
+  highlightMatch(text: string, searchTerm: string): string {
+    if (!text || !searchTerm) return text;
+    
+    const regex = new RegExp(searchTerm, 'gi');
+    return text.replace(regex, match => 
+      `<span class="highlight">${match}</span>`
+    );
+  }
+
+  filterProducts(): void {
+    if (!this.productSearchTerm) {
+      this.filteredProducts = [...this.allProducts];
+      return;
+    }
+    
+    const searchTerm = this.productSearchTerm.toLowerCase();
+    this.filteredProducts = this.allProducts.filter(product => 
+      product.productName.toLowerCase().includes(searchTerm)
+    );
+  }
+
+  // Customer management methods
+  filterCustomers(): void {
+    if (!this.customerSearchInput) {
+      this.filteredCustomers = [...this.customers];
+      return;
+    }
+
+    const filter = this.customerSearchInput.toUpperCase();
+    
+    this.filteredCustomers = this.customers.filter(customer => {
+      const searchString = [
+        customer.displayName || '',
+        customer.contactId || '',
+        customer.mobile || '',
+        customer.phone || '',
+        customer.alternateContact || '',
+        customer.landline || ''
+      ]
+      .filter(field => field)
+      .join(' ')
+      .toUpperCase();
+      
+      return searchString.includes(filter);
+    });
+  }
+
+  toggleCustomerDropdown(): void {
+    this.showCustomerDropdown = !this.showCustomerDropdown;
+    if (this.showCustomerDropdown) {
+      this.filterCustomers();
+    }
+  }
+
+  selectCustomer(customer: any): void {
+    const addressParts = [
+      customer.addressLine1,
+      customer.addressLine2,
+      customer.city,
+      customer.state,
+      customer.country,
+      customer.zipCode
+    ].filter(part => part);
+    
+    const fullAddress = addressParts.join(', ');
+    const phoneNumber = customer.mobile || customer.phone || customer.alternateContact || customer.landline || '';
+
+    let formattedDob = '';
+    if (customer.dob) {
+      const dobDate = customer.dob instanceof Date ? customer.dob : new Date(customer.dob);
+      if (!isNaN(dobDate.getTime())) {
+        formattedDob = this.datePipe.transform(dobDate, 'yyyy-MM-dd') || '';
+      }
+    }
+
+    this.saleForm.patchValue({
+      customer: customer.id,
+      customerName: customer.displayName,
+      customerPhone: phoneNumber,
+      customerEmail: customer.email || '',
+      billingAddress: fullAddress,
+      shippingAddress: fullAddress,
+      
+      alternateContact: customer.alternateContact || '',
+      customerAge: customer.age || null,
+      customerDob: formattedDob, 
+      customerGender: customer.gender || '',
+      customerOccupation: customer.occupation || '',
+      creditLimit: customer.creditLimit || 0,
+      otherData: customer.otherData || customer.notes || '',
+    });
+    
+    this.customerSearchInput = customer.displayName;
+    this.showCustomerDropdown = false;
+    
+    // Trigger customer details change event
+    this.onCustomerDetailsChange();
+  }
+
+  searchCustomerByPhone(): void {
+    const inputPhone = this.saleForm.get('customerPhone')?.value?.trim();
+    
+    if (!inputPhone || inputPhone.length < 5) {
+      return;
+    }
+
+    const cleanPhone = inputPhone.replace(/\D/g, '');
+
+    const foundCustomer = this.customers.find(customer => {
+      const customerPhones = [
+        customer.mobile,
+        customer.phone,
+        customer.alternateContact,
+        customer.landline
+      ].filter(phone => phone);
+
+      return customerPhones.some(phone => {
+        const cleanCustomerPhone = phone?.replace(/\D/g, '') || '';
+        return phone === inputPhone || cleanCustomerPhone === cleanPhone;
+      });
+    });
+
+    if (foundCustomer) {
+      let formattedDob = '';
+      if (foundCustomer.dob) {
+        const dobDate = foundCustomer.dob instanceof Date ? foundCustomer.dob : new Date(foundCustomer.dob);
+        if (!isNaN(dobDate.getTime())) {
+          formattedDob = this.datePipe.transform(dobDate, 'yyyy-MM-dd') || '';
+        }
+      }
+      
+      this.saleForm.patchValue({
+        customer: foundCustomer.id,
+        customerName: foundCustomer.displayName,
+        customerPhone: foundCustomer.mobile || foundCustomer.phone || '',
+        alternateContact: foundCustomer.alternateContact || '',
+        customerEmail: foundCustomer.email || '',
+        customerAge: foundCustomer.age || null,
+        customerDob: formattedDob,
+          customerOccupation: foundCustomer.occupation || '', // Add this line
+
+        customerGender: foundCustomer.gender || '',
+        billingAddress: foundCustomer.addressLine1 || '',
+        shippingAddress: foundCustomer.addressLine1 || '',
+        creditLimit: foundCustomer.creditLimit || 0
+      });
+      this.customerSearchInput = foundCustomer.displayName;
+      
+      // Trigger customer details change event
+      this.onCustomerDetailsChange();
+    }
+  }
+
+  onCustomerBlur(): void {
+    setTimeout(() => {
+      this.showCustomerDropdown = false;
+    }, 200);
+  }
+
+  // FIXED: Customer details change handler
+  onCustomerDetailsChange(): void {
+    console.log('🔄 Customer details changed');
+    
+    // Only update prescription if modal is open and no manual edits have been made
+    if (this.modalInstance && 
+        document.getElementById('prescriptionModal')?.classList.contains('show') &&
+        !this.hasManualPrescriptionEdit) {
+      
+      console.log('📝 Updating prescription with new customer details');
+      
+      // Update prescription data
+      this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || '';
+      this.prescriptionData.patientAge = this.saleForm.get('customerAge')?.value?.toString() || '';
+      
+      // Update the modal fields
+      this.updatePatientInfoInModal();
+    }
+  }
+
+  // FIXED: Patient name edit handlers
+  onPatientNameEdit(event: any): void {
+    const newValue = event.target.textContent?.trim() || '';
+    console.log('✏️ Patient name manually edited to:', newValue);
+    
+    this.hasManualPrescriptionEdit = true;
+    this.manualPatientName = newValue;
+    this.prescriptionData.patientName = newValue;
+  }
+
+  onPatientNameInput(event: any): void {
+    const newValue = event.target.textContent?.trim() || '';
+    this.hasManualPrescriptionEdit = true;
+    this.manualPatientName = newValue;
+    this.prescriptionData.patientName = newValue;
+  }
+
+  onPatientAgeEdit(event: any): void {
+    const newValue = event.target.textContent?.trim() || '';
+    console.log('✏️ Patient age manually edited to:', newValue);
+    
+    this.hasManualPrescriptionEdit = true;
+    this.manualPatientAge = newValue;
+    this.prescriptionData.patientAge = newValue;
+  }
+
+  onPatientAgeInput(event: any): void {
+    const newValue = event.target.textContent?.trim() || '';
+    this.hasManualPrescriptionEdit = true;
+    this.manualPatientAge = newValue;
+    this.prescriptionData.patientAge = newValue;
+  }
+
+// Method to manually refresh customer info in prescription
+refreshCustomerInfoInPrescription(): void {
+  if (this.prescriptionData && !this.hasManualPrescriptionEdit) {
+    this.autoFetchCustomerDetails();
+    this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || '';
+    this.prescriptionData.patientAge = this.saleForm.get('customerAge')?.value?.toString() || '';
+    this.updatePatientInfoInModal();
+    this.showToast('Customer information updated in prescription', 'success');
+  }
+}
+  openCustomerEditPopup(): void {
+    const customerId = this.saleForm.get('customer')?.value;
+    if (!customerId) {
+      this.showToast('Please select a customer first', 'error');
+      return;
+    }
+
+    const customer = this.customers.find(c => c.id === customerId);
+    if (customer) {
+      const formBillingAddress = this.saleForm.get('billingAddress')?.value;
+      const formShippingAddress = this.saleForm.get('shippingAddress')?.value;
+      const formAlternateContact = this.saleForm.get('alternateContact')?.value;
+
+      this.selectedCustomerForEdit = { 
+        ...customer,
+        isIndividual: !customer.businessName,
+        firstName: customer.firstName || '',
+        lastName: customer.lastName || '',
+        billingAddress: formBillingAddress || customer.billingAddress || customer.addressLine1 || '',
+        shippingAddress: formShippingAddress || customer.shippingAddress || customer.addressLine1 || '',
+        alternateContact: formAlternateContact || customer.alternateContact || '',
+        email: this.saleForm.get('customerEmail')?.value || customer.email || '',
+        mobile: this.saleForm.get('customerPhone')?.value || customer.mobile || '',
+        age: this.saleForm.get('customerAge')?.value || customer.age || null,
+        dob: this.saleForm.get('customerDob')?.value || customer.dob || null,
+        gender: this.saleForm.get('customerGender')?.value || customer.gender || ''
+      };
+      this.showCustomerEditPopup = true;
+    } else {
+      this.showToast('Customer not found in local list', 'error');
+    }
+  }
+
+
+  onCustomerEditClose(): void {
+    this.showCustomerEditPopup = false;
+  }
+
+  // Service type methods
+  onServiceTypeChange(event: any): void {
+    const serviceId = event.target.value;
+    
+    if (this.showPpServicePopup && serviceId !== this.saleForm.get('typeOfService')?.value) {
+      this.ppServiceData = null;
+    }
+    if (this.showCodPopup && serviceId !== this.saleForm.get('typeOfService')?.value) {
+      this.codData = null;
+    }
+
+    const selectedService = this.serviceTypes.find(s => s.id === serviceId);
+    const serviceName = selectedService?.name?.toLowerCase() || '';
+
+    this.showPpServicePopup = false;
+    this.showCodPopup = false;
+
+    if (serviceName.includes('pp')) {
+      this.showPpServicePopup = true;
+      this.codData = null;
+      this.saleForm.patchValue({ typeOfService: serviceId });
+    } 
+    else if (serviceId === 'COD' || serviceName.includes('cod')) {
+      this.showCodPopup = true;
+      this.ppServiceData = null;
+      this.saleForm.patchValue({ typeOfService: serviceId });
+    } 
+    else {
+      this.saleForm.patchValue({ typeOfService: serviceId });
+    }
+
+    this.showTransactionIdField = !!selectedService?.name && 
+                              (serviceName.includes('pp') || 
+                               serviceName.includes('payment'));
+    
+    const transactionIdControl = this.saleForm.get('transactionId');
+    if (transactionIdControl) {
+      if (this.showTransactionIdField) {
+        transactionIdControl.setValidators([Validators.required]);
+      } else {
+        transactionIdControl.clearValidators();
+      }
+      transactionIdControl.updateValueAndValidity();
+    }
+  }
+ async onCustomerSave(updatedCustomer: any): Promise<void> {
+    try {
+      const updatedBy = this.currentUser; // Get the name of the user making the change
+
+      // Step 1: Update the main customer record in the database
+      // This also creates a detailed activity log for the customer.
+      await this.customerService.updateCustomer(updatedCustomer.id, updatedCustomer, updatedBy);
+
+      // Step 2: Prepare the data to update on the current sale document
+      const saleUpdateData = {
+        customerName: updatedCustomer.displayName || 
+                      `${updatedCustomer.firstName || ''} ${updatedCustomer.lastName || ''}`.trim(),
+        customerPhone: updatedCustomer.mobile || updatedCustomer.phone || '',
+        customerEmail: updatedCustomer.email || '',
+        billingAddress: updatedCustomer.billingAddress || updatedCustomer.addressLine1 || '',
+        shippingAddress: updatedCustomer.shippingAddress || updatedCustomer.addressLine1 || '',
+        alternateContact: updatedCustomer.alternateContact || '',
+        customerAge: updatedCustomer.age || null,
+        customerDob: updatedCustomer.dob || null,
+        customerGender: updatedCustomer.gender || '',
+        customerOccupation: updatedCustomer.occupation || '',
+        updatedAt: new Date() // Mark the sale as updated
+      };
+      
+      // Step 3: Update the current sale document in the database
+      if (this.saleId) {
+        await this.saleService.updateSaleWithStockHandling(this.saleId, saleUpdateData);
+      }
+      
+      // Step 4: Update the local component state to reflect the changes instantly
+      
+      // Update the main form
+      this.saleForm.patchValue(saleUpdateData);
+      
+      // Update the customer in the local customers array
+      const index = this.customers.findIndex(c => c.id === updatedCustomer.id);
+      if (index >= 0) {
+        this.customers[index] = { ...this.customers[index], ...updatedCustomer };
+        this.filteredCustomers = [...this.customers]; // Refresh filtered list
+      } else {
+        // If for some reason the customer wasn't in the list, add them
+        this.customers.push(updatedCustomer);
+      }
+      
+      // Update the search input to show the new customer name
+      this.customerSearchInput = updatedCustomer.displayName || 
+                                 `${updatedCustomer.firstName || ''} ${updatedCustomer.lastName || ''}`.trim();
+      
+      // Close the popup
+      this.showCustomerEditPopup = false;
+      
+      // Notify the user of success
+      this.showToast('Customer and sale information updated successfully!', 'success');
+
+      // Trigger change detection to be sure the UI updates
+      this.changeDetectorRef.detectChanges();
+
+    } catch (error) {
+      console.error('Error saving customer changes:', error);
+      this.showToast('Failed to save customer changes. Please try again.', 'error');
+    }
+  }
+
+onCodFormSubmit(formData: any): void {
+  this.codData = formData;
+  this.showCodPopup = false;
+  
+  // CRITICAL FIX: Recalculate all totals to include the new COD packing charge.
+  this.recalculateAllTotals();
+}
+
+  onCodClose(): void {
+    this.showCodPopup = false;
+    
+    if (!this.codData) {
+      this.saleForm.patchValue({
+        typeOfService: ''
+      });
+    }
+  }
+
+onPpServiceFormSubmit(formData: any): void {
+  this.ppServiceData = formData;
+  this.showPpServicePopup = false;
+  
+  if (formData.transactionId && !this.saleForm.get('transactionId')?.value) {
+    this.saleForm.patchValue({
+      transactionId: formData.transactionId
+    });
+  }
+  
+  // CRITICAL FIX: Recalculate all totals to include the new PP service packing charge.
+  this.recalculateAllTotals();
+}
+
+  onPpServiceClose(): void {
+    this.showPpServicePopup = false;
+    
+    if (!this.ppServiceData) {
+      this.saleForm.patchValue({
+        typeOfService: ''
+      });
+    }
+  }
+
+  // Prescription methods with improved modal handling - FIXED VERSION
   selectMedicineType(type: string): void {
     this.selectedMedicineType = type;
   }
 
-  openPrescriptionModal(event?: Event): void {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-
-    if (this.editingPrescriptionIndex === null) {
-      this.resetPrescriptionData();
-      this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || '';
-      this.prescriptionData.date = this.todayDate;
-    }
-
-    const modalElement = document.getElementById('prescriptionModal');
-    if (modalElement) {
-      this.currentPrescriptionModal = new bootstrap.Modal(modalElement, {
-        keyboard: false,
-        backdrop: 'static'
-      });
-      this.currentPrescriptionModal.show();
-
-      setTimeout(() => {
-        this.forceLTRDirection();
-      }, 150);
-    }
+  getMedicineTypeName(type: string): string {
+    const typeNames: {[key: string]: string} = {
+      'kasayam': 'കഷായം',
+      'kasayam_combination': 'കഷായം', // Added this line
+      'buligha': 'ഗുളിക',
+      'bhasmam': 'ഭസ്മം',
+      'krudham': 'ഘൃതം',
+      'suranam': 'ചൂർണ്ണം',
+      'rasayanam': 'രസായനം',
+      'lagium': 'ലേഹ്യം'
+    };
+    return typeNames[type] || 'Medicine';
   }
 
-  private forceLTRDirection(): void {
-    const editableFields = document.querySelectorAll('.prescription-template [contenteditable="true"], .prescription-template input, .prescription-template textarea, .prescription-template select');
-    
-    editableFields.forEach((field: Element) => {
-      const htmlElement = field as HTMLElement;
-      if (htmlElement) {
-        htmlElement.style.direction = 'ltr';
-        htmlElement.style.textAlign = 'left';
-        htmlElement.style.unicodeBidi = 'embed';
-        htmlElement.style.writingMode = 'horizontal-tb';
-        
-        htmlElement.addEventListener('input', this.maintainLTROnInput.bind(this));
-        htmlElement.addEventListener('focus', this.maintainLTROnFocus.bind(this));
-        htmlElement.addEventListener('keydown', this.maintainLTROnKeydown.bind(this));
-        htmlElement.addEventListener('paste', this.maintainLTROnPaste.bind(this));
-      }
-    });
-    
-    const modalContent = document.querySelector('.prescription-template') as HTMLElement;
-    if (modalContent) {
-      modalContent.style.direction = 'ltr';
-      modalContent.style.textAlign = 'left';
-    }
-  }
+  // Updated addMedicineByType method to include kasayam_combination
+  addMedicineByType(): void {
+    if (!this.selectedMedicineType) return;
 
-  private maintainLTROnPaste(event: any): void {
-    const element = event.target;
-    if (element) {
-      setTimeout(() => {
-        element.style.direction = 'ltr';
-        element.style.textAlign = 'left';
-        element.style.unicodeBidi = 'embed';
-      }, 10);
-    }
-  }
+    const newMedicine: Medicine = {
+      name: '',
+      type: this.selectedMedicineType,
+      time: 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി',
+      timing: 'before' // Default timing
+    };
 
-  private maintainLTROnInput(event: any): void {
-    const element = event.target;
-    if (element) {
-      element.style.direction = 'ltr';
-      element.style.textAlign = 'left';
-      element.style.unicodeBidi = 'embed';
-    }
-  }
-
-  private maintainLTROnFocus(event: any): void {
-    const element = event.target;
-    if (element) {
-      element.style.direction = 'ltr';
-      element.style.textAlign = 'left';
-      element.style.unicodeBidi = 'embed';
-    }
-  }
-
-  private maintainLTROnKeydown(event: any): void {
-    const element = event.target;
-    if (element) {
-      setTimeout(() => {
-        element.style.direction = 'ltr';
-        element.style.textAlign = 'left';
-        element.style.unicodeBidi = 'embed';
-      }, 1);
-    }
-  }
-
-  preventEnterSubmission(event: KeyboardEvent): void {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  }
-
-  updatePrescriptionField(field: string, event: any): void {
-    const value = event.target.textContent || event.target.innerText || '';
-    
-    this.maintainLTROnInput(event);
-    
-    switch(field) {
-      case 'patientName':
-        this.prescriptionData.patientName = value;
-        break;
-      case 'patientAge':
-        this.prescriptionData.patientAge = value;
-        break;
-      case 'date':
-        this.prescriptionData.date = value;
-        break;
-    }
-  }
-
-  updateMedicineField(index: number, field: string, event: any): void {
-    const value = event.target.textContent || event.target.innerText || '';
-    
-    this.maintainLTROnInput(event);
-    
-    if (this.prescriptionData.medicines[index]) {
-      this.prescriptionData.medicines[index][field] = value;
-    }
-  }
-
-  closePrescriptionModal(): void {
-    if (this.currentPrescriptionModal) {
-      this.currentPrescriptionModal.hide();
-    }
-    this.editingPrescriptionIndex = null;
-    this.resetPrescriptionData();
-  }
-
-  savePrescription(): void {
-    this.savePrescriptionData();
-    
-    if (this.editingPrescriptionIndex !== null) {
-      this.prescriptions[this.editingPrescriptionIndex] = {...this.prescriptionData};
-    } else {
-      this.prescriptions.push({...this.prescriptionData});
-    }
-    
-    this.closePrescriptionModal();
-    this.showToast('Prescription saved successfully!', 'success');
-  }
-
-  viewPrescription(prescription: PrescriptionData): void {
-    this.viewPrescriptionContent = this.generateViewContent(prescription);
-    
-    const modalElement = document.getElementById('prescriptionViewModal');
-    if (modalElement) {
-      if (this.currentViewModal) {
-        this.currentViewModal.dispose();
-      }
-      
-      this.currentViewModal = new bootstrap.Modal(modalElement);
-      this.currentViewModal.show();
-    }
-  }
-
-  private generateViewContent(prescription: PrescriptionData): string {
-    const formattedDate = this.datePipe.transform(prescription.date || this.todayDate, 'MMMM d, yyyy') || this.todayDate;
-    
-    let medicinesHtml = '';
-    prescription.medicines.forEach((medicine, index) => {
-      medicinesHtml += `
-        <div class="medicine-item mb-3 p-3 border rounded">
-          <h6>${index + 1}. ${this.getMedicineTypeName(medicine.type)}</h6>
-          ${this.generateMedicineViewDetails(medicine)}
-        </div>
-      `;
-    });
-
-    return `
-      <div class="prescription-view">
-        <div class="text-center mb-4">
-          <h4>ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h4>
-          <p>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
-          <p>E-mail: contact@herballytouch.com | Ph: 7034110999</p>
-          <p>ഡോ. രാജന പി.ആർ., BAMS</p>
-        </div>
-        
-        <div class="patient-info mb-4">
-          <div class="row">
-            <div class="col-md-4"><strong>പേര്:</strong> ${prescription.patientName || 'Unknown Patient'}</div>
-            <div class="col-md-4"><strong>Age:</strong> ${prescription.patientAge || '___'}</div>
-            <div class="col-md-4"><strong>തീയതി:</strong> ${formattedDate}</div>
-          </div>
-        </div>
-        
-        <div class="medicines">
-          ${medicinesHtml}
-        </div>
-        
-        ${prescription.additionalNotes ? `
-          <div class="additional-notes mt-4 p-3 bg-light rounded">
-            <h6>Additional Notes:</h6>
-            <p>${prescription.additionalNotes}</p>
-          </div>
-        ` : ''}
-      </div>
-    `;
-  }
-
-  private generateMedicineViewDetails(medicine: Medicine): string {
-    let details = '';
-    
-    details += `<p><strong>${medicine.name || '___'}</strong></p>`;
-    
-    const foodTimingLabel = this.getFoodTimingLabel(medicine.foodTiming || 'before_after_food');
-    
-    switch(medicine.type) {
+    switch(this.selectedMedicineType) {
       case 'kasayam':
-        details += `
-          <p>കഷായം ${medicine.instructions || '___'}ml എടുത്ത് ${medicine.quantity || '___'}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${medicine.powder || '___'} ഗുളിക പൊടിച്ച് ചേർത്ത് ${medicine.pills || '___'} നേരം ${foodTimingLabel} സേവിക്കുക.</p>
-        `;
+        newMedicine.instructions = '';
+        newMedicine.quantity = '';
+        newMedicine.powder = '';
+        newMedicine.pills = '';
+        break;
+      case 'kasayam_combination': // Added this case
+        newMedicine.instructions = '';
+        newMedicine.quantity = '';
+        newMedicine.combinationName = '';
+        newMedicine.combinationQuantity = '';
+        newMedicine.frequency = '';
         break;
       case 'buligha':
-        details += `
-          <p>ഗുളിക ${medicine.instructions || '___'} എണ്ണം എടുത്ത് ${medicine.powder || '___'} നേരം ${foodTimingLabel} സേവിക്കുക.</p>
-        `;
+        newMedicine.instructions = '';
+        newMedicine.powder = '';
         break;
-      default:
-        if (medicine.dosage) details += `<p>Dosage: ${medicine.dosage}</p>`;
-        if (medicine.instructions) details += `<p>Instructions: ${medicine.instructions}</p>`;
-        details += `<p>${foodTimingLabel} സേവിക്കുക.</p>`;
+      case 'bhasmam':
+        newMedicine.dosage = '';
+        newMedicine.quantity = '';
+        newMedicine.instructions = '';
+        newMedicine.powder = '';
+        break;
+      case 'krudham':
+        newMedicine.instructions = '';
+        newMedicine.frequency = '';
+        break;
+      case 'suranam':
+        newMedicine.instructions = '';
+        newMedicine.powder = '';
+        newMedicine.dosage = '';
+        newMedicine.frequency = '';
+        break;
+      case 'rasayanam':
+        newMedicine.instructions = '';
+        break;
+      case 'lagium':
+        newMedicine.instructions = '';
+        newMedicine.dosage = '';
+        newMedicine.frequency = '';
+        break;
     }
+
+    this.prescriptionData.medicines.push(newMedicine);
+    this.selectedMedicineType = '';
     
-    return details;
+    // Force change detection and wait for DOM update
+    this.changeDetectorRef.detectChanges();
+    
+    setTimeout(() => {
+      const lastIndex = this.prescriptionData.medicines.length - 1;
+      const firstField = document.getElementById(`medicineName_${lastIndex}`);
+      if (firstField) {
+        firstField.focus();
+      }
+    }, 100);
   }
 
-  closeViewModal(): void {
-    if (this.currentViewModal) {
-      this.currentViewModal.hide();
+  addSameMedicineType(): void {
+    if (!this.selectedMedicineType) return;
+
+    const sameTypeMedicines = this.prescriptionData.medicines.filter(med => med.type === this.selectedMedicineType);
+    
+    if (sameTypeMedicines.length === 0) {
+      this.addMedicineByType();
+      return;
     }
+
+    const lastMedicine = sameTypeMedicines[sameTypeMedicines.length - 1];
+    const newMedicine: Medicine = JSON.parse(JSON.stringify(lastMedicine));
+    
+    this.prescriptionData.medicines.push(newMedicine);
+    
+    // Force change detection and wait for DOM update
+    this.changeDetectorRef.detectChanges();
+    
+    setTimeout(() => {
+      const lastIndex = this.prescriptionData.medicines.length - 1;
+      const firstField = document.getElementById(`medicineName_${lastIndex}`);
+      if (firstField) {
+        firstField.focus();
+      }
+    }, 100);
   }
 
-  printViewedPrescription(): void {
-    const printContent = this.generatePrintContent(this.prescriptions.find(p => this.viewPrescriptionContent.includes(p.patientName || '')) || this.prescriptions[0]);
-    
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
+  addMedicine(): void {
+    this.prescriptionData.medicines.push({
+      name: '',
+      dosage: '',
+      instructions: '',
+      ingredients: '',
+      pills: '',
+      powder: '',
+      time: '',
+      type: '',
+      timing: 'before'
+    });
+
+    // Force change detection and wait for DOM update
+    this.changeDetectorRef.detectChanges();
+
+    setTimeout(() => {
+      const lastIndex = this.prescriptionData.medicines.length - 1;
+      const firstField = document.getElementById(`medicineName_${lastIndex}`);
+      if (firstField) {
+        firstField.focus();
+      }
+    }, 100);
+  }
+
+  removeMedicine(index: number): void {
+    this.prescriptionData.medicines.splice(index, 1);
+    this.changeDetectorRef.detectChanges();
+  }
+
+openPrescriptionModal(): void {
+  console.log('🔵 openPrescriptionModal called');
+  
+  // Prevent multiple modal operations
+  if (this.isModalProcessing) {
+    console.log('⚠️ Modal operation already in progress');
+    return;
+  }
+
+  this.isModalProcessing = true;
+
+  try {
+    // Clean up any existing modal first
+    this.cleanupModal();
+
+    // If not editing, reset prescription data with customer info
+    if (this.editingPrescriptionIndex === null) {
+      this.resetPrescriptionDataWithCustomerInfo();
+    } else {
+      // For editing, preserve the existing medicines but update patient info only if no manual edits
+      this.prescriptionData = {
+        ...this.prescriptions[this.editingPrescriptionIndex]
       };
+      
+      // Don't override manual edits
+      if (!this.hasManualPrescriptionEdit) {
+        this.prescriptionData.patientName = this.saleForm.get('customerName')?.value || this.prescriptionData.patientName || '';
+        this.prescriptionData.patientAge = this.saleForm.get('customerAge')?.value?.toString() || this.prescriptionData.patientAge || '';
+      }
     }
+    
+    // Force change detection before showing modal
+    this.changeDetectorRef.detectChanges();
+
+    // Use setTimeout to ensure DOM is ready
+    setTimeout(() => {
+      const modalElement = document.getElementById('prescriptionModal');
+      if (modalElement) {
+        try {
+          this.modalInstance = new bootstrap.Modal(modalElement, {
+            focus: true,
+            keyboard: true,
+            backdrop: 'static'
+          });
+          
+          // Add event listeners for modal events
+          modalElement.addEventListener('hidden.bs.modal', () => {
+            this.onModalHidden();
+          });
+
+          modalElement.addEventListener('shown.bs.modal', () => {
+            this.isModalProcessing = false;
+            console.log('✅ Modal shown successfully');
+            
+            // Update form fields after modal is shown
+            this.updatePatientInfoInModal();
+            
+            // If editing, populate the fields after modal is fully shown
+            if (this.editingPrescriptionIndex !== null) {
+              setTimeout(() => {
+                this.updateFormFieldsFromPrescription();
+              }, 100);
+            }
+          });
+
+          this.modalInstance.show();
+          console.log('🚀 Modal show() called');
+        } catch (error) {
+          console.error('❌ Error creating modal:', error);
+          this.isModalProcessing = false;
+          this.showToast('Error opening prescription modal. Please try again.', 'error');
+        }
+      } else {
+        console.error('❌ Modal element not found');
+        this.isModalProcessing = false;
+        this.showToast('Modal element not found. Please refresh the page.', 'error');
+      }
+    }, 150);
+
+  } catch (error) {
+    console.error('❌ Error in openPrescriptionModal:', error);
+    this.isModalProcessing = false;
+    this.showToast('Error opening prescription modal. Please try again.', 'error');
+  }
+}
+
+// Auto-fetch customer details from the form
+private autoFetchCustomerDetails(): void {
+  const customerName = this.saleForm.get('customerName')?.value || '';
+  const customerAge = this.saleForm.get('customerAge')?.value || '';
+  const customerPhone = this.saleForm.get('customerPhone')?.value || '';
+
+  console.log('📝 Auto-fetching customer details:', {
+    customerName,
+    customerAge,
+    customerPhone
+  });
+
+  // If customer name is empty but we have a phone, try to find customer
+  if (!customerName && customerPhone) {
+    const foundCustomer = this.customers.find(customer => {
+      const customerPhones = [
+        customer.mobile,
+        customer.phone,
+        customer.alternateContact,
+        customer.landline
+      ].filter(phone => phone);
+
+      return customerPhones.some(phone => {
+        const cleanPhone = phone?.replace(/\D/g, '') || '';
+        const cleanInputPhone = customerPhone.replace(/\D/g, '');
+        return phone === customerPhone || cleanPhone === cleanInputPhone;
+      });
+    });
+
+    if (foundCustomer) {
+      this.saleForm.patchValue({
+        customerName: foundCustomer.displayName,
+        customerAge: foundCustomer.age
+      });
+    }
+  }
+}
+
+// Reset prescription data with customer information
+private resetPrescriptionDataWithCustomerInfo(): void {
+  // Reset manual edit tracking
+  this.hasManualPrescriptionEdit = false;
+  this.manualPatientName = '';
+  this.manualPatientAge = '';
+  
+  const customerName = this.saleForm.get('customerName')?.value || '';
+  const customerAge = this.saleForm.get('customerAge')?.value || '';
+
+  this.prescriptionData = {
+    medicines: [],
+    patientName: customerName,
+    patientAge: customerAge?.toString() || '',
+    date: this.todayDate,
+    additionalNotes: ''
+  };
+
+  console.log('🔄 Reset prescription data with customer info:', this.prescriptionData);
+}
+
+// Update patient info in modal after it's shown
+private updatePatientInfoInModal(): void {
+  setTimeout(() => {
+    // Only update if no manual edits have been made
+    if (!this.hasManualPrescriptionEdit) {
+      // Update patient name field
+      const patientNameElement = document.getElementById('patientName');
+      if (patientNameElement) {
+        patientNameElement.textContent = this.prescriptionData.patientName || '';
+      }
+
+      // Update patient age field
+      const patientAgeElement = document.getElementById('patientAge');
+      if (patientAgeElement) {
+        patientAgeElement.textContent = this.prescriptionData.patientAge || '';
+      }
+    }
+
+    // Always update date field
+    const dateElement = document.getElementById('prescriptionDate');
+    if (dateElement) {
+      dateElement.textContent = this.prescriptionData.date || this.todayDate;
+    }
+
+    console.log('✅ Updated patient info in modal');
+  }, 100);
+}
+  private onModalHidden(): void {
+    console.log('🔴 Modal hidden event triggered');
+    this.cleanupModal();
+    this.editingPrescriptionIndex = null;
+    this.isModalProcessing = false;
+    
+    // Reset manual edit tracking when modal is closed
+    this.hasManualPrescriptionEdit = false;
+    this.manualPatientName = '';
+    this.manualPatientAge = '';
+    
+    // Force change detection
+    this.changeDetectorRef.detectChanges();
   }
 
   editPrescription(index: number): void {
-    this.editingPrescriptionIndex = index;
-    
-    this.prescriptionData = JSON.parse(JSON.stringify(this.prescriptions[index]));
-    
-    this.prescriptionData.patientName = this.prescriptionData.patientName || 
-                                       this.saleForm.get('customerName')?.value || '';
-    this.prescriptionData.date = this.prescriptionData.date || this.todayDate;
-    
-    this.openPrescriptionModal();
-    
-    setTimeout(() => {
-      this.updateFormFieldsFromPrescription();
-      this.forceLTRDirection();
-    }, 200);
-  }
+    // Prevent multiple rapid clicks
+    if (this.isModalProcessing) {
+      console.log('⚠️ Modal operation already in progress, ignoring edit request');
+      return;
+    }
 
-  private setEditableField(id: string, value: string | undefined): void {
-    const element = document.getElementById(id);
-    if (element) {
-      element.textContent = value || '';
-      element.style.direction = 'ltr';
-      element.style.textAlign = 'left';
-      element.style.unicodeBidi = 'embed';
+    try {
+      console.log('✏️ Editing prescription at index:', index);
+      
+      if (index < 0 || index >= this.prescriptions.length) {
+        this.showToast('Invalid prescription index', 'error');
+        return;
+      }
+
+      // Set editing index and copy prescription data
+      this.editingPrescriptionIndex = index;
+      this.prescriptionData = JSON.parse(JSON.stringify(this.prescriptions[index]));
+      
+      // Mark as manual edit since we're editing an existing prescription
+      this.hasManualPrescriptionEdit = true;
+      this.manualPatientName = this.prescriptionData.patientName || '';
+      this.manualPatientAge = this.prescriptionData.patientAge || '';
+      
+      // Ensure required fields have default values
+      this.prescriptionData.date = this.prescriptionData.date || this.todayDate;
+      
+      // Ensure all medicines have required properties
+      this.prescriptionData.medicines = this.prescriptionData.medicines.map(medicine => ({
+        ...medicine,
+        timing: medicine.timing || 'before',
+        name: medicine.name || '',
+        type: medicine.type || '',
+        time: medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി'
+      }));
+
+      console.log('📝 Prescription data to edit:', this.prescriptionData);
+      
+      // Open the modal
+      this.openPrescriptionModal();
+
+    } catch (error) {
+      console.error('❌ Error in editPrescription:', error);
+      this.showToast('Error loading prescription for editing. Please try again.', 'error');
+      this.editingPrescriptionIndex = null;
+      this.isModalProcessing = false;
     }
   }
 
@@ -1776,69 +2080,320 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     }
   }
 
+  // FIXED: Updated updateFormFieldsFromPrescription method
   private updateFormFieldsFromPrescription(): void {
-    const patientNameElement = document.getElementById('patientName');
-    if (patientNameElement) {
-      patientNameElement.textContent = this.prescriptionData.patientName;
-    }
+    try {
+      console.log('🔄 Updating form fields from prescription data:', this.prescriptionData);
 
-    const patientAgeElement = document.getElementById('patientAge');
-    if (patientAgeElement) {
-      patientAgeElement.textContent = this.prescriptionData.patientAge || '';
-    }
+      // Update patient information only if manual edits are allowed
+      if (this.hasManualPrescriptionEdit) {
+        this.setEditableFieldValue('patientName', this.prescriptionData.patientName);
+        this.setEditableFieldValue('patientAge', this.prescriptionData.patientAge || '');
+      }
 
+      // Update prescription date
+      const dateElement = document.getElementById('prescriptionDate');
+      if (dateElement) {
+        dateElement.textContent = this.prescriptionData.date || this.todayDate;
+      }
+
+      // Update medicines
+      this.prescriptionData.medicines.forEach((medicine, index) => {
+        console.log(`🔄 Updating medicine ${index}:`, medicine);
+        
+        switch(medicine.type) {
+          case 'kasayam':
+            this.setEditableFieldValue(`kasayamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`kasayamInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`kasayamQuantity_${index}`, medicine.quantity);
+            this.setEditableFieldValue(`kasayamPowder_${index}`, medicine.powder);
+            this.setEditableFieldValue(`kasayamPills_${index}`, medicine.pills);
+            
+            // Set timing dropdown
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'kasayam_combination':
+            this.setEditableFieldValue(`combkasayamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`combquantity_${index}`, medicine.quantity);
+            this.setEditableFieldValue(`combquantity2_${index}`, medicine.combinationQuantity);
+            this.setEditableFieldValue(`combMedicineNam_${index}`, medicine.combinationName);
+            this.setEditableFieldValue(`combfrequency_${index}`, medicine.frequency);
+            
+            // Set timing dropdown
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'buligha':
+            this.setEditableFieldValue(`bulighaName_${index}`, medicine.name);
+            this.setEditableFieldValue(`bulighaInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`bulighaPowder_${index}`, medicine.powder);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'bhasmam':
+            this.setEditableFieldValue(`bhasmamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`bhasmamDosage_${index}`, medicine.dosage);
+            this.setEditableFieldValue(`bhasmamQuantity_${index}`, medicine.quantity);
+            this.setEditableFieldValue(`bhasmamInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`bhasmamPowder_${index}`, medicine.powder);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'krudham':
+            this.setEditableFieldValue(`krudhamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`krudhamInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`krudhamFrequency_${index}`, medicine.frequency);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'suranam':
+            this.setEditableFieldValue(`suranamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`suranamInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`suranamPowder_${index}`, medicine.powder);
+            this.setEditableFieldValue(`suranamFrequency_${index}`, medicine.frequency);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'rasayanam':
+            this.setEditableFieldValue(`rasayanamName_${index}`, medicine.name);
+            this.setEditableFieldValue(`rasayanamInstructions_${index}`, medicine.instructions);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          case 'lagium':
+            this.setEditableFieldValue(`lagiumName_${index}`, medicine.name);
+            this.setEditableFieldValue(`lagiumInstructions_${index}`, medicine.instructions);
+            this.setEditableFieldValue(`lagiumFrequency_${index}`, medicine.frequency);
+            this.setSelectValue(`timing_${index}`, medicine.timing || 'before');
+            break;
+            
+          default:
+            this.setEditableFieldValue(`medicineName_${index}`, medicine.name);
+            break;
+        }
+      });
+
+      // Update additional notes
+      const notesElement = document.getElementById('additionalNotes') as HTMLTextAreaElement;
+      if (notesElement && this.prescriptionData.additionalNotes) {
+        notesElement.value = this.prescriptionData.additionalNotes;
+      }
+
+      console.log('✅ Form fields updated successfully');
+    } catch (error) {
+      console.error('❌ Error updating form fields from prescription:', error);
+    }
+  }
+
+  // FIXED: Helper method to set editable field values
+  private setEditableFieldValue(id: string, value: string | undefined): void {
+    setTimeout(() => {
+      const element = document.getElementById(id);
+      if (element) {
+        element.textContent = value || '';
+        console.log(`✅ Set field ${id} to: ${value || ''}`);
+      } else {
+        console.warn(`⚠️ Element with id ${id} not found`);
+      }
+    }, 50);
+  }
+
+  // FIXED: Helper method to set select values
+  private setSelectValue(name: string, value: string): void {
+    setTimeout(() => {
+      const selectElement = document.querySelector(`[name="${name}"]`) as HTMLSelectElement;
+      if (selectElement) {
+        selectElement.value = value;
+        console.log(`✅ Set select ${name} to: ${value}`);
+      } else {
+        console.warn(`⚠️ Select element with name ${name} not found`);
+      }
+    }, 50);
+  }
+
+  // Keep the old method for backward compatibility
+  private setEditableField(id: string, value: string | undefined): void {
+    this.setEditableFieldValue(id, value);
+  }
+
+  // FIXED: savePrescription method
+  savePrescription(): void {
+    try {
+      console.log('💾 Saving prescription...');
+      console.log('Current prescription data:', this.prescriptionData);
+      console.log('Editing index:', this.editingPrescriptionIndex);
+      
+      // Collect data from DOM elements
+      this.savePrescriptionData();
+      
+      if (this.editingPrescriptionIndex !== null) {
+        // Update existing prescription
+        console.log('📝 Updating existing prescription at index:', this.editingPrescriptionIndex);
+        this.prescriptions[this.editingPrescriptionIndex] = JSON.parse(JSON.stringify(this.prescriptionData));
+        this.showToast('Prescription updated successfully!', 'success');
+      } else {
+        // Add new prescription
+        console.log('➕ Adding new prescription');
+        this.prescriptions.push(JSON.parse(JSON.stringify(this.prescriptionData)));
+        this.showToast('Prescription saved successfully!', 'success');
+      }
+      
+      console.log('📋 All prescriptions:', this.prescriptions);
+      
+      // Close modal properly
+      if (this.modalInstance) {
+        this.modalInstance.hide();
+      }
+      
+      // Reset state
+      this.editingPrescriptionIndex = null;
+      this.resetPrescriptionData();
+      
+      // Force change detection
+      this.changeDetectorRef.detectChanges();
+      
+    } catch (error) {
+      console.error('❌ Error saving prescription:', error);
+      this.showToast('Error saving prescription. Please try again.', 'error');
+    }
+  }
+
+  // FIXED: Updated savePrescriptionData method to handle manual edits properly
+  private savePrescriptionData(): void {
+    // Get patient information - prioritize manual edits over form data
+    if (this.hasManualPrescriptionEdit) {
+      // Use manually edited values
+      this.prescriptionData.patientName = this.getEditableFieldContent('patientName') || this.manualPatientName || 'Unknown Patient';
+      this.prescriptionData.patientAge = this.getEditableFieldContent('patientAge') || this.manualPatientAge || '';
+    } else {
+      // Use form data as fallback
+      this.prescriptionData.patientName = this.getEditableFieldContent('patientName') || 
+                                          this.saleForm.get('customerName')?.value || 
+                                          'Unknown Patient';
+      this.prescriptionData.patientAge = this.getEditableFieldContent('patientAge') || 
+                                         this.saleForm.get('customerAge')?.value?.toString() || 
+                                         '';
+    }
+    
+    this.prescriptionData.date = this.todayDate;
+
+    console.log('💾 Saving patient info:', {
+      patientName: this.prescriptionData.patientName,
+      patientAge: this.prescriptionData.patientAge,
+      hasManualEdit: this.hasManualPrescriptionEdit
+    });
+
+    // Update medicines from DOM
     this.prescriptionData.medicines.forEach((medicine, index) => {
-      this.setEditableField(`medicineName_${index}`, medicine.name);
+      console.log(`💾 Saving medicine ${index} of type ${medicine.type}`);
       
       switch(medicine.type) {
         case 'kasayam':
-          this.setEditableField(`kasayamName_${index}`, medicine.name);
-          this.setEditableField(`kasayamInstructions_${index}`, medicine.instructions);
-          this.setEditableField(`kasayamQuantity_${index}`, medicine.quantity);
-          this.setEditableField(`kasayamPowder_${index}`, medicine.powder);
-          this.setEditableField(`kasayamPills_${index}`, medicine.pills);
+          medicine.name = this.getEditableFieldContent(`kasayamName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
+          medicine.pills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
+          medicine.quantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
+          medicine.powder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
+        case 'kasayam_combination':
+          medicine.name = this.getEditableFieldContent(`combkasayamName_${index}`) || medicine.name || '';
+          medicine.quantity = this.getEditableFieldContent(`combquantity_${index}`) || medicine.quantity || '';
+          medicine.combinationQuantity = this.getEditableFieldContent(`combquantity2_${index}`) || medicine.combinationQuantity || '';
+          medicine.combinationName = this.getEditableFieldContent(`combMedicineNam_${index}`) || medicine.combinationName || '';
+          medicine.frequency = this.getEditableFieldContent(`combfrequency_${index}`) || medicine.frequency || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
+          break;
+          
         case 'buligha':
-          this.setEditableField(`bulighaName_${index}`, medicine.name);
-          this.setEditableField(`bulighaInstructions_${index}`, medicine.instructions);
-          this.setEditableField(`bulighaPowder_${index}`, medicine.powder);
+          medicine.name = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
+          medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
         case 'bhasmam':
-          this.setEditableField(`bhasmamName_${index}`, medicine.name);
-          this.setEditableField(`bhasmamDosage_${index}`, medicine.dosage);
-          this.setEditableField(`bhasmamQuantity_${index}`, medicine.quantity);
-          this.setEditableField(`bhasmamInstructions_${index}`, medicine.instructions);
-          this.setEditableField(`bhasmamPowder_${index}`, medicine.powder);
+          medicine.name = this.getEditableFieldContent(`bhasmamName_${index}`) || medicine.name || '';
+          medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
+          medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
+          medicine.instructions = this.getEditableFieldContent(`bhasmamInstructions_${index}`) || medicine.instructions || '';
+          medicine.powder = this.getEditableFieldContent(`bhasmamPowder_${index}`) || medicine.powder || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
         case 'krudham':
-          this.setEditableField(`krudhamName_${index}`, medicine.name);
-          this.setEditableField(`krudhamInstructions_${index}`, medicine.instructions);
+          medicine.name = this.getEditableFieldContent(`krudhamName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`krudhamInstructions_${index}`) || medicine.instructions || '';
+          medicine.frequency = this.getEditableFieldContent(`krudhamFrequency_${index}`) || medicine.frequency || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
         case 'suranam':
-          this.setEditableField(`suranamName_${index}`, medicine.name);
-          this.setEditableField(`suranamInstructions_${index}`, medicine.instructions);
-          this.setEditableField(`suranamPowder_${index}`, medicine.powder);
-          this.setEditableField(`suranamDosage_${index}`, medicine.dosage);
+          medicine.name = this.getEditableFieldContent(`suranamName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`suranamInstructions_${index}`) || medicine.instructions || '';
+          medicine.powder = this.getEditableFieldContent(`suranamPowder_${index}`) || medicine.powder || '';
+          medicine.frequency = this.getEditableFieldContent(`suranamFrequency_${index}`) || medicine.frequency || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
         case 'rasayanam':
-          this.setEditableField(`rasayanamName_${index}`, medicine.name);
-          this.setEditableField(`rasayanamInstructions_${index}`, medicine.instructions);
+          medicine.name = this.getEditableFieldContent(`rasayanamName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`rasayanamInstructions_${index}`) || medicine.instructions || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
           break;
+          
         case 'lagium':
-          this.setEditableField(`lagiumName_${index}`, medicine.name);
-          this.setEditableField(`lagiumInstructions_${index}`, medicine.instructions);
-          this.setEditableField(`lagiumDosage_${index}`, medicine.dosage);
+          medicine.name = this.getEditableFieldContent(`lagiumName_${index}`) || medicine.name || '';
+          medicine.instructions = this.getEditableFieldContent(`lagiumInstructions_${index}`) || medicine.instructions || '';
+          medicine.frequency = this.getEditableFieldContent(`lagiumFrequency_${index}`) || medicine.frequency || '';
+          medicine.timing = this.getSelectValue(`timing_${index}`) || medicine.timing || 'before';
+          break;
+          
+        default:
+          medicine.name = this.getEditableFieldContent(`medicineName_${index}`) || medicine.name || '';
           break;
       }
       
-      this.setEditableField(`${medicine.type}Time_${index}`, medicine.time);
+      console.log(`✅ Saved medicine ${index}:`, medicine);
     });
 
+    // Get additional notes
     const notesElement = document.getElementById('additionalNotes') as HTMLTextAreaElement;
-    if (notesElement && this.prescriptionData.additionalNotes) {
-      notesElement.value = this.prescriptionData.additionalNotes;
+    if (notesElement) {
+      this.prescriptionData.additionalNotes = notesElement.value;
     }
+
+    console.log('💾 Final prescription data:', this.prescriptionData);
   }
+
+  // Helper method to get select values
+  private getSelectValue(name: string): string {
+    const selectElement = document.querySelector(`[name="${name}"]`) as HTMLSelectElement;
+    return selectElement?.value || '';
+  }
+
+  // Keep existing method for getting editable field content
+  private getEditableFieldContent(id: string): string {
+    const element = document.getElementById(id);
+    return element?.textContent?.trim() || element?.innerText?.trim() || '';
+  }
+
+resetPrescriptionData(): void {
+  // Reset manual edit tracking
+  this.hasManualPrescriptionEdit = false;
+  this.manualPatientName = '';
+  this.manualPatientAge = '';
+  
+  this.prescriptionData = {
+    medicines: [],
+    patientName: this.saleForm.get('customerName')?.value || '',
+    patientAge: this.saleForm.get('customerAge')?.value?.toString() || '',
+    date: this.todayDate,
+    additionalNotes: ''
+  };
+}
 
   printPrescription(): void {
     this.savePrescriptionData();
@@ -1896,19 +2451,6 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
             border-bottom: 1px solid #ddd;
             padding-bottom: 20px;
           }
-          .logo-container {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 120px;
-            height: auto;
-            z-index: 10;
-          }
-          .logo-container img {
-            width: 100%;
-            height: auto;
-            max-width: 120px;
-          }
           .patient-info { 
             display: flex; 
             justify-content: space-between; 
@@ -1923,86 +2465,23 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
             border-top: 1px solid #ddd;
             padding-top: 20px;
           }
-          .medicine-item { 
-            margin-bottom: 20px; 
-            padding: 15px;
-            border: 1px solid #eee;
-            border-radius: 5px;
-          }
-          .highlight { background-color: yellow; }
-          .additional-notes {
-            margin-top: 30px;
-            padding: 15px;
-            background: #f5f5f5;
-            border-radius: 5px;
-          }
-          .prescription-header {
-            text-align: center;
-            margin-bottom: 20px;
-            margin-left: 140px;
-          }
-          .doctor-title {
-            font-weight: bold;
-            margin-top: 10px;
-          }
-          .prescription-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-          }
-          .prescription-table td {
-            padding: 8px;
-            vertical-align: top;
-          }
-          .medicine-content {
-            margin-left: 20px;
-          }
-          
-          @media print {
-            .logo-container {
-              position: absolute;
-              top: 10px;
-              left: 10px;
-            }
-          }
-          
-          @media (max-width: 600px) {
-            .prescription-header {
-              margin-left: 0;
-              margin-top: 140px;
-            }
-            .logo-container {
-              position: relative;
-              width: 100px;
-              margin-bottom: 20px;
-            }
-          }
         </style>
       </head>
       <body>
-        <div class="logo-container">
-          <img src="/assets/logo2.png">
-        </div>
-        
-        <div class="prescription-header">
+        <div class="header">
           <h2>DR.RAJANA P.R.,BAMS</h2>
           <h3>HERBALLY TOUCH AYURVEDA PRODUCTS PVT.LTD.</h3>
           <p>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt.,Kerala - 683 579</p>
           <p>E–mail: contact@herbalytouch.com | Ph: 7034110999</p>
         </div>
         
-        
-        <table class="prescription-table">
-          <tr>
-            <td><strong>Name</strong></td>
-            <td>${prescription.patientName || '______'}</td>
-            <td><strong>Age</strong></td>
-            <td>${prescription.patientAge || '______'}</td>
-            <td><strong>Date</strong></td>
-            <td>${formattedDate}</td>
-          </tr>
-        </table>
-        
+        <div class="patient-info">
+          <div>
+            <p><strong>Name:</strong> ${prescription.patientName || '______'}</p>
+            <p><strong>Age:</strong> ${prescription.patientAge || '______'}</p>
+          </div>
+          <p><strong>Date:</strong> ${formattedDate}</p>
+        </div>
         
         <div class="medicine-content">
           ${medicinesHtml}
@@ -2010,7 +2489,7 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
         
         ${prescription.additionalNotes ? `
           <div class="additional-notes">
-            <h4 style="font-size: 16px; margin-bottom: 8px;">Additional Notes:</h4>
+            <h4>Additional Notes:</h4>
             <p>${prescription.additionalNotes}</p>
           </div>
         ` : ''}
@@ -2024,605 +2503,111 @@ if (Array.isArray(sale.interestedProductIds) && sale.interestedProductIds.length
     `;
   }
 
-  private getEditableFieldContent(id: string): string {
-    const element = document.getElementById(id);
-    return element?.textContent?.trim() || element?.innerText?.trim() || '';
-  }
-
+  // Updated generateMedicineDetails method to handle kasayam_combination
   private generateMedicineDetails(medicine: Medicine, index: number): string {
     let details = '';
     
-    const medicineName = this.getEditableFieldContent(`kasayamName_${index}`) || medicine.name || '';
-    
-    details += `<p><strong>${medicineName}</strong></p>`;
-    
-    const foodTimingLabel = this.getFoodTimingLabel(medicine.foodTiming || 'before_after_food');
-    
     switch(medicine.type) {
       case 'kasayam':
-        const kasayamInstructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
-        const kasayamQuantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
-        const kasayamPowder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
-        const kasayamPills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
-        
+        const kasayamName = medicine.name || '';
+        const kasayamInstructions = medicine.instructions || '';
+        const kasayamQuantity = medicine.quantity || '';
+        const kasayamPowder = medicine.powder || '';
+        const kasayamPills = medicine.pills || '';
+        const kasayamTiming = medicine.timing === 'before' ? 'ഭക്ഷണത്തിനുമുൻപ്' : 'ശേഷംസേവിക്കുക';
         
         details += `
-          <p>കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. </p>
-          <p>ഗുളിക ${kasayamPills} പൊടി ചേർത്ത് ${foodTimingLabel} സേവിക്കുക.</p>
+          <p><strong>${kasayamName}</strong></p>
+          <p>${kasayamName}കഷായം ${kasayamInstructions}ml എടുത്ത് ${kasayamQuantity}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${kasayamPowder}. 
+          ഗുളിക . പൊടിച്ച്ചേർത്ത് ${kasayamPills} നേരം ${kasayamTiming}.</p>
+        `;
+        break;
+      
+      case 'kasayam_combination':
+        const combName = medicine.name || '';
+        const combQuantity = medicine.quantity || '';
+        const combQuantity2 = medicine.combinationQuantity || '';
+        const combMedicineName = medicine.combinationName || '';
+        const combFrequency = medicine.frequency || '';
+        const combTiming = medicine.timing === 'before' ? 'ഭക്ഷണത്തിനുമുൻപ്' : 'ശേഷംസേവിക്കുക';
+        
+        details += `
+          <p><strong>${combName}</strong></p>
+          <p>${combName}കഷായം ${combQuantity}ml എടുത്ത് ${combQuantity2}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് ${combMedicineName}ഗുളിക പൊടിച്ച്ചേർത്ത് ${combFrequency}നേരം ${combTiming}.</p>
         `;
         break;
         
-      case 'buligha':
-        const bulighaInstructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
-        
-        details += `
-          <p>ഗുളിക ${bulighaInstructions} എണ്ണം എടുത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
-      case 'bhasmam':
-        const bhasmamDosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
-        const bhasmamQuantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
-        
-        details += `
-          <p>ഭസ്മം ${bhasmamDosage} നുള്ള് എടുത്ത് ${bhasmamQuantity} ml. തേൻ / ചെറുനാരങ്ങാനീർ ചേർത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
-      case 'krudham':
-        details += `
-          <p>ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
-      case 'suranam':
-        details += `
-          <p>ചൂർണ്ണം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
-      case 'rasayanam':
-        details += `
-          <p>രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
-      case 'lagium':
-        details += `
-          <p>ലേഹ്യം ഒരു ടീ - സ്പൂൺ എടുത്ത്</p>
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
-        `;
-        break;
-        
+      // Add other medicine types as needed
       default:
+        const defaultTime = medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
+        const defaultTiming = medicine.timing === 'before' ? 'ഭക്ഷണത്തിനുമുൻപ്' : 'ശേഷം സേവിക്കുക';
         details += `
+          <p><strong>${medicine.name || ''}</strong></p>
           <p>Type: ${medicine.type || '______'}</p>
           ${medicine.dosage ? `<p>Dosage: ${medicine.dosage}</p>` : ''}
           ${medicine.instructions ? `<p>Instructions: ${medicine.instructions}</p>` : ''}
-          <p>${foodTimingLabel} സേവിക്കുക.</p>
+          <p>നേരം: ${defaultTime} ${defaultTiming}.</p>
         `;
     }
     
     return details;
   }
 
-  private savePrescriptionData(): void {
-    const patientName = document.getElementById('patientName')?.textContent?.trim() || 
-                       'Unknown Patient';
-    const patientAge = document.getElementById('patientAge')?.textContent?.trim() || 
-                      this.saleForm.get('customerAge')?.value || 
-                      '';
-    
-    this.prescriptionData = {
-      ...this.prescriptionData,
-      patientName: patientName,
-      patientAge: patientAge,
-      date: this.todayDate
-    };
+onTaxChange(selectedRate: string): void {
+  const rate = parseFloat(selectedRate) || 0;
+  console.log('🔄 Tax rate changed to:', rate);
+  
+  this.saleForm.patchValue({ orderTax: rate });
+  
+  // Recalculate shipping tax with new rate
+  this.calculateShippingTax();
+  
+  // UPDATED: Force recalculation regardless of preservation mode
+  this.recalculateAllTotals();
+  
+  console.log('💰 Total payable after tax change:', this.saleForm.get('totalPayable')?.value);
+}
 
-    this.prescriptionData.medicines.forEach((medicine, index) => {
-      medicine.name = this.getEditableFieldContent(`kasayamName_${index}`) || medicine.name;
-      
-      switch(medicine.type) {
-        case 'kasayam':
-          medicine.instructions = this.getEditableFieldContent(`kasayamInstructions_${index}`) || medicine.instructions || '';
-          medicine.pills = this.getEditableFieldContent(`kasayamPills_${index}`) || medicine.pills || '';
-          medicine.quantity = this.getEditableFieldContent(`kasayamQuantity_${index}`) || medicine.quantity || '';
-          medicine.powder = this.getEditableFieldContent(`kasayamPowder_${index}`) || medicine.powder || '';
-          medicine.time = this.getEditableFieldContent(`kasayamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-          
-        case 'buligha':
-          medicine.instructions = this.getEditableFieldContent(`bulighaInstructions_${index}`) || medicine.instructions || '';
-          medicine.name = this.getEditableFieldContent(`bulighaName_${index}`) || medicine.name || '';
-          medicine.powder = this.getEditableFieldContent(`bulighaPowder_${index}`) || medicine.powder || '';
-          break;
-          
-        case 'bhasmam':
-          medicine.dosage = this.getEditableFieldContent(`bhasmamDosage_${index}`) || medicine.dosage || '';
-          medicine.quantity = this.getEditableFieldContent(`bhasmamQuantity_${index}`) || medicine.quantity || '';
-          medicine.time = this.getEditableFieldContent(`bhasmamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-          
-        case 'krudham':
-          medicine.time = this.getEditableFieldContent(`krudhamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-          
-        case 'suranam':
-          medicine.time = this.getEditableFieldContent(`suranamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-          
-        case 'rasayanam':
-          medicine.time = this.getEditableFieldContent(`rasayanamTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-          
-        case 'lagium':
-          medicine.time = this.getEditableFieldContent(`lagiumTime_${index}`) || medicine.time || 'രാവിലെ / ഉച്ചയ്ക്ക് / രാത്രി';
-          break;
-      }
-    });
+onAfterTaxShippingChange(afterTaxValue: string | number | null): void {
+  if (afterTaxValue === null || afterTaxValue === '') return;
+  
+  const numericValue = typeof afterTaxValue === 'string' ? 
+                      parseFloat(afterTaxValue) : 
+                      afterTaxValue;
+  
+  if (isNaN(numericValue)) return;
 
-    const notesElement = document.getElementById('additionalNotes') as HTMLTextAreaElement;
-    if (notesElement) {
-      this.prescriptionData.additionalNotes = notesElement.value;
-    }
-  }
-
-  loadCustomers(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.customerService.getCustomers().subscribe({
-        next: (customers: any[]) => {
-          this.customers = customers.map(customer => ({
-            ...customer,
-            displayName: customer.businessName || 
-                       `${customer.firstName || ''} ${customer.middleName ? customer.middleName + ' ' : ''}${customer.lastName || ''}`.trim(),
-            contactId: customer.contactId || '',
-            landline: customer.landline || ''
-          }));
-          
-          this.filteredCustomers = [...this.customers];
-          resolve();
-        },
-        error: (error: any) => {
-          console.error('Error loading customers:', error);
-          reject(error);
-        }
-      });
-    });
-  }
-
-  loadProducts(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.productService.getProductsRealTime().subscribe({
-        next: (products: any[]) => {
-          this.allProducts = products.map(p => ({
-            ...p,
-            productName: p.name || p.productName
-          }));
-          this.filteredProducts = [...this.allProducts];
-          resolve();
-        },
-        error: (error: any) => {
-          console.error('Error loading products:', error);
-          reject(error);
-        }
-      });
-    });
-  }
-
-  filterProducts(): void {
-    if (!this.productSearchTerm) {
-      this.filteredProducts = [...this.allProducts];
-      return;
-    }
-    
-    const searchTerm = this.productSearchTerm.toLowerCase();
-    this.filteredProducts = this.allProducts.filter(product => 
-      product.productName.toLowerCase().includes(searchTerm)
-    );
-  }
-
-  initializeForm(): void {
-    this.saleForm = this.fb.group({
-      customer: ['', Validators.required],
-      customerName: [''],
-      invoiceNo: ['', Validators.required],
-      orderNo: ['', Validators.required],
-      customerPhone: ['', Validators.required],
-      transactionId: [''],
-      productInterested: [''],
-      status: ['Pending', Validators.required],
-      paymentStatus: ['Due'],
-      alternateContact: [''],
-      customerAge: [null],
-      customerDob: [null],
-      customerGender: [''],
-      customerEmail: [''],
-      shippingDetails: [''],
-      roundOff: [0],
-      productTaxAmount: [0],
-      shippingTaxAmount: [0],
-      codTaxAmount: [0],
-      ppTaxAmount: [0],
-      customerSearch: [''],
-      customerOccupation: [''],
-      creditLimit: [0],
-      otherData: [''],
-      paymentAccount: ['', Validators.required],
-      typeOfService: [''],
-      billingAddress: [''],
-      shippingAddress: [''],
-      saleDate: [this.todayDate, Validators.required],
-      businessLocation: ['', Validators.required],
-      invoiceScheme: [''],
-      document: [null],
-      discountType: ['Percentage'],
-      discountAmount: [0, [Validators.min(0)]],
-      orderTax: [18, [Validators.min(0), Validators.max(100)]],
-      sellNote: [''],
-      shippingStatus: [''],
-      deliveryPerson: [''],
-      shippingDocuments: [null],
-      totalPayable: [0],
-      paymentAmount: [0, [Validators.min(0)]],
-      paidOn: [this.todayDate],
-      paymentMethod: ['', Validators.required],
-      paymentNote: [''],
-      changeReturn: [0],
-      balance: [0],
-      shippingCharges: [0, [Validators.min(0)]],
-      shippingChargesAfterTax: [0, [Validators.min(0)]],
-      addedBy: ['', Validators.required]
-    });
-  }
-
-  onAfterTaxShippingChange(afterTaxValue: string | number | null): void {
-    if (!afterTaxValue) return;
-    
-    const numericValue = typeof afterTaxValue === 'string' ? 
-                        parseFloat(afterTaxValue) : 
-                        afterTaxValue;
-    
-    if (isNaN(numericValue)) return;
-
-    const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    
-    if (taxRate > 0) {
-      const beforeTax = numericValue / (1 + (taxRate / 100));
-      this.saleForm.patchValue({
-        shippingCharges: parseFloat(beforeTax.toFixed(2))
-      }, { emitEvent: false });
-    } else {
-      this.saleForm.patchValue({
-        shippingCharges: numericValue
-      }, { emitEvent: false });
-    }
-    
-    this.calculateTotalPayable();
-  }
-
-  onDynamicProductSelect(productName: string, index: number): void {
-    if (!productName) {
-      this.resetProductAtIndex(index);
-      return;
-    }
-
-    const selectedProduct = this.allProducts.find(p => p.productName === productName);
-    if (selectedProduct) {
-      this.populateProductAtIndex(selectedProduct, index);
-    }
-  }
-
-  private resetProductAtIndex(index: number): void {
-    this.products[index] = {
-      name: '',
-      quantity: 1,
-      unitPrice: 0,
-      discount: 0,
-      subtotal: 0,
-      commissionPercent: 0,
-      commissionAmount: 0,
-      priceBeforeTax: 0,
-      taxIncluded: false,
-      discountType: 'Amount',
-      batchNumber: '',
-      expiryDate: '',
-      taxRate: 0,
-      taxAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      igstAmount: 0,
-      taxType: ''
-    };
-    this.updateProduct(index);
-  }
-
-  private populateProductAtIndex(selectedProduct: any, index: number): void {
-    this.products[index].name = selectedProduct.productName;
-    this.products[index].priceBeforeTax = selectedProduct.defaultSellingPriceExcTax || 0;
-    
-    const taxRate = selectedProduct.taxRate !== undefined
-      ? selectedProduct.taxRate
-      : (selectedProduct.applicableTax ? selectedProduct.applicableTax.percentage : 0);
-    
-    this.products[index].taxRate = taxRate;
-    this.products[index].unitPrice = selectedProduct.defaultSellingPriceIncTax ||
-      (this.products[index].priceBeforeTax * (1 + (taxRate / 100)));
-    this.products[index].quantity = 1;
-    this.products[index].batchNumber = selectedProduct.batchNumber || '';
-    this.products[index].expiryDate = selectedProduct.expiryDate || '';
-    
-    this.updateProduct(index);
-  }
-
-  setupValueChanges(): void {
-    this.saleForm.get('paymentAmount')?.valueChanges.subscribe(() => {
-      this.calculateBalance();
-    });
-
-    this.saleForm.get('discountAmount')?.valueChanges.subscribe(() => {
-      this.calculateTotalPayable();
-    });
-
-    this.saleForm.get('orderTax')?.valueChanges.subscribe(() => {
-      this.calculateTotalPayable();
-    });
-
-    this.saleForm.get('shippingCharges')?.valueChanges.subscribe(() => {
-      this.calculateTotalPayable();
-    });
-
-    this.saleForm.get('shippingCharges')?.valueChanges.subscribe(value => {
-      if (this.saleForm.get('shippingCharges')?.dirty) {
-        this.calculateAfterTaxShipping();
-      }
-    });
-
-    this.saleForm.get('shippingChargesAfterTax')?.valueChanges.subscribe(value => {
-      if (this.saleForm.get('shippingChargesAfterTax')?.dirty) {
-        this.calculateBeforeTaxShipping();
-      }
-    });
-
-    this.saleForm.get('discountType')?.valueChanges.subscribe(() => {
-      this.calculateTotalPayable();
-    });
-
-    this.saleForm.get('addedBy')?.valueChanges.subscribe(userId => {
-      this.onUserSelect(userId);
-    });
-  }
-
-  updateDefaultProduct(): void {
-    const product = this.defaultProduct;
-    const selectedProduct = this.allProducts.find(p => p.productName === product.name);
-    
-    if (selectedProduct) {
-      if (product.quantity > selectedProduct.currentStock) {
-        alert(`Cannot increase quantity. Only ${selectedProduct.currentStock} items available for "${product.name}".`);
-        product.quantity = selectedProduct.currentStock;
-      }
-      
-      if (!product.taxRate && selectedProduct.taxRate) {
-        product.taxRate = selectedProduct.taxRate;
-      }
-    }
-
-    this.calculateProductTax(product);
-
-    if (product.priceBeforeTax !== undefined && product.taxRate !== undefined) {
-      product.unitPrice = product.priceBeforeTax * (1 + (product.taxRate / 100));
-    } else if (product.unitPrice !== undefined && product.taxRate !== undefined) {
-      product.priceBeforeTax = product.unitPrice / (1 + (product.taxRate / 100));
-    }
-
-    const subtotalBeforeDiscount = product.quantity * product.unitPrice;
-    
-    let discountAmount = 0;
-    if (product.discountType === 'Percentage') {
-      discountAmount = (subtotalBeforeDiscount * product.discount) / 100;
-    } else {
-      discountAmount = product.discount;
-    }
-    
-    const discountedSubtotal = subtotalBeforeDiscount - discountAmount;
-    
-    product.commissionAmount = (product.commissionPercent || 0) / 100 * discountedSubtotal;
-    product.subtotal = discountedSubtotal - product.commissionAmount;
-    
-    this.calculateItemsTotal();
-    this.calculateTotalPayable();
-    this.calculateTaxes();
-  }
-
-  calculateAfterTaxShipping(): void {
-    const beforeTax = this.saleForm.get('shippingCharges')?.value || 0;
-    const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    
-    const afterTax = beforeTax * (1 + (taxRate / 100));
-    
-    this.saleForm.patchValue({
-      shippingChargesAfterTax: parseFloat(afterTax.toFixed(2))
-    }, { emitEvent: false });
-    
-    this.calculateTotalPayable();
-  }
-
-  calculateBeforeTaxShipping(): void {
-    const afterTax = this.saleForm.get('shippingChargesAfterTax')?.value || 0;
-    const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    
-    let beforeTax = afterTax;
-    if (taxRate > 0) {
-      beforeTax = afterTax / (1 + (taxRate / 100));
-    }
-    
+  const taxRate = this.saleForm.get('orderTax')?.value || 0;
+  
+  if (taxRate > 0) {
+    const beforeTax = numericValue / (1 + (taxRate / 100));
     this.saleForm.patchValue({
       shippingCharges: parseFloat(beforeTax.toFixed(2))
     }, { emitEvent: false });
     
-    this.calculateTotalPayable();
+    // Calculate and update shipping tax
+    const shippingTax = beforeTax * (taxRate / 100);
+    this.shippingTaxAmount = parseFloat(shippingTax.toFixed(2));
+    this.saleForm.patchValue({
+      shippingTaxAmount: this.shippingTaxAmount
+    }, { emitEvent: false });
+  } else {
+    this.saleForm.patchValue({
+      shippingCharges: numericValue,
+      shippingTaxAmount: 0
+    }, { emitEvent: false });
+    this.shippingTaxAmount = 0;
   }
-
-  updateProduct(index: number): void {
-    const product = this.products[index];
-    const selectedProduct = this.allProducts.find(p => p.productName === product.name);
-
-    if (selectedProduct && !product.taxRate && selectedProduct.taxRate) {
-      product.taxRate = selectedProduct.taxRate;
-    }
-
-    if (product.priceBeforeTax !== undefined && product.taxRate !== undefined) {
-      product.unitPrice = product.priceBeforeTax * (1 + (product.taxRate / 100));
-    } else if (product.unitPrice !== undefined && product.taxRate !== undefined) {
-      product.priceBeforeTax = product.unitPrice / (1 + (product.taxRate / 100));
-    }
-
-    this.calculateProductTax(product);
-
-    const subtotalBeforeDiscount = product.quantity * product.unitPrice;
-
-    let discountAmount = 0;
-    if (product.discountType === 'Percentage') {
-      discountAmount = (subtotalBeforeDiscount * product.discount) / 100;
-    } else {
-      discountAmount = product.discount;
-    }
-
-    const discountedSubtotal = subtotalBeforeDiscount - discountAmount;
-
-    product.commissionAmount = (product.commissionPercent || 0) / 100 * discountedSubtotal;
-
-    product.subtotal = discountedSubtotal - product.commissionAmount;
-
-    this.calculateItemsTotal();
-    this.calculateTotalPayable();
-    this.calculateTaxes();
-  }
-
-addProduct(): void {
-  // Only add if the default product has data
-  if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
-    const productToAdd: Product = {
-      ...this.defaultProduct,
-      taxAmount: this.defaultProduct.taxAmount || 0,
-      cgstAmount: this.defaultProduct.cgstAmount || 0,
-      sgstAmount: this.defaultProduct.sgstAmount || 0,
-      igstAmount: this.defaultProduct.igstAmount || 0,
-      taxType: this.defaultProduct.taxType || ''
-    };
-    this.products.push(productToAdd);
-  }
-
-  // Reset the default product
-  this.defaultProduct = {
-    name: '',
-    quantity: 1,
-    unitPrice: 0,
-    discount: 0,
-    discountType: 'Amount',
-    commissionPercent: this.defaultProduct.commissionPercent || 0,
-    commissionAmount: 0,
-    subtotal: 0,
-    priceBeforeTax: 0,
-    taxIncluded: false,
-    batchNumber: '',
-    expiryDate: '',
-    taxRate: 0,
-    taxAmount: 0,
-    cgstAmount: 0,
-    sgstAmount: 0,
-    igstAmount: 0,
-    taxType: ''
-  };
+  
+  this.recalculateAllTotals();
 }
 
-  removeProduct(index: number): void {
-    this.products.splice(index, 1);
-    this.calculateItemsTotal();
-    this.calculateTotalPayable();
-  }
-
-  calculateItemsTotal(): void {
-    const defaultProductValue = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-      ? this.defaultProduct.subtotal 
-      : 0;
-    
-    this.itemsTotal = this.products.reduce((sum, product) => sum + product.subtotal, defaultProductValue);
-    this.totalCommission = this.products.reduce((sum, product) => sum + (product.commissionAmount || 0), 
-      (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-        ? (this.defaultProduct.commissionAmount || 0) 
-        : 0);
-  }
-
-  calculateShippingWithTax(): number {
-    const shippingBeforeTax = this.saleForm.get('shippingCharges')?.value || 0;
-    const taxRate = this.saleForm.get('orderTax')?.value || 0;
-    
-    const shippingTax = shippingBeforeTax * (taxRate / 100);
-    const shippingWithTax = shippingBeforeTax + shippingTax;
-    
-    this.saleForm.patchValue({
-      shippingTaxAmount: shippingTax
-    });
-    
-    return shippingWithTax;
-  }
-
-  calculateBalance(): void {
-    const totalPayable = this.saleForm.get('totalPayable')?.value || 0;
-    const paymentAmount = this.saleForm.get('paymentAmount')?.value || 0;
-    const roundOff = this.saleForm.get('roundOff')?.value || 0;
-  
-    const roundedTotal = totalPayable + roundOff;
-
-    if (paymentAmount > roundedTotal) {
-      this.saleForm.patchValue({
-        changeReturn: (paymentAmount - roundedTotal).toFixed(2),
-        balance: 0
-      });
-    } else {
-      this.saleForm.patchValue({
-        changeReturn: 0,
-        balance: (roundedTotal - paymentAmount).toFixed(2)
-      });
-    }
-  }
-
+  // File handling methods
   onFileSelected(event: any): void {
     const file = event.target.files[0];
     if (file) {
       this.saleForm.patchValue({ document: file.name });
     }
-  }
-
-  onCustomerChange(event: any): void {
-    const customerId = event.target.value;
-    const selectedCustomer = this.customers.find(c => c.id === customerId);
-    if (selectedCustomer) {
-      this.saleForm.patchValue({
-        customerPhone: selectedCustomer.mobile || selectedCustomer.phone || '',
-        billingAddress: selectedCustomer.address || '',
-        shippingAddress: selectedCustomer.address || ''
-      });
-      this.customerSearchInput = selectedCustomer.displayName;
-    }
-  }
-
-  onCustomerBlur(): void {
-    setTimeout(() => {
-      this.showCustomerDropdown = false;
-    }, 200);
-  }
-
-  onCustomerSearchFocus(): void {
-    this.showCustomerDropdown = true;
-    this.filterCustomers();
   }
 
   onShippingDocumentSelected(event: Event): void {
@@ -2637,341 +2622,59 @@ addProduct(): void {
     this.shippingDocuments = this.shippingDocuments.filter(d => d !== doc);
   }
 
-  resetPrescriptionData(): void {
-    this.prescriptionData = {
-      medicines: [],
-      patientName: this.saleForm.get('customerName')?.value || '',
-      patientAge: this.saleForm.get('customerAge')?.value?.toString() || '',
-      date: this.todayDate,
-      additionalNotes: ''
-    };
-  }
+  // Form submission and validation
+// In src/app/edit-sale/edit-sale.component.ts
 
-  calculateRoundOff(): void {
-    const totalPayable = this.saleForm.get('totalPayable')?.value || 0;
-    
-    const roundedTotal = Math.round(totalPayable);
-    const roundOff = roundedTotal - totalPayable;
-    
-    this.saleForm.patchValue({
-      roundOff: parseFloat(roundOff.toFixed(2)),
-      totalPayable: parseFloat(totalPayable.toFixed(2))
-    });
-    
-    this.calculateBalance();
-  }
+// In src/app/edit-sale/edit-sale.component.ts
+// In src/app/edit-sale/edit-sale.component.ts
 
+// In src/app/edit-sale/edit-sale.component.ts
+
+// In src/app/edit-sale/edit-sale.component.ts
+
+// In src/app/edit-sale/edit-sale.component.ts
+
+
+  // Helper function to clean undefined values
   private cleanObjectForFirestore(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return null;
-    }
+    const cleaned: any = {};
     
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.cleanObjectForFirestore(item)).filter(item => item !== undefined);
-    }
-    
-    if (typeof obj === 'object') {
-      const cleaned: any = {};
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          const value = this.cleanObjectForFirestore(obj[key]);
-          if (value !== undefined) {
-            cleaned[key] = value;
-          }
-        }
-      }
-      return cleaned;
-    }
-    
-    return obj;
-  }
-
-  private createCleanPrescription(): any {
-    if (!this.prescriptions || this.prescriptions.length === 0) {
-      return null;
-    }
-
-    return this.prescriptions.map(prescription => ({
-      patientName: prescription.patientName || '',
-      patientAge: prescription.patientAge || '',
-      date: prescription.date || this.todayDate,
-      additionalNotes: prescription.additionalNotes || '',
-      medicines: (prescription.medicines || []).map(medicine => ({
-        name: medicine.name || '',
-        type: medicine.type || '',
-        dosage: medicine.dosage || '',
-        instructions: medicine.instructions || '',
-        time: medicine.time || '',
-        quantity: medicine.quantity || '',
-        pills: medicine.pills || '',
-        powder: medicine.powder || '',
-        foodTiming: medicine.foodTiming || 'before_after_food'
-      }))
-    }));
-  }
-
-  private getFieldLabel(fieldName: string): string {
-    const fieldLabels: {[key: string]: string} = {
-      'customer': 'Customer',
-      'customerName': 'Customer Name',
-      'invoiceNo': 'Invoice Number',
-      'orderNo': 'Order Number',
-      'customerPhone': 'Customer Phone',
-      'paymentAccount': 'Payment Account',
-      'billingAddress': 'Billing Address',
-      'shippingAddress': 'Shipping Address',
-      'saleDate': 'Sale Date',
-      'businessLocation': 'Business Location',
-      'paymentMethod': 'Payment Method',
-      'addedBy': 'Sales Agent'
-    };
-    
-    return fieldLabels[fieldName] || fieldName;
-  }
-
-  async updateSale(): Promise<void> {
-    if (this.isSubmitting) {
-      return;
-    }
-    
-    this.isSubmitting = true;
-    
-    try {
-      this.markFormGroupTouched(this.saleForm);
-      
-      if (this.saleForm.invalid) {
-        const invalidControls = this.findInvalidControls();
-        if (invalidControls.length > 0) {
-          const firstInvalid = invalidControls[0];
-          this.focusOnField(firstInvalid.name);
-          const fieldName = this.getFieldLabel(firstInvalid.name);
-          this.showToast(`Please fill in the required field: ${fieldName}`, 'error');
-        } else {
-          this.showToast('Please fill in all required fields', 'error');
-        }
-        this.isSubmitting = false;
-        return;
-      }
-
-      if (this.products.length === 0 &&
-          !(this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0)) {
-        this.showToast('Please add at least one product', 'error');
-        this.isSubmitting = false;
-        return;
-      }
-
-      // Calculate comprehensive tax amounts
-      const productTax = this.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
-      const defaultProductTax = (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) 
-        ? (this.defaultProduct.taxAmount || 0) 
-        : 0;
-      
-      const shippingTax = (this.saleForm.get('shippingCharges')?.value || 0) *
-        (this.saleForm.get('orderTax')?.value || 0) / 100;
-      const totalTax = productTax + defaultProductTax + shippingTax;
-
-      // Calculate tax breakdown
-      const cgstTotal = this.products.reduce((sum, p) => sum + (p.cgstAmount || 0), 0) + 
-                       (this.defaultProduct.cgstAmount || 0);
-      const sgstTotal = this.products.reduce((sum, p) => sum +  (p.sgstAmount || 0), 0) + 
-                       (this.defaultProduct.sgstAmount || 0);
-      const igstTotal = this.products.reduce((sum, p) => sum + (p.igstAmount || 0), 0) + 
-                       (this.defaultProduct.igstAmount || 0);
-
-      const paymentAccountId = this.saleForm.get('paymentAccount')?.value;
-      const selectedPaymentAccount = paymentAccountId ? this.paymentAccounts.find(acc => acc.id === paymentAccountId) : null;
-
-      const selectedCustomerId = this.saleForm.get('customer')?.value;
-      const selectedCustomer = selectedCustomerId ? this.customers.find(c => c.id === selectedCustomerId) : null;
-      const customerName = selectedCustomer?.displayName || 'Walk-in Customer';
-
-      const selectedLocationId = this.saleForm.get('businessLocation')?.value;
-      const selectedLocation = selectedLocationId ? this.businessLocations.find(loc => loc.id === selectedLocationId) : null;
-      const locationName = selectedLocation?.name || '';
-
-      const selectedServiceId = this.saleForm.get('typeOfService')?.value;
-      const selectedService = selectedServiceId ? this.serviceTypes.find(s => s.id === selectedServiceId) : null;
-      const serviceName = selectedService?.name || '';
-
-      const selectedUserId = this.saleForm.get('addedBy')?.value;
-      const selectedUser = selectedUserId ? this.users.find(u => u.id === selectedUserId) : null;
-      const userName = selectedUser?.displayName || selectedUser?.name || selectedUser?.email || 'System User';
-
-      const commissionPercent = selectedUserId ? await this.getAgentCommission(selectedUserId) : 0;
-
-      const productsToSave = [...this.products].map(product => ({
-        id: product.id || '',
-        name: product.name || '',
-        productName: product.productName || product.name || '',
-        sku: product.sku || '',
-        quantity: product.quantity || 0,
-        unitPrice: product.unitPrice || 0,
-        batchNumber: product.batchNumber || '',
-        expiryDate: product.expiryDate || '',
-        discount: product.discount || 0,
-        commissionPercent: product.commissionPercent || 0,
-        commissionAmount: product.commissionAmount || 0,
-        subtotal: product.subtotal || 0,
-        taxRate: product.taxRate || 0,
-        taxAmount: product.taxAmount || 0,
-        taxType: product.taxType || '',
-        cgstAmount: product.cgstAmount || 0,
-        sgstAmount: product.sgstAmount || 0,
-        igstAmount: product.igstAmount || 0,
-        priceBeforeTax: product.priceBeforeTax || 0
-      }));
-
-      if (this.defaultProduct.name || this.defaultProduct.quantity > 0 || this.defaultProduct.unitPrice > 0) {
-        productsToSave.push({
-          id: '',
-          name: this.defaultProduct.name || '',
-          productName: this.defaultProduct.name || '',
-          sku: '',
-          quantity: this.defaultProduct.quantity || 0,
-          unitPrice: this.defaultProduct.unitPrice || 0,
-          discount: this.defaultProduct.discount || 0,
-          commissionPercent: this.defaultProduct.commissionPercent || 0,
-          commissionAmount: this.defaultProduct.commissionAmount || 0,
-          subtotal: this.defaultProduct.subtotal || 0,
-          batchNumber: this.defaultProduct.batchNumber || '',
-          expiryDate: this.defaultProduct.expiryDate || '',
-          taxRate: this.defaultProduct.taxRate || 0,
-          taxAmount: this.defaultProduct.taxAmount || 0,
-          taxType: this.defaultProduct.taxType || '',
-          cgstAmount: this.defaultProduct.cgstAmount || 0,
-          sgstAmount: this.defaultProduct.sgstAmount || 0,
-          igstAmount: this.defaultProduct.igstAmount || 0,
-          priceBeforeTax: this.defaultProduct.priceBeforeTax || 0
-        });
-      }
-
-      // Create clean prescription data
-      const cleanPrescriptions = this.createCleanPrescription();
-
-      const saleData: any = {
-        ...this.saleForm.value,
-        prescriptions: cleanPrescriptions,
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = obj[key];
         
-        // Comprehensive tax information
-        taxAmount: parseFloat(totalTax.toFixed(2)),
-        taxDetails: {
-          cgst: parseFloat(cgstTotal.toFixed(2)),
-          sgst: parseFloat(sgstTotal.toFixed(2)),
-          igst: parseFloat(igstTotal.toFixed(2)),
-          total: parseFloat(totalTax.toFixed(2))
-        },
-        productTaxAmount: parseFloat((productTax + defaultProductTax).toFixed(2)),
-        shippingTaxAmount: parseFloat(shippingTax.toFixed(2)),
-        
-        orderTax: this.saleForm.get('orderTax')?.value || 0,
-        paymentAccountId: selectedPaymentAccount?.id || '',
-        paymentAccountName: selectedPaymentAccount?.name || '',
-        paymentAccountType: selectedPaymentAccount?.accountType || '',
-        ppServiceData: this.ppServiceData || null,
-        hasPpService: !!this.ppServiceData,
-        prescription: cleanPrescriptions && cleanPrescriptions.length > 0 ? cleanPrescriptions[0] : null,
-        status: this.saleForm.get('status')?.value || 'Pending',
-        paymentStatus: this.saleForm.get('paymentStatus')?.value ||
-          (this.saleForm.get('status')?.value === 'Pending' ? 'Due' : 'Paid'),
-        codData: this.codData || null,
-        hasCod: !!this.codData,
-        shippingDocuments: [],
-        customerId: selectedCustomerId || '',
-        customer: customerName,
-        businessLocationId: selectedLocationId || '',
-        businessLocation: locationName,
-        location: locationName,
-        transactionId: this.saleForm.get('transactionId')?.value || '',
-        typeOfService: selectedServiceId || '',
-        typeOfServiceName: serviceName,
-        shippingCharges: this.saleForm.get('shippingCharges')?.value || 0,
-        shippingChargesAfterTax: this.saleForm.get('shippingChargesAfterTax')?.value || 0,
-        shippingTotal: this.calculateShippingWithTax ? this.calculateShippingWithTax() :
-          (this.saleForm.get('shippingCharges')?.value || 0),
-        subtotal: this.itemsTotal || 0,
-        totalBeforeTax: (this.itemsTotal || 0) - totalTax,
-        totalPayable: this.saleForm.get('totalPayable')?.value || 0,
-        products: productsToSave,
-        itemsTotal: this.itemsTotal || 0,
-        totalCommission: this.totalCommission || 0,
-        commissionPercentage: commissionPercent || 0,
-        updatedAt: new Date(),
-        addedBy: selectedUserId || '',
-        addedByDisplayName: userName,
-        interestedProductIds: this.selectedProductsForInterested.map(p => p.id || '') || []
-      };
-
-      // Clean the entire sale data object to remove undefined values
-      const cleanSaleData = this.cleanObjectForFirestore(saleData);
-
-      console.log('Updating sale data with tax details:', cleanSaleData);
-
-      await this.saleService.updateSale(this.saleId, cleanSaleData);
-
-      // Save prescription separately if it exists
-      if (cleanPrescriptions && cleanPrescriptions.length > 0) {
-        try {
-          await this.saleService.savePrescription({
-            patientName: cleanPrescriptions[0].patientName || 'Unknown Patient',
-            date: this.todayDate,
-            medicines: cleanPrescriptions[0].medicines || [],
-            doctorName: this.currentUser
-          });
-        } catch (prescriptionError) {
-          console.error('Error saving prescription:', prescriptionError);
-          this.showToast('Sale updated successfully, but prescription could not be saved', 'info');
+        if (value === undefined) {
+          continue;
         }
-      }
-
-      this.showToast(`Sale updated successfully!`, 'success');
-      
-      setTimeout(() => {
-        this.router.navigate(['/sales-order']);
-      }, 1500);
-
-    } catch (error: any) {
-      console.error('Update sale error:', error);
-      let errorMessage = 'Error updating sale. ';
-      if (error.code) errorMessage += `Error code: ${error.code}. `;
-      errorMessage += error.message || 'Please try again.';
-      this.showToast(errorMessage, 'error');
-    } finally {
-      this.isSubmitting = false;
-    }
-  }
-
-  private findInvalidControls(): { name: string; control: any }[] {
-    const invalid = [];
-    const controls = this.saleForm.controls;
-    for (const name in controls) {
-      if (controls[name].invalid) {
-        invalid.push({ name, control: controls[name] });
+        
+        if (value === null) {
+          cleaned[key] = null;
+          continue;
+        }
+        
+        if (Array.isArray(value)) {
+          cleaned[key] = value.map(item => 
+            typeof item === 'object' && item !== null 
+              ? this.cleanObjectForFirestore(item) 
+              : item
+          );
+          continue;
+        }
+        
+        if (typeof value === 'object' && value !== null) {
+          cleaned[key] = this.cleanObjectForFirestore(value);
+          continue;
+        }
+        
+        cleaned[key] = value;
       }
     }
-    return invalid;
-  }
-
-  private markFormGroupTouched(formGroup: FormGroup): void {
-    Object.keys(formGroup.controls).forEach(key => {
-      const control = formGroup.get(key);
-      control?.markAsTouched();
-      
-      if (control instanceof FormGroup) {
-        this.markFormGroupTouched(control);
-      }
-    });
-  }
-
-  private focusOnField(fieldName: string): void {
-    const element = document.querySelector(`[formControlName="${fieldName}"]`) as HTMLElement;
-    if (element) {
-      element.focus();
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    
+    return cleaned;
   }
 
   resetForm(): void {
-    if (confirm('Are you sure you want to reset the form? All unsaved changes will be lost.')) {
+    if (confirm('Are you sure you want to reset the form? All changes will be lost.')) {
       this.loadSaleData(this.saleId);
     }
   }
@@ -2982,18 +2685,23 @@ addProduct(): void {
     }
   }
 
-  onContentEditableChange(event: Event, field: string, index?: number): void {
-    const element = event.target as HTMLElement;
-    const value = element.innerText.trim();
-
-    if (index !== undefined) {
-      this.prescriptionData.medicines[index][field as keyof Medicine] = value;
-    } else {
-      if (field !== 'medicines') {
-        (this.prescriptionData as any)[field] = value;
+  private markFormGroupTouched(formGroup: FormGroup): void {
+    Object.values(formGroup.controls).forEach(control => {
+      control.markAsTouched();
+      if (control instanceof FormGroup) {
+        this.markFormGroupTouched(control);
       }
-    }
+    });
+  }
 
-    this.changeDetectorRef.detectChanges();
+  private getFormErrors(): any {
+    const errors: any = {};
+    Object.keys(this.saleForm.controls).forEach(key => {
+      const control = this.saleForm.get(key);
+      if (control?.errors) {
+        errors[key] = control.errors;
+      }
+    });
+    return errors;
   }
 }

@@ -1,122 +1,116 @@
-<div class="trial-balance-container">
-  <div class="header-section">
-    <h1>Trial Balance</h1>
-    <div class="controls">
-      <div class="date-range">
-        <label>As on:</label>
-        <input type="date" [(ngModel)]="asOfDate" (change)="generateTrialBalance()">
-        <button (click)="generateTrialBalance()" [disabled]="isLoading">
-          {{ isLoading ? 'Generating...' : 'Generate' }}
+<!-- trial-balance.component.html -->
+
+<div class="trial-balance-page">
+  <!-- Report Header -->
+  <div class="report-header-main">
+    <h2>HERBALY TOUCH AYURVEDA PRODUCTS PVT LTD</h2>
+    <h3>Trial Balance</h3>
+    <p>From {{ startDate | date:'dd-MMM-yyyy' }} to {{ endDate | date:'dd-MMM-yyyy' }}</p>
+    
+    <!-- REMOVED: The Profit/Loss Status Display has been removed from the header -->
+    
+    <!-- Filters and Actions -->
+    <div class="report-actions">
+<!-- Inside the report-actions section -->
+<div class="period-selector">
+  <label for="start-date">Start Date:</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(startDate)"
+           (blur)="onManualDateInput($event, 'start')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #startDatePicker 
+           id="start-date"
+           type="date" 
+           class="hidden-date-picker" 
+           [(ngModel)]="startDate" 
+           (change)="generateTrialBalance()">
+  </div>
+</div>
+
+<div class="period-selector">
+  <label for="end-date">End Date:</label>
+  <div class="date-input-wrapper">
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(endDate)"
+           (blur)="onManualDateInput($event, 'end')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #endDatePicker 
+           id="end-date"
+           type="date" 
+           class="hidden-date-picker" 
+           [(ngModel)]="endDate" 
+           (change)="generateTrialBalance()">
+  </div>
+</div>
+        <button class="btn-export" (click)="exportToExcel()" [disabled]="isLoading || trialBalanceData.items.length === 0">
+          <i class="fas fa-download"></i> Export
         </button>
-      </div>
-      <div class="export-options">
-        <button (click)="exportToExcel()" class="export-btn excel">
-          <i class="fas fa-file-excel"></i> Excel
-        </button>
-        <button (click)="exportToPDF()" class="export-btn pdf">
-          <i class="fas fa-file-pdf"></i> PDF
-        </button>
-        <button (click)="printReport()" class="export-btn print">
-          <i class="fas fa-print"></i> Print
-        </button>
-      </div>
     </div>
   </div>
 
-  <div *ngIf="isLoading" class="loading-indicator">
-    <div class="spinner"></div>
-    <span>Generating trial balance...</span>
-  </div>
-  <div *ngIf="!isLoading && trialBalanceData.length > 0" class="trial-balance-content">
-    <div class="company-header">
-      <h2>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h2>
-      <p>Trial Balance as on {{ asOfDate | date:'longDate' }}</p>
-      <div class="info-note">
-        <i class="fas fa-info-circle"></i>
-        <span>This trial balance shows the debit and credit balances for each account in a simplified format.</span>
-      </div>
-    </div><div class="table-wrapper">
-      <table class="trial-balance-table">
-        <thead>
-          <tr>
-            <th class="account-name">Account Name</th>
-            <th class="account-number">Account No.</th>
-            <th class="account-head">Account Head</th>
-            <th class="debit-amount">Debit (₹)</th>
-            <th class="credit-amount">Credit (₹)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let item of trialBalanceData" [class]="'account-type-' + item.accountType.toLowerCase()">
-            <td class="account-name">{{ item.accountName }}</td>
-            <td class="account-number">{{ item.accountNumber }}</td>
-            <td class="account-head">{{ item.accountHead }}</td>
-            <td class="debit-amount">{{ item.debit > 0 ? (item.debit | number:'1.2-2') : '-' }}</td>
-            <td class="credit-amount">{{ item.credit > 0 ? (item.credit | number:'1.2-2') : '-' }}</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          <tr class="total-row">
-            <td colspan="3"><strong>Total</strong></td>
-            <td class="debit-amount"><strong>{{ totalDebit | number:'1.2-2' }}</strong></td>
-            <td class="credit-amount"><strong>{{ totalCredit | number:'1.2-2' }}</strong></td>
-          </tr>
-          <tr class="difference-row" *ngIf="!isBalanced">
-            <td colspan="3"><strong>Difference</strong></td>
-            <td class="debit-amount">
-              <strong>{{ difference > 0 ? (difference | number:'1.2-2') : '-' }}</strong>
-            </td>
-            <td class="credit-amount">
-              <strong>{{ difference < 0 ? (absDifference | number:'1.2-2') : '-' }}</strong>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
-    </div><div class="summary-section">
-      <div class="summary-card">
-        <h3>Trial Balance Summary</h3>
-        <div class="summary-item">
-          <span>Total Debit:</span>
-          <span>₹{{ totalDebit | number:'1.2-2' }}</span>
-        </div>
-        <div class="summary-item">
-          <span>Total Credit:</span>
-          <span>₹{{ totalCredit | number:'1.2-2' }}</span>
-        </div>
-        <div class="summary-item" *ngIf="!isBalanced">
-          <span>Difference:</span>
-          <span [class.positive]="difference > 0" [class.negative]="difference < 0">
-            ₹{{ absDifference | number:'1.2-2' }} {{ difference > 0 ? '(Debit excess)' : '(Credit excess)' }}
-          </span>
-        </div>
-        <div class="summary-item status">
-          <span>Status:</span>
-          <span [class.balanced]="isBalanced" [class.unbalanced]="!isBalanced">
-            {{ isBalanced ? '✅ Balanced' : '⚠️ Unbalanced' }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Account Type Summary -->
-      <div class="summary-card account-types">
-        <h3>Account Type Breakdown</h3>
-        <div *ngFor="let group of accountTypeGroups" class="type-summary">
-          <div class="type-header">
-            <span class="type-badge" [class]="'type-' + group.type.toLowerCase()">{{ group.type }}</span>
-            <span class="account-count">({{ group.accounts.length }} accounts)</span>
-          </div>
-          <div class="type-totals">
-            <span>Debit: ₹{{ group.totalDebit | number:'1.2-2' }}</span>
-            <span>Credit: ₹{{ group.totalCredit | number:'1.2-2' }}</span>
-          </div>
-        </div>
-      </div>
+  <!-- Report Body -->
+  <div class="report-body card">
+    <div *ngIf="isLoading" class="loading-overlay">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p>Generating Report...</p>
     </div>
-  </div>
+    
+    <div *ngIf="!isLoading" class="card-body">
+      <div *ngIf="errorMessage" class="alert alert-danger">
+        {{ errorMessage }}
+      </div>
 
-  <div *ngIf="!isLoading && trialBalanceData.length === 0" class="no-data">
-    <i class="fas fa-file-alt"></i>
-    <p>No trial balance data available</p>
-    <p>Please select a date and generate the report</p>
+      <div class="table-responsive">
+        <table class="table trial-balance-table" *ngIf="trialBalanceData.items.length > 0; else noData">
+          <thead>
+            <tr>
+              <th class="text-start">Account Code</th>
+              <th class="text-start">Particulars</th>
+              <th class="text-start">Account Type</th>
+              <th class="text-end">Debit (₹)</th>
+              <th class="text-end">Credit (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of trialBalanceData.items">
+              <td class="text-start">{{ item.accountCode }}</td>
+              <td class="text-start">{{ item.accountName }}</td>
+              <td class="text-start">{{ item.accountType }}</td>
+              <td class="text-end font-monospace">{{ formatAmount(item.debit) }}</td>
+              <td class="text-end font-monospace">{{ formatAmount(item.credit) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td class="text-start fw-bold" colspan="3">TOTAL</td>
+              <td class="text-end fw-bold font-monospace">{{ formatAmount(trialBalanceData.totals.debit) }}</td>
+              <td class="text-end fw-bold font-monospace">{{ formatAmount(trialBalanceData.totals.credit) }}</td>
+            </tr>
+            <!-- <tr class="difference-row" *ngIf="trialBalanceData.difference !== 0">
+              <td class="text-start fw-bold" colspan="3">DIFFERENCE</td>
+              <td class="text-end fw-bold font-monospace" [class.text-danger]="trialBalanceData.difference !== 0" colspan="2">
+                {{ formatAmount(Math.abs(trialBalanceData.difference)) }}
+              </td>
+            </tr> -->
+          </tfoot>
+        </table>
+      </div>
+
+      <ng-template #noData>
+        <div class="no-data-message" *ngIf="!errorMessage">
+          <i class="fas fa-folder-open"></i>
+          <p>No data available to display for the selected date range.</p>
+        </div>
+      </ng-template>
+    </div>
   </div>
 </div>

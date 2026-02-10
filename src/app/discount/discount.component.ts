@@ -1,5 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
-import { FormGroup, FormBuilder, Validators } from '@angular/forms';
+import { Component, OnInit, OnDestroy, HostListener, ViewChild, ElementRef } from '@angular/core';import { FormGroup, FormBuilder, Validators } from '@angular/forms';
 import { DiscountService } from '../services/discount.service';
 import { saveAs } from 'file-saver';
 import * as XLSX from 'xlsx';
@@ -20,6 +19,8 @@ export class DiscountComponent implements OnInit, OnDestroy {
   discountForm: FormGroup;
   discounts: any[] = [];
   filteredDiscounts: any[] = [];
+  @ViewChild('startsAtPicker') startsAtPicker!: ElementRef;
+@ViewChild('endsAtPicker') endsAtPicker!: ElementRef;
   displayedDiscounts: any[] = [];
   showForm: boolean = false;
   showColumnVisibility: boolean = false;
@@ -101,7 +102,58 @@ export class DiscountComponent implements OnInit, OnDestroy {
       this.discountSubscription.unsubscribe();
     }
   }
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
+// Helper to get YYYY-MM-DD for the hidden native date picker binding
+getFormattedDate(dateValue: any): string {
+  if (!dateValue) return '';
+  const date = new Date(dateValue);
+  if (isNaN(date.getTime())) return '';
+  return date.toISOString().split('T')[0];
+}
+
+openDatePicker(type: 'start' | 'end'): void {
+  if (type === 'start') this.startsAtPicker.nativeElement.showPicker();
+  else this.endsAtPicker.nativeElement.showPicker();
+}
+
+onManualDateInput(event: any, controlName: string): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    if (dateObj && dateObj.getDate() === parseInt(day) && 
+        dateObj.getMonth() + 1 === parseInt(month)) {
+      
+      const isoDate = `${year}-${month}-${day}`;
+      this.discountForm.get(controlName)?.setValue(isoDate);
+    } else {
+      alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+      this.resetVisibleInput(event, controlName);
+    }
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    this.resetVisibleInput(event, controlName);
+  }
+}
+
+private resetVisibleInput(event: any, controlName: string): void {
+  event.target.value = this.getFormattedDateForInput(this.discountForm.get(controlName)?.value);
+}
   // Load all products for reference
   loadAllProducts(): void {
     this.productsService.fetchAllProducts().then(products => {

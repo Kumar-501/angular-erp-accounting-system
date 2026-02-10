@@ -6,13 +6,12 @@ import { collection, addDoc, Firestore, writeBatch, doc } from '@angular/fire/fi
 import { UserService } from '../services/user.service';
 import { Component, ElementRef, ViewChild } from '@angular/core';
 import { SaleService } from '../services/sale.service';
+import { AccountDataService } from '../services/account-data.service'; // <-- Import the new service
+
 
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-
-
-
 
 @Component({
   selector: 'app-list-accounts',
@@ -28,8 +27,8 @@ throw new Error('Method not implemented.');
 }
   accountForm!: FormGroup;
   fundTransferForm!: FormGroup;
-  sortColumn: string = 'name'; // Default sort column
-  sortDirection: 'asc' | 'desc' = 'asc'; // Default sort direction
+  sortColumn: string = 'name';
+  sortDirection: 'asc' | 'desc' = 'asc';
   @ViewChild('table') table!: ElementRef;
   depositForm!: FormGroup;
   showModal = false;
@@ -58,25 +57,39 @@ debitCreditTotals: { [key: string]: { debit: number, credit: number } } = {};  s
   currentPage = 1;
   unlinkedPayments = 3;
 acc: any;
+
+  // **NEW**: State flags to ensure all data is loaded before processing
+  private accountsLoaded = false;
+  private transactionsLoaded = false;
+  private salesLoaded = false;
+
   constructor(
     private fb: FormBuilder,
     private accountService: AccountService,
     private router: Router,
+        private accountDataService: AccountDataService ,// <-- Inject here
+
     private firestore: Firestore,
     private userService: UserService,
     private saleService: SaleService
   ) {}
-
-// 2. Replace the existing ngOnInit method (around line 60) with:
 ngOnInit(): void {
   this.initForm();
   this.initFundTransferForm();
   this.initDepositForm();
+
+      this.loadAccounts();
+
   this.loadUsers();
   
-  // Load sales first, then accounts to ensure sales data is available
-  this.loadSalesRealtime();
+  this.userService.getCurrentUser().subscribe(user => {
+    this.currentUser = user;
+  });
+  
+  // Load accounts and transactions
   this.loadAccountsRealtime();
+  this.loadTransactionsRealtime(); // CRITICAL: Load transactions
+  this.loadSalesRealtime(); // CRITICAL: Load sales
 }
 
  getAccountHeadOptions(): any[] {
@@ -126,7 +139,7 @@ initDepositForm(): void {
   this.depositForm = this.fb.group({
     depositTo: ['', Validators.required],
     amount: [0, [Validators.required, Validators.min(1)]],
-    depositFrom: [''], // Removed Validators.required
+    depositFrom: [''],
     date: [new Date().toISOString().split('T')[0], Validators.required],
     note: [''],
     attachmentUrl: ['']
@@ -135,380 +148,309 @@ initDepositForm(): void {
   loadUsers(): void {
     this.userService.getUsers().subscribe(users => {
       this.users = users;
-      console.log('Users loaded:', this.users);
     });
   }
-sortData(column: string): void {
-  if (this.sortColumn === column) {
-    this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-  } else {
-    this.sortColumn = column;
-    this.sortDirection = 'asc';
+
+  loadAccounts(): void {
+    this.accountService.getAccounts((fetchedAccounts) => {
+      this.accounts = fetchedAccounts;
+
+      // --- THIS IS THE CRITICAL NEW LINE ---
+      // After fetching the accounts for this component,
+      // also send a copy to the shared service for other components to use.
+      this.accountDataService.updateAccounts(this.accounts);
+
+      // ... rest of your existing logic for this component
+    });
   }
 
-  this.accounts = [...this.accounts].sort((a, b) => {
-    let valueA, valueB;
-
-    // Special handling for account head
-    if (column === 'accountHead') {
-      valueA = a.accountHead ? `${a.accountHead.group} ${a.accountHead.value}` : '';
-      valueB = b.accountHead ? `${b.accountHead.group} ${b.accountHead.value}` : '';
-    } else {
-      valueA = a[column] === null || a[column] === undefined ? '' : a[column];
-      valueB = b[column] === null || b[column] === undefined ? '' : b[column];
-    }
-
-    // Numeric sorting for balance
-    if (column === 'openingBalance') {
-      const numA = parseFloat(valueA) || 0;
-      const numB = parseFloat(valueB) || 0;
-      return this.sortDirection === 'asc' ? numA - numB : numB - numA;
-    }
-
-    // String sorting for other columns
-    if (typeof valueA === 'string' && typeof valueB === 'string') {
-      const comparison = valueA.toLowerCase().localeCompare(valueB.toLowerCase());
-      return this.sortDirection === 'asc' ? comparison : -comparison;
-    }
-
-    // Default comparison
-    if (valueA < valueB) return this.sortDirection === 'asc' ? -1 : 1;
-    if (valueA > valueB) return this.sortDirection === 'asc' ? 1 : -1;
-    return 0;
-  });
-}
-loadTransactionsRealtime(): void {
-  this.accountService.getAllTransactions((transactions) => {
-    this.transactions = transactions;
+// **MODIFIED**: Sets a flag and calls the central processing function
+loadAccountsRealtime(): void {
+  this.accountService.getAccounts((accounts: any[]) => {
+    this.accounts = accounts;
+    this.accountsLoaded = true;
     this.processAccountTransactions();
   });
 }
-  
-processAccountTransactions(): void {
-    this.accountTransactions = {};
-    this.debitCreditTotals = {};
-    
-    // Group account service transactions by account
-    this.transactions.forEach(transaction => {
-      const accountId = transaction.accountId;
-      if (!this.accountTransactions[accountId]) {
-        this.accountTransactions[accountId] = [];
-      }
-      
-      // Calculate debit/credit based on transaction type and amount
-      let debit = 0;
-      let credit = 0;
-      const amount = Number(transaction.amount || 0);
-      
-      // If transaction already has debit/credit fields, use them
-      if (transaction.debit !== undefined && transaction.credit !== undefined) {
-        debit = Number(transaction.debit || 0);
-        credit = Number(transaction.credit || 0);
-      } else {        // Calculate debit/credit from amount and type
-        switch (transaction.type) {
-          case 'expense':
-          case 'transfer_out':
-          case 'fund_transfer_out':
-          case 'deposit_out':
-          case 'purchase_payment':
-            debit = amount;
-            break;
-          case 'income':
-          case 'transfer_in':
-          case 'fund_transfer_in':
-          case 'deposit_in':
-          case 'deposit':
-          case 'sale':
-          case 'purchase_return':
-            credit = amount;
-            break;
-          default:
-            // For unknown types, assume expense types are debits, others are credits
-            if (transaction.type?.includes('expense') || transaction.type?.includes('payment') || 
-                transaction.type?.includes('out')) {
-              debit = amount;
-            } else {
-              credit = amount;
-            }
-        }
-      }
-      
-      this.accountTransactions[accountId].push({
-        ...transaction,
-        debit: debit,
-        credit: credit
-      });
-    });
-      // Include sales payments as credit transactions
-    this.sales.forEach(sale => {
-      const accountId = sale.paymentAccountId || sale.paymentAccount;
-      if (accountId) {
-        if (!this.accountTransactions[accountId]) {
-          this.accountTransactions[accountId] = [];
-        }
-        
-        // Calculate the proper payment amount using enhanced logic
-        const paymentAmount = this.calculateSalesPaymentAmount(sale);
-        
-        // Only include sales with actual payment amounts > 0
-        if (paymentAmount > 0) {
-          console.log('Processing sale for list-accounts:', {
-            invoiceNo: sale.invoiceNo,
-            accountId: accountId,
-            paymentAmount: paymentAmount,
-            balance: sale.balance,
-            itemsTotal: sale.itemsTotal
-          });
-          
-          this.accountTransactions[accountId].push({ 
-            debit: 0, 
-            credit: paymentAmount,
-            type: 'sale',
-            description: `Sale: ${sale.invoiceNo || sale.orderNo || 'No invoice'} - ${sale.customerName || sale.customer || 'Unknown Customer'}`,
-            date: this.convertToDate(sale.paidOn || sale.saleDate || sale.createdAt),
-            amount: paymentAmount,
-            invoiceNo: sale.invoiceNo,
-            customer: sale.customerName || sale.customer,
-            source: 'sale'
-          });
-        }
-      }
-    });
-    
-    // Calculate debit and credit totals per account
-    Object.keys(this.accountTransactions).forEach(accountId => {
-      const txns = this.accountTransactions[accountId];
-      const totalDebit = txns.reduce((sum, t) => sum + (Number(t.debit) || 0), 0);
-      const totalCredit = txns.reduce((sum, t) => sum + (Number(t.credit) || 0), 0);
-      this.debitCreditTotals[accountId] = { debit: totalDebit, credit: totalCredit };
-    });
-    
-    // Update overall balance display
-    this.calculateTotalBalance();
-  }
-  
-  
-  
-  
-  
-  
-  applySearchFilter(): void {
-  if (!this.searchTerm || this.searchTerm.trim() === '') {
-    this.filteredAccounts = [...this.accounts];
-    this.totalEntries = this.filteredAccounts.length;
-    this.calculateTotalBalance();
+
+// ================================================================
+// ========= REPLACE THIS ENTIRE FUNCTION IN list-accounts.component.ts =========
+// ================================================================
+
+private async updateAccountBalancesInDatabase(): Promise<void> {
+  if (!this.accounts || this.accounts.length === 0) {
     return;
   }
-
-  const searchTermLower = this.searchTerm.toLowerCase().trim();
   
-  this.filteredAccounts = this.accounts.filter(account => {
-    // Check each field for a match
-    return (
-      (account.name?.toLowerCase().includes(searchTermLower)) ||
-      (account.accountNumber?.toLowerCase().includes(searchTermLower)) ||
-      (account.accountHead?.value?.toLowerCase().includes(searchTermLower)) ||
-      (account.accountHead?.group?.toLowerCase().includes(searchTermLower)) ||
-      (account.note?.toLowerCase().includes(searchTermLower)) ||
-      (account.addedBy?.toLowerCase().includes(searchTermLower)) ||
-      (account.accountSubType?.toLowerCase().includes(searchTermLower)));
+  console.log('🔄 Checking for balance discrepancies and updating database...');
+  
+  try {
+    const balanceUpdates = new Map<string, number>();
+    
+    this.accounts.forEach(account => {
+      // 1. Store the balance that was originally loaded from the database.
+      const storedBalanceInDB = account.currentBalance || 0; 
+      
+      // 2. Calculate the fresh, transaction-based balance.
+      const calculatedBalance = this.calculateAccountCurrentBalance(account);
+      
+      // 3. Compare the FRESHLY CALCULATED balance with the ORIGINAL database balance.
+      if (Math.abs(calculatedBalance - storedBalanceInDB) > 0.01) {
+        balanceUpdates.set(account.id, calculatedBalance);
+        console.log(`📊 Balance update needed for ${account.name}: ${storedBalanceInDB.toFixed(2)} → ${calculatedBalance.toFixed(2)}`);
+      }
+      
+      // 4. Finally, update the local component's account object for the UI.
+      account.currentBalance = calculatedBalance;
+    });
+    
+    if (balanceUpdates.size > 0) {
+      await this.accountService.batchUpdateCurrentBalances(balanceUpdates);
+      console.log(`✅ Successfully updated ${balanceUpdates.size} account balances in database`);
+    } else {
+      console.log('✅ All account balances are up to date in the database.');
+    }
+  } catch (error) {
+    console.error('❌ Error updating account balances:', error);
+  }
+}
+calculateAccountCurrentBalance(account: any): number {
+  if (!account || !account.id) {
+    return 0;
+  }
+
+  const openingBalance = Number(account.openingBalance || 0);
+  const transactionsForAccount = this.accountTransactions[account.id] || [];
+
+  if (transactionsForAccount.length === 0) {
+    return openingBalance;
+  }
+
+  const finalBalance = transactionsForAccount.reduce((balance, transaction) => {
+    const credit = Number(transaction.credit) || 0;
+    const debit = Number(transaction.debit) || 0;
+    
+    if (transaction.isCapitalTransaction === true) {
+      return balance + credit + debit;
+    } else {
+      return balance + credit - debit;
+    }
+  }, openingBalance);
+
+  return finalBalance;
+}
+
+// Use this method in your template
+getAccountCurrentBalance(account: any): number {
+  // Always use the calculated balance from transactions
+  return this.calculateAccountCurrentBalance(account);
+}
+
+// OPTIONAL: Add a refresh button to manually update balances
+async refreshAllBalances(): Promise<void> {
+  console.log('🔄 Refreshing all account balances...');
+  
+  // Recalculate all balances
+  this.accounts.forEach(account => {
+    const calculatedBalance = this.calculateAccountCurrentBalance(account);
+    account.currentBalance = calculatedBalance;
   });
   
-  this.totalEntries = this.filteredAccounts.length;
+  // Optionally save to database
+  const updates = new Map<string, number>();
+  this.accounts.forEach(account => {
+    updates.set(account.id, account.currentBalance);
+  });
+  
+  await this.accountService.batchUpdateCurrentBalances(updates);
+  
+  this.applySearchFilter();
+  this.calculateTotalBalance();
+  
+  console.log('✅ All balances refreshed');
+}
+
+// **MODIFIED & FIXED**: This is now the central coordinator.
+private processAccountTransactions(): void {
+  // Guard prevents the function from running until all data is ready.
+  if (!this.accountsLoaded || !this.transactionsLoaded || !this.salesLoaded) {
+    console.log('⏳ Data not fully loaded, skipping transaction processing for now...');
+    return;
+  }
+  console.log('✅ All data loaded, processing transactions...');
+
+  this.accountTransactions = {};
+  this.debitCreditTotals = {};
+  const processedTxIds = new Set<string>();
+
+  // Process regular transactions
+  this.transactions.forEach(transaction => {
+    const accountId = transaction.accountId;
+    if (!accountId || processedTxIds.has(transaction.id)) return;
+    processedTxIds.add(transaction.id);
+    if (!this.accountTransactions[accountId]) this.accountTransactions[accountId] = [];
+    this.accountTransactions[accountId].push(transaction);
+  });
+
+  // Process sales as credit entries
+  this.sales.forEach(sale => {
+    const accountId = sale.paymentAccountId || sale.paymentAccount;
+    if (!accountId) return;
+    
+    const paymentAmount = this.calculateSalesPaymentAmount(sale);
+    if (paymentAmount > 0) {
+      if (!this.accountTransactions[accountId]) this.accountTransactions[accountId] = [];
+      
+      const saleTransactionId = `sale_${sale.id}`;
+      
+      if (!processedTxIds.has(saleTransactionId)) {
+        this.accountTransactions[accountId].push({ 
+          id: saleTransactionId, 
+          credit: paymentAmount, 
+          debit: 0, 
+          type: 'sale',
+          source: 'sale',
+          description: `Sale: ${sale.invoiceNo || 'N/A'}`,
+          date: this.convertToDate(sale.paidOn || sale.saleDate || sale.createdAt),
+          hasReturns: sale.hasReturns || false,
+          saleStatus: sale.status || 'Completed'
+        });
+        processedTxIds.add(saleTransactionId);
+      }
+    }
+  });
+  
+  // Calculate debit/credit totals
+  Object.keys(this.accountTransactions).forEach(accountId => {
+    const txns = this.accountTransactions[accountId];
+    const totalDebit = txns.reduce((sum, t) => sum + (Number(t.debit) || 0), 0);
+    const totalCredit = txns.reduce((sum, t) => sum + (Number(t.credit) || 0), 0);
+    this.debitCreditTotals[accountId] = { debit: totalDebit, credit: totalCredit };
+  });
+
+  // **CORE FIX**: Call the database sync function. This function will now
+  // handle the balance calculation, comparison, local state update, and DB update.
+  this.updateAccountBalancesInDatabase();
+  
+  // Update the UI with the fresh data
+  this.applySearchFilter();
+  this.sortData(this.sortColumn);
   this.calculateTotalBalance();
 }
 
-// Update clearSearch function
-clearSearch(): void {
-  this.searchTerm = '';
-  this.applySearchFilter();
+
+
+// **MODIFIED**: Sets a flag and calls the central processing function
+loadTransactionsRealtime(): void {
+  this.accountService.getAllTransactions((transactions) => {
+    this.transactions = transactions;
+    this.transactionsLoaded = true;
+    this.processAccountTransactions();
+  });
 }
+ sortData(column: string, toggleDirection: boolean = true): void {
+    if (this.sortColumn === column && toggleDirection) {
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+      this.sortColumn = column;
+      this.sortDirection = 'asc';
+    }
 
-loadAccountsRealtime(): void {
-  this.accountService.getAccounts((accounts: any[]) => {
-    // First get all accounts
-    this.accounts = accounts;
-    
-    // Then get all transactions to calculate final balances and debit/credit totals
-    this.accountService.getAllTransactions((transactions: any[]) => {
-      this.transactions = transactions;
-      
-      // Create a map to store calculated balances
-      const accountBalances = new Map<string, number>();
-      
-      // Initialize account transactions and debit/credit totals
-      this.accountTransactions = {};
-      this.debitCreditTotals = {};
-      
-      // Initialize with opening balances
-      accounts.forEach(account => {
-        accountBalances.set(account.id, account.openingBalance || 0);
-        this.accountTransactions[account.id] = [];
-        this.debitCreditTotals[account.id] = { debit: 0, credit: 0 };
-      });
+    this.filteredAccounts.sort((a, b) => {
+      let valueA, valueB;
 
-      // Process all transactions chronologically
-      transactions.sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      ).forEach(transaction => {
-        const accountId = transaction.accountId;
-        
-        if (accountBalances.has(accountId)) {
-          const currentBalance = accountBalances.get(accountId) || 0;
-          const amount = Number(transaction.amount || 0);
-          
-          // Calculate debit/credit based on transaction type and amount
-          let debit = 0;
-          let credit = 0;
-          let balanceChange = 0;
-          
-          // If transaction already has debit/credit fields, use them
-          if (transaction.debit !== undefined && transaction.credit !== undefined) {
-            debit = Number(transaction.debit || 0);
-            credit = Number(transaction.credit || 0);
-            balanceChange = credit - debit;
-          } else {            // Calculate debit/credit from amount and type
-            switch (transaction.type) {
-              case 'expense':
-              case 'transfer_out':
-              case 'fund_transfer_out':
-              case 'deposit_out':
-              case 'purchase_payment':
-                debit = amount;
-                balanceChange = -amount; // Debit decreases balance
-                break;
-              case 'income':
-              case 'transfer_in':
-              case 'fund_transfer_in':
-              case 'deposit_in':
-              case 'deposit':
-              case 'sale':
-              case 'purchase_return':
-                credit = amount;
-                balanceChange = amount; // Credit increases balance
-                break;
-              default:
-                // For unknown types, assume expense types decrease balance
-                if (transaction.type?.includes('expense') || transaction.type?.includes('payment') || 
-                    transaction.type?.includes('out')) {
-                  debit = amount;
-                  balanceChange = -amount;
-                } else {
-                  credit = amount;
-                  balanceChange = amount;
-                }
-            }
-          }
-          
-          // Update balance
-          accountBalances.set(accountId, currentBalance + balanceChange);
-          
-          // Store transaction with calculated debit/credit for display
-          this.accountTransactions[accountId].push({
-            ...transaction,
-            debit: debit,
-            credit: credit
-          });
-          
-          // Update debit/credit totals
-          this.debitCreditTotals[accountId].debit += debit;
-          this.debitCreditTotals[accountId].credit += credit;
-        }      });
+      if (column === 'balance') {
+        valueA = this.getAccountCurrentBalance(a);
+        valueB = this.getAccountCurrentBalance(b);
+      } else if (column === 'accountHead') {
+        valueA = a.accountHead ? `${a.accountHead.group} ${a.accountHead.value}` : '';
+        valueB = b.accountHead ? `${b.accountHead.group} ${b.accountHead.value}` : '';
+      } else {
+        valueA = a[column] ?? '';
+        valueB = b[column] ?? '';
+      }
 
-      // Also process sales data for balance calculation
-      this.sales.forEach(sale => {
-        const accountId = sale.paymentAccountId || sale.paymentAccount;
-        const paymentAmount = this.calculateSalesPaymentAmount(sale);
-        
-        if (accountId && paymentAmount > 0 && accountBalances.has(accountId)) {
-          const currentBalance = accountBalances.get(accountId) || 0;
-          accountBalances.set(accountId, currentBalance + paymentAmount);
-          
-          // Add sale as a credit transaction
-          if (!this.accountTransactions[accountId]) {
-            this.accountTransactions[accountId] = [];
-          }
-          this.accountTransactions[accountId].push({ 
-            debit: 0, 
-            credit: paymentAmount,
-            type: 'sale',
-            description: `Sale: ${sale.invoiceNo || sale.orderNo || 'No invoice'} - ${sale.customerName || sale.customer || 'Unknown Customer'}`,
-            date: this.convertToDate(sale.paidOn || sale.saleDate || sale.createdAt),
-            amount: paymentAmount,
-            invoiceNo: sale.invoiceNo,
-            customer: sale.customerName || sale.customer,
-            source: 'sale'
-          });
-          
-          // Update credit total
-          if (!this.debitCreditTotals[accountId]) {
-            this.debitCreditTotals[accountId] = { debit: 0, credit: 0 };
-          }
-          this.debitCreditTotals[accountId].credit += paymentAmount;
-        }
-      });
-      
-      // Update accounts with calculated balances
-      this.accounts = accounts.map(account => {
-        const calculatedBalance = accountBalances.get(account.id) || account.openingBalance || 0;
-        return {
-          ...account,
-          calculatedBalance: calculatedBalance
-        };
-      });
+      if (typeof valueA === 'number' && typeof valueB === 'number') {
+        return this.sortDirection === 'asc' ? valueA - valueB : valueB - valueA;
+      }
 
-      this.filteredAccounts = [...this.accounts];
-      this.totalEntries = this.accounts.length;
-      this.calculateTotalBalance();
-      this.sortData('name');
+      const comparison = String(valueA).toLowerCase().localeCompare(String(valueB).toLowerCase());
+      return this.sortDirection === 'asc' ? comparison : -comparison;
     });
-  });
-}
 
-accountBook(account: any): void {
-  this.router.navigate(['/account-book', account.id], {
-    state: { accountName: account.name } // Optional: pass account name for display
-  });
+    this.calculateTotalBalance();
+  }
+  applySearchFilter(): void {
+    const searchTermLower = this.searchTerm.toLowerCase().trim();
+    
+    this.filteredAccounts = this.searchTerm
+      ? this.accounts.filter(account =>
+          (account.name?.toLowerCase().includes(searchTermLower)) ||
+          (account.accountNumber?.toLowerCase().includes(searchTermLower)) ||
+          (account.accountHead?.value?.toLowerCase().includes(searchTermLower)) ||
+          (account.accountHead?.group?.toLowerCase().includes(searchTermLower))
+        )
+      : [...this.accounts];
+    
+    this.totalEntries = this.filteredAccounts.length;
+    this.sortData(this.sortColumn, false); // Re-sort the filtered data
+  }
+
+
+  clearSearch(): void {
+    this.searchTerm = '';
+    this.applySearchFilter();
+  }
+
+ accountBook(account: any): void {
+    // Set a flag to ensure the account book refreshes its data upon navigation
+    this.accountService.setAccountBookRefreshFlag(account.id, true);
+    this.router.navigate(['/account-book', account.id]);
+  }
+
+// **NEW METHOD**: Trigger balance update for specific account
+private async triggerBalanceUpdateForAccount(accountId: string): Promise<void> {
+  try {
+    const account = this.accounts.find(acc => acc.id === accountId);
+    if (account) {
+      const calculatedBalance = this.calculateAccountCurrentBalance(account);
+      await this.accountService.updateCurrentBalance(accountId, calculatedBalance);
+      console.log(`✅ Updated balance for ${account.name}: ₹${calculatedBalance.toFixed(2)}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error updating balance for account ${accountId}:`, error);
+  }
 }
 getSortIcon(column: string): string {
-  if (this.sortColumn !== column) {
-    return 'fa-sort'; // Default icon when column is not being sorted
+    if (this.sortColumn !== column) return 'fa-sort';
+    return this.sortDirection === 'asc' ? 'fa-sort-up active' : 'fa-sort-down active';
   }
-  
-  return this.sortDirection === 'asc' 
-    ? 'fa-sort-up active' 
-    : 'fa-sort-down active';
-}
-calculateTotalBalance(): void {
-  const total = this.filteredAccounts.reduce(
-    (sum, acc) => sum + (acc.calculatedBalance || acc.openingBalance || 0), 
-    0
-  );
-  this.totalBalance = total.toFixed(2);
-}
-initForm(): void {
-  this.accountForm = this.fb.group({
-    name: ['', Validators.required],
-    accountNumber: ['', Validators.required],
-    accountType: [''],
-    accountSubType: [''],
-    incomeType: [''],
-    openingBalance: [0, [Validators.required, Validators.min(0)]],
-    paidOnDate: [new Date().toISOString().split('T')[0], Validators.required],
-    paymentAccount: [''],
-    accountHeadGroup: ['', Validators.required], // New field for group selection
-    accountHeadValue: ['', Validators.required], // New field for value selection
-    accountDetails: this.fb.array([]),
-    note: [''],
-    addedBy: ['']
-  });
 
-  // Initialize with empty account details
-  for (let i = 0; i < 5; i++) {
-    this.accountDetailsArray.push(this.createAccountDetail());
+  calculateTotalBalance(): void {
+    const total = this.filteredAccounts.reduce(
+      (sum, acc) => sum + this.getAccountCurrentBalance(acc),
+      0
+    );
+    this.totalBalance = total.toFixed(2);
   }
-}
 
+  initForm(): void {
+    this.accountForm = this.fb.group({
+      name: ['', Validators.required],
+      accountNumber: ['', Validators.required],
+      accountSubType: [''],
+      openingBalance: [0, [Validators.required, Validators.min(0)]],
+      accountHeadGroup: ['', Validators.required],
+      accountHeadValue: ['', Validators.required],
+      accountDetails: this.fb.array([]),
+      note: [''],
+      addedBy: ['']
+    });
+
+    for (let i = 0; i < 5; i++) {
+      this.accountDetailsArray.push(this.createAccountDetail());
+    }
+  }
 
   initFundTransferForm(): void {
     this.fundTransferForm = this.fb.group({
@@ -532,10 +474,7 @@ initForm(): void {
     });
   }
 
-
-
-
-  getMinValue(a: number, b: number): number {
+ getMinValue(a: number, b: number): number {
     return Math.min(a, b);
   }
 
@@ -552,8 +491,7 @@ openForm(account?: any): void {
     this.isEdit = true;
     this.currentAccountId = account.id;
 
-    
-      const formData = {
+    const formData = {
       name: account.name,
       accountNumber: account.accountNumber,
       accountType: account.accountType,
@@ -562,16 +500,16 @@ openForm(account?: any): void {
       openingBalance: account.openingBalance || 0,
       paidOnDate: account.paidOnDate || new Date().toISOString().split('T')[0],
       paymentAccount: account.paymentAccount || '',
-      accountHeadGroup: account.accountHead?.group || '',
-      accountHeadValue: account.accountHead?.value || '',
       note: account.note || '',
-      addedBy: account.addedBy || ''
+      addedBy: account.addedBy || this.currentUser?.username || '',
+      accountHeadGroup: account.accountHead?.group || '',
+      accountHeadValue: account.accountHead 
+        ? `${account.accountHead.group}|${account.accountHead.value}` 
+        : (account.accountHeadValue || '')
     };
-
 
     this.accountForm.patchValue(formData);
 
-    // Handle account details
     if (account.accountDetails && Array.isArray(account.accountDetails)) {
       while (this.accountDetailsArray.length) {
         this.accountDetailsArray.removeAt(0);
@@ -586,7 +524,6 @@ openForm(account?: any): void {
         );
       });
       
-      // Fill remaining slots if needed
       const remainingDetails = 5 - account.accountDetails.length;
       if (remainingDetails > 0) {
         for (let i = 0; i < remainingDetails; i++) {
@@ -594,17 +531,19 @@ openForm(account?: any): void {
         }
       }
     }
-   } else {
-    // Reset form for new account
+  } else {
     this.isEdit = false;
     this.currentAccountId = null;
     this.accountForm.reset({
       paidOnDate: new Date().toISOString().split('T')[0],
-      openingBalance: 0
+      openingBalance: 0,
+      accountHeadGroup: '',
+      accountHeadValue: '',
+      accountSubType: '',
+      addedBy: this.currentUser?.username || ''
     });
     
-    // Reset account details
-     while (this.accountDetailsArray.length) {
+    while (this.accountDetailsArray.length) {
       this.accountDetailsArray.removeAt(0);
     }
     for (let i = 0; i < 5; i++) {
@@ -615,88 +554,65 @@ openForm(account?: any): void {
 }
 
   closeForm(): void {
-    this.accountForm.reset();
-    this.initForm();
     this.showModal = false;
     this.isEdit = false;
     this.currentAccountId = null;
+    this.accountForm.reset();
   }
+
+// **CRITICAL FIX**: Updated saveAccount to trigger balance update
 saveAccount(): void {
-  console.log('Form submitted', this.accountForm.value); // Debug log
-  
-  if (this.accountForm.valid) {
-    console.log('Form is valid');
-    
-    const formValue = {...this.accountForm.value};
-    console.log('Form values before processing:', formValue);
-    
-    // Process account head
-    if (formValue.accountHeadGroup && formValue.accountHeadValue) {
-      formValue.accountHead = {
-        group: formValue.accountHeadGroup,
-        value: formValue.accountHeadValue
-      };
-      console.log('Processed account head:', formValue.accountHead);
-    }
-    
-    // Remove the separate group and value fields
-    delete formValue.accountHeadGroup;
-    delete formValue.accountHeadValue;
-    
-    // Filter out empty account details
-    formValue.accountDetails = formValue.accountDetails.filter(
-      (detail: any) => detail.label && detail.value && 
-      detail.label.trim() !== '' && detail.value.trim() !== ''
-    );
-    console.log('Filtered account details:', formValue.accountDetails);
-    
-    if (this.isEdit && this.currentAccountId) {
-      console.log('Updating existing account');
-      this.accountService.updateAccount(this.currentAccountId, formValue)
-        .then(() => {
-          console.log('Account updated successfully');
-          alert('Account updated successfully!');
-          this.closeForm();
-        })
-        .catch((err: any) => {
-          console.error('Error updating account:', err);
-          alert('Error updating account: ' + err.message);
-        });
-    } else {
-      console.log('Creating new account');
-      this.accountService.addAccount(formValue)
-        .then(() => {
-          console.log('Account created successfully');
-          alert('Account created successfully!');
-          this.closeForm();
-        })
-        .catch((err: any) => {
-          console.error('Error creating account:', err);
-          alert('Error creating account: ' + err.message);
-        });
-    }
-  } else {
-    console.log('Form is invalid');
-    // Display which fields are invalid
-    Object.keys(this.accountForm.controls).forEach(key => {
-      const control = this.accountForm.get(key);
-      if (control?.invalid) {
-        console.log('Invalid field:', key, control.errors);
-      }
-    });
+  if (!this.accountForm.valid) {
     alert('Please fill all required fields correctly');
+    return;
+  }
+
+  const formValue = { ...this.accountForm.value };
+
+  if (formValue.accountHeadGroup && formValue.accountHeadValue) {
+    formValue.accountHead = {
+      group: formValue.accountHeadGroup,
+      value: formValue.accountHeadValue
+    };
+  }
+  delete formValue.accountHeadGroup;
+  delete formValue.accountHeadValue;
+
+  formValue.accountDetails = formValue.accountDetails.filter(
+    (detail: any) => detail.label?.trim() && detail.value?.trim()
+  );
+
+  if (this.isEdit && this.currentAccountId) {
+    this.accountService.updateAccount(this.currentAccountId, formValue)
+      .then(async () => {
+        alert('Account updated successfully!');
+        // **CRITICAL FIX**: Update balance after account modification
+        await this.triggerBalanceUpdateForAccount(this.currentAccountId!);
+        this.closeForm();
+      })
+      .catch((err: any) => alert('Error updating account: ' + err.message));
+  } else {
+    this.accountService.addAccount(formValue)
+      .then(async (docRef) => {
+        alert('Account created successfully!');
+        // **CRITICAL FIX**: Set initial balance after account creation
+        const accountId = docRef.id;
+        await this.accountService.updateCurrentBalance(accountId, formValue.openingBalance || 0);
+        this.closeForm();
+      })
+      .catch((err: any) => alert('Error creating account: ' + err.message));
   }
 }
 
   deleteAccount(id: string | null): void {
-    if (id && confirm('Are you sure to delete?')) {
-      this.accountService.deleteAccount(id)
-        .then(() => alert('Account deleted!'))
-        .catch((err: string) => alert('Error: ' + err));
+    if (id) {
+        this.accountService.deleteAccount(id)
+          .then(() => alert('Account deleted!'))
+          .catch((err: string) => alert('Error: ' + err));
     }
+    this.closeConfirmModal();
   }
 
-  // UI functions
   changeTab(tab: string): void {
     this.activeTab = tab;
   }
@@ -706,19 +622,47 @@ get accountHeadGroups(): any[] {
     group: group.group
   }));
 }
+
 getAccountTransactions(accountId: string): any[] {
   const transactions = this.accountTransactions[accountId] || [];
-  
-  // Ensure all transactions have proper debit/credit values
-  return transactions.map(tx => ({
+  // **CRITICAL FIX**: Sort transactions by date and ensure proper display
+  const processedTransactions = transactions.map(tx => ({
     ...tx,
     debit: Number(tx.debit || 0),
     credit: Number(tx.credit || 0),
-    description: tx.description || 'No description',
-    date: tx.date || new Date()
-  })).sort((a, b) => 
+    description: this.getTransactionDescription(tx),
+    date: tx.date || new Date(),
+    displayType: this.getTransactionDisplayType(tx)
+  }));
+  
+  // Sort by date (newest first) and return
+  return processedTransactions.sort((a, b) => 
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
+}
+
+// **NEW METHOD**: Get proper transaction description
+private getTransactionDescription(tx: any): string {
+  if (tx.source === 'sale') {
+    let desc = tx.description || 'Sale';
+    if (tx.hasReturns) {
+      desc += ' (Has Returns)';
+    }
+    return desc;
+  } else if (tx.source === 'sales_return') {
+    return tx.description || 'Sales Return';
+  }
+  return tx.description || 'Transaction';
+}
+
+// **NEW METHOD**: Get transaction display type
+private getTransactionDisplayType(tx: any): string {
+  if (tx.source === 'sale') {
+    return 'Sale';
+  } else if (tx.source === 'sales_return') {
+    return 'Sales Return';
+  }
+  return tx.type || 'Transaction';
 }
 
 getAccountDebitTotal(accountId: string): number {
@@ -742,28 +686,22 @@ getTotalCredit(): number {
     return sum + (totals?.credit || 0);
   }, 0);
 }
-// Get options for a specific group
+
 getAccountHeadOptionsForGroup(groupName: string): any[] {
   const group = this.getAccountHeadOptions().find(g => g.group === groupName);
   return group ? group.options : [];
 }
 
-
 onAccountHeadGroupChange(event: any): void {
   const selectedGroup = event.target.value;
   
-  // Reset the account head value when group changes
   this.accountForm.get('accountHeadValue')?.setValue('');
   
-  // If you want to trigger validation
   this.accountForm.get('accountHeadValue')?.markAsUntouched();
 }
 
-
-
   exportCSV(): void {
     try {
-      // Define an interface for the row structure
       interface CsvRow {
         Name: string;
         'Account Type': string;
@@ -775,25 +713,22 @@ onAccountHeadGroupChange(event: any): void {
         'Added By': string;
       }
   
-      // Prepare data for CSV with explicit typing
       const csvData: CsvRow[] = this.accounts.map(account => ({
         'Name': account.name || '',
         'Account Type': account.accountType || '',
         'Account Sub Type': account.accountSubType || '',
         'Account Number': account.accountNumber || '',
         'Note': account.note || '',
-        'Balance': `₹ ${(account.openingBalance || 0).toFixed(2)}`,
+        'Balance': `₹ ${this.calculateAccountCurrentBalance(account).toFixed(2)}`,
         'Account Details': this.formatAccountDetails(account.accountDetails),
         'Added By': account.addedBy || ''
       }));
   
-      // Create CSV content
       const headers = Object.keys(csvData[0]) as Array<keyof CsvRow>;
       let csvContent = headers.join(',') + '\n';
   
       csvData.forEach(row => {
         const values = headers.map(header => {
-          // Escape quotes in values and wrap in quotes if contains commas
           const value = row[header];
           if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
             return `"${value.replace(/"/g, '""')}"`;
@@ -803,7 +738,6 @@ onAccountHeadGroupChange(event: any): void {
         csvContent += values.join(',') + '\n';
       });
   
-      // Create download link
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
@@ -821,42 +755,35 @@ onAccountHeadGroupChange(event: any): void {
     }
   }
 
-
   exportExcel(): void {
     try {
-      // Prepare data for Excel
       const excelData = this.accounts.map(account => ({
         'Name': account.name || '',
         'Account Type': account.accountType || '',
         'Account Sub Type': account.accountSubType || '',
         'Account Number': account.accountNumber || '',
         'Note': account.note || '',
-        'Balance': (account.openingBalance || 0),
+        'Balance': this.calculateAccountCurrentBalance(account),
         'Account Details': this.formatAccountDetails(account.accountDetails),
         'Added By': account.addedBy || ''
       }));
 
-      // Create worksheet
       const worksheet = XLSX.utils.json_to_sheet(excelData);
       
-      // Format the balance column as currency
       const range = XLSX.utils.decode_range(worksheet['!ref'] || '');
       for (let i = range.s.r + 1; i <= range.e.r; ++i) {
-        const cellAddress = { c: 5, r: i }; // Balance is column 5 (0-based index)
+        const cellAddress = { c: 5, r: i };
         const cellRef = XLSX.utils.encode_cell(cellAddress);
         if (worksheet[cellRef]) {
           worksheet[cellRef].z = '"₹"#,##0.00';
         }
       }
       
-      // Create workbook
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Payment Accounts');
       
-      // Generate file name with current date
       const fileName = `payment_accounts_${new Date().toISOString().slice(0,10)}.xlsx`;
       
-      // Export to Excel
       XLSX.writeFile(workbook, fileName);
     } catch (error) {
       console.error('Error exporting Excel:', error);
@@ -864,21 +791,18 @@ onAccountHeadGroupChange(event: any): void {
     }
   }
 
-
-// Print Functionality
 printData(): void {
   try {
-    // Create a printable version of the table
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       alert('Popup was blocked. Please allow popups for this site to print.');
       return;
     }
 
-    // Get current date for header
     const currentDate = new Date().toLocaleDateString();
+
+    const totalForPrint = this.accounts.reduce((sum, acc) => sum + this.calculateAccountCurrentBalance(acc), 0).toFixed(2);
     
-    // Create the print content
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -932,14 +856,14 @@ printData(): void {
                 <td>${account.accountSubType || ''}</td>
                 <td>${account.accountNumber || ''}</td>
                 <td>${account.note || ''}</td>
-                <td>₹ ${(account.openingBalance || 0).toFixed(2)}</td>
+                <td>₹ ${this.calculateAccountCurrentBalance(account).toFixed(2)}</td>
                 <td>${this.formatAccountDetails(account.accountDetails)}</td>
                 <td>${account.addedBy || ''}</td>
               </tr>
             `).join('')}
             <tr class="total-row">
               <td colspan="5">Total:</td>
-              <td>₹ ${this.calculateTotalBalance()}</td>
+              <td>₹ ${totalForPrint}</td>
               <td colspan="2"></td>
             </tr>
           </tbody>
@@ -957,7 +881,6 @@ printData(): void {
       </html>
     `;
 
-    // Write the content and print
     printWindow.document.open();
     printWindow.document.write(printContent);
     printWindow.document.close();
@@ -967,46 +890,40 @@ printData(): void {
   }
 }
 
-
   toggleColumnVisibility(): void {
     console.log('Toggling column visibility');
   }
 
-// Export to PDF
 exportPDF(): void {
   try {
-    // Create new PDF document in landscape mode
     const doc = new jsPDF('landscape');
     
-    // Add title
     doc.setFontSize(16);
     doc.setTextColor(40, 40, 40);
     doc.text('Payment Accounts Report', 14, 15);
     
-    // Add subtitle with date
     doc.setFontSize(10);
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 22);
     
-    // Prepare data for the table
     const data = this.accounts.map(account => [
       account.name || '-',
       account.accountType || '-',
       account.accountSubType || '-',
       account.accountNumber || '-',
       account.note || '-',
-      `₹ ${(account.openingBalance || 0).toFixed(2)}`,
+      `₹ ${this.calculateAccountCurrentBalance(account).toFixed(2)}`,
       this.formatAccountDetails(account.accountDetails) || '-',
       account.addedBy || '-'
     ]);
+
+    const totalForPdf = this.accounts.reduce((sum, acc) => sum + this.calculateAccountCurrentBalance(acc), 0).toFixed(2);
     
-    // Add total row
     data.push([
       { content: 'Total:', colSpan: 5, styles: { fontStyle: 'bold' } },
-      { content: `₹ ${this.calculateTotalBalance()}`, styles: { fontStyle: 'bold' } },
+      { content: `₹ ${totalForPdf}`, styles: { fontStyle: 'bold' } },
       { content: '', colSpan: 2, styles: { fontStyle: 'bold' } }
     ]);
     
-    // Add table
     (doc as any).autoTable({
       head: [
         ['Name', 'Account Type', 'Account Sub Type', 'Account Number', 
@@ -1029,11 +946,10 @@ exportPDF(): void {
       },
       margin: { top: 30 },
       columnStyles: {
-        5: { cellWidth: 20 } // Balance column width
+        5: { cellWidth: 20 }
       }
     });
     
-    // Save the PDF
     doc.save(`payment_accounts_${new Date().toISOString().slice(0,10)}.pdf`);
   } catch (error) {
     console.error('Error exporting PDF:', error);
@@ -1041,12 +957,10 @@ exportPDF(): void {
   }
 }
 
-
   editAccount(account: any): void {
     this.openForm(account);
   }
 
-// Enhanced fund transfer method
 fundTransfer(account: any): void {
   console.log('Opening fund transfer modal for account:', account);
   this.selectedFromAccount = account;
@@ -1057,6 +971,7 @@ fundTransfer(account: any): void {
   console.log('Fund transfer form after patch:', this.fundTransferForm.value);
   this.showFundTransferModal = true;
 }
+
 deposit(account: any): void {
   this.selectedAccount = account;
   this.depositForm.patchValue({
@@ -1076,8 +991,6 @@ deposit(account: any): void {
   onFileSelected(event: any): void {
     const file = event.target.files[0];
     if (file) {
-      // Here you would typically upload the file to storage
-      // For now we'll just store the file name
       if (this.showFundTransferModal) {
         this.fundTransferForm.patchValue({
           attachmentUrl: file.name
@@ -1090,18 +1003,17 @@ deposit(account: any): void {
     }
   }
 
-
-
   closeDepositForm(): void {
     this.depositForm.reset();
     this.initDepositForm();
     this.showDepositModal = false;
     this.selectedAccount = null;
-  }  submitDeposit(): void {
+  }  
+  
+  submitDeposit(): void {
     if (this.depositForm.valid) {
       const formValue = this.depositForm.value;
       
-      // Get the target account
       const toAccount = this.accounts.find(acc => acc.id === formValue.depositTo);
       
       if (!toAccount) {
@@ -1112,7 +1024,6 @@ deposit(account: any): void {
       const depositAmount = parseFloat(formValue.amount);
       const depositDate = new Date(formValue.date);
       
-      // Check if depositFrom is provided
       const hasFromAccount = formValue.depositFrom && formValue.depositFrom.trim() !== '';
       let fromAccount = null;
       
@@ -1124,7 +1035,6 @@ deposit(account: any): void {
           return;
         }
         
-        // Validate sufficient balance in from account
         const currentBalance = this.calculateAccountCurrentBalance(fromAccount);
         if (currentBalance < depositAmount) {
           alert('Insufficient balance in the source account');
@@ -1132,7 +1042,6 @@ deposit(account: any): void {
         }
       }
       
-      // Prepare deposit data
       const depositData = {
         accountId: formValue.depositTo,
         accountName: toAccount.name,
@@ -1147,223 +1056,137 @@ deposit(account: any): void {
         hasDocument: !!formValue.attachmentUrl
       };
       
-      // Use the account service to process the deposit
-      this.accountService.addDeposit(depositData).then(() => {
+      this.accountService.addDeposit(depositData).then(async () => {
         alert('Deposit processed successfully!');
+        
+        // **CRITICAL FIX**: Update balances after deposit
+        await this.triggerBalanceUpdateForAccount(formValue.depositTo);
+        if (hasFromAccount) {
+          await this.triggerBalanceUpdateForAccount(formValue.depositFrom);
+        }
+        
         this.closeDepositForm();
       }).catch((error) => {
         console.error('Error processing deposit:', error);
         alert('Error processing deposit. Please try again.');
-      });    } else {
+      });    
+    } else {
       alert('Please fill all required fields');
     }
   }
+
   submitFundTransfer(): void {
-    console.log('Fund transfer form submitted');
+    if (!this.fundTransferForm.valid) {
+      alert('Please correct the form errors.');
+      return;
+    }
+
+    const formValue = this.fundTransferForm.value;
     
-    // Safety check for form initialization
-    if (!this.fundTransferForm) {
-      console.error('Fund transfer form is not initialized');
-      alert('Form is not properly initialized. Please close and reopen the form.');
+    if (formValue.fromAccount === formValue.toAccount) {
+      alert('Transfer from and to accounts cannot be the same');
       return;
     }
     
-    console.log('Form valid:', this.fundTransferForm.valid);
-    console.log('Form value:', this.fundTransferForm.value);
-    console.log('Form errors:', this.fundTransferForm.errors);
+    const fromAccount = this.accounts.find(acc => acc.id === formValue.fromAccount);
+    const toAccount = this.accounts.find(acc => acc.id === formValue.toAccount);
     
-    if (this.fundTransferForm.valid) {
-      const formValue = this.fundTransferForm.value;
-      
-      // Validate that from and to accounts are different
-      if (formValue.fromAccount === formValue.toAccount) {
-        alert('Transfer from and to accounts cannot be the same');
-        return;
-      }
-      
-      // Get the account objects
-      const fromAccount = this.accounts.find(acc => acc.id === formValue.fromAccount);
-      const toAccount = this.accounts.find(acc => acc.id === formValue.toAccount);
-      
-      if (!fromAccount || !toAccount) {
-        alert('One or both accounts not found');
-        return;
-      }
-      
-      // Calculate current balance including all transactions
-      const fromAccountCurrentBalance = this.calculateAccountCurrentBalance(fromAccount);
-      const transferAmount = parseFloat(formValue.amount);
-      
-      console.log(`Transfer amount: ₹${transferAmount}`);
-      console.log(`From account (${fromAccount.name}) current balance: ₹${fromAccountCurrentBalance}`);
-      
-      // Validate sufficient balance
-      if (fromAccountCurrentBalance < transferAmount) {
-        const message = `Insufficient balance in ${fromAccount.name}. Available balance: ₹${fromAccountCurrentBalance.toFixed(2)}, Required: ₹${transferAmount.toFixed(2)}`;
-        console.log(message);
-        alert(message);
-        return;
-      }
-      
-      // Prepare transfer data
-      const transferData = {
-        fromAccountId: formValue.fromAccount,
-        fromAccountName: fromAccount.name,
-        toAccountId: formValue.toAccount,
-        toAccountName: toAccount.name,
-        amount: transferAmount,
-        date: new Date(formValue.date),
-        note: formValue.note || '',
-        attachmentUrl: formValue.attachmentUrl || '',
-        addedBy: 'User',
-        hasDocument: !!formValue.attachmentUrl
-      };
-      
-      // Use the account service to process the transfer
-      this.accountService.addFundTransfer(transferData).then(() => {
-        console.log('Fund transfer completed successfully');
-        alert('Fund transfer completed successfully!');
-        this.closeFundTransferForm();
-      }).catch((error) => {
-        console.error('Error during fund transfer:', error);
-        alert('Error during fund transfer: ' + error.message);
-      });
-    } else {
-      console.log('Fund transfer form is invalid:', this.fundTransferForm.errors);
-      // Display which fields are invalid for debugging
-      Object.keys(this.fundTransferForm.controls).forEach(key => {
-        const control = this.fundTransferForm.get(key);
-        if (control && control.invalid) {
-          console.log(`Invalid field: ${key}`, control.errors);
-        }
-      });
-      
-      // Show specific error messages
-      let errorMessage = 'Please correct the following errors:\n';
-      if (this.fundTransferForm.get('fromAccount')?.invalid) {
-        errorMessage += '- Select a source account\n';
-      }
-      if (this.fundTransferForm.get('toAccount')?.invalid) {
-        errorMessage += '- Select a destination account\n';
-      }
-      if (this.fundTransferForm.get('amount')?.invalid) {
-        errorMessage += '- Enter a valid amount (minimum ₹0.01)\n';
-      }
-      if (this.fundTransferForm.get('date')?.invalid) {
-        errorMessage += '- Select a valid date\n';
-      }
-      
-      alert(errorMessage);
+    if (!fromAccount || !toAccount) {
+      alert('One or both accounts not found');
+      return;
     }
+    
+    const fromAccountCurrentBalance = this.calculateAccountCurrentBalance(fromAccount);
+    const transferAmount = parseFloat(formValue.amount);
+    
+    if (fromAccountCurrentBalance < transferAmount) {
+      alert(`Insufficient balance in ${fromAccount.name}. Available: ₹${fromAccountCurrentBalance.toFixed(2)}`);
+      return;
+    }
+    
+    const transferData = {
+      fromAccountId: formValue.fromAccount,
+      fromAccountName: fromAccount.name,
+      toAccountId: formValue.toAccount,
+      toAccountName: toAccount.name,
+      amount: transferAmount,
+      date: new Date(formValue.date),
+      note: formValue.note || '',
+      attachmentUrl: formValue.attachmentUrl || '',
+      addedBy: 'User',
+      hasDocument: !!formValue.attachmentUrl
+    };
+    
+    this.accountService.addFundTransfer(transferData).then(async () => {
+      alert('Fund transfer completed successfully!');
+      
+      // **CRITICAL FIX**: Update balances after transfer
+      await this.triggerBalanceUpdateForAccount(formValue.fromAccount);
+      await this.triggerBalanceUpdateForAccount(formValue.toAccount);
+      
+      this.closeFundTransferForm();
+    }).catch((error) => {
+      alert('Error during fund transfer: ' + error.message);
+    });
   }
   
-  // Helper method to get account name
   getAccountName(accountId: string): string {
     const account = this.accounts.find(a => a.id === accountId);
     return account ? account.name : 'Unknown Account';
   }
 
-  updateAccountBalances(fromAccountId: string, toAccountId: string, amount: number): void {
-    // Find accounts
-    const fromAccount = this.accounts.find(acc => acc.id === fromAccountId);
-    const toAccount = this.accounts.find(acc => acc.id === toAccountId);
-    
-    if (fromAccount && toAccount) {
-      // Update balances
-      const fromNewBalance = (fromAccount.openingBalance || 0) - amount;
-      const toNewBalance = (toAccount.openingBalance || 0) + amount;
-      
-      // Update in Firestore
-      this.accountService.updateAccount(fromAccountId, { openingBalance: fromNewBalance })
-        .then(() => console.log('From account balance updated'))
-        .catch(err => console.error('Error updating from account:', err));
-        
-      this.accountService.updateAccount(toAccountId, { openingBalance: toNewBalance })
-        .then(() => console.log('To account balance updated'))
-        .catch(err => console.error('Error updating to account:', err));
-    }
-  }
-
-  // Modified close function to show confirmation
   close(account: any): void {
     this.accountToClose = account;
     this.showCloseConfirmModal = true;
   }
 
-  // Function to handle confirmation dialog
   confirmClose(): void {
     if (this.accountToClose && this.accountToClose.id) {
-      this.accountService.deleteAccount(this.accountToClose.id)
-        .then(() => {
-          alert(`Account "${this.accountToClose.name}" deleted successfully!`);
-          this.closeConfirmModal();
-        })
-        .catch((err) => {
-          console.error('Error deleting account:', err);
-          alert('Error deleting account: ' + err.message);
-        });
+        this.deleteAccount(this.accountToClose.id);
     }
   }
 
-  // Function to close the confirmation modal
   closeConfirmModal(): void {
     this.showCloseConfirmModal = false;
     this.accountToClose = null;
   }
 
   previousPage(): void {
-    if (this.currentPage > 1) {
-      this.currentPage--;
-    }
+    if (this.currentPage > 1) this.currentPage--;
   }
 
   nextPage(): void {
-    if (this.currentPage * this.entriesPerPage < this.totalEntries) {
-      this.currentPage++;
-    }
-  }  loadSalesRealtime(): void {
-    this.saleService.getSalesWithAccountInfo().subscribe(
-      (sales: any[]) => {
-        console.log('Raw sales data loaded in list-accounts:', sales); // Debug log
-        this.sales = sales;
-        
-        // Log sales with their calculated payment amounts for debugging
-        sales.forEach(sale => {
-          const paymentAmount = this.calculateSalesPaymentAmount(sale);
-          if (paymentAmount > 0) {
-            console.log('Sale with payment:', {
-              invoiceNo: sale.invoiceNo,
-              paymentAmount: paymentAmount,
-              paymentAccountId: sale.paymentAccountId,
-              balance: sale.balance,
-              itemsTotal: sale.itemsTotal
-            });
-          }
-        });
-        
-        // Reprocess account transactions to include updated sales data
-        this.processAccountTransactions();
-      },
-      (error: any) => {
-        console.error('Error loading sales:', error);
-        this.sales = []; // Initialize empty array on error
-      }
-    );
+    if (this.currentPage * this.entriesPerPage < this.totalEntries) this.currentPage++;
   }
+
+
+  
+// **MODIFIED**: Sets a flag and calls the central processing function
+loadSalesRealtime(): void {
+  this.saleService.getSalesWithAccountInfo().subscribe(
+    (sales: any[]) => {
+      this.sales = sales;
+      this.salesLoaded = true;
+      this.processAccountTransactions();
+    },
+    (error: any) => {
+      console.error('Error loading sales:', error);
+      this.sales = [];
+      this.salesLoaded = true; // Still set flag on error to not block processing
+      this.processAccountTransactions();
+    }
+  );
+}
 
   private convertToDate(dateValue: any): Date {
     if (!dateValue) return new Date();
     if (dateValue instanceof Date) return dateValue;
-    if (dateValue?.toDate && typeof dateValue.toDate === 'function') return dateValue.toDate(); // Handle Firestore Timestamp
+    if (dateValue?.toDate && typeof dateValue.toDate === 'function') return dateValue.toDate();
     if (typeof dateValue === 'string') {
-      // Handle various string date formats
       const date = new Date(dateValue);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-      // If standard parsing fails, try to extract date components for formats like "June 23, 2025 at 3:49:55 AM UTC+5:30"
+      if (!isNaN(date.getTime())) return date;
       try {
-        const cleanedDate = dateValue.replace(/\s+at\s+.*$/, ''); // Remove time zone part
+        const cleanedDate = dateValue.replace(/\s+at\s+.*$/, '');
         return new Date(cleanedDate);
       } catch {
         return new Date();
@@ -1373,85 +1196,25 @@ deposit(account: any): void {
     return new Date();
   }
 
-  // Helper method to calculate sales payment amount
-  private calculateSalesPaymentAmount(sale: any): number {
-    let paymentAmount = 0;
-    
-    // First try to get the actual payment amount
-    if (sale.paymentAmount && Number(sale.paymentAmount) > 0) {
-      paymentAmount = Number(sale.paymentAmount);
+// Add this method to properly format account head display
+getAccountHeadDisplay(account: any): string {
+    if (account.accountHead) {
+        if (typeof account.accountHead === 'object') {
+            return `${account.accountHead.group} - ${account.accountHead.value}`;
+        } else if (typeof account.accountHead === 'string') {
+            const parts = account.accountHead.split('|');
+            return parts.length > 1 ? `${parts[0]} - ${parts[1]}` : account.accountHead;
+        }
+    } else if (account.accountHeadValue) {
+        const parts = account.accountHeadValue.split('|');
+        return parts.length > 1 ? `${parts[0]} - ${parts[1]}` : account.accountHeadValue;
     }
-    // If no payment amount, check if this is a paid sale and use itemsTotal or balance
-    else if (sale.balance && Number(sale.balance) > 0) {
-      paymentAmount = Number(sale.balance);
-    }
-    // Check for items total + any additional charges
-    else if (sale.itemsTotal) {
-      let total = Number(sale.itemsTotal);
-      
-      // Add packaging charges if present
-      if (sale.codData && sale.codData.packingCharge) {
-        total += Number(sale.codData.packingCharge);
-      }
-      
-      // Add tax if present
-      if (sale.orderTax && Number(sale.orderTax) > 0) {
-        const taxAmount = (total * Number(sale.orderTax)) / 100;
-        total += taxAmount;
-      }
-      
-      paymentAmount = total;
-    }
-    // Fallback to totalAmount or total
-    else {
-      paymentAmount = Number(sale.totalAmount || sale.total || 0);
-    }
-    
-    return paymentAmount;
-  }
-  // Helper method to calculate current account balance including all transactions
-  calculateAccountCurrentBalance(account: any): number {
-    if (!account || !account.id) return 0;
-    
-    // Use calculatedBalance if available, otherwise calculate manually
-    if (account.calculatedBalance !== undefined) {
-      return Number(account.calculatedBalance);
-    }
-    
-    const openingBalance = Number(account.openingBalance || 0);
-    const accountTotals = this.debitCreditTotals[account.id];
-    
-    if (!accountTotals) {
-      return openingBalance;
-    }
-    
-    // Current balance = Opening balance + Credits - Debits
-    const currentBalance = openingBalance + accountTotals.credit - accountTotals.debit;
-    return currentBalance;
-  }
+    return '';
+}
 
-  // Helper method to check fund transfer form state for debugging
-  debugFundTransferForm(): void {
-    console.log('=== Fund Transfer Form Debug Info ===');
-    console.log('Form valid:', this.fundTransferForm?.valid);
-    console.log('Form value:', this.fundTransferForm?.value);
-    console.log('Accounts loaded:', this.accounts?.length || 0);
-    console.log('Selected from account:', this.selectedFromAccount);
-    console.log('Modal visible:', this.showFundTransferModal);
+ private calculateSalesPaymentAmount(sale: any): number {
+    const paidAmount = sale.paymentAmount ? Number(sale.paymentAmount) : 0;
     
-    if (this.fundTransferForm) {
-      Object.keys(this.fundTransferForm.controls).forEach(key => {
-        const control = this.fundTransferForm.get(key);
-        console.log(`${key}:`, {
-          value: control?.value,
-          valid: control?.valid,
-          errors: control?.errors,
-          touched: control?.touched,
-          dirty: control?.dirty
-        });
-      });
-    }
-    console.log('=== End Debug Info ===');
+    return paidAmount;
   }
-
 }

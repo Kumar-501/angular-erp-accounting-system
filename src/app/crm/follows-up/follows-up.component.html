@@ -175,59 +175,40 @@
     <!-- Dropdown Toggle Button -->
   
     <!-- Dropdown Menu -->
-    <div class="actions-dropdown-menu dropdown-menu" [class.show]="activeDropdown === item.id">
-      
- 
-      
-      <a class="action-item dropdown-item" (click)="editFollowUp(item)">
-        <i class="action-icon fas fa-edit"></i> Edit
-      </a>
-      
-      <a class="action-item dropdown-item" (click)="deleteFollowUp(item.id)">
-        <i class="action-icon fas fa-trash"></i> Delete
-      </a>
-      
-      <div class="action-divider dropdown-divider"></div>
-      
-      
-      <a class="action-item dropdown-item" (click)="openAddLogFormWithItem(item)">
-        <i class="action-icon fas fa-plus"></i> Add Follow Up Log
-      </a>
-    </div>
+
   </div>
 
   <div class="dropdown">
     
     <!-- Dropdown Toggle Button -->
-    <button class="actions-dropdown-toggle btn btn-sm btn-outline-secondary" 
-            (click)="toggleDropdown($event, item.id || '')">
-      Actions
+ <!-- Action Button -->
+<!-- Action Button -->
+<button class="action-btn" (click)="openActionPopup(item)">
+  <i class="fas fa-ellipsis-v"></i>
+</button>
+
+<!-- Action Popup Modal -->
+<div class="action-popup-modal" *ngIf="activePopup === item.id">
+  <div class="action-popup-content">
+    <a class="action-item" (click)="editFollowUp(item); closeActionPopup()">
+      <i class="action-icon fas fa-edit"></i> Edit
+    </a>
+    
+    <a class="action-item" (click)="deleteFollowUp(item.id); closeActionPopup()">
+      <i class="action-icon fas fa-trash"></i> Delete
+    </a>
+    
+    <div class="action-divider"></div>
+    
+    <a class="action-item" (click)="openAddLogFormWithItem(item); closeActionPopup()">
+      <i class="action-icon fas fa-plus"></i> Add Follow Up Log
+    </a>
+    
+    <button class="close-btn" (click)="closeActionPopup()">
+      <i class="fas fa-times"></i>
     </button>
-    
-    <!-- Dropdown Menu -->
-    <div class="actions-dropdown-menu dropdown-menu" 
-         [class.show]="activeDropdown === item.id">
-      
-      <!-- Action Items -->
-    
-      
-      <a class="action-item dropdown-item" (click)="editFollowUp(item)">
-        <i class="action-icon fas fa-edit"></i> Edit
-      </a>
-      
-      <a class="action-item dropdown-item" (click)="deleteFollowUp(item.id)">
-        <i class="action-icon fas fa-trash"></i> Delete
-      </a>
-      
-      <div class="dropdown-divider"></div>
-      
-    
-      
-      <a class="action-item dropdown-item" (click)="openAddLogFormWithItem(item)">
-        <i class="action-icon fas fa-plus"></i> Add Follow Up Log
-      </a>
-      
-    </div>
+  </div>
+</div>
   </div>
 
                 </div>
@@ -353,12 +334,12 @@
               </div>
               <!-- In your modal form template -->
 <div class="row mb-3">
-  <div class="col-md-6">
+  <!-- <div class="col-md-6">
     <label class="form-label">Follow Up Type</label>
     <select class="form-select" [(ngModel)]="newFollowUp.followUpType" name="followUpType">
       <option *ngFor="let type of followUpTypeOptions" [value]="type">{{type}}</option>
     </select>
-  </div>
+  </div> -->
   <div class="col-md-6">
     <label class="form-label">Followup Category</label>
     <select class="form-select" [(ngModel)]="newFollowUp.followupCategory" name="followupCategory">
@@ -376,10 +357,10 @@
               <label class="form-label">Additional Info</label>
               <textarea class="form-control" [(ngModel)]="newFollowUp.additionalInfo" name="additionalInfo" rows="2"></textarea>
             </div>
-            <div class="form-check mb-3">
+            <!-- <div class="form-check mb-3">
               <input class="form-check-input" type="checkbox" [(ngModel)]="newFollowUp.sendNotification" name="sendNotification">
               <label class="form-check-label">Send Notification</label>
-            </div>
+            </div> -->
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" (click)="closeForm()">Cancel</button>
               <button type="submit" class="btn btn-primary" [disabled]="isLoading">

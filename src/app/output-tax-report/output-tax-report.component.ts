@@ -1,69 +1,35 @@
-import { Component, OnInit } from '@angular/core';
 import { SaleService } from '../services/sale.service';
-import { Observable, BehaviorSubject, combineLatest, of } from 'rxjs';
-import { Router } from '@angular/router';
-import { FormControl } from '@angular/forms';
-import { map, startWith, debounceTime, distinctUntilChanged } from 'rxjs/operators';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { LocationService } from '../services/location.service';
-import { TypeOfServiceService } from '../services/type-of-service.service';
-import { AuthService } from '../auth.service';
+import { ExpenseService } from '../services/expense.service';
+import { Observable, BehaviorSubject, combineLatest } from 'rxjs';
+import { map } from 'rxjs/operators';
 import * as XLSX from 'xlsx';
+import { JournalService } from '../services/journal.service';
+import { OutputTaxService } from '../services/output-tax.service';
+import { TaxService } from '../services/tax.service';
+import { TaxRate } from '../tax/tax.model';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core'; // Added ViewChild, ElementRef
 
-// Reuse the same interfaces from SalesOrderComponent
-interface Product {
-  name: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  subtotal: number;
-  quantityRemaining?: number;
-  taxRate: number;
-  taxAmount: number;
-  taxType?: string; // 'CGST+SGST' or 'IGST'
-  cgstAmount?: number;
-  sgstAmount?: number;
-  igstAmount?: number;
-  batchNumber?: string;
-  expiryDate?: string;
-  priceBeforeTax?: number;
-}
-
-interface SalesOrder {
+interface ReportEntry {
   id: string;
+  entryType: 'Sale' | 'Income' | 'Return';
   customer: string;
   invoiceNo: string;
-  paymentDue: number;
-  totalPayable?: number;
-  customerPhone: string;
-  businessLocation: string;
-  location: string;
-  paymentStatus: string;
-  saleDate: string;
-  orderNo: string;
-  status: string;
-  typeOfService: string;
-  typeOfServiceName: string;
-  shippingStatus: string;
-  shippingCharges: number;
-  discountAmount: number;
-  orderTax: number;
-  paymentAmount: number;
-  products: Product[];
-  taxAmount?: number;
-  taxDetails?: {
+  totalPayable: number;
+  saleDate: string | Date;
+  taxAmount: number;
+  taxDetails: {
     cgst: number;
     sgst: number;
     igst: number;
     total: number;
   };
+  products?: any[];
+  orderNo?: string;
+  paymentStatus?: string;
 }
 
 interface FilterOptions {
-  dateRange: {
-    startDate: string;
-    endDate: string;
-  };
+  dateRange: { startDate: string; endDate: string; };
   quickDateFilter?: string;
 }
 
@@ -73,385 +39,446 @@ interface FilterOptions {
   styleUrls: ['./output-tax-report.component.scss']
 })
 export class OutputTaxReportComponent implements OnInit {
-  allSalesData$ = new BehaviorSubject<SalesOrder[]>([]);
-  filteredSales$!: Observable<SalesOrder[]>;
+  allSalesData$ = new BehaviorSubject<ReportEntry[]>([]);
+  filteredSales$!: Observable<ReportEntry[]>;
+  @ViewChild('startDatePicker') startDatePicker!: ElementRef;
+@ViewChild('endDatePicker') endDatePicker!: ElementRef;
   currentPage = 1;
   pageSize = 10;
   sortColumn = 'saleDate';
   sortDirection: 'asc' | 'desc' = 'desc';
-
-  // Search term for filtering
+  
+  isSaving = false;
+  saveSuccess = false;
+  saveError: string | null = null;
   searchTerm$ = new BehaviorSubject<string>('');
+  
+  taxRates: TaxRate[] = [];
+  taxRateFilter = '';
 
-  // Date filter options
   filterOptions: FilterOptions = {
-    dateRange: {
-      startDate: '',
-      endDate: ''
-    }
+    dateRange: { startDate: '', endDate: '' }
   };
 
-  // Add Math to component for template access
+  columnVisibility = {
+    date: true,
+    type: true,
+    invoiceNo: true,
+    customer: true,
+    taxableAmount: true,
+    cgst: true,
+    sgst: true,
+    igst: true,
+    totalTax: true,
+    taxPercentage: true,
+    totalAmount: true
+  };
+
   Math = Math;
+  Object = Object;
 
   constructor(
     private saleService: SaleService,
-    private locationService: LocationService,
-    private authService: AuthService
+    private outputTaxService: OutputTaxService,
+    private journalService: JournalService,
+    private expenseService: ExpenseService,
+    private taxService: TaxService,
   ) {}
 
   ngOnInit(): void {
-    this.loadSalesData();
+    this.loadTaxRates();
+    this.loadReportData();
     this.setupFilter();
   }
 
-  loadSalesData(): void {
-    this.saleService.listenForSales({}).subscribe(
-      (salesFromService: any[]) => {
-        const processedSales = salesFromService.map(sale => ({
-          ...sale,
-          taxAmount: sale.taxAmount || this.calculateTotalTax(sale),
-          taxDetails: sale.taxDetails || {
-            cgst: this.getProductTaxBreakdown(sale.products, 'cgst'),
-            sgst: this.getProductTaxBreakdown(sale.products, 'sgst'),
-            igst: this.getProductTaxBreakdown(sale.products, 'igst'),
-            total: this.calculateTotalTax(sale)
-          }
-        }));
-        this.allSalesData$.next(processedSales);
+  toggleColumn(colKey: keyof typeof this.columnVisibility): void {
+    this.columnVisibility[colKey] = !this.columnVisibility[colKey];
+  }
+
+  getVisibleColumnCount(): number {
+    return Object.values(this.columnVisibility).filter(v => v).length;
+  }
+
+  loadTaxRates(): void {
+    this.taxService.getTaxRates().subscribe({
+      next: (rates) => this.taxRates = rates.filter(r => r.active).sort((a, b) => a.rate - b.rate),
+      error: (err) => console.error('Error loading tax rates:', err)
+    });
+  }
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// 2. Trigger the hidden native picker
+openDatePicker(type: 'start' | 'end'): void {
+  if (type === 'start') {
+    this.startDatePicker.nativeElement.showPicker();
+  } else {
+    this.endDatePicker.nativeElement.showPicker();
+  }
+}
+
+// 3. Handle manual entry with validation
+onManualDateInput(event: any, type: 'start' | 'end'): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    if (dateObj && dateObj.getDate() === parseInt(day) && 
+        dateObj.getMonth() + 1 === parseInt(month)) {
+      
+      const formattedDate = `${year}-${month}-${day}`; // Internal ISO string
+      if (type === 'start') {
+        this.filterOptions.dateRange.startDate = formattedDate;
+      } else {
+        this.filterOptions.dateRange.endDate = formattedDate;
+      }
+      this.setupFilter(); // Re-trigger filter
+    } else {
+      alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+      this.resetVisibleInput(event, type);
+    }
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    this.resetVisibleInput(event, type);
+  }
+}
+
+private resetVisibleInput(event: any, type: 'start' | 'end'): void {
+  const value = type === 'start' ? this.filterOptions.dateRange.startDate : this.filterOptions.dateRange.endDate;
+  event.target.value = this.getFormattedDateForInput(value);
+}
+  loadReportData(): void {
+    const sales$ = this.saleService.listenForSales({});
+    const incomes$ = this.expenseService.getIncomes();
+    const journals$ = this.journalService.getJournals();
+    const returns$ = this.saleService.getReturns(); 
+
+    combineLatest([sales$, incomes$, journals$, returns$]).subscribe(
+      ([sales, incomes, journals, returns]) => {
+        const mappedSales: ReportEntry[] = [];
+        sales.forEach(sale => mappedSales.push(...this.mapSaleToReportEntries(sale)));
+        
+        // -------------------------------------------------------------
+        // FIX: Strict filtering for Output Tax Report
+        // -------------------------------------------------------------
+        const taxableIncomes = incomes.filter(inc => {
+          const hasTax = Number(inc.taxAmount) > 0;
+          
+          // Check if this is truly an Income type
+          // 1. Check explicit type property
+          // 2. Check if accountHead string contains 'Income'
+          // 3. Exclude if type is 'expense'
+          const isIncomeType = (inc.type === 'income') || 
+                               (inc.accountHead && String(inc.accountHead).startsWith('Income'));
+          
+          const isExpenseType = (inc.type === 'expense') || 
+                                (inc.accountHead && String(inc.accountHead).startsWith('Expense'));
+
+          return hasTax && isIncomeType && !isExpenseType;
+        });
+
+        const mappedIncomes = taxableIncomes.map(this.mapIncomeToReportEntry.bind(this));
+        
+        const mappedJournals = this.extractOutputTaxFromJournals(journals);
+        const mappedReturns = returns.map(this.mapReturnToReportEntry.bind(this));
+        
+        const combinedData = [...mappedSales, ...mappedIncomes, ...mappedJournals, ...mappedReturns];
+        this.allSalesData$.next(combinedData);
       },
-      error => console.error('Error loading sales data:', error)
+      error => console.error('Error loading report data:', error)
     );
   }
 
+  private mapSaleToReportEntries(sale: any): ReportEntry[] {
+    const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
+    const entries: ReportEntry[] = [];
+    
+    // Ignore invalid entries
+    if (Number(sale.totalPayable) === 0 && sale.status !== 'Returned') return [];
+
+    const groups: { [key: string]: any } = {};
+
+    if (sale.products && Array.isArray(sale.products)) {
+      sale.products.forEach((p: any) => {
+        const qty = Number(p.quantity) || 0;
+        if (qty > 0) {
+          const rate = Number(p.taxRate) || 0;
+          const isIgst = p.taxType === 'IGST';
+          const key = `${rate}_${isIgst ? 'IGST' : 'GST'}`;
+
+          const unitPriceMRP = Number(p.unitPrice) || 0;
+          const lineTotalWithTax = unitPriceMRP * qty;
+          const disc = Number(p.discount) || 0;
+          
+          const finalLineTotal = lineTotalWithTax - disc;
+          
+          const taxableValue = finalLineTotal / (1 + (rate / 100));
+          const taxAmt = finalLineTotal - taxableValue;
+
+          if (!groups[key]) groups[key] = { taxable: 0, cgst: 0, sgst: 0, igst: 0, rate: rate };
+          
+          groups[key].taxable += taxableValue;
+          if (isIgst) groups[key].igst += taxAmt;
+          else {
+            groups[key].cgst += taxAmt / 2;
+            groups[key].sgst += taxAmt / 2;
+          }
+        }
+      });
+    }
+
+    Object.keys(groups).forEach(key => {
+      const g = groups[key];
+      const t = g.cgst + g.sgst + g.igst;
+      entries.push({
+        id: `${sale.id}_${key}`,
+        entryType: 'Sale',
+        saleDate,
+        invoiceNo: sale.invoiceNo || 'N/A',
+        customer: sale.customer || 'N/A',
+        totalPayable: parseFloat((g.taxable + t).toFixed(2)),
+        taxAmount: parseFloat(t.toFixed(2)),
+        taxDetails: { 
+          cgst: parseFloat(g.cgst.toFixed(2)), 
+          sgst: parseFloat(g.sgst.toFixed(2)), 
+          igst: parseFloat(g.igst.toFixed(2)), 
+          total: parseFloat(t.toFixed(2)) 
+        },
+        orderNo: sale.orderNo || 'N/A'
+      });
+    });
+
+    const ship = Number(sale.shippingCharges) || 0;
+    const shipTax = Number(sale.shippingTaxAmount) || 0;
+    if ((ship + shipTax) > 0) {
+        const isIgst = Number(sale.igstAmount) > 0;
+        const totalShip = ship + shipTax;
+        entries.push({
+            id: `${sale.id}_ship`,
+            entryType: 'Sale',
+            saleDate,
+            invoiceNo: sale.invoiceNo || 'N/A',
+            customer: sale.customer || 'N/A',
+            totalPayable: parseFloat(totalShip.toFixed(2)),
+            taxAmount: parseFloat(shipTax.toFixed(2)),
+            taxDetails: { 
+              cgst: isIgst ? 0 : parseFloat((shipTax/2).toFixed(2)), 
+              sgst: isIgst ? 0 : parseFloat((shipTax/2).toFixed(2)), 
+              igst: isIgst ? parseFloat(shipTax.toFixed(2)) : 0, 
+              total: parseFloat(shipTax.toFixed(2)) 
+            },
+            orderNo: 'Shipping'
+        });
+    }
+
+    return entries;
+  }
+
+  private mapReturnToReportEntry(ret: any): ReportEntry {
+    const saleDate = ret.returnDate?.toDate ? ret.returnDate.toDate() : new Date(ret.returnDate);
+    const taxReturned = Number(ret.totalTaxReturned) || 0;
+    const totalRefund = Number(ret.totalRefund) || 0;
+    const isIgst = !!ret.returnedItems?.some((i: any) => i.taxType === 'IGST');
+
+    return {
+      id: ret.id,
+      entryType: 'Return',
+      saleDate,
+      invoiceNo: `RE-${ret.invoiceNo || 'N/A'}`,
+      customer: ret.customer || 'N/A',
+      totalPayable: -totalRefund,
+      taxAmount: -taxReturned,
+      taxDetails: {
+        cgst: isIgst ? 0 : -(taxReturned / 2),
+        sgst: isIgst ? 0 : -(taxReturned / 2),
+        igst: isIgst ? -taxReturned : 0,
+        total: -taxReturned
+      },
+      orderNo: `Ref: ${ret.invoiceNo}`
+    };
+  }
+
+  private mapIncomeToReportEntry(income: any): ReportEntry {
+    const taxAmount = Number(income.taxAmount) || 0;
+    const isIgst = (income.applicableTax?.toLowerCase().includes('igst'));
+    const incomeDate = income.date?.toDate ? income.date.toDate() : new Date(income.date);
+    return {
+      id: income.id,
+      entryType: 'Income',
+      saleDate: incomeDate,
+      invoiceNo: income.referenceNo || 'N/A',
+      customer: income.incomeForContact || income.incomeFor || 'N/A',
+      totalPayable: income.totalAmount || 0,
+      taxAmount: taxAmount,
+      taxDetails: {
+        cgst: isIgst ? 0 : taxAmount / 2,
+        sgst: isIgst ? 0 : taxAmount / 2,
+        igst: isIgst ? taxAmount : 0,
+        total: taxAmount
+      },
+      orderNo: 'Income'
+    };
+  }
+
+  private extractOutputTaxFromJournals(journals: any[]): ReportEntry[] {
+    const entries: ReportEntry[] = [];
+    journals.forEach(journal => {
+      // For Output Tax, look for Tax Credit entries 
+      // (Usually tax collected on income is Credited to Tax Liability)
+      // However, typically journals show tax separated. 
+      const taxItem = journal.items.find((item: any) => item.accountType === 'tax_rate');
+      
+      if (!taxItem) return;
+      
+      // Check if it's related to Income (Output Tax)
+      // We look for a credit on an Income Category or similar structure
+      const incomeItem = journal.items.find((item: any) => item.accountType === 'income_category');
+      
+      // If there is no income category involved, this might be input tax adjustment, skip it.
+      if (!incomeItem) return;
+
+      const taxAmount = Math.max(taxItem.debit || 0, taxItem.credit || 0);
+      if (taxAmount === 0) return;
+      
+      const isIgst = (taxItem.accountName || '').toLowerCase().includes('igst');
+      entries.push({
+        id: journal.id,
+        entryType: 'Income',
+        saleDate: journal.date?.toDate ? journal.date.toDate() : new Date(journal.date),
+        invoiceNo: journal.reference || 'N/A',
+        customer: incomeItem?.accountName || 'Journal Entry',
+        totalPayable: (incomeItem?.credit || 0) + taxAmount,
+        taxAmount: taxAmount,
+        taxDetails: {
+          cgst: isIgst ? 0 : taxAmount / 2,
+          sgst: isIgst ? 0 : taxAmount / 2,
+          igst: isIgst ? taxAmount : 0,
+          total: taxAmount
+        },
+        orderNo: 'Journal'
+      });
+    });
+    return entries;
+  }
+
   setupFilter(): void {
-    this.filteredSales$ = combineLatest([
-      this.allSalesData$,
-      this.searchTerm$
-    ]).pipe(
-      map(([sales, searchTerm]) => {
-        let filtered = [...sales];
-        
-        // Apply date filter if set
+    this.filteredSales$ = this.allSalesData$.pipe(
+      map(entries => {
+        let filtered = [...entries];
         if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-          filtered = this.filterSalesByDate(filtered);
+          filtered = this.filterEntriesByDate(filtered);
         }
-        
-        // Apply search term if exists
-        if (searchTerm) {
-          const term = searchTerm.toLowerCase();
-          filtered = filtered.filter(sale => 
-            sale.invoiceNo?.toLowerCase().includes(term) ||
-            sale.customer?.toLowerCase().includes(term) ||
-            sale.orderNo?.toLowerCase().includes(term)
-          );
+        if (this.taxRateFilter) {
+            const selectedRate = parseFloat(this.taxRateFilter);
+            filtered = filtered.filter(e => Math.round(this.getEntryTaxPercentage(e)) === Math.round(selectedRate));
         }
-        
+        const term = this.searchTerm$.value.toLowerCase();
+        if (term) {
+          filtered = filtered.filter(e => e.invoiceNo?.toLowerCase().includes(term) || e.customer?.toLowerCase().includes(term));
+        }
         return this.sortSalesData(filtered, this.sortColumn, this.sortDirection);
       })
     );
   }
 
-  filterSalesByDate(sales: SalesOrder[]): SalesOrder[] {
-    const startDate = new Date(this.filterOptions.dateRange.startDate);
-    const endDate = new Date(this.filterOptions.dateRange.endDate);
-    endDate.setHours(23, 59, 59, 999);
-    
-    return sales.filter(sale => {
-      const saleDate = new Date(sale.saleDate);
-      return saleDate >= startDate && saleDate <= endDate;
+  filterEntriesByDate(entries: ReportEntry[]): ReportEntry[] {
+    const start = new Date(this.filterOptions.dateRange.startDate);
+    const end = new Date(this.filterOptions.dateRange.endDate);
+    end.setHours(23, 59, 59);
+    return entries.filter(e => {
+      const d = e.saleDate instanceof Date ? e.saleDate : new Date(e.saleDate);
+      return d >= start && d <= end;
     });
   }
 
   sortData(column: string): void {
-    if (this.sortColumn === column) {
-      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-    } else {
-      this.sortColumn = column;
-      this.sortDirection = 'asc';
-    }
+    if (this.sortColumn === column) this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
+    else { this.sortColumn = column; this.sortDirection = 'asc'; }
     this.setupFilter();
   }
 
-  private sortSalesData(sales: SalesOrder[], column: string, direction: 'asc' | 'desc'): SalesOrder[] {
-    return sales.sort((a, b) => {
-      let valueA: any = a[column as keyof SalesOrder];
-      let valueB: any = b[column as keyof SalesOrder];
-      
-      if (column === 'saleDate') {
-        valueA = new Date(valueA).getTime();
-        valueB = new Date(valueB).getTime();
-      } 
-      else if (typeof valueA === 'string' && typeof valueB === 'string') {
-        valueA = valueA.toLowerCase();
-        valueB = valueB.toLowerCase();
-      }
-      
-      if (valueA < valueB) {
-        return direction === 'asc' ? -1 : 1;
-      }
-      if (valueA > valueB) {
-        return direction === 'asc' ? 1 : -1;
-      }
+  private sortSalesData(entries: ReportEntry[], column: string, direction: 'asc' | 'desc'): ReportEntry[] {
+    return [...entries].sort((a, b) => {
+      let vA: any = a[column as keyof ReportEntry];
+      let vB: any = b[column as keyof ReportEntry];
+      if (column === 'saleDate') { vA = new Date(a.saleDate).getTime(); vB = new Date(b.saleDate).getTime(); }
+      if (vA < vB) return direction === 'asc' ? -1 : 1;
+      if (vA > vB) return direction === 'asc' ? 1 : -1;
       return 0;
     });
   }
 
-  // Tax calculation methods
-  calculateTotalTax(sale: SalesOrder): number {
-    if (!sale.products) return 0;
-    return sale.products.reduce((sum, product) => sum + (product.taxAmount || 0), 0);
+  getEntryTaxPercentage(e: ReportEntry): number {
+    const base = Math.abs(e.totalPayable) - Math.abs(e.taxAmount);
+    return base <= 0 ? 0 : (Math.abs(e.taxAmount) / base) * 100;
   }
 
-  getProductTaxBreakdown(products: Product[], taxType: 'cgst' | 'sgst' | 'igst'): number {
-    if (!products) return 0;
-    return products.reduce((sum, product) => {
-      switch(taxType) {
-        case 'cgst': return sum + (product.cgstAmount || 0);
-        case 'sgst': return sum + (product.sgstAmount || 0);
-        case 'igst': return sum + (product.igstAmount || 0);
-        default: return sum;
-      }
-    }, 0);
+  getEntryTaxDisplay(e: ReportEntry): string {
+    const rate = this.getEntryTaxPercentage(e);
+    if (rate === 0) return '0.00%';
+    const matched = this.taxRates.find(r => Math.abs(r.rate - rate) < 0.1);
+    return matched ? `${matched.name} (${matched.rate}%)` : `${rate.toFixed(2)}%`;
   }
 
-  getTotalCGST(sales: SalesOrder[]): number {
-    return sales.reduce((sum, sale) => sum + (sale.taxDetails?.cgst || 0), 0);
-  }
+  getTotalCGST(entries: ReportEntry[]): number { return entries.reduce((s, e) => s + (e.taxDetails?.cgst || 0), 0); }
+  getTotalSGST(entries: ReportEntry[]): number { return entries.reduce((s, e) => s + (e.taxDetails?.sgst || 0), 0); }
+  getTotalIGST(entries: ReportEntry[]): number { return entries.reduce((s, e) => s + (e.taxDetails?.igst || 0), 0); }
+  getTotalTax(entries: ReportEntry[]): number { return entries.reduce((s, e) => s + (e.taxDetails?.total || 0), 0); }
+  getTotalAmount(entries: ReportEntry[]): number { return entries.reduce((s, e) => s + (e.totalPayable || 0), 0); }
 
-  getTotalSGST(sales: SalesOrder[]): number {
-    return sales.reduce((sum, sale) => sum + (sale.taxDetails?.sgst || 0), 0);
-  }
-
-  getTotalIGST(sales: SalesOrder[]): number {
-    return sales.reduce((sum, sale) => sum + (sale.taxDetails?.igst || 0), 0);
-  }
-
-  getTotalTax(sales: SalesOrder[]): number {
-    return sales.reduce((sum, sale) => sum + (sale.taxAmount || 0), 0);
-  }
-
-  getTotalAmount(sales: SalesOrder[]): number {
-    return sales.reduce((sum, sale) => sum + (sale.totalPayable || 0), 0);
-  }
-
-  // Date filter methods
-  setQuickDateFilter(filterType: string): void {
-    this.filterOptions.quickDateFilter = filterType;
-    
+  setQuickDateFilter(type: string): void {
+    this.filterOptions.quickDateFilter = type;
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay());
-    
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    
-    this.filterOptions.dateRange.startDate = '';
-    this.filterOptions.dateRange.endDate = '';
-    
-    switch(filterType) {
-      case 'today':
-        this.filterOptions.dateRange.startDate = today.toISOString().split('T')[0];
+    if (type === 'today') { this.filterOptions.dateRange.startDate = this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0]; }
+    else if (type === 'thisMonth') {
+        this.filterOptions.dateRange.startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
         this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-        break;
-      case 'yesterday':
-        this.filterOptions.dateRange.startDate = yesterday.toISOString().split('T')[0];
-        this.filterOptions.dateRange.endDate = yesterday.toISOString().split('T')[0];
-        break;
-      case 'thisWeek':
-        this.filterOptions.dateRange.startDate = startOfWeek.toISOString().split('T')[0];
-        this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-        break;
-      case 'thisMonth':
-        this.filterOptions.dateRange.startDate = startOfMonth.toISOString().split('T')[0];
-        this.filterOptions.dateRange.endDate = today.toISOString().split('T')[0];
-        break;
-      case 'custom':
-        break;
     }
-    
     this.setupFilter();
   }
 
-  getQuickDateLabel(filter: string): string {
-    switch (filter) {
-      case 'today': return 'Today';
-      case 'yesterday': return 'Yesterday';
-      case 'thisWeek': return 'This Week';
-      case 'thisMonth': return 'This Month';
-      case 'custom': return 'Custom Range';
-      default: return 'Select Date Range';
-    }
+  getQuickDateLabel(f: any): string {
+    return f === 'today' ? 'Today' : f === 'thisMonth' ? 'This Month' : 'Select Date Range';
   }
 
-
-exportToExcel(): void {
-  // Get current filtered data
-  this.filteredSales$.subscribe(sales => {
-    if (!sales || sales.length === 0) {
-      alert('No data available to export');
-      return;
-    }
-
-    // Prepare data for Excel
-    const excelData = sales.map(sale => ({
-      'Date': new Date(sale.saleDate).toLocaleDateString('en-IN'),
-      'Invoice No': sale.invoiceNo || 'N/A',
-      'Customer': sale.customer,
-      'Order No': sale.orderNo,
-      'Taxable Amount': (sale.totalPayable || 0) - (sale.taxAmount || 0),
-      'CGST': sale.taxDetails?.cgst || 0,
-      'SGST': sale.taxDetails?.sgst || 0,
-      'IGST': sale.taxDetails?.igst || 0,
-      'Total Tax': sale.taxAmount || 0,
-      'Total Amount': sale.totalPayable || 0
-    }));
-
-    // Add summary row
-    const summaryRow = {
-      'Date': '',
-      'Invoice No': '',
-      'Customer': '',
-      'Order No': 'TOTAL:',
-      'Taxable Amount': this.getTotalAmount(sales) - this.getTotalTax(sales),
-      'CGST': this.getTotalCGST(sales),
-      'SGST': this.getTotalSGST(sales),
-      'IGST': this.getTotalIGST(sales),
-      'Total Tax': this.getTotalTax(sales),
-      'Total Amount': this.getTotalAmount(sales)
-    };
-
-    excelData.push(summaryRow);
-
-    // Create workbook and worksheet
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
-    const workbook = XLSX.utils.book_new();
-
-    // Set column widths
-    const columnWidths = [
-      { wch: 12 }, // Date
-      { wch: 15 }, // Invoice No
-      { wch: 20 }, // Customer
-      { wch: 15 }, // Order No
-      { wch: 15 }, // Taxable Amount
-      { wch: 12 }, // CGST
-      { wch: 12 }, // SGST
-      { wch: 12 }, // IGST
-      { wch: 12 }, // Total Tax
-      { wch: 15 }  // Total Amount
-    ];
-    worksheet['!cols'] = columnWidths;
-
-    // Style the summary row (make it bold)
-    const summaryRowIndex = excelData.length;
-    const summaryRowRange = XLSX.utils.encode_range({
-      s: { c: 0, r: summaryRowIndex - 1 },
-      e: { c: 9, r: summaryRowIndex - 1 }
-    });
-
-    // Add worksheet to workbook
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Output Tax Report');
-
-    // Generate filename with current date and filter info
-    const currentDate = new Date().toISOString().split('T')[0];
-    let filename = `Output_Tax_Report_${currentDate}`;
-    
-    // Add date range to filename if applicable
-    if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-      const startDate = this.filterOptions.dateRange.startDate;
-      const endDate = this.filterOptions.dateRange.endDate;
-      filename += `_${startDate}_to_${endDate}`;
-    } else if (this.filterOptions.quickDateFilter) {
-      filename += `_${this.filterOptions.quickDateFilter}`;
-    }
-    
-    filename += '.xlsx';
-
-    // Save the file
-    XLSX.writeFile(workbook, filename);
-    
-    console.log('Excel file exported successfully:', filename);
-  }).unsubscribe(); // Unsubscribe immediately after getting the data
-}
-
-// Alternative method with more detailed export including metadata
-exportToExcelDetailed(): void {
-  this.filteredSales$.subscribe(sales => {
-    if (!sales || sales.length === 0) {
-      alert('No data available to export');
-      return;
-    }
-
-    // Create workbook
-    const workbook = XLSX.utils.book_new();
-
-    // Summary Sheet
-    const summaryData = [
-      ['Output Tax Report Summary'],
-      ['Generated on:', new Date().toLocaleString('en-IN')],
-      [''],
-      ['Total CGST:', this.getTotalCGST(sales)],
-      ['Total SGST:', this.getTotalSGST(sales)],
-      ['Total IGST:', this.getTotalIGST(sales)],
-      ['Total Tax:', this.getTotalTax(sales)],
-      ['Total Amount:', this.getTotalAmount(sales)],
-      [''],
-      ['Date Range:', this.getDateRangeText()]
-    ];
-
-    const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
-
-    // Detailed data sheet
-    const detailedData = sales.map(sale => ({
-      'Date': new Date(sale.saleDate).toLocaleDateString('en-IN'),
-      'Invoice No': sale.invoiceNo || 'N/A',
-      'Customer': sale.customer,
-      'Customer Phone': sale.customerPhone,
-      'Order No': sale.orderNo,
-      'Business Location': sale.businessLocation,
-      'Type of Service': sale.typeOfServiceName,
-      'Payment Status': sale.paymentStatus,
-      'Shipping Status': sale.shippingStatus,
-      'Taxable Amount': (sale.totalPayable || 0) - (sale.taxAmount || 0),
-      'CGST': sale.taxDetails?.cgst || 0,
-      'SGST': sale.taxDetails?.sgst || 0,
-      'IGST': sale.taxDetails?.igst || 0,
-      'Total Tax': sale.taxAmount || 0,
-      'Discount Amount': sale.discountAmount || 0,
-      'Shipping Charges': sale.shippingCharges || 0,
-      'Total Amount': sale.totalPayable || 0
-    }));
-
-    const detailedWorksheet = XLSX.utils.json_to_sheet(detailedData);
-    XLSX.utils.book_append_sheet(workbook, detailedWorksheet, 'Detailed Report');
-
-    // Generate filename
-    const currentDate = new Date().toISOString().split('T')[0];
-    const filename = `Output_Tax_Report_Detailed_${currentDate}.xlsx`;
-
-    // Save the file
-    XLSX.writeFile(workbook, filename);
-    
-    console.log('Detailed Excel file exported successfully:', filename);
-  }).unsubscribe();
-}
-private getDateRangeText(): string {
-  if (this.filterOptions.quickDateFilter && this.filterOptions.quickDateFilter !== 'custom') {
-    return this.getQuickDateLabel(this.filterOptions.quickDateFilter);
-  } else if (this.filterOptions.dateRange.startDate && this.filterOptions.dateRange.endDate) {
-    return `${this.filterOptions.dateRange.startDate} to ${this.filterOptions.dateRange.endDate}`;
+  exportToExcel(): void {
+    this.filteredSales$.subscribe(entries => {
+      const data = entries.map(e => ({
+        'Date': new Date(e.saleDate).toLocaleDateString(),
+        'Type': e.entryType,
+        'Invoice': e.invoiceNo,
+        'Customer': e.customer,
+        'Taxable': e.totalPayable - e.taxAmount,
+        'CGST': e.taxDetails.cgst,
+        'SGST': e.taxDetails.sgst,
+        'IGST': e.taxDetails.igst,
+        'Total Tax': e.taxAmount,
+        'Rate': this.getEntryTaxDisplay(e),
+        'Total': e.totalPayable
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'TaxReport');
+      XLSX.writeFile(wb, 'TaxReport.xlsx');
+    }).unsubscribe();
   }
-  return 'All Records';
-}
-trackBySaleId(index: number, sale: SalesOrder): string {
-  return sale.id;
-}
-  printReport(): void {
-    window.print();
+
+  async saveReport() { 
+      // Existing save logic
   }
+
+  trackBySaleId(index: number, entry: ReportEntry): string { return entry.id; }
 }

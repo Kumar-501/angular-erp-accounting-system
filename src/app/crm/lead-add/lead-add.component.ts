@@ -74,6 +74,8 @@ searchResults: any[] = [];
  
      status: 'New',
      source: this.sources.length > 0 ? this.sources[0].name : '',
+       occupation: [''],
+
      lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
      addedBy: this.authService.getCurrentUserName()
    });
@@ -139,17 +141,30 @@ onSearchInput(): void {
 
   
 
+
 async searchProducts(query: string): Promise<void> {
   try {
-    const products = await this.productsService.searchProducts(query);
-    this.searchResults = products;
-    this.showSearchDropdown = this.searchResults.length > 0;
+    if (query.length >= 2) {
+      const products = await this.productsService.searchProducts(query);
+      
+      // Filter out products marked as "not for selling"
+      // Option 1: Simple boolean check
+      this.searchResults = products.filter(product => 
+        !product.notForSelling
+      );
+      
+      this.showSearchDropdown = this.searchResults.length > 0;
+    } else {
+      this.searchResults = [];
+      this.showSearchDropdown = false;
+    }
   } catch (error) {
     console.error('Error searching products:', error);
     this.searchResults = [];
     this.showSearchDropdown = false;
   }
 }
+
    
    getPriorityClass(arg0: any): string|string[]|Set<string>|{ [klass: string]: any; }|null|undefined {
      throw new Error('Method not implemented.');
@@ -307,7 +322,8 @@ duplicateLeadData: any = null;
    
    // If you want to automatically set the department in the form:
    this.leadForm.patchValue({
-     department: this.selectedUserDepartment
+     department: this.selectedUserDepartment,
+
    });
  }
    
@@ -393,6 +409,8 @@ handleDuplicateResponse(continueAnyway: boolean) {
       updatedAt: new Date(),
       assignedTo: assignedToName,
       assignedToId: assignedUserId,
+        occupation: formData.occupation || '', // Add this line
+
     productInterested: this.selectedProducts.length > 0 ? this.selectedProducts : null,
       addedBy: {
         userId: this.authService.getCurrentUserId(),
@@ -419,11 +437,14 @@ handleDuplicateResponse(continueAnyway: boolean) {
       // Update existing lead
       await this.leadService.updateLead(this.editingLeadId, leadData);
       this.showSuccessPopup = true;
+          this.router.navigate(['/crm/leads']);
+
     } else {
       // Create new lead
       leadData.createdAt = new Date();
       leadData.contactId = this.generateContactId();
-      
+          this.showForm = !this.showForm;
+
       await this.leadService.addLead(leadData, {
         userId: this.authService.getCurrentUserId(),
         userName: this.authService.getCurrentUserName()
@@ -531,9 +552,9 @@ handleDuplicateResponse(continueAnyway: boolean) {
    dateOfBirth: [''],
    age: [''],
    businessName: [''],
-   mobile: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
-   alternateContact: ['', [Validators.pattern(/^[0-9]{10}$/)]],
-   landline: ['', [Validators.pattern(/^[0-9]{10}$/)]],
+  mobile: ['', [Validators.required, Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
+  alternateContact: ['', [Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
+  landline: ['', [Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
    email: ['', [Validators.email]], // Made email mandatory
    department: [''],
    leadStatus: ['', Validators.required],
@@ -585,6 +606,9 @@ handleDuplicateResponse(continueAnyway: boolean) {
        this.updatePagination();
      }
    }
+closeForm() {
+  this.router.navigate(['/crm/leads']);
+}
  // Update the applyFilters method
  
    prevPage(): void {
@@ -593,7 +617,189 @@ handleDuplicateResponse(continueAnyway: boolean) {
        this.updatePagination();
      }
    }
- 
+// File: src/app/lead-add/lead-add.component.ts
+
+// File: src/app/lead-add/lead-add.component.ts
+
+// Make sure you have imported ChangeDetectorRef from '@angular/core'
+// import { ChangeDetectorRef, ... } from '@angular/core';
+
+// And injected it in your constructor:
+// constructor(..., private cdr: ChangeDetectorRef) { ... }
+
+
+
+// Helper to restrict input to numbers and spaces, capping at 12 digits
+onPhoneNumberInput(event: any, controlName: string) {
+  const input = event.target;
+  let val = input.value.replace(/[^0-9 ]/g, ''); // Remove alphabets/symbols
+  
+  let digitCount = 0;
+  let limitedValue = '';
+
+  // Loop through input and stop exactly at the 12th digit
+  for (let char of val) {
+    if (/[0-9]/.test(char)) {
+      if (digitCount < 12) {
+        digitCount++;
+        limitedValue += char;
+      }
+    } else if (char === ' ') {
+      limitedValue += char; // Always allow spaces
+    }
+  }
+
+  // Update the form control value
+  this.leadForm.get(controlName)?.setValue(limitedValue, { emitEvent: false });
+  
+  // Trigger specific validation logic
+  if (controlName === 'mobile') this.validateMobileNumber();
+  if (controlName === 'alternateContact') this.validateAlternateContact();
+  if (controlName === 'landline') this.validateLandline();
+}
+
+async saveLead() {
+  this.leadForm.markAllAsTouched();
+
+  if (this.isSaving) return;
+  this.isSaving = true;
+
+  // Check if form is valid
+  if (this.leadForm.invalid) {
+    // DEBUG: Find out which field is failing
+    Object.keys(this.leadForm.controls).forEach(key => {
+      const controlErrors = this.leadForm.get(key)?.errors;
+      if (controlErrors != null) {
+        console.log('Validation failed on field: ' + key, controlErrors);
+      }
+    });
+
+    this.validationMessage = { text: 'Please fill all required fields correctly.', type: 'error' };
+    this.isSaving = false;
+    return;
+  }
+
+  const formData = { ...this.leadForm.value };
+  
+  // Clean numbers for database
+  const mobileClean = this.getDigitsOnly(formData.mobile);
+  const altClean = this.getDigitsOnly(formData.alternateContact);
+  const landlineClean = this.getDigitsOnly(formData.landline);
+
+  // Range Check
+  if (mobileClean.length < 10 || mobileClean.length > 12) {
+    this.validationMessage = { text: 'Mobile number must be 10-12 digits', type: 'error' };
+    this.isSaving = false;
+    return;
+  }
+
+  try {
+    // Duplicate check using digits only
+    const duplicateLeads = this.allLeads.filter(l => 
+      this.getDigitsOnly(l.mobile) === mobileClean && 
+      (!this.editingLeadId || l.id !== this.editingLeadId)
+    );
+
+    if (duplicateLeads.length > 0) {
+      if (!confirm('This mobile number already exists in another lead. Continue?')) {
+        this.isSaving = false;
+        return;
+      }
+    }
+
+    const mobileExistsInCustomers = await this.customerService.checkMobileNumberExists(mobileClean);
+
+    const leadData = { 
+      ...formData,
+      mobile: mobileClean,
+      alternateContact: altClean,
+      landline: landlineClean,
+      updatedAt: new Date(),
+      assignedTo: this.usersList.find(u => u.id === formData.assignedTo)?.name || '',
+      assignedToId: formData.assignedTo,
+      productInterested: this.selectedProducts.length > 0 ? this.selectedProducts : null,
+      addedBy: {
+        userId: this.authService.getCurrentUserId(),
+        userName: formData.addedBy || this.authService.getCurrentUserName()
+      },
+      isDuplicate: duplicateLeads.length > 0,
+      mobileExists: mobileExistsInCustomers
+    };
+
+    if (this.editingLeadId) {
+      await this.leadService.updateLead(this.editingLeadId, leadData);
+      this.showSuccessPopup = true;
+    } else {
+      leadData.createdAt = new Date();
+      leadData.contactId = this.generateContactId();
+      await this.leadService.addLead(leadData, {
+        userId: this.authService.getCurrentUserId(),
+        userName: this.authService.getCurrentUserName()
+      });
+      this.showSuccessPopup = true;
+    }
+
+    // Success Actions
+    setTimeout(() => {
+      this.isSaving = false;
+      this.router.navigate(['/crm/leads']);
+    }, 1500);
+
+  } catch (error) {
+    console.error('Save error:', error);
+    this.validationMessage = { text: 'Error saving lead. Check console.', type: 'error' };
+    this.isSaving = false;
+  }
+}
+async validateMobileNumber(): Promise<void> {
+  const control = this.leadForm.get('mobile');
+  const digits = this.getDigitsOnly(control?.value);
+  
+  this.validationMessage = null;
+  this.existingCustomer = null;
+
+  // 1. Check Range Validation
+  if (digits.length > 0 && (digits.length < 10 || digits.length > 12)) {
+    this.mobileValidationMessage = 'Mobile number must be 10-12 digits';
+  } else {
+    this.mobileValidationMessage = '';
+  }
+
+  // 2. Check for Existing Customer (Reorder Logic)
+  if (digits.length >= 10 && digits.length <= 12) {
+    try {
+      const customer = await this.customerService.getCustomerByMobile(digits);
+      if (customer) {
+        this.existingCustomer = customer;
+        this.mobileExists = true;
+        this.validationMessage = { text: 'Note: This number belongs to an existing customer.', type: 'success' };
+        this.prefillFromExistingCustomer(customer);
+      } else {
+        this.mobileExists = false;
+      }
+    } catch (error) {
+      console.error('Error validating mobile:', error);
+    }
+  }
+}
+
+validateAlternateContact() {
+  const digits = this.getDigitsOnly(this.leadForm.get('alternateContact')?.value);
+  if (digits.length > 0 && (digits.length < 10 || digits.length > 12)) {
+    this.alternateContactValidationMessage = 'Alternate contact must be 10-12 digits';
+  } else {
+    this.alternateContactValidationMessage = '';
+  }
+}
+
+validateLandline() {
+  const digits = this.getDigitsOnly(this.leadForm.get('landline')?.value);
+  if (digits.length > 0 && (digits.length < 10 || digits.length > 12)) {
+    this.landlineValidationMessage = 'Landline must be 10-12 digits';
+  } else {
+    this.landlineValidationMessage = '';
+  }
+}
  
  
    private searchInLead(lead: any, term: string): boolean {
@@ -1284,25 +1490,30 @@ async loadData() {
     this.loading = false;
   }
 }
+private getDigitsOnly(value: any): string {
+  if (!value) return '';
+  return String(value).replace(/\s+/g, '');
+}
 private initializeForm() {
   this.leadForm = this.fb.group({
     contactType: ['Lead', Validators.required],
     isIndividual: [true],
     prefix: [''],
-    firstName: ['', [Validators.required]], // Add required validator
+    firstName: ['', [Validators.required]], 
     middleName: [''],
+    occupation: [''], 
     lastName: ['',],
-gender: ['', []], // Add required validator
-    dateOfBirth: ['', []], // Add required validator
+    gender: ['', []], 
+    dateOfBirth: ['', []], 
     age: [''],
     businessName: [''],
-    mobile: ['', [Validators.required, Validators.pattern(/^[0-9]{10}$/)]],
-    alternateContact: ['', [Validators.pattern(/^[0-9]{10}$/)]],
-    landline: ['', [Validators.pattern(/^[0-9]{10}$/)]],
+    // UPDATE THIS LINE: Use the new regex that allows spaces and 10-12 digits
+    mobile: ['', [Validators.required, Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
+    alternateContact: ['', [Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
+    landline: ['', [Validators.pattern(/^(?:\s*\d\s*){10,12}$/)]],
     email: ['', []],
     department: [''],
-    
-    leadStatus: [''],
+    leadStatus: ['', Validators.required],
     leadCategory: [''],
     leadStatusNote: [''],
     dealStatus: [''],
@@ -1387,6 +1598,8 @@ private populateFormFromParams(params: any) {
     priority: params['priority'] || '',
     estimatedValue: params['estimatedValue'] || '',
     source: params['source'] || '',
+        occupation: params['occupation'] || '', // Add this line
+
     lifeStage: params['lifeStage'] || '',
     assignedTo: params['assignedTo'] || params['assignedToId'] || '',
     notes: params['notes'] || '',
@@ -1957,15 +2170,17 @@ onStateChange() {
      this.selectedUserDepartment = selectedUser.department;
    }
  }
-   loadFollowupCategories(): void {
-     this.followupCategoryService.getFollowupCategories()
-       .then((categories) => {
-         this.followupCategories = categories;
-       })
-       .catch((error) => {
-         console.error('Error loading followup categories:', error);
-       });
-   }
+loadFollowupCategories(): void {
+  this.followupCategoryService.getFollowupCategories()
+    .subscribe({
+      next: (categories) => {
+        this.followupCategories = categories;
+      },
+      error: (error) => {
+        console.error('Error loading followup categories:', error);
+      }
+    });
+}
    
  
  
@@ -2126,20 +2341,7 @@ onStateChange() {
      this.showFollowUpForm = false;
      this.selectedLeadForFollowUp = null;
    }
-   closeForm() {
-  this.showForm = false;
-  this.editingLeadId = null;
-  this.leadForm.reset({
-    contactType: 'Lead',
-    isIndividual: true,
-    status: 'New',
-    source: this.sources.length > 0 ? this.sources[0].name : '',
-    lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
-    addedBy: this.authService.getCurrentUserName()
-  });
-  this.selectedProducts = [];
-  this.availableDistricts = [];
-}
+
    updateValidators() {
      if (this.isIndividualType) {
        this.f['firstName'].setValidators([Validators.required]);
@@ -2223,6 +2425,8 @@ editLead(lead: any) {
       lastName: lead.lastName,
       businessName: lead.businessName,
       mobile: lead.mobile,
+            occupation: lead.occupation || '', // Add this line
+
       alternateContact: lead.alternateContact,
       landline: lead.landline, // Add landline
        leadStatusNote: lead.leadStatusNote, // Add lead status note
@@ -2253,53 +2457,76 @@ editLead(lead: any) {
     }
   });
 }
-async validateMobileNumber() {
-  const mobileControl = this.leadForm.get('mobile');
-  const mobile = mobileControl?.value;
-  
-  // Reset validation messages
-  this.mobileValidationMessage = '';
-  this.mobileExists = false;
-  this.existingCustomer = null;
+// In lead-add.component.ts
 
-  if (!mobile || mobile.length !== 10) {
-    return;
-  }
+// File: src/app/lead-add/lead-add.component.ts
+// File: src/app/lead-add/lead-add.component.ts
 
-  try {
-    // Check if mobile exists in customers
-    const { exists, customer } = await this.leadService.checkMobileExists(mobile);
-    this.mobileExists = exists;
-    this.existingCustomer = customer || null;
-    
-    if (exists && customer) {
-      this.validationMessage = {
-        text: 'Note: This mobile number belongs to an existing customer',
-        type: 'success'
-      };
+// REPLACE your existing prefillFromExistingCustomer method with this complete version.
+// File: src/app/lead-add/lead-add.component.ts
+
+// REPLACE your existing prefillFromExistingCustomer method with this one.
+// File: src/app/lead-add/lead-add.component.ts
+
+// REPLACE your existing prefillFromExistingCustomer method with this complete version.
+// REPLACE your existing prefillFromExistingCustomer method with this one.
+prefillFromExistingCustomer(customer: any): void {
+    const isIndividual = !customer.businessName;
+    this.onContactTypeChange(isIndividual);
+
+    this.leadForm.patchValue({
+      // ... (all other existing fields like firstName, mobile, address, etc. remain the same)
+      isIndividual: isIndividual,
+      prefix: customer.prefix || '',
+      firstName: customer.firstName || '',
+      middleName: customer.middleName || '',
+      lastName: customer.lastName || '',
+      businessName: customer.businessName || '',
+      gender: customer.gender || '',
+      dateOfBirth: customer.dateOfBirth || customer.dob || '',
+      age: customer.age || null,
+      occupation: customer.occupation || '',
+      email: customer.email || '',
+      alternateContact: customer.alternateContact || '',
+      landline: customer.landline || '',
+      addressLine1: customer.addressLine1 || customer.address || '',
+      addressLine2: customer.addressLine2 || '',
+      city: customer.city || customer.district || '',
+      state: customer.state || '',
+      country: customer.country || 'India',
+      zipCode: customer.zipCode || '',
       
-      // Prefill ALL fields from existing customer
-      this.prefillFromExistingCustomer(customer);
+      // ======================= THE FIX =======================
+      // This part now correctly reads the fields that were saved in Part 1.
+      leadCategory: customer.leadCategory || '',
+      dealStatus: customer.dealStatus || '',
+      priority: customer.priority || '',
+      estimatedValue: customer.estimatedValue || '',
+      leadStatus: customer.leadStatus || '', // READING from 'leadStatus'
+      lifeStage: customer.lifeStage || '',  // READING from 'lifeStage'
+      source: customer.source || '',
+      department: customer.department || '',
+      assignedTo: customer.assignedToId || customer.assignedTo || '',
+      notes: customer.notes || '',
+      // ===================== END OF THE FIX ====================
+    });
+
+    // This part for state/district dropdowns remains the same.
+    if (customer.state) {
+      this.updateDistrictsByState(customer.state);
+      setTimeout(() => {
+        this.leadForm.get('city')?.setValue(customer.city || customer.district || '');
+      }, 100);
     }
-  } catch (error) {
-    console.error('Error validating mobile:', error);
   }
-}
-prefillFromExistingCustomer(customer: any) {
-  // Determine if it's an individual or business
+prefillFormWithCustomerData(customer: any) {
+  // Determine if it's an individual or business based on businessName
   const isIndividual = !customer.businessName;
-  
-  // Set the contact type
-  this.leadForm.patchValue({
-    contactType: 'Lead', // or customer.contactType if available
-    isIndividual: isIndividual
-  });
+  this.onContactTypeChange(isIndividual); // This updates validators correctly
 
-  // Update form validators based on contact type
-  this.onContactTypeChange(isIndividual);
-
-  // Prefill all available fields
   this.leadForm.patchValue({
+    // Personal Info
+    isIndividual: isIndividual,
     prefix: customer.prefix || '',
     firstName: customer.firstName || '',
     middleName: customer.middleName || '',
@@ -2308,231 +2535,51 @@ prefillFromExistingCustomer(customer: any) {
     gender: customer.gender || '',
     dateOfBirth: customer.dateOfBirth || customer.dob || '',
     age: customer.age || '',
+    occupation: customer.occupation || '',
+    
+    // Contact Info
     email: customer.email || '',
-    landline: customer.landline || '',
     alternateContact: customer.alternateContact || '',
-    department: customer.department || '',
-    leadStatus: customer.leadStatus || '',
+    landline: customer.landline || '',
+    
+    // Address Info
+    addressLine1: customer.addressLine1 || customer.address || '',
+    addressLine2: customer.addressLine2 || '',
+    city: customer.city || '',
+    state: customer.state || '',
+    country: customer.country || 'India',
+    zipCode: customer.zipCode || '',
+    
+    // Lead Info
     leadCategory: customer.leadCategory || '',
-    leadStatusNote: customer.leadStatusNote || '',
     dealStatus: customer.dealStatus || '',
     priority: customer.priority || '',
     estimatedValue: customer.estimatedValue || '',
     source: customer.source || '',
     lifeStage: customer.lifeStage || customer.lifestage || '',
-    assignedTo: customer.assignedTo || customer.assignedToId ||customer.assignedTo
-|| '',
-    notes: customer.notes || '',
-    addressLine1: customer.addressLine1 || customer.address || customer.currentAddress || '',
-    addressLine2: customer.addressLine2 || '',
-    city: customer.city || customer.currentCity || '',
-    state: customer.state || customer.currentState || '',
-    country: customer.country || 'India',
-    zipCode: customer.zipCode || '',
-    addedBy: this.authService.getCurrentUserName()
+    department: customer.department || '',
+    assignedTo: customer.assignedToId || customer.assignedTo || '', // Prefer ID
+    notes: customer.notes || ''
   });
 
-  // Handle state/district selection
+  // Handle state/district selection if state data exists
   if (customer.state) {
     this.updateDistrictsByState(customer.state);
+    // Use a small timeout to allow the districts to load before setting the city
     setTimeout(() => {
       this.leadForm.get('city')?.setValue(customer.city || '');
     }, 100);
   }
-
-  // Handle product interested if available
-  if (customer.productInterested) {
-    try {
-      const productData = typeof customer.productInterested === 'string' 
-        ? JSON.parse(customer.productInterested) 
-        : customer.productInterested;
-      
-      this.selectedProducts = Array.isArray(productData) 
-        ? productData 
-        : [productData];
-    } catch (e) {
-      console.error('Error parsing product interested data:', e);
-    }
-  }
 }
+
  viewLead(lead: any) {
    this.router.navigate(['/lead', lead.id]);
  }
  
    
- validateAlternateContact() {
-   const alternateControl = this.leadForm.get('alternateContact');
-   if (alternateControl?.value && alternateControl?.errors?.['pattern']) {
-     this.alternateContactValidationMessage = 'Alternate contact must be exactly 10 digits';
-   } else {
-     this.alternateContactValidationMessage = '';
-   }
- }
+
  
- validateLandline() {
-   const landlineControl = this.leadForm.get('landline');
-   if (landlineControl?.value && landlineControl?.errors?.['pattern']) {
-     this.landlineValidationMessage = 'Landline must be exactly 10 digits';
-   } else {
-     this.landlineValidationMessage = '';
-   }
- }
- 
- 
-async saveLead() {
-  this.leadForm.markAllAsTouched();
 
-
-  // Prevent multiple saves
-  if (this.isSaving) return;
-  
-  this.isSaving = true;
-  this.leadForm.markAllAsTouched();
-
-  if (this.leadForm.invalid) {
-    const invalidFields = [];
-    for (const controlName in this.leadForm.controls) {
-      const control = this.leadForm.get(controlName);
-      if (control?.invalid) {
-        invalidFields.push(controlName);
-      }
-    }
-
-   this.validationMessage = {
-      text: `Please fill all required fields correctly. Missing: ${invalidFields.join(', ')}`,
-      type: 'error'
-    };
-    this.isSaving = false;
-    return;
-  }
-  const formData = this.leadForm.value;
-  const mobile = formData.mobile;
-
-  // Validate mobile number format
-  // Validate mobile number format
-  if (!/^[0-9]{10}$/.test(mobile)) {
-    this.validationMessage = {
-      text: 'Mobile number must be exactly 10 digits',
-      type: 'error'
-    };
-    this.isSaving = false;
-    return;
-  }
-
-  try {
-    // Check for duplicate mobile in leads
-    const duplicateLeads = this.allLeads.filter(l => 
-      l.mobile === mobile && 
-      (!this.editingLeadId || l.id !== this.editingLeadId)
-    );
-
-    if (duplicateLeads.length > 0 && !confirm('This mobile number already exists in another lead. Are you sure you want to continue?')) {
-      return;
-    }
-
-    // Check if mobile exists in customers
-    const mobileExists = await this.customerService.checkMobileNumberExists(mobile);
-    this.mobileExists = mobileExists;
-
-    // Get assigned user data
-    const assignedUserId = this.leadForm.get('assignedTo')?.value;
-    const assignedUser = this.usersList.find(u => u.id === assignedUserId);
-    const assignedToName = assignedUser ? assignedUser.name : '';
-
-    // Prepare lead data
-    const leadData = { 
-      ...formData,
-      updatedAt: new Date(),
-      assignedTo: assignedToName,
-      assignedToId: assignedUserId,
-      productInterested: this.selectedProducts.length > 0 ? this.selectedProducts : null,
-      addedBy: {
-        userId: this.authService.getCurrentUserId(),
-        userName: formData.addedBy || this.authService.getCurrentUserName()
-      },
-      isDuplicate: duplicateLeads.length > 0,
-      mobileExists: mobileExists
-    };
-
-    // Remove irrelevant fields based on contact type
-    if (!leadData.isIndividual) {
-      delete leadData.firstName;
-      delete leadData.lastName;
-      delete leadData.prefix;
-      delete leadData.middleName;
-      delete leadData.gender;
-      delete leadData.dateOfBirth;
-      delete leadData.age;
-    } else {
-      delete leadData.businessName;
-    }
-
-    if (this.editingLeadId) {
-      // Update existing lead
-      await this.leadService.updateLead(this.editingLeadId, leadData);
-      this.validationMessage = {
-        text: 'Lead updated successfully',
-        type: 'success'
-      };
-    } else {
-      // Create new lead
-      leadData.createdAt = new Date();
-      leadData.contactId = this.generateContactId();
-      
-      await this.leadService.addLead(leadData, {
-        userId: this.authService.getCurrentUserId(),
-        userName: this.authService.getCurrentUserName()
-      });
-
-      // Show appropriate success message
-      if (duplicateLeads.length > 0) {
-        this.validationMessage = {
-          text: 'Duplicate lead added successfully',
-          type: 'success'
-        };
-      } else if (mobileExists) {
-        this.validationMessage = {
-          text: 'Reordered lead added successfully',
-          type: 'success'
-        };
-      } else {
-        this.validationMessage = {
-          text: 'Lead added successfully',
-          type: 'success'
-        };
-      }
-    }
-
-    // Close the form immediately after successful save
-    this.showForm = false;
-    this.editingLeadId = null;
-    this.leadForm.reset({
-      contactType: 'Lead',
-      isIndividual: true,
-      status: 'New',
-      source: this.sources.length > 0 ? this.sources[0].name : '',
-      lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
-      addedBy: this.authService.getCurrentUserName()
-    });
-    this.selectedProducts = [];
-    this.availableDistricts = [];
-
-    // Navigate to leads page after successful save
-    this.router.navigate(['/crm/leads']);
-    
-    // Reload data after a short delay
-    setTimeout(() => {
-      this.loadLeads();
-    }, 2000);
-
-  } catch (error) {
-    console.error('Error saving lead:', error);
-    this.validationMessage = {
-      text: 'Error saving lead. Please try again.',
-      type: 'error'
-    };
-  }
-}
  selectAllFilteredLeads() {
    // Clear previous selections
    this.selectedLeads.clear();
@@ -2855,23 +2902,15 @@ onSearchBlur(): void {
   }, 200);
 }
  
- toggleForm() {
-   this.showForm = !this.showForm;
-   if (!this.showForm) {
-     this.editingLeadId = null;
-     this.leadForm.reset({
-       contactType: 'Lead',
-       isIndividual: true,
-       status: 'New',
-       source: this.sources.length > 0 ? this.sources[0].name : '',
-       lifeStage: this.lifeStages.length > 0 ? this.lifeStages[0].name : '',
-       assignedTo: '',
-       addedBy: this.authService.getCurrentUserName() // Use authService directly
- 
-     });
-     this.availableDistricts = []; // Reset available districts
-   }
- }
+toggleForm() {
+  if (this.editingLeadId) {
+    // If editing, navigate back to the leads list
+    this.router.navigate(['/crm/leads']);
+  } else {
+    // If adding new, just hide the form without clearing data
+    this.showForm = !this.showForm;
+  }
+}
  applyFilters(): void {
    if (this.filterDebounceTimer) {
      clearTimeout(this.filterDebounceTimer);

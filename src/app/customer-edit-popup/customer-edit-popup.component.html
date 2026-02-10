@@ -41,7 +41,14 @@
           <label>Contact ID:</label>
           <input type="text" [(ngModel)]="customerData.contactId" name="contactId" class="form-control" readonly>
         </div>
-
+ <div class="col-md-6">
+    <div class="form-group">
+      <label>Occupation{{isIndividual ? '' : ''}}:</label>
+      <input type="text" [(ngModel)]="customerData.occupation" name="occupation" 
+             class="form-control" 
+             [placeholder]="isIndividual ? 'Enter Occupation' : 'Enter Industry'">
+    </div>
+  </div>
         <!-- Name Fields -->
         <div class="form-group">
           <label>Name:</label>
@@ -74,13 +81,45 @@
           <!-- Display Name Field -->
     
         </div>
+<!-- customer-edit-popup.component.html -->
+<!-- Add this in the form, preferably near the name fields -->
 
-        <!-- Date of Birth -->
-        <div class="form-group" *ngIf="isIndividual">
-          <label>Date of Birth:</label>
-          <input type="date" [(ngModel)]="customerData.dob" name="dob" class="form-control">
-        </div>
-
+<!-- Demographic Fields -->
+<div class="row" *ngIf="isIndividual">
+  <div class="col-md-3">
+    <div class="form-group">
+      <label>Age:</label>
+      <input type="number" [(ngModel)]="customerData.age" name="age" 
+             class="form-control" min="0" max="120">
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="form-group">
+      <label>Date of Birth:</label>
+      <input type="date" [(ngModel)]="customerData.dob" name="dob" class="form-control">
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="form-group">
+      <label>Gender:</label>
+      <select [(ngModel)]="customerData.gender" name="gender" class="form-control">
+        <option value="">Select</option>
+        <option *ngFor="let gender of genders" [value]="gender">{{gender}}</option>
+      </select>
+    </div>
+  </div>
+<div class="row">
+  <div class="col-md-6">
+    <div class="form-group">
+      <label>Occupation{{isIndividual ? '' : ''}}:</label>
+      <input type="text" [(ngModel)]="customerData.occupation" name="occupation" 
+             class="form-control" 
+             [placeholder]="isIndividual ? 'Enter Occupation' : 'Enter Industry'">
+    </div>
+  </div>
+</div>
+</div>
+      
         <!-- Contact Info -->
         <div class="row">
           <div class="col-md-6">
@@ -181,12 +220,12 @@
           <!-- City, State, Country, Zip -->
          <div class="row">
   <div class="col-md-6">
-  <div class="form-group">
+  <!-- <div class="form-group">
   <label>City:</label>
   <input type="text" [(ngModel)]="customerData.city" name="city" 
          class="form-control" placeholder="Enter City"
          (ngModelChange)="onAddressFieldChange()">
-</div>
+</div> -->
   </div>
             <div class="col-md-6">
                  <div class="form-group">
@@ -200,6 +239,12 @@
 
             </div>
           </div>
+          <div class="col-md-6">
+      <label>District:</label>
+      <input type="text" [(ngModel)]="customerData.district" name="district" 
+             class="form-control" placeholder="Enter District"
+             (ngModelChange)="onAddressFieldChange()">
+    </div>
 
           <div class="row">
             <div class="col-md-6">

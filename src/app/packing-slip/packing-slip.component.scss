@@ -438,4 +438,19 @@
     background: transparent !important;
     color: black !important;
   }
+}.totals-row.grand-total {
+  font-size: 24px;
+  font-weight: bold;
+  color: #000;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
 }
+
+.amount-in-words {
+  font-size: 16px;
+  font-style: italic;
+  margin-top: 6px;
+  color: #333;
+}
+

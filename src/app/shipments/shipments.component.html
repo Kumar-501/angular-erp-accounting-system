@@ -1,68 +1,3 @@
-<!-- Prescription Modal -->
-<div class="modal fade" [class.show]="showPrescriptionModal" [style.display]="showPrescriptionModal ? 'block' : 'none'">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Prescription</h5>
-        <button type="button" class="close" (click)="closePrescriptionModal()">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div id="prescription-print-content" style="font-family: 'Arial Unicode MS', Arial, sans-serif;">
-          <!-- Header -->
-          <div style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid #000; padding-bottom: 10px;">
-            <h3 style="margin-bottom: 5px;">ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h3>
-            <p style="margin: 2px 0;">First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</p>
-            <p style="margin: 2px 0;">E-mail: contactherballytouch.com | Ph: 7034110999</p>
-            <p style="margin: 2px 0;">ഡോ. രാജന പി.ആർ., BAMS</p>
-          </div>
-          
-          <!-- Patient Info -->
-          <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-            <p><strong>പേര്:</strong> {{currentPrescription.patientName || '.....................................................'}}</p>
-            <p><strong>തീയതി:</strong> {{currentPrescription.date || '.....................................................'}}</p>
-          </div>
-          
-          <!-- Medicines -->
-          <div style="margin-bottom: 15px;">
-            <div *ngFor="let medicine of currentPrescription.medicines; let i = index" style="margin-bottom: 15px;">
-              <p style="margin-bottom: 5px;">
-                {{i + 1}}. 
-                <span *ngIf="i < 5">ഔഷധം 15 ml. എടുക്കുക 45 ml. തിളപ്പിച്ച വെള്ളം ചേർത്ത് കുടിക്കുക. രാത്രി ഭക്ഷണത്തിന് ശേഷം / മുമ്പ് സൊവികുക.</span>
-                <span *ngIf="i >= 5">ഗുളിക {{medicine.pills || '.......................'}} എണ്ണം എടുക്കുക {{medicine.dosage || '...............'}} ml. തിളപ്പിച്ച വെള്ളം ചേർത്ത് നേരം ഭക്ഷണത്തിന് മുമ്പ് / ശേഷം സൊവികുക.</span>
-              </p>
-              <div *ngIf="i < 5" style="display: flex; flex-wrap: wrap; gap: 15px;">
-                <span><strong>ചേരുവ:</strong> {{medicine.ingredients || '.......................'}}</span>
-                <span><strong>ഗുളിക:</strong> {{medicine.pills || '.......................'}}</span>
-                <span><strong>പൊടി ചേരുവ:</strong> {{medicine.powder || '.......................'}}</span>
-                <span><strong>നേരം:</strong> {{medicine.time || '.......................'}}</span>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Note -->
-          <div style="margin-top: 30px; font-style: italic; text-align: center;">
-            <p>NB: മുകളിലുള്ള മരുന്നുകള്‍ ഡോക്ടര്‍ പറയുന്ന വിധം ഉപയോഗിക്കുക.</p>
-          </div>
-          
-          <!-- Signature -->
-          <div style="margin-top: 50px; text-align: right;">
-            <div style="border-top: 1px solid #000; display: inline-block; width: 200px; text-align: center;">
-              <p>ഡോക്ടറുടെ ഒപ്പ്</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="closePrescriptionModal()">Close</button>
-        <button type="button" class="btn btn-primary" (click)="savePrescription()">Save</button>
-        <button type="button" class="btn btn-success" (click)="printPrescription()">
-          <i class="fas fa-print"></i> Print
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="modal-backdrop fade" [class.show]="showPrescriptionModal" [style.display]="showPrescriptionModal ? 'block' : 'none'"></div>
 <div class="controls-panel">
   <div class="controls-wrapper">
     <h2>Shipments</h2>
@@ -86,26 +21,26 @@
       <button class="filter-btn" (click)="toggleFilters()">
         <i class="fas fa-filter"></i> Filters
       </button>
-      <button class="export-btn" (click)="exportCSV()">
+  <button class="export-btn" (click)="exportCSV()">
         <i class="fas fa-file-csv"></i> CSV
       </button>
-   <button class="export-btn" (click)="exportCSV()">
-        <i class="fas fa-file-csv"></i> Excel
+ <button class="export-btn" (click)="exportCSV()">
+        <i class="fas fa-file-csv"></i>Excel
       </button>
-<button class="btn btn-primary" (click)="bulkPrintSelected()">
-  <i class="fas fa-print"></i>
-  Print Bulk
-  <span class="count-badge">{{selectedShipments.length}}</span>
-</button>
+      <button class="btn btn-primary" (click)="bulkPrintSelected()">
+        <i class="fas fa-print"></i>
+        Print Bulk
+        <span class="count-badge">{{selectedShipments.length}}</span>
+      </button>
 
 
       <button type="button" class="btn btn-primary" (click)="generateBulkDocuments('packing-slip')" [disabled]="selectedShipments.length === 0">
   <i class="fas fa-box"></i> Bulk Packing Slips
 </button>
 
-<button type="button" class="btn btn-primary" (click)="generateBulkDocuments('invoice')" [disabled]="selectedShipments.length === 0">
-  <i class="fas fa-file-invoice"></i> Bulk Invoices
-</button>
+      <button type="button" class="btn btn-primary" (click)="generateBulkDocuments('invoice')" [disabled]="selectedShipments.length === 0">
+        <i class="fas fa-file-invoice"></i> Bulk Invoices
+      </button>
 
  
       <!-- Add this button with your other export buttons -->
@@ -216,19 +151,14 @@
 <div class="mb-3">
   <label class="form-label">Shipping Status</label>
   <select class="form-select" [(ngModel)]="filterValues.shippingStatus" name="shippingStatus">
-    <option value="All">All Statuses</option>
-    <option value="Processing">Processing</option>
-    <option value="Packed">Packed</option>
-    <option value="Pending">Pending</option>
-    <option value="Shipped">Shipped</option>
-    <option value="Onhold">Onhold</option>
-    <option value="Ordered">Ordered</option>
-    <option value="Print">Print</option>
-    <option value="Reached hub">Reached hub</option>
-    <option value="Out for delivery">Out for delivery</option>
-    <option value="Returned">Returned</option>
-    <option value="Cancelled">Cancelled</option>
-    <option value="Delivered">Delivered</option>
+   <option value="">All Statuses</option>
+        <option value="Shipped">Ordered</option>
+        <option value="Delivered">Print</option>
+        <option value="Returned">Processing</option>
+        <option value="Returned">Packed</option>
+            <option value="Returned">shipped</option>
+             <option value="Returned">Delivered</option>
+    
   </select>
 </div>
   </div>
@@ -245,136 +175,120 @@
   <div class="card">
     <div class="card-body p-0">
       <div class="table-responsive">
-        <table class="table table-striped table-hover mb-0">
-          <thead>
-            <tr class="text-nowrap">
-              <th><input type="checkbox" (change)="selectAll($event)"></th>
-              <th>Action</th>
-              <th *ngIf="isColumnVisible('date')">Date <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('invoiceNo')">Invoice No. <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('contactNumber')">Contact <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('alternateContact')">Alternate Contact <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('customer')">Customer <i class="fas fa-sort"></i></th>
+       <table class="table table-striped table-hover mb-0">
+<thead>
+  <tr class="text-nowrap">
+    <!-- Static Columns -->
+    <th><input type="checkbox" (change)="selectAll($event)"></th>
+    <th>Action</th>
 
-              <th *ngIf="isColumnVisible('typeOfService')">Type of Service <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('location')"> Current Location</th> <!-- Add this column -->
-              <th *ngIf="isColumnVisible('billingAddress')">Billing Location<i class="fas fa-sort"></i></th>
-      <th *ngIf="isColumnVisible('shippingDetails')">Shipping Details</th>
+    <!-- Dynamic Columns from Component -->
+    <th *ngIf="isColumnVisible('date')">Date <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('invoiceNo')">Invoice No. <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('customer')">Customer <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('contactNumber')">Contact <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('alternateContact')">Alternate Contact <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('location')">Current Location <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('billingAddress')">Billing Location <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('state')">State <i class="fas fa-sort"></i></th>
+<th *ngIf="isColumnVisible('district')">District <i class="fas fa-sort"></i></th>  <th *ngIf="isColumnVisible('pincode')">Pincode <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('shippingDetails')">Shipping Details <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('typeOfService')">Type of Service <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('quantity')">Quantity <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('shippingCharge')">Shipping Charge <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('grandTotal')">Grand Total <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('shippingStatus')">Shipping Status <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('paymentStatus')">Payment Status <i class="fas fa-sort"></i></th>
+    <th *ngIf="isColumnVisible('addedBy')">Added By <i class="fas fa-sort"></i></th>
+  </tr>
+</thead>
 
-              <th *ngIf="isColumnVisible('shippingStatus')">Shipping Status <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('shippingCharge')">Shipping Charge <i class="fas fa-sort"></i></th>
-              <th *ngIf="isColumnVisible('addedBy')">Added By <i class="fas fa-sort"></i></th>
+<tbody>
+  <!-- Row for when no data is available - PARSER ERROR IS FIXED HERE -->
 
-              <th *ngIf="isColumnVisible('paymentStatus')">Payment Status <i class="fas fa-sort"></i></th>
-            </tr>
-          </thead>
-          <tbody>
-         <tr *ngIf="filteredShipments.length === 0">
-  <td colspan="11" class="text-center py-3">No data available in table</td>
-</tr>
-<tr *ngFor="let shipment of filteredShipments.slice((currentPage-1)*entriesPerPage, currentPage*entriesPerPage)">              <td><input type="checkbox" [checked]="isSelected(shipment.id)" (change)="toggleSelection(shipment.id)"></td>
-          <td>
-  <!-- Action Button -->
-  <button class="action-button" (click)="openActionPopup(shipment, $event)">Actions</button>
-
-  <!-- Action Popup -->
-  <div class="action-popup-overlay" *ngIf="currentActionPopup === shipment.id" (click)="closeActionPopup()">
-    <div class="action-popup" (click)="$event.stopPropagation()">
-      <div class="popup-header">
-        <h4>Shipment #{{shipment.invoiceNo}}</h4>
-        <button class="close-btn" (click)="closeActionPopup()">&times;</button>
-      </div>
-      
-      <div class="popup-body">
-        <div class="action-item" [routerLink]="['/shipments/view', shipment.id]">
-          <i class="fas fa-eye text-info"></i>
-          <span>View</span>
-
-        </div>
-        
-        <div class="action-item" (click)="openEditFormModal(shipment); closeActionPopup()">
-          <i class="fas fa-edit text-primary"></i>
-          <span>Edit</span>
-        </div>
-        
-        <div class="action-item" (click)="openEditModal(shipment); closeActionPopup()">
-          <i class="fas fa-money-bill-wave text-warning"></i>
-          <span>Edit Payment Status</span>
-        </div>
-        
-        <div class="action-item" (click)="generatePackingSlip(shipment.id); closeActionPopup()">
-          <i class="fas fa-box-open text-secondary"></i>
-          <span>Packing Slip</span>
-        </div>
-        
-        <div class="action-item" (click)="generateInvoice(shipment); closeActionPopup()">
-          <i class="fas fa-file-invoice text-success"></i>
-          <span>Generate Invoice</span>
-        </div>
-        
-        <div class="action-item" 
-             (click)="viewPrescription(shipment); closeActionPopup()"
-             [class.disabled]="!shipment.prescriptions || shipment.prescriptions.length === 0"
-             [title]="(!shipment.prescriptions || shipment.prescriptions.length === 0) ? 'No prescription available' : ''">
-          <i class="fas fa-file-prescription text-info"></i>
-          <span>View Prescription</span>
-        </div>
-        
-        <div class="action-item" (click)="printShipment(shipment); closeActionPopup()">
-          <i class="fas fa-print text-secondary"></i>
-          <span>Print</span>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="action-item text-danger" (click)="confirmDelete(shipment); closeActionPopup()">
-          <i class="fas fa-trash-alt"></i>
-          <span>Delete</span>
+  <!-- Loop through shipments -->
+  <tr *ngFor="let shipment of filteredShipments.slice((currentPage-1)*entriesPerPage, currentPage*entriesPerPage)">
+    <!-- Checkbox Cell -->
+    <td><input type="checkbox" [checked]="isSelected(shipment.id)" (change)="toggleSelection(shipment.id)"></td>
+    
+    <!-- Action Cell with Popup -->
+    <td>
+      <button class="action-button" (click)="openActionPopup(shipment, $event)">Actions</button>
+      <div class="action-popup-overlay" *ngIf="currentActionPopup === shipment.id" (click)="closeActionPopup()">
+        <div class="action-popup" (click)="$event.stopPropagation()">
+          <div class="popup-header">
+            <h4>Shipment #{{shipment.invoiceNo}}</h4>
+            <button class="close-btn" (click)="closeActionPopup()">×</button>
+          </div>
+          <div class="popup-body">
+            <div class="action-item" [routerLink]="['/shipments/view', shipment.id]"><i class="fas fa-eye text-info"></i><span>View</span></div>
+            <div class="action-item" (click)="openEditFormModal(shipment); closeActionPopup()"><i class="fas fa-edit text-primary"></i><span>Edit</span></div>
+            <div class="action-item" (click)="openEditModal(shipment); closeActionPopup()"><i class="fas fa-money-bill-wave text-warning"></i><span>Edit Payment Status</span></div>
+            <div class="action-item" (click)="generatePackingSlip(shipment.id); closeActionPopup()"><i class="fas fa-box-open text-secondary"></i><span>Packing Slip</span></div>
+            <div class="action-item" (click)="generateInvoice(shipment); closeActionPopup()"><i class="fas fa-file-invoice text-success"></i><span>Generate Invoice</span></div>
+            <div class="action-item" (click)="viewPrescription(shipment); closeActionPopup()" [class.disabled]="!shipment.prescriptions || shipment.prescriptions.length === 0" [title]="(!shipment.prescriptions || shipment.prescriptions.length === 0) ? 'No prescription available' : ''"><i class="fas fa-file-prescription text-info"></i><span>View Prescription</span></div>
+            <div class="action-item" (click)="printShipment(shipment); closeActionPopup()"><i class="fas fa-print text-secondary"></i><span>Print</span></div>
+            <div class="divider"></div>
+            <div class="action-item text-danger" (click)="confirmDelete(shipment); closeActionPopup()"><i class="fas fa-trash-alt"></i><span>Delete</span></div>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
-</td>
-<td *ngIf="isColumnVisible('date')">
-  {{ formatDateForDisplay(shipment.date) }}
-</td>
+    </td>
 
-<td *ngIf="isColumnVisible('invoiceNo')">{{ shipment.invoiceNo }}</td>
-              <td *ngIf="isColumnVisible('contactNumber')">{{ shipment.contactNumber }}</td>
-<td *ngIf="isColumnVisible('alternateContact')">{{ shipment.alternateContact || 'N/A' }}</td>              <td *ngIf="isColumnVisible('customer')">{{ shipment.customer }}</td>
-              
-              <td *ngIf="isColumnVisible('typeOfService')">
-                {{ shipment.typeOfServiceName || shipment.typeOfService || 'Standard' }}
-              </td>
-              <td *ngIf="isColumnVisible('location')">{{ shipment.location }}</td> <!-- Add this cell -->
-              <td *ngIf="isColumnVisible('billingAddress')">{{ shipment.billingAddress || 'N/A' }}</td>
-      <td *ngIf="isColumnVisible('shippingDetails')">{{ shipment.shippingDetails || 'N/A' }}</td>
+    <!-- Dynamic Data Cells -->
+    <td *ngIf="isColumnVisible('date')">{{ formatDateForDisplay(shipment.date) }}</td>
+    <td *ngIf="isColumnVisible('invoiceNo')">{{ shipment.invoiceNo }}</td>
+    <td *ngIf="isColumnVisible('customer')">{{ shipment.customer }}</td>
+    <td *ngIf="isColumnVisible('contactNumber')">{{ shipment.contactNumber }}</td>
+    <td *ngIf="isColumnVisible('alternateContact')">{{ shipment.alternateContact || 'N/A' }}</td>
+    <td *ngIf="isColumnVisible('location')">{{ shipment.location }}</td>
+    <td *ngIf="isColumnVisible('billingAddress')">{{ shipment.billingAddress || 'N/A' }}</td>
+    <td *ngIf="isColumnVisible('state')">{{ parseAddress(shipment.billingAddress, 'state') }}</td>
+      <td *ngIf="isColumnVisible('district')">{{ shipment.district || parseAddress(shipment.billingAddress, 'district') }}</td>    <td *ngIf="isColumnVisible('pincode')">{{ parseAddress(shipment.billingAddress, 'pincode') }}</td>
+    <td *ngIf="isColumnVisible('shippingDetails')">{{ shipment.shippingDetails || 'N/A' }}</td>
+    <td *ngIf="isColumnVisible('typeOfService')">{{ shipment.typeOfServiceName || shipment.typeOfService || 'Standard' }}</td>
+    <td *ngIf="isColumnVisible('quantity')">{{ getShipmentTotalQuantity(shipment) }}</td>
+    <td *ngIf="isColumnVisible('shippingCharge')">{{ shipment.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</td>
+<td *ngIf="isColumnVisible('grandTotal')">{{ shipment.totalPayable | currency:'INR':'symbol':'1.0-0' }}</td><td *ngIf="isColumnVisible('shippingStatus')">
+  <span [ngClass]="getStatusBadgeClass(shipment.shippingStatus)">
+    {{ shipment.shippingStatus || 'N/A' }}
+  </span>
+</td>
+    <td *ngIf="isColumnVisible('paymentStatus')">
+      <span [ngClass]="{
+        'badge bg-danger': shipment.paymentStatus === 'Unpaid',
+        'badge bg-warning': shipment.paymentStatus === 'Partial',
+        'badge bg-success': shipment.paymentStatus === 'Paid'
+      }">{{ shipment.paymentStatus }}</span>
+    </td>
+    <td *ngIf="isColumnVisible('addedBy')">{{ shipment.addedByDisplayName || shipment.addedBy || 'System' }}</td>
+  </tr>
+</tbody>
 
-              <td *ngIf="isColumnVisible('shippingStatus')">
-                <span [ngClass]="getStatusBadgeClass(shipment.shippingStatus)">
-                  {{ shipment.shippingStatus || 'N/A' }}
-                </span>
-              </td>
-              <td *ngIf="isColumnVisible('shippingCharge')">{{ shipment.shippingCharge | currency:'INR':'symbol':'1.2-2' }}</td>
-              <td *ngIf="isColumnVisible('addedBy')">{{ shipment.addedByDisplayName || shipment.addedBy || 'System' }}</td>
-              <td *ngIf="isColumnVisible('paymentStatus')">
-                <span [ngClass]="{
-                  'badge bg-danger': shipment.paymentStatus === 'Unpaid',
-                  'badge bg-warning': shipment.paymentStatus === 'Partial',
-                  'badge bg-success': shipment.paymentStatus === 'Paid'
-                }">{{ shipment.paymentStatus }}</span>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot class="table-active font-weight-bold">
-            <tr>
-              <td colspan="8" class="text-end fw-bold">Total Shipments:</td>
-              <td class="fw-bold">{{ totalShipmentCount }}</td>
-              <td class="fw-bold">₹{{ totalShipmentAmount | number:'1.2-2' }}</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
+<tfoot class="table-active font-weight-bold">
+  <tr>
+    <td colspan="2" class="text-end fw-bold">Total Shipments:</td>
+    <td *ngIf="isColumnVisible('date')"></td>
+    <td *ngIf="isColumnVisible('invoiceNo')"></td>
+    <td *ngIf="isColumnVisible('customer')"></td>
+    <td *ngIf="isColumnVisible('contactNumber')"></td>
+    <td *ngIf="isColumnVisible('alternateContact')"></td>
+    <td *ngIf="isColumnVisible('location')"></td>
+    <td *ngIf="isColumnVisible('billingAddress')"></td>
+    <td *ngIf="isColumnVisible('state')"></td>
+    <td *ngIf="isColumnVisible('district')"></td>
+    <td *ngIf="isColumnVisible('pincode')"></td>
+    <td *ngIf="isColumnVisible('shippingDetails')"></td>
+    <td *ngIf="isColumnVisible('typeOfService')"></td>
+    <td *ngIf="isColumnVisible('quantity')" class="fw-bold">{{ totalShipmentCount }}</td>
+    <td *ngIf="isColumnVisible('shippingCharge')"></td>
+    <td *ngIf="isColumnVisible('grandTotal')" class="fw-bold">₹{{ totalShipmentAmount | number:'1.2-2' }}</td>
+    <td *ngIf="isColumnVisible('shippingStatus')"></td>
+    <td *ngIf="isColumnVisible('paymentStatus')"></td>
+    <td *ngIf="isColumnVisible('addedBy')"></td>
+  </tr>
+</tfoot>
+</table>
       </div>
     </div>
     
@@ -416,23 +330,56 @@
 
 </div>
 
-<!-- Add the prescription modal at the end of the file -->
+
+<!-- Updated prescription modal with fixed kasayam_combination case -->
 <div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="prescriptionModalLabel">Prescription Details</h5>
+        <h5 class="modal-title" id="prescriptionModalLabel">
+          Prescription Details
+          <span *ngIf="hasMultiplePrescriptions()" class="badge bg-info ms-2">
+            {{ getCurrentPrescriptionInfo() }}
+          </span>
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+      
+      <!-- Navigation buttons for multiple prescriptions -->
+      <div class="modal-header border-bottom-0 pt-0" *ngIf="hasMultiplePrescriptions()">
+        <div class="d-flex justify-content-between w-100">
+          <button type="button" 
+                  class="btn btn-outline-primary btn-sm" 
+                  (click)="previousPrescription()"
+                  [disabled]="currentPrescriptionIndex === 0">
+            <i class="fas fa-chevron-left"></i> Previous
+          </button>
+          
+          <span class="align-self-center">
+            Viewing {{ currentPrescriptionIndex + 1 }} of {{ allPrescriptions.length }} prescriptions
+          </span>
+          
+          <button type="button" 
+                  class="btn btn-outline-primary btn-sm" 
+                  (click)="nextPrescription()"
+                  [disabled]="currentPrescriptionIndex === allPrescriptions.length - 1">
+            Next <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+      
       <div class="modal-body" id="prescriptionPrintContent">
         <!-- Prescription content will be dynamically generated -->
         <div *ngIf="currentPrescriptionData">
           <!-- Header Section -->
           <div class="text-center mb-4 prescription-header border-bottom pb-3">
-            <h3 class="text-primary fw-bold">ഹെർബലി ടച്ച് ആയുര്‍വേദ ഉല്‍പ്പന്നങ്ങള്‍ പ്രൈവറ്റ് ലിമിറ്റഡ്</h3>
+                    <div class="logo-container">
+            <img src="/assets/logo2.png">
+          </div>
+            <h3 class="text-primary fw-bold">HERBALLY TOUCH AYURVEDA PRODUCTS PVT.LTD</h3>
             <p class="mb-1"><strong>First Floor, Chirackal Tower, Ayroor P.O., Ernakulam Dt., Kerala - 683 579</strong></p>
             <p class="mb-1"><strong>E-mail: contact&#64;herballytouch.com | Ph: 7034110999</strong></p>
-            <h4 class="text-success mt-2"><strong>ഡോ. രാജന പി.ആർ., BAMS</strong></h4>
+            <h4 class="text-success mt-2"><strong>DR RANJANA P.R.BAMS</strong></h4>
           </div>
           
           <!-- Patient Information -->
@@ -478,7 +425,17 @@
                     <strong>{{medicine.name}}</strong> കഷായം {{medicine.instructions}}ml എടുത്ത് 
                     {{medicine.quantity}}ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത് 
                     {{medicine.powder}} ഗുളിക പൊടിച്ച്ചേർത്ത് 
-                    {{medicine.pills}} നേരം {{medicine.time}} സേവിക്കുക.
+                    {{medicine.pills}} നേരം മുമ്പ് സേവിക്കുക.
+                  </p>
+                </div>
+                
+                <!-- Kasayam Combination Display - FIXED -->
+                <div *ngSwitchCase="'kasayam_combination'" class="kasayam-combination-display">
+                  <p class="malayalam-text mb-2">
+                    <strong>{{medicine.name}}</strong>കഷായം {{medicine.quantity || ''}} ml എടുത്ത്
+                    {{medicine.combinationQuantity || ''}} ml തിളപ്പിച്ചാറ്റിയവെള്ളം ചേർത്ത്
+                    {{medicine.combinationName || ''}}ഗുളിക പൊടിച്ച്ചേർത്ത്
+                    {{medicine.frequency || ''}} ശേഷം സേവിക്കുക.
                   </p>
                 </div>
                 
@@ -486,7 +443,7 @@
                 <div *ngSwitchCase="'buligha'" class="buligha-display">
                   <p class="malayalam-text mb-2">
                     <strong>{{medicine.name}}</strong> ഗുളിക {{medicine.instructions}} എണ്ണം എടുത്ത് 
-                    {{medicine.powder}} നേരം {{medicine.time}} സേവിക്കുക.
+                    {{medicine.powder}} നേരം മുമ്പ് സേവിക്കുക.
                   </p>
                 </div>
                 
@@ -494,14 +451,14 @@
                 <div *ngSwitchCase="'bhasmam'" class="bhasmam-display">
                   <p class="malayalam-text mb-2">
                     <strong>{{medicine.name}}</strong> ഭസ്മം {{medicine.dosage}} എടുത്ത് {{medicine.quantity}}ml 
-                    {{medicine.instructions}} ചേർത്ത് {{medicine.powder}} നേരം {{medicine.time}} സേവിക്കുക.
+                    {{medicine.instructions}} ചേർത്ത് {{medicine.powder}} നേരം ശേഷം സേവിക്കുക.
                   </p>
                 </div>
                 
                 <!-- Krudham Display -->
                 <div *ngSwitchCase="'krudham'" class="krudham-display">
                   <p class="malayalam-text mb-2">
-                    <strong>{{medicine.name}}</strong> ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം {{medicine.time}} സേവിക്കുക.
+                    <strong>{{medicine.name}}</strong> ഘൃതം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം ശേഷം സേവിക്കുക.
                   </p>
                 </div>
                 
@@ -509,21 +466,21 @@
                 <div *ngSwitchCase="'suranam'" class="suranam-display">
                   <p class="malayalam-text mb-2">
                     <strong>{{medicine.name}}</strong> ചൂർണ്ണം {{medicine.instructions}} എടുത്ത് {{medicine.powder}} ചേർത്ത് തിളപ്പിച്ച് 
-                    {{medicine.dosage}} നേരം {{medicine.time}} സേവിക്കുക.
+                    {{medicine.dosage}} നേരം ശേഷം സേവിക്കുക.
                   </p>
                 </div>
                 
                 <!-- Rasayanam Display -->
                 <div *ngSwitchCase="'rasayanam'" class="rasayanam-display">
                   <p class="malayalam-text mb-2">
-                    <strong>{{medicine.name}}</strong> രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം {{medicine.time}} സേവിക്കുക.
+                    <strong>{{medicine.name}}</strong> രസായനം ഒരു ടീ - സ്പൂൺ എടുത്ത് {{medicine.instructions}} നേരം ശേഷം സേവിക്കുക.
                   </p>
                 </div>
                 
                 <!-- Lagium Display -->
                 <div *ngSwitchCase="'lagium'" class="lagium-display">
                   <p class="malayalam-text mb-2">
-                    <strong>{{medicine.name}}</strong> ലേഹ്യം {{medicine.instructions}} എടുത്ത് {{medicine.dosage}} നേരം {{medicine.time}} സേവിക്കുക.
+                    <strong>{{medicine.name}}</strong> ലേഹ്യം {{medicine.instructions}} എടുത്ത് {{medicine.dosage}} നേരം നേരം സേവിക്കുക.
                   </p>
                 </div>
                 
@@ -533,7 +490,7 @@
                     <strong>Medicine:</strong> {{medicine.name}}<br>
                     <strong>Dosage:</strong> {{medicine.dosage}}<br>
                     <strong>Instructions:</strong> {{medicine.instructions}}<br>
-                    <strong>Time:</strong> {{medicine.time}}
+                    <strong>Time:</strong> {{medicine.timing || medicine.time}}
                   </p>
                 </div>
               </div>
@@ -571,21 +528,35 @@
           <p class="text-muted">This shipment does not have any prescription attached.</p>
         </div>
       </div>
+      
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-info" (click)="printPrescriptionPDF()" 
-                *ngIf="currentPrescriptionData">
-          <i class="fas fa-print"></i> Print Prescription
-        </button>
-        <button type="button" class="btn btn-primary" (click)="downloadPrescriptionPDF()" 
-                *ngIf="currentPrescriptionData">
-          <i class="fas fa-download"></i> Download PDF
-        </button>
+        
+        <!-- Print buttons for multiple prescriptions -->
+        <div *ngIf="currentPrescriptionData" class="btn-group">
+          <button type="button" class="btn btn-info" (click)="printPrescriptionPDF()">
+            <i class="fas fa-print"></i> Print Current
+          </button>
+          
+          <button type="button" 
+                  class="btn btn-primary" 
+                  (click)="printAllPrescriptions()"
+                  *ngIf="hasMultiplePrescriptions()">
+            <i class="fas fa-print"></i> Print All ({{ allPrescriptions.length }})
+          </button>
+        </div>
+        
+
       </div>
     </div>
   </div>
 </div>
-<!-- Add this modal near the bottom of your shipments.component.html -->
+
+
+<!-- Updated Invoice Modal with separate print layout -->
+<!-- src/app/shipments/shipments.component.html -->
+
+<!-- Find the #invoiceModal element and replace its content -->
 <div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -594,19 +565,19 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body" id="invoicePrintContent">
-        <!-- Invoice Header -->
-        <div class="text-center mb-4">
-          <h3>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h3>
-          <p>1st Floor, Chirackal Tower, Ayroor P.O, Emakulam, Kerala, 683579, India</p>
-          <p>Mobile: 00917034110999 | GST: 32AAGCH3136H12X</p>
+        <!-- Invoice Header and Customer Details -->
+        <div class="invoice-print-header">
+          <img src="assets/logo2.png" alt="Company Logo" class="logo">
+          <div class="company-details">
+            <h3>HERBALY TOUCH AYURVEDA PRODUCTS PRIVATE LIMITED</h3>
+            <p>1st Floor, Chirackal Tower, Ayroor P.O, Emakulam, Kerala, 683579, India</p>
+            <p>Mobile: 00917034110999 | GST: 32AAGCH3136H12X</p>
+          </div>
         </div>
-
-        <!-- Invoice Details -->
         <div class="row mb-4">
           <div class="col-md-6">
             <p><strong>Invoice No:</strong> {{ invoiceData.invoiceNo }}</p>
             <p><strong>Date:</strong> {{ invoiceData.date }}</p>
-            <p><strong>Order No:</strong> {{ currentShipment?.orderNo || 'N/A' }}</p>
           </div>
           <div class="col-md-6 text-end">
             <p><strong>Customer:</strong> {{ invoiceData.to.name }}</p>
@@ -615,7 +586,7 @@
           </div>
         </div>
 
-        <!-- Products Table -->
+        <!-- Products Table with Dynamic Columns -->
         <div class="table-responsive mb-4">
           <table class="table table-bordered">
             <thead>
@@ -626,8 +597,13 @@
                 <th>Unit Price (₹)</th>
                 <th>Discount</th>
                 <th>Taxable Value (₹)</th>
-                <th>CGST (₹)</th>
-                <th>SGST (₹)</th>
+                
+                <!-- ======================= CONDITIONAL HEADERS (THE FIX) ======================= -->
+                <th *ngIf="invoiceHasCgstSgst">CGST (₹)</th>
+                <th *ngIf="invoiceHasCgstSgst">SGST (₹)</th>
+                <th *ngIf="invoiceHasIgst">IGST (₹)</th>
+                <!-- ===================== END OF CONDITIONAL HEADERS ==================== -->
+                
                 <th>Subtotal (₹)</th>
               </tr>
             </thead>
@@ -637,61 +613,47 @@
                 <td>{{ product.name }}</td>
                 <td>{{ product.quantity }} Nos.</td>
                 <td class="text-end">{{ product.unitPrice | number:'1.2-2' }}</td>
-                <td class="text-end">
-                  {{ product.discount | number:'1.2-2' }} 
-                  <span *ngIf="product.discount > 0">({{ product.discountPercent | number:'1.2-2' }}%)</span>
-                </td>
+                <td class="text-end">{{ product.discount | number:'1.2-2' }}</td>
                 <td class="text-end">{{ product.taxableValue | number:'1.2-2' }}</td>
-                <td class="text-end">{{ product.cgstAmount | number:'1.2-2' }} ({{ product.cgstRate | number:'1.2-2' }}%)</td>
-                <td class="text-end">{{ product.sgstAmount | number:'1.2-2' }} ({{ product.sgstRate | number:'1.2-2' }}%)</td>
+
+                <!-- ======================= CONDITIONAL DATA CELLS (THE FIX) ======================= -->
+                <td *ngIf="invoiceHasCgstSgst" class="text-end">{{ product.cgstAmount | number:'1.2-2' }} ({{ product.cgstRate | number:'1.2-2' }}%)</td>
+                <td *ngIf="invoiceHasCgstSgst" class="text-end">{{ product.sgstAmount | number:'1.2-2' }} ({{ product.sgstRate | number:'1.2-2' }}%)</td>
+                <td *ngIf="invoiceHasIgst" class="text-end">{{ product.igstAmount | number:'1.2-2' }} ({{ product.igstRate | number:'1.2-2' }}%)</td>
+                <!-- ===================== END OF CONDITIONAL DATA CELLS ==================== -->
+
                 <td class="text-end">{{ product.subtotal | number:'1.2-2' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        <!-- Shipping Row -->
-        <div class="row mb-3">
-          <div class="col-8">
-            <p>Shipping Charges</p>
-          </div>
-          <div class="col-4 text-end">
-            <p>₹{{ (invoiceData.shippingCharge - invoiceData.shippingTax) | number:'1.2-2' }}</p>
-          </div>
-          <div class="col-8">
-            <p>Shipping Tax (18%)</p>
-          </div>
-          <div class="col-4 text-end">
-            <p>₹{{ invoiceData.shippingTax | number:'1.2-2' }}</p>
-          </div>
-        </div>
-
-        <!-- Totals -->
+        <!-- Totals Section -->
         <div class="row mb-4">
-          <div class="col-8 text-end">
-            <p><strong>Total Taxable Value:</strong></p>
-            <p><strong>Total CGST (9.00%):</strong></p>
-            <p><strong>Total SGST (9.00%):</strong></p>
-            <p><strong>Grand Total:</strong></p>
+          <div class="col-md-6">
+            <!-- This column is intentionally empty for alignment -->
           </div>
-          <div class="col-4 text-end">
-            <p><strong>₹{{ invoiceData.totalTaxableValue | number:'1.2-2' }}</strong></p>
-            <p><strong>₹{{ getTotalCGST() | number:'1.2-2' }}</strong></p>
-            <p><strong>₹{{ getTotalSGST() | number:'1.2-2' }}</strong></p>
-            <p><strong>₹{{ invoiceData.total | number:'1.2-2' }}</strong></p>
+          <div class="col-md-6 text-end">
+            <p><strong>Total Taxable Value: </strong> <strong>₹{{ invoiceData.totalTaxableValue | number:'1.2-2' }}</strong></p>
+            
+            <!-- ======================= CONDITIONAL TOTALS (THE FIX) ======================= -->
+            <p *ngIf="invoiceHasCgstSgst"><strong>Total CGST: </strong> <strong>₹{{ getTotalCGST() | number:'1.2-2' }}</strong></p>
+            <p *ngIf="invoiceHasCgstSgst"><strong>Total SGST: </strong> <strong>₹{{ getTotalSGST() | number:'1.2-2' }}</strong></p>
+            <p *ngIf="invoiceHasIgst"><strong>Total IGST: </strong> <strong>₹{{ getTotalIGST() | number:'1.2-2' }}</strong></p>
+            <!-- ===================== END OF CONDITIONAL TOTALS ==================== -->
+            
+            <p><strong>Grand Total: </strong> <strong>₹{{ getGrandTotal() | number:'1.0-0' }}</strong></p>
           </div>
         </div>
 
-        <!-- Payment Info -->
+        <!-- Payment Info and Footer -->
         <div class="row">
           <div class="col-12">
-            <p><strong>Payment Method:</strong> {{ currentShipment?.paymentMethod || 'N/A' }}</p>
-            <p><strong>Amount Paid:</strong> ₹{{ currentShipment?.paymentAmount | number:'1.2-2' }}</p>
-            <p><strong>Balance Due:</strong> ₹{{ currentShipment?.balance | number:'1.2-2' }}</p>
+            <p><strong>Payment Method:</strong> {{ selectedShipment?.paymentMethod || 'N/A' }}</p>
+            <p><strong>Amount Paid:</strong> ₹{{ selectedShipment?.paymentAmount | number:'1.2-2' }}</p>
+            <p><strong>Balance Due:</strong> ₹{{ selectedShipment?.balance | number:'1.2-2' }}</p>
           </div>
         </div>
-
-        <!-- Footer -->
         <div class="text-center mt-4">
           <p>Thank you for your business!</p>
           <small class="text-muted">This is a computer generated invoice and does not require signature</small>
@@ -700,9 +662,8 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         <button type="button" class="btn btn-primary" (click)="printGeneratedInvoice()">
-          <i class="fas fa-print"></i> Print Invoice
+          <i class="fa fa-print"></i> Print Invoice
         </button>
-      
       </div>
     </div>
   </div>
@@ -878,12 +839,12 @@
         <form #editForm="ngForm">
           <div class="row">
            
-            <div class="col-md-6">
+            <!-- <div class="col-md-6">
               <div class="form-group">
                 <label>Date</label>
                 <input type="date" class="form-control" [(ngModel)]="editFormData.date" name="date" required>
               </div>
-            </div>
+            </div> -->
           </div>
           
           <div class="row">
@@ -911,11 +872,12 @@
             <div class="col-md-6">
               <div class="form-group">
                 <label>Shipping Status</label>
-                <select class="form-control" [(ngModel)]="editFormData.shippingStatus" name="shippingStatus">
-                  <option value="Processing">Processing</option>
+<select class="form-control" [(ngModel)]="editFormData.shippingStatus" name="shippingStatus">
+  <option value="Processing">Processing</option>
   <option value="Packed">Packed</option>
   <option value="Pending">Pending</option>
   <option value="Shipped">Shipped</option>
+  <option value="Delivered">Delivered</option>
   <option value="Onhold">Onhold</option>
   <option value="Ordered">Ordered</option>
   <option value="Print">Print</option>
@@ -923,8 +885,7 @@
   <option value="Out for delivery">Out for delivery</option>
   <option value="Returned">Returned</option>
   <option value="Cancelled">Cancelled</option>
-  <option value="Delivered">Delivered</option>
-                </select>
+</select>
               </div>
             </div>
             <div class="col-md-6">

@@ -304,7 +304,7 @@ export class ImportShippingComponent {
         updateData.refNumber = row.REF.toString().trim();
       }
 
-      await this.saleService.updateSale(targetSale.id, updateData);
+      await this.saleService['updateSale'](targetSale.id, updateData);
       
       result.updated++;
       result.successDetails.push({

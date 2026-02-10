@@ -2,21 +2,41 @@ import { Injectable } from '@angular/core';
 import { Firestore, collection, addDoc, doc, deleteDoc, updateDoc, onSnapshot, query, where, getDocs, DocumentData, DocumentReference, getDoc, orderBy } from '@angular/fire/firestore';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { GinStockLog } from '../interfaces/gin-stock-log.interface';
+export interface LocationTransfer {
+  locationId: string;
+  locationName?: string;
+  products: TransferProduct[];
+}
+
+export interface TransferProduct {
+  productId: string;
+  productName: string;
+  sku: string;
+  barcode?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  unit: string;
+  currentStock?: number;
+}
 
 export interface GinTransfer {
   id?: string;
   date: string;
   referenceNo: string;
   locationFrom: string;
-  locationTo: string;
-  locationTo2?: string | null;
+  locationFromName?: string;
   status: string;
-  items: GinTransferItem[];
+  transfers: LocationTransfer[];
   shippingCharges: number;
   additionalNotes: string;
   totalAmount: number;
   createdAt: Date;
   updatedAt: Date;
+  
+  locationTo?: string;
+  locationTo2?: string | null;
+  items?: GinTransferItem[];
 }
 
 export interface GinTransferItem {
@@ -46,7 +66,6 @@ export class GinTransferService {
     this.subscribeToGinTransfers();
   }
 
-  // Set up real-time listener for gin transfers
   private subscribeToGinTransfers(): void {
     if (this.unsubscribe) {
       this.unsubscribe();
@@ -70,20 +89,16 @@ export class GinTransferService {
     });
   }
 
-  // Add a new GIN transfer and create stock log entries
   async addGinTransfer(ginTransfer: GinTransfer): Promise<string> {
     try {
-      // Add timestamps
       const timestamp = new Date();
       ginTransfer.createdAt = timestamp;
       ginTransfer.updatedAt = timestamp;
       
-      // Save to gin-transfers collection
       const ginTransfersRef = collection(this.firestore, 'ginTransfers');
       const docRef = await addDoc(ginTransfersRef, ginTransfer);
       const transferId = docRef.id;
       
-      // Create stock log entries
       await this.createStockLogEntries(ginTransfer, transferId);
       
       console.log('GIN Transfer and stock logs saved successfully');
@@ -94,34 +109,37 @@ export class GinTransferService {
     }
   }
 
-  // Create stock log entries for the transfer
   private async createStockLogEntries(ginTransfer: GinTransfer, transferId: string): Promise<void> {
     try {
       const stockLogPromises: Promise<any>[] = [];
       
-      for (const item of ginTransfer.items) {
-        // Create primary transfer log entry (from source to primary destination)
-        const primaryLogEntry: GinStockLog = {
-          fromLocation: ginTransfer.locationFrom,
-          toLocationId: ginTransfer.locationTo,
-          transferAmount: item.quantity,
-          createdDate: ginTransfer.createdAt,
-          transferId: transferId,
-          productId: item.productId,
-          productName: item.productName,
-          sku: item.sku,
-          referenceNo: ginTransfer.referenceNo
-        };
+      if (ginTransfer.transfers && ginTransfer.transfers.length > 0) {
+        for (const transfer of ginTransfer.transfers) {
+          for (const product of transfer.products) {
+            const logEntry: GinStockLog = {
+              fromLocation: ginTransfer.locationFrom,
+              toLocationId: transfer.locationId,
+              transferAmount: product.quantity,
+              createdDate: ginTransfer.createdAt,
+              transferId: transferId,
+              productId: product.productId,
+              productName: product.productName,
+              sku: product.sku,
+              referenceNo: ginTransfer.referenceNo
+            };
 
-        const ginStockLogRef = collection(this.firestore, 'gin-stock-log');
-        stockLogPromises.push(addDoc(ginStockLogRef, primaryLogEntry));
-
-        // Create secondary transfer log entry if there's a secondary location and quantity
-        if (ginTransfer.locationTo2 && item.secondaryQuantity && item.secondaryQuantity > 0) {
-          const secondaryLogEntry: GinStockLog = {
+            const ginStockLogRef = collection(this.firestore, 'gin-stock-log');
+            stockLogPromises.push(addDoc(ginStockLogRef, logEntry));
+          }
+        }
+      }
+      
+      if (ginTransfer.items && ginTransfer.items.length > 0) {
+        for (const item of ginTransfer.items) {
+          const primaryLogEntry: GinStockLog = {
             fromLocation: ginTransfer.locationFrom,
-            toLocationId: ginTransfer.locationTo2,
-            transferAmount: item.secondaryQuantity,
+            toLocationId: ginTransfer.locationTo!,
+            transferAmount: item.quantity,
             createdDate: ginTransfer.createdAt,
             transferId: transferId,
             productId: item.productId,
@@ -130,11 +148,27 @@ export class GinTransferService {
             referenceNo: ginTransfer.referenceNo
           };
 
-          stockLogPromises.push(addDoc(ginStockLogRef, secondaryLogEntry));
+          const ginStockLogRef = collection(this.firestore, 'gin-stock-log');
+          stockLogPromises.push(addDoc(ginStockLogRef, primaryLogEntry));
+
+          if (ginTransfer.locationTo2 && item.secondaryQuantity && item.secondaryQuantity > 0) {
+            const secondaryLogEntry: GinStockLog = {
+              fromLocation: ginTransfer.locationFrom,
+              toLocationId: ginTransfer.locationTo2,
+              transferAmount: item.secondaryQuantity,
+              createdDate: ginTransfer.createdAt,
+              transferId: transferId,
+              productId: item.productId,
+              productName: item.productName,
+              sku: item.sku,
+              referenceNo: ginTransfer.referenceNo
+            };
+
+            stockLogPromises.push(addDoc(ginStockLogRef, secondaryLogEntry));
+          }
         }
       }
 
-      // Execute all stock log creation promises
       await Promise.all(stockLogPromises);
       console.log(`Created ${stockLogPromises.length} stock log entries for transfer ${transferId}`);
     } catch (error) {
@@ -143,12 +177,10 @@ export class GinTransferService {
     }
   }
 
-  // Get all GIN transfers with real-time updates
   getGinTransfers(): Observable<GinTransfer[]> {
     return this.ginTransfers$;
   }
 
-  // Get all stock logs with real-time updates
   getStockLogs(): Observable<GinStockLog[]> {
     return new Observable<GinStockLog[]>(observer => {
       const stockLogsRef = collection(this.firestore, 'gin-stock-log');
@@ -172,7 +204,6 @@ export class GinTransferService {
     });
   }
 
-  // Get stock logs for a specific transfer
   async getStockLogsByTransferId(transferId: string): Promise<GinStockLog[]> {
     try {
       const stockLogsRef = collection(this.firestore, 'gin-stock-log');
@@ -195,7 +226,6 @@ export class GinTransferService {
     }
   }
 
-  // Get stock logs for a specific product
   async getStockLogsByProductId(productId: string): Promise<GinStockLog[]> {
     try {
       const stockLogsRef = collection(this.firestore, 'gin-stock-log');
@@ -218,7 +248,6 @@ export class GinTransferService {
     }
   }
 
-  // Get a single GIN transfer by ID
   async getGinTransfer(id: string): Promise<GinTransfer | undefined> {
     try {
       const docRef = doc(this.firestore, 'ginTransfers', id);
@@ -235,20 +264,16 @@ export class GinTransferService {
     }
   }
 
-  // Update a GIN transfer and update stock logs if needed
   async updateGinTransfer(id: string, ginTransfer: Partial<GinTransfer>): Promise<void> {
     try {
       const updateData = { ...ginTransfer, updatedAt: new Date() };
       const docRef = doc(this.firestore, 'ginTransfers', id);
       await updateDoc(docRef, updateData);
 
-      // If status changed to "Completed", update stock logs
       if (ginTransfer.status === 'Completed') {
         const existingTransfer = await this.getGinTransfer(id);
         if (existingTransfer) {
-          // First delete existing stock logs
           await this.deleteStockLogsByTransferId(id);
-          // Then create new ones
           await this.createStockLogEntries(existingTransfer, id);
         }
       }
@@ -258,14 +283,11 @@ export class GinTransferService {
     }
   }
 
-  // Delete a GIN transfer and its associated stock logs
   async deleteGinTransfer(id: string): Promise<void> {
     try {
-      // Delete the transfer
       const docRef = doc(this.firestore, 'ginTransfers', id);
       await deleteDoc(docRef);
 
-      // Delete associated stock logs
       await this.deleteStockLogsByTransferId(id);
       
       console.log(`Deleted GIN transfer ${id} and its associated stock logs`);
@@ -275,7 +297,6 @@ export class GinTransferService {
     }
   }
 
-  // Delete stock logs by transfer ID
   private async deleteStockLogsByTransferId(transferId: string): Promise<void> {
     try {
       const stockLogsRef = collection(this.firestore, 'gin-stock-log');
@@ -295,42 +316,51 @@ export class GinTransferService {
       throw error;
     }
   }
-// Add these methods to GinTransferService
-async getGinTransfersByProductId(productId: string): Promise<GinTransfer[]> {
-  try {
-    const allTransfers = await this.getAllGinTransfers();
-    return allTransfers.filter(transfer => 
-      transfer.items?.some(item => item.productId === productId)
-    );
-  } catch (error) {
-    console.error('Error getting transfers by product ID:', error);
-    return [];
-  }
-}
 
-async getGinTransfersByProductName(productName: string): Promise<GinTransfer[]> {
-  try {
-    const allTransfers = await this.getAllGinTransfers();
-    return allTransfers.filter(transfer => 
-      transfer.items?.some(item => item.productName === productName)
-    );
-  } catch (error) {
-    console.error('Error getting transfers by product name:', error);
-    return [];
+  async getGinTransfersByProductId(productId: string): Promise<GinTransfer[]> {
+    try {
+      const allTransfers = await this.getAllGinTransfers();
+      return allTransfers.filter(transfer => {
+        if (transfer.transfers) {
+          return transfer.transfers.some(t => 
+            t.products.some(p => p.productId === productId)
+          );
+        }
+        return transfer.items?.some(item => item.productId === productId);
+      });
+    } catch (error) {
+      console.error('Error getting transfers by product ID:', error);
+      return [];
+    }
   }
-}
 
-private async getAllGinTransfers(): Promise<GinTransfer[]> {
-  try {
-    const querySnapshot = await getDocs(collection(this.firestore, 'ginTransfers'));
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as GinTransfer }));
-  } catch (error) {
-    console.error('Error getting all GIN transfers:', error);
-    return [];
+  async getGinTransfersByProductName(productName: string): Promise<GinTransfer[]> {
+    try {
+      const allTransfers = await this.getAllGinTransfers();
+      return allTransfers.filter(transfer => {
+        if (transfer.transfers) {
+          return transfer.transfers.some(t => 
+            t.products.some(p => p.productName === productName)
+          );
+        }
+        return transfer.items?.some(item => item.productName === productName);
+      });
+    } catch (error) {
+      console.error('Error getting transfers by product name:', error);
+      return [];
+    }
   }
-}
 
-  // Clean up subscriptions when service is destroyed
+  private async getAllGinTransfers(): Promise<GinTransfer[]> {
+    try {
+      const querySnapshot = await getDocs(collection(this.firestore, 'ginTransfers'));
+      return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as GinTransfer }));
+    } catch (error) {
+      console.error('Error getting all GIN transfers:', error);
+      return [];
+    }
+  }
+
   ngOnDestroy(): void {
     if (this.unsubscribe) {
       this.unsubscribe();

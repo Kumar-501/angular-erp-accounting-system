@@ -1,0 +1,795 @@
+/* Purchase Order Form Styles */
+
+/* Main container styles */
+.container-fluid {
+    background-color: #f5f5f5;
+    min-height: 100vh;
+  }
+  .date-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  .date-input {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    flex: 1;
+    height: 38px; // Standard Bootstrap height
+  }
+
+  .calendar-btn {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    border-left: none;
+    padding: 0.375rem 0.75rem;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    color: #495057;
+    height: 38px;
+    display: flex;
+    align-items: center;
+
+    &:hover {
+      background-color: darken(#e9ecef, 5%);
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+// Ensure highlight for mandatory fields works with the wrapper
+.highlight-mandatory .date-input {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+  /* Card styling */
+  .card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 1.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+  }
+  
+  .card-header {
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+  }
+  /* Add this to your component's CSS file or global styles */
+.invalid-field {
+  border-color: #dc3545 !important;
+}
+
+.invalid-label {
+  color: #dc3545 !important;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #dc3545;
+}
+
+.highlight-mandatory {
+  animation: highlight 1.5s;
+}
+
+@keyframes highlight {
+  0% { background-color: rgba(220, 53, 69, 0.1); }
+  100% { background-color: transparent; }
+}
+  
+  .card-header.bg-primary {
+    background-color: #0d6efd !important;
+  }
+  
+  .card-header.bg-light {
+    background-color: #f8f9fa !important;
+    color: #212529;
+  }
+  
+  .card-body {
+    padding: 1.25rem;
+  }
+  
+  /* Form controls */
+  .form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .form-control, .form-select {
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    padding: 0.375rem 0.75rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+  
+  .form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .form-control-sm {
+    height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .input-group > .form-control,
+  .input-group > .form-select {
+    position: relative;
+    flex: 1 1 auto;
+    width: 1%;
+    min-width: 0;
+  }
+  
+  /* Table styles */
+  .table {
+    width: 100%;
+    margin-bottom: 0;
+    color: #212529;
+    vertical-align: middle;
+    border-color: #dee2e6;
+  }
+  
+  .table-bordered {
+    border: 1px solid #dee2e6;
+  }
+  
+  .table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.075);
+  }
+  
+  .table th, .table td {
+    padding: 0.75rem;
+    vertical-align: middle;
+    border-top: 1px solid #dee2e6;
+  }
+  
+  .table thead th {
+    vertical-align: bottom;
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+    font-weight: 500;
+  }
+  
+  .table-light {
+    background-color: #f8f9fa;
+  }
+  
+  /* Buttons */
+  .btn {
+    display: inline-block;
+    font-weight: 400;
+    text-align: center;
+    vertical-align: middle;
+    user-select: none;
+    border: 1px solid transparent;
+    padding: 0.375rem 0.75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    border-radius: 0.25rem;
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+  
+  .btn-primary {
+    color: #fff;
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+  
+  .btn-primary:hover {
+    color: #fff;
+    background-color: #0b5ed7;
+    border-color: #0a58ca;
+  }
+  
+  .btn-secondary {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+  }
+  
+  .btn-secondary:hover {
+    color: #fff;
+    background-color: #5c636a;
+    border-color: #565e64;
+  }
+  
+  .btn-danger {
+    color: #fff;
+    background-color: #dc3545;
+    border-color: #dc3545;
+  }
+  
+  .btn-danger:hover {
+    color: #fff;
+    background-color: #bb2d3b;
+    border-color: #b02a37;
+  }
+  
+  .btn-outline-secondary {
+    color: #6c757d;
+    border-color: #6c757d;
+  }
+  
+  .btn-outline-secondary:hover {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+  }
+  
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.2rem;
+  }
+  
+  /* Utility classes */
+  .text-muted {
+    color: #6c757d !important;
+  }
+  
+  .text-end {
+    text-align: right !important;
+  }
+  
+  small {
+    font-size: 80%;
+  }
+  
+  /* Custom styles for this form */
+  .product-search-input {
+    min-width: 250px;
+  }
+  
+  .required-field::after {
+    content: "*";
+    color: red;
+    margin-left: 3px;
+  }
+  
+  /* File input styling */
+  input[type="file"] {
+    padding: 0.375rem;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 992px) {
+    .table-responsive {
+      overflow-x: auto;
+    }
+    
+    .card-body {
+      padding: 1rem;
+    }
+  }
+  
+  /* Currency styling */
+  .currency-input {
+    text-align: right;
+  }
+  
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+  .input-group .btn-outline-secondary {
+  border-color: #ced4da;
+}
+
+.input-group .btn-outline-secondary:hover {
+  background-color: #f8f9fa;
+}.supplier-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 0.25rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  
+  .list-group-item {
+    border: none;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    
+    &:hover, &.active {
+      background-color: #f8f9fa;
+    }
+  }
+}.table-responsive {
+  min-height: 200px; /* Ensure space is reserved even when empty */
+}
+
+.table tbody {
+  display: table-row-group; /* Force display even when empty */
+}/* Clean Table Styling with Full Data Visibility */
+
+/* Table Container */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: #fff;
+}
+
+/* Main Table Styling */
+.table {
+  min-width: 1600px; /* Increased for new table structure */
+  margin-bottom: 0;
+  font-size: 14px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* For bordered tables */
+.table-bordered {
+  border: 1px solid #dee2e6;
+}
+
+.table-bordered th,
+.table-bordered td {
+  border: 1px solid #e9ecef;
+}
+
+/* Table Header - Simple, Clean, No Effects */
+.table thead th {
+  background-color: #e9ecef;
+  color: #495057;
+  font-weight: 600;
+  padding: 12px 8px;
+  border: 1px solid #dee2e6;
+  vertical-align: middle;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table thead th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.table thead th:last-child {
+  border-top-right-radius: 8px;
+}
+
+/* Table Body */
+.table tbody tr {
+  border-bottom: 1px solid #e9ecef;
+  background-color: #ffffff;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.table tbody td {
+  padding: 10px 8px;
+  vertical-align: middle;
+  border: 1px solid #e9ecef;
+  white-space: nowrap;
+  color: #495057;
+}
+
+/* Form Controls - Ensuring Full Content Visibility */
+.form-control, .form-control-sm {
+  min-width: 100px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  background-color: #fff;
+}
+
+.form-control:focus, .form-control-sm:focus {
+  border-color: red;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Form Select */
+.form-select, .form-select-sm {
+  min-width: 100px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background-color: #fff;
+}
+
+.form-select:focus, .form-select-sm:focus {
+  border-color:red;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  outline: none;
+}
+
+/* Add these styles to your component's CSS */
+.invalid-field {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.invalid-label {
+  color: #dc3545 !important;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #dc3545;
+  font-size: 0.875em;
+}
+
+.highlight-mandatory {
+  animation: highlight-pulse 1.5s;
+  border-color: #dc3545 !important;
+}
+
+@keyframes highlight-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+.mandatory-field {
+  position: relative;
+}
+
+.mandatory-field::after {
+  content: "*";
+  color: #dc3545;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Specific Column Widths for Data Visibility - Updated for new table */
+.table th:nth-child(1), .table td:nth-child(1) { width: 40px; } /* Checkbox */
+.table th:nth-child(2), .table td:nth-child(2) { width: 60px; } /* S.NO */
+.table th:nth-child(3), .table td:nth-child(3) { min-width: 250px; } /* Product Name */
+.table th:nth-child(4), .table td:nth-child(4) { width: 120px; } /* Order quantity */
+.table th:nth-child(5), .table td:nth-child(5) { width: 140px; } /* Unit Purchase Price */
+.table th:nth-child(6), .table td:nth-child(6) { min-width: 180px; } /* Discount % - wider for input group */
+.table th:nth-child(7), .table td:nth-child(7) { width: 140px; } /* Unit Cost (Before Tax) */
+.table th:nth-child(8), .table td:nth-child(8) { width: 140px; } /* Subtotal before tax */
+.table th:nth-child(9), .table td:nth-child(9) { width: 120px; } /* Product tax (%) */
+.table th:nth-child(10), .table td:nth-child(10) { width: 120px; } /* Tax Amount */
+.table th:nth-child(11), .table td:nth-child(11) { width: 120px; } /* Net Cost */
+.table th:nth-child(12), .table td:nth-child(12) { width: 120px; } /* Line Total */
+.table th:nth-child(13), .table td:nth-child(13) { width: 60px; } /* Actions */
+
+/* Product Select Dropdown */
+select.form-control, select.form-control-sm, .form-select {
+  min-width: 180px;
+  max-width: 200px;
+}
+
+select.form-control option, select.form-control-sm option, .form-select option {
+  padding: 4px;
+  font-size: 13px;
+}
+
+/* Input Groups for Discount */
+.input-group {
+  display: flex;
+  width: 100%;
+}
+
+.input-group .form-select {
+  min-width: 100px;
+  max-width: 110px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.input-group .form-control {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+  min-width: 70px;
+}
+
+/* Number Inputs */
+input[type="number"].form-control, input[type="number"].form-control-sm {
+  min-width: 80px;
+}
+
+/* Text Inputs */
+input[type="text"].form-control, input[type="text"].form-control-sm {
+  min-width: 90px;
+}
+
+/* Date Inputs */
+input[type="date"].form-control, input[type="date"].form-control-sm {
+  min-width: 120px;
+}
+
+/* Net Cost Display */
+.table td:nth-child(10) div {
+  font-weight: 600;
+  color: #495057;
+}
+
+.table td:nth-child(10) small {
+  font-size: 11px;
+  color: #6c757d;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Total Column */
+.table td:nth-child(14) div {
+  font-weight: 700;
+  color: #28a745;
+  font-size: 15px;
+}
+
+/* Buttons */
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+/* Empty State */
+.empty-row td {
+  padding: 40px 20px;
+  background-color: #f8f9fa;
+}
+
+.empty-row i {
+  color: #adb5bd;
+}
+
+.empty-row p {
+  color: #6c757d;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+/* Footer */
+.table tfoot td {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-top: 2px solid #e9ecef;
+  font-weight: 600;
+  padding: 15px 8px;
+  color: #495057;
+}
+
+.table tfoot .fw-bold {
+  color: #28a745;
+  font-size: 16px;
+}
+
+/* Checkboxes */
+.form-check-input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.form-check-input:checked {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .table {
+    font-size: 12px;
+  }
+  
+  .form-control-sm {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  
+  .table th, .table td {
+    padding: 8px 6px;
+  }
+}
+
+/* Ensure no text overflow or hiding */
+.table td, .table th {
+  overflow: visible;
+  text-overflow: initial;
+  white-space: nowrap;
+}
+
+/* Select dropdown full width within cell */
+.table td select {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Input fields full width within cell */
+.table td input {
+  width: 100%;
+}
+
+/* Input groups in table cells */
+.table td .input-group {
+  width: 100%;
+  min-width: 180px;
+}
+
+/* Read-only fields styling */
+.form-control[readonly], .form-control-sm[readonly] {
+  background-color: #f8f9fa;
+  color: #495057;
+  border-color: #e9ecef;
+}
+
+/* Currency display */
+.text-end {
+  text-align: right !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+/* Additional padding for better readability */
+.table-hover tbody tr:hover td {
+  background-color: #f8f9fa;
+}
+
+/* Scrollbar styling for webkit browsers */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}/* Disabled button styling */
+.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Mandatory field highlighting */
+.ng-invalid.ng-touched:not(form) {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25) !important;
+}
+
+/* Special highlighting for mandatory fields */
+.mandatory-field.ng-invalid.ng-touched {
+  border-left: 4px solid #dc3545 !important;
+}
+
+/* Highlight animation */
+@keyframes highlight {
+  0% { background-color: rgba(220, 53, 69, 0.1); }
+  100% { background-color: transparent; }
+}
+
+.highlight-mandatory {
+  animation: highlight 1.5s ease-in-out;
+}/* Purchase items table styling */
+.purchase-items-table {
+  font-size: 0.9rem;
+}
+
+.purchase-items-table th {
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background-color: #f6faf7 !important;
+}
+
+.purchase-items-table td, 
+.purchase-items-table th {
+  vertical-align: middle;
+  padding: 8px;
+}
+
+.purchase-items-table .form-control {
+  font-size: 0.9rem;
+  padding: 0.25rem 0.5rem;
+  height: calc(1.5em + 0.5rem + 2px);
+}
+
+.purchase-items-table .input-group {
+  flex-wrap: nowrap;
+}
+
+.purchase-items-table .discount-type-select {
+  width: 100px;
+  min-width: 100px;
+}
+
+.purchase-items-table .discount-input {
+  width: 80px;
+  min-width: 80px;
+}
+
+/* Special styling for large number fields */
+.purchase-items-table .large-number {
+  min-width: 120px;
+  text-align: right;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  background-color: #f8f9fa;
+}
+
+/* Make table horizontally scrollable on small screens */
+@media (max-width: 1200px) {
+  .purchase-items-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}.order-total-display {
+  font-size: 2.1rem;     /* Adjust size as needed */
+  font-weight: bold;     /* Optional: make it bold */
+  margin-top: 10px;      /* Optional spacing */
+  padding: 10px 0;       /* Optional padding */
+  border-top: 1px solid #ddd;  /* Optional: visual separator */
+}

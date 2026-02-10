@@ -1,137 +1,490 @@
-.modal {
-  background-color: rgba(0, 0, 0, 0.5);
-  &.show {
-    display: block;
+// Product History Component Styles
+// ====================================
+
+// Variables
+$primary-color: #007bff;
+$secondary-color: #6c757d;
+$success-color: #28a745;
+$danger-color: #dc3545;
+$warning-color: #ffc107;
+$info-color: #17a2b8;
+$light-color: #f8f9fa;
+$dark-color: #343a40;
+$border-color: #dee2e6;
+$text-muted: #6c757d;
+
+$border-radius: 0.25rem;
+$box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+$transition: all 0.15s ease-in-out;
+
+// Container Styles
+.container-fluid {
+  background-color: #ffffff;
+  min-height: 100vh;
+  
+  .py-4 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
   }
 }
 
-.product-image-container {
-  img {
-    max-height: 200px;
-    object-fit: contain;
+// Loading Indicator
+.loading-container {
+  .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3em;
+    
+    &.text-primary {
+      color: $primary-color !important;
+    }
   }
   
-  .no-image-placeholder {
-    height: 200px;
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6c757d;
+  p {
+    color: $secondary-color;
+    font-size: 1.1rem;
+    margin-top: 1rem;
   }
 }
 
-.table-responsive {
-  max-height: 400px;
-  overflow-y: auto;
-}.current-stock {
-  font-size: 1.1rem;
+// Card Enhancements
+.card {
+  border: 1px solid $border-color;
+  border-radius: $border-radius;
+  box-shadow: none;
   margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-top: 5%;
-  margin-left: 50%;
-
-  .label {
-    font-weight: 600;
-    margin-right: 0.5rem;
-    color: #333;
-  }
-
-  .value {
-    font-weight: normal;
-    color: #555;
-  }
-}
-/* Add to your component's CSS */
-.purchase-history-table {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.purchase-history-table table {
-  margin-bottom: 0;
-}
-
-.purchase-history-table thead th {
-  position: sticky;
-  top: 0;
-  background-color: #f8f9fa;
-  z-index: 10;
-}
-
-/* Sales History Styles */
-.sales-history-table {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.sales-history-table table {
-  margin-bottom: 0;
-}
-
-.sales-history-table thead th {
-  position: sticky;
-  top: 0;
-  background-color: #f8f9fa;
-  z-index: 10;
-}
-
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
+  background-color: #ffffff;
   
-  &.status-completed {
-    background-color: #d1e7dd;
-    color: #0f5132;
-    border: 1px solid #a3cfbb;
+  .card-header {
+    background-color: $light-color;
+    color: $dark-color;
+    border-bottom: 1px solid $border-color;
+    border-radius: $border-radius $border-radius 0 0;
+    padding: 0.75rem 1rem;
+    
+    h5, h6 {
+      margin: 0;
+      font-weight: 600;
+      font-size: 1rem;
+      
+      i {
+        margin-right: 0.5rem;
+        color: $text-muted;
+      }
+    }
+    
+    small {
+      color: $text-muted;
+      font-weight: 400;
+    }
   }
   
-  &.status-paid {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+  .card-body {
+    padding: 1rem;
+    background: white;
+    border-radius: 0 0 $border-radius $border-radius;
   }
 }
 
-.card-header {
-  .fas {
-    color: #007bff;
-  }
-}
-
-.text-muted {
-  h6 {
+// Filter Section
+.filters-section {
+  .form-label {
+    font-weight: 500;
+    color: $dark-color;
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.875rem;
+  }
+  
+  .form-select,
+  .form-control {
+    border-radius: $border-radius;
+    border: 1px solid $border-color;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    background-color: white;
+    
+    &:focus {
+      border-color: $primary-color;
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+  }
+  
+  .btn-outline-secondary {
+    border-radius: $border-radius;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border: 1px solid $border-color;
+    color: $text-muted;
+    background-color: white;
+    
+    &:hover {
+      background-color: $light-color;
+      border-color: $border-color;
+      color: $dark-color;
+    }
   }
 }
 
-hr.mt-1 {
-  margin-top: 0.25rem !important;
-  margin-bottom: 0.75rem;
-}.status-badge {
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: bold;
-  text-transform: capitalize;
-  
-  &.completed {
-    background-color: #d4edda;
-    color: #155724;
+// Active Filters
+.active-filters {
+  .badge {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: $border-radius;
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    
+    .btn-close {
+      margin-left: 0.5rem;
+      opacity: 0.7;
+      
+      &:hover {
+        opacity: 1;
+      }
+    }
+    
+    &.bg-primary {
+      background-color: $primary-color !important;
+      color: white;
+    }
+    
+    &.bg-info {
+      background-color: $info-color !important;
+      color: white;
+    }
+  }
+}
+
+// Summary Section
+.summary-section {
+  .summary-header {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid $border-color;
+    margin-bottom: 1rem;
+    
+    h5 {
+      color: $dark-color;
+      font-weight: 600;
+      margin: 0;
+      font-size: 1.25rem;
+    }
+    
+    .summary-meta {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+      
+      .meta-item {
+        background-color: $light-color;
+        padding: 0.5rem 1rem;
+        border-radius: $border-radius;
+        border: 1px solid $border-color;
+        font-size: 0.875rem;
+        color: $text-muted;
+        
+        strong {
+          color: $dark-color;
+          font-weight: 600;
+        }
+      }
+    }
   }
   
-  &.pending {
-    background-color: #fff3cd;
-    color: #856404;
+  .quantities-section {
+    .border-end {
+      border-right: 1px solid $border-color !important;
+    }
+    
+    h6 {
+      color: $text-muted;
+      font-weight: 600;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+    
+    .table {
+      margin-bottom: 0;
+      
+      td {
+        padding: 0.5rem 0;
+        border: none;
+        font-size: 0.875rem;
+        
+        &:first-child {
+          color: $text-muted;
+          font-weight: 400;
+        }
+        
+        &.text-end {
+          font-weight: 600;
+          color: $dark-color;
+          
+          &.fw-bold {
+            color: $dark-color;
+          }
+          
+          &.h5 {
+            font-size: 1.5rem;
+            color: $primary-color !important;
+            font-weight: 700;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Transaction History Table
+.transaction-history {
+  .table-responsive {
+    border-radius: $border-radius;
+    overflow: hidden;
+    border: 1px solid $border-color;
   }
   
-  &.cancelled {
-    background-color: #f8d7da;
-    color: #721c24;
+  .table {
+    margin-bottom: 0;
+    
+    thead {
+      background-color: $light-color;
+      
+      th {
+        color: $dark-color;
+        font-weight: 600;
+        font-size: 0.875rem;
+        padding: 0.75rem;
+        border-bottom: 2px solid $border-color;
+        white-space: nowrap;
+      }
+    }
+    
+    tbody {
+      tr {
+        &:hover {
+          background-color: rgba(0, 123, 255, 0.05);
+        }
+        
+        td {
+          padding: 0.75rem;
+          border-bottom: 1px solid $border-color;
+          vertical-align: middle;
+          font-size: 0.875rem;
+          
+          small {
+            font-size: 0.75rem;
+            color: $text-muted;
+          }
+        }
+      }
+    }
+  }
+  
+  // Badge Styles
+  .badge {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.25rem 0.5rem;
+    border-radius: $border-radius;
+    
+    &.bg-primary {
+      background-color: $primary-color !important;
+      color: white;
+    }
+    
+    &.bg-success {
+      background-color: $success-color !important;
+      color: white;
+    }
+    
+    &.bg-danger {
+      background-color: $danger-color !important;
+      color: white;
+    }
+    
+    &.bg-warning {
+      background-color: $warning-color !important;
+      color: $dark-color;
+    }
+    
+    &.bg-info {
+      background-color: $info-color !important;
+      color: white;
+    }
+    
+    &.bg-secondary {
+      background-color: $secondary-color !important;
+      color: white;
+    }
+    
+    i {
+      margin-right: 0.25rem;
+    }
+  }
+  
+  // Quantity Change Colors
+  .text-success {
+    color: $success-color !important;
+    font-weight: 600;
+  }
+  
+  .text-danger {
+    color: $danger-color !important;
+    font-weight: 600;
+  }
+  
+  .text-primary {
+    color: $primary-color !important;
+    font-weight: 600;
+  }
+}
+
+// View More Button
+.view-more-section {
+  .btn-outline-primary {
+    border-radius: $border-radius;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    border: 1px solid $primary-color;
+    color: $primary-color;
+    background-color: white;
+    
+    &:hover {
+      background-color: $primary-color;
+      border-color: $primary-color;
+      color: white;
+    }
+  }
+}
+
+// No History Message
+.no-history-message {
+  padding: 3rem 2rem;
+  text-align: center;
+  
+  i {
+    color: $border-color;
+    margin-bottom: 1rem;
+  }
+  
+  h5 {
+    color: $text-muted;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  
+  p {
+    color: $text-muted;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .container-fluid {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .card {
+    margin-bottom: 1rem;
+    
+    .card-body {
+      padding: 0.75rem;
+    }
+  }
+  
+  .summary-section {
+    .summary-header {
+      .summary-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+    }
+    
+    .quantities-section {
+      .border-end {
+        border-right: none !important;
+        border-bottom: 1px solid $border-color !important;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+      }
+    }
+  }
+  
+  .table-responsive {
+    .table {
+      thead th {
+        font-size: 0.75rem;
+        padding: 0.5rem;
+      }
+      
+      tbody td {
+        padding: 0.5rem;
+        font-size: 0.75rem;
+      }
+    }
+  }
+  
+  .badge {
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.4rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .filters-section {
+    .col-md-4,
+    .col-md-3,
+    .col-md-2 {
+      margin-bottom: 1rem;
+    }
+  }
+  
+  .summary-section {
+    .quantities-section {
+      .col-md-4 {
+        margin-bottom: 1rem;
+      }
+    }
+  }
+}
+
+// Custom scrollbar for table
+.table-responsive::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: $light-color;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: $border-color;
+  border-radius: 3px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: $text-muted;
+}
+
+// Print styles
+@media print {
+  .filters-section,
+  .view-more-section {
+    display: none !important;
+  }
+  
+  .card {
+    box-shadow: none !important;
+    border: 1px solid $border-color !important;
+  }
+  
+  .table {
+    font-size: 0.75rem !important;
   }
 }

@@ -17,7 +17,7 @@ export class SidebarComponent implements OnInit {
       icon: 'home',
       isExpanded: false,
       route: '/dashboard',
-      roles: ['admin','executive','supervisor','logistics hod','logistics prepaid','logistics cod','auditing executives','accounts hod','sales hod','accounts executives','costing executives']
+      roles: ['admin','executive','supervisor','logistics hod','logistics prepaid','logistics cod','auditing executives','accounts hod','sales hod','costing executives','leads',]
     },
     {
       name: 'User Management',
@@ -36,93 +36,64 @@ export class SidebarComponent implements OnInit {
       isExpanded: false,
       subItems: [
         { name: 'Suppliers', route: '/suppliers', roles: ['admin', 'manager','costing executives','accounts hod','accounts executives', 'auditing executives'] },
-                // { name: 'Ledger', route: '/shopping', roles: ['admin', 'manager','accounts executives', 'executive',,] },
-
         { name: 'Customers', route: '/customers', roles: ['admin', 'accounts hod','manager','accounts executives', 'costing executives','executive','sales hod', 'supervisor'] },
-        // { name: 'Customer Groups', route: '/customer-group', roles: ['admin', 'manager','supervisor'] },
- 
-        //  { name: 'paycash details', route: '/paycash-details', roles: ['admin', ] },
-
- 
- 
         { name: 'Import Contacts', route: '/import-contacts', roles: ['admin','accounts hod','accounts hod','accounts executives', 'costing executives','sales hod','executive','supervisor'] }
       ],
       roles: ['admin', 'manager',  'supervisor','accounts executives','sales hod','accounts hod','costing executives','executive','auditing executives']
     },
-
-
-
-
-
     {
       name: 'Products',
       icon: 'inventory_2',
       isExpanded: false,
       subItems: [
-        { name: 'List Products', route: '/list-products', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
+        { name: 'List Products', route: '/list-products', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','supervisor','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
         { name: 'Not for selling Products', route: '/not-selling', roles: ['admin','logistics prepaid', 'logistics cod','logistics hod','accounts hod','sales hod','costing executives' , 'accounts executives','supervisor','auditing executives'] },
-
         { name: 'Add Product', route: '/add-product', roles: ['admin', 'accounts hod','manager','costing executives','purchase team'] },
         { name: 'Update Price', route: '/update-price', roles: ['admin', 'accounts hod','manager','purchase team'] },
-              { name: 'Warranties', route: '/warranties', roles: ['admin','logistics prepaid','logistics cod','accounts hod','logistics hod','costing executives','accounts executives', 'sales hod', ,'auditing executives'] },
-
+        { name: 'Warranties', route: '/warranties', roles: ['admin','logistics prepaid','logistics cod','supervisor','logistics cod','accounts hod','logistics hod','costing executives','accounts executives', 'sales hod', ,'auditing executives'] },
         { name: 'Variations', route: '/variations', roles: ['admin', 'manager','accounts hod','costing executives','purchase team'] },
         { name: 'Import Products', route: '/import-products', roles: ['admin','accounts hod','costing executives','purchase team','costing executives'] },
         { name: 'Import Opening Stock', route: '/import-opening', roles: ['admin','accounts hod',,'purchase team'] },
         { name: 'Units', route: '/units', roles: ['admin', 'manager','accounts hod',,'purchase team'] },
         { name: 'Categories', route: '/categories', roles: ['admin', 'manager','accounts hod',,'purchase team'] },
         { name: 'Brands', route: '/brands', roles: ['admin', 'manager','accounts hod',,'purchase team'] },
-
-
       ],
-      roles: ['admin', 'manager',  'accounts hod','supervisor','logistics cod','logistics prepaid','logistics hod','costing executives','saleshod','accounts executives','auditing executives']
+      roles: ['admin', 'manager',  'accounts hod','supervisor','logistics cod','logistics prepaid','logistics hod','costing executives','sales hod','accounts executives','auditing executives']
     },
     {
       name: 'Purchases',
       icon: 'shopping_cart',
       isExpanded: false,
-      roles: ['admin', 'manager','logistics hod','logistics prepaid', 'accountant','logistics cod', 'executive','costing executives','accounts executives','accounts hod','auditing executives'], // Accountant not included
+      roles: ['admin', 'manager','logistics hod','logistics prepaid', 'accountant','logistics cod','costing executives','accounts executives','accounts hod','auditing executives'],
       subItems: [
-        { name: 'Purchase Requisition', route: '/purchase-requisition', roles: ['admin','logistics hod', 'logistics prepaid','logistics cod','manager', 'executive','accountant','accounts hod','costing executives','supervisor','auditing executives'] },
-        { name: 'Purchase Order', route: '/purchase-order', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod', 'executive','accountant','accounts hod','costing executives','supervisor','auditing executives'] },
-        { name: 'List Purchases', route: '/list-purchase', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod','costing executives', 'executive','accounts hod','accountant','supervisor','auditing executives'] },
-        { name: 'Add Purchase', route: '/add-purchase', roles: ['admin', 'manager','logistics hod','logistics prepaid','logistics cod','accountant','costing executives','accounts hod','supervisor','purchase team'] },
-        { name: 'List Purchase Return', route: '/purchase-return', roles: ['admin','logistics hod', 'logistics cod','manager','accountant','costing executives','accounts hod','supervisor','purchase team'] }
+        { name: 'Purchase Requisition', route: '/purchase-requisition', roles: ['admin','logistics hod', 'logistics prepaid','logistics cod','accounts executives','manager', 'executive','accountant','accounts hod','costing executives','supervisor'] },
+        { name: 'Purchase Order', route: '/purchase-order', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod', 'accounts executives','executive','accountant','accounts hod','costing executives','supervisor','auditing executives'] },
+        { name: 'List Purchases', route: '/list-purchase', roles: ['admin','logistics prepaid', 'manager','logistics hod','logistics cod','accounts executives','costing executives', 'executive','accounts hod','accountant','supervisor','auditing executives'] },
+        { name: 'Add Purchase', route: '/add-purchase', roles: ['admin', 'manager','logistics hod','logistics prepaid','logistics cod','accountant','accounts executives','costing executives','accounts hod','supervisor','purchase team'] },
+        { name: 'List Purchase Return', route: '/purchase-return', roles: ['admin', 'logistics cod','manager','accountant','costing executives','accounts hod','supervisor','purchase team'] }
       ]
     },
     {
       name: 'Sell',
       icon: 'point_of_sale',
       isExpanded: false,
-      
       subItems: [
         { name: 'Sales Order', route: '/sales-order', roles: ['admin', 'sales hod', 'accounts hod','executive','accounts executives', 'supervisor','auditing executives'] },
-        { name: 'All sales', route: '/sales', roles: ['admin', 'sales hod','logistics hod','logistics cod','accounts executives','accounts hod','costing executives' , 'supervisor','auditing executives'] },
+        { name: 'All sales', route: '/sales', roles: ['admin', 'sales hod','logistics hod','logistics cod','accounts executives', 'supervisor','logistics prepaid','accounts hod','costing executives' , 'supervisor','auditing executives'] },
         { name: 'Add Sale', route: '/add-sale', roles: ['admin', 'manager','accounts executives','accounts hod', ,'sales team'] },
-        { name: 'Shipments', route: '/shipments', roles: ['admin', 'auditing executives','logistics cod','logistics hod','accounts hod','accounts executives','sales team'] },
+        { name: 'Shipments', route: '/shipments', roles: ['admin', 'auditing executives','costing executives','logistics cod', 'logistics prepaid','logistics hod','accounts hod','accounts executives','sales team'] },
         { name: 'Discounts', route: '/discount', roles: ['admin', 'manager','accounts hod','sales team',] },
-         { name: 'Import Shipping', route: '/import-shipping', roles: ['admin','logistics hod','logistics cod','costing executives','accounts hod','accounts executives', 'auditing executives'] },
-
+        { name: 'Import Shipping', route: '/import-shipping', roles: ['admin','logistics hod', 'logistics prepaid','logistics cod','costing executives','accounts hod','accounts executives', 'auditing executives'] },
         { name: 'Import Sales', route: '/import-sales', roles: ['admin' ,'accounts executives','accounts hod','sales team',]},
       ],
-      roles: ['admin', 'manager',  'supervisor','logistics prepaid','sales hod','logistics cod','costing executives','logistics hod','accounts hod','accounts executives','executive','sales team']
-    },
-    {
-      name: 'Stock Transfers',
-      icon: 'swap_horiz',
-      isExpanded: false,
-      subItems: [
-        { name: 'List Stock Transfers', route: '/list-stock', roles: ['admin', 'manager', 'supervisor'] },
-        { name: 'Add Stock Transfer', route: '/add-stock', roles: ['admin', 'manager','supervisor'] }
-      ],
-      roles: ['admin', 'manager', ]
+      roles: ['admin', 'manager', 'auditing executives', 'logistics prepaid','supervisor','logistics prepaid','sales hod','logistics cod','costing executives','logistics hod','accounts hod','accounts executives','executive','sales team']
     },
     {
       name: 'Stock Adjustment',
       icon: 'adjust',
       isExpanded: false,
       subItems: [
-        { name: 'List Stock Adjustments', route: '/list-adjustment', roles: ['admin', 'logistics prepaid','logistics hod','auditing executives','accounts hod','accounts executives','costing executives', 'supervisor'] },
+        { name: 'List Stock Adjustments', route: '/list-adjustment', roles: ['admin', 'logistics prepaid', 'auditing executives','logistics hod','auditing executives','accounts hod','accounts executives','costing executives', 'supervisor'] },
         { name: 'Add Stock Adjustment', route: '/add-adjustment', roles: ['admin','logistics prepaid', 'logistics hod','manager','costing executives','accounts hod','accounts executives','supervisor'] }
       ],
       roles: ['admin', 'costing executives','logistics prepaid','logistics prepaid','accounts executives','accounts hod','logistics hod','auditing executives',]
@@ -132,77 +103,75 @@ export class SidebarComponent implements OnInit {
       icon: 'adjust',
       isExpanded: false,
       subItems: [
-        { name: 'Add GIN Transfer', route: '/add-gin-transfer', roles: ['admin','logistics hod','logistics cod','logistics prepaid','costing executives','accounts hod','accounts executives','manager', ] },
-        { name: 'List GIN Transfer', route: '/list-gin-transfers', roles: ['admin', 'logistics hod','logistics cod','logistics prepaid','costing executives','accounts hod','accounts executives','auditing executives',] },
+        { name: 'Add GIN Transfer', route: '/add-gin-transfer', roles: ['admin','logistics hod','logistics cod','logistics Manager','logistics prepaid','costing executives','accounts hod','accounts executives','manager', ] },
+        { name: 'List GIN Transfer', route: '/list-gin-transfers', roles: ['admin', 'logistics hod','logistics cod', 'logistics hod','auditing executives','logistics prepaid','costing executives','accounts hod','accounts executives','auditing executives',] },
         { name: 'Add Goods Received Notes', route: '/add-goods', roles: ['admin','accounts hod','logistics cod','logistics prepaid', 'logistics hod','manager',] },
-        { name: 'List Goods Received Notes', route: '/list-goods', roles: ['admin','costing executives','logistics cod','logistics prepaid','logistics hod','accounts hod', 'manager',] },
-        { name: 'Product Sell Report', route: '/product-sell-report', roles: ['admin', 'manager','logistics prepaid','logistics cod','supervisor'] },
+        { name: 'List Goods Received Notes', route: '/list-goods', roles: ['admin','costing executives', 'auditing executives','logistics cod','logistics prepaid','logistics hod','accounts hod', 'manager',] },
+        { name: 'Product Sell Report', route: '/product-sell-report', roles: ['admin', 'manager','logistics prepaid','logistics hod','logistics cod','supervisor'] },
         { name: 'Sale Shipping Summary', route: '/sale-summary', roles: ['admin', 'manager','logistics cod','logistics prepaid','logistics hod','supervisor'] },
-        { name: 'Import Shipping', route: '/import-shipping', roles: ['admin', 'manager','supervisor'] },
-
         { name: 'Summary Report', route: '/summary-report', roles: ['admin', 'accounts hod','accounting executives','logistics prepaid','costing executives','sales hod','supervisor'] },
-
       ],
-      roles: ['admin', 'manager','logistics hod','logistics prepaid','logistics cod','auditing executives','accounts executives', 'logistics hod','accounts hod','accounts hod','costing executives','sales hod','supervisor']
-},
+      roles: ['admin', 'manager','logistics hod','logistics prepaid','Logistics Manager','costing executives','logistics cod','logistics hod','auditing executives','accounts executives', 'logistics hod','accounts hod','accounts hod','costing executives','sales hod','supervisor']
+    },
     {
-      name: 'Expenses/Income',
+      name: 'Expenses/Income Categories',
       icon: 'receipt',
       isExpanded: false,
-      roles: ['admin', 'auditing executives','accounts executives', 'accounts hod','accountant', ],
+      roles: ['admin', 'auditing executives','auditing executives','accounts executives', 'accounts hod','accountant', ],
       subItems: [
-        { name: 'List Expenses/List Income', route: '/list-expenses', roles: ['admin','accounts hod', 'auditing executives', 'accounts executives','accountant','supervisor'] },
-        { name: 'Add Expense/Add Income', route: '/add-expense', roles: ['admin', 'manager', 'accountant','accounts hod','accounts executives','supervisor'] },
         { name: 'Expense Categories/Income Categories', route: '/expense-categories', roles: ['admin', 'manager','accounts hod','accounts executives', 'accountant','supervisor'] },
-
       ]
     },
     {
-      name: 'Transact',
-      icon: 'account_balance',
+      name: 'Financial Reports',
+      icon: 'assessment',
       isExpanded: false,
       roles: ['admin', 'manager','accounts executives','accounts hod','auditing executives', 'accountant',],
       subItems: [
         { name: 'List Accounts', route: '/list-accounts', roles: ['admin','accounts hod', 'auditing executives', 'accounts executives','accountant','supervisor'] },
         { name: 'Balance Sheet', route: '/balance-sheet', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
-        // { name: 'Trial Balance', route: '/trial-balance', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
-
-       
-        { name: 'Profit and Loss Report', route: '/profit-loss', roles: ['admin', 'manager', 'accounts hod','accountant','supervisor'] },
-
+        { name: 'Trial Balance', route: '/trial-balance', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
+        { name: 'Profit and Loss Report', route: '/profit-loss2', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] },
+        { name: 'Cash Flow', route: '/cash-flow', roles: ['admin', 'accounts hod','auditing executives', 'accountant','supervisor'] },
+        { name: 'Ledger Report', route: '/ledger-report', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] },
+        { name: 'Day Book', route: '/day-book', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] },
+        { name: 'Account Home', route: '/account-home', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] },
+        { name: 'Account Dashboard', route: '/account-dashboard', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] }
       ]
     },
-      {
+    {
+      name: 'Accounting Entries',
+      icon: 'edit_note',
+      isExpanded: false,
+      roles: ['admin', 'manager','accounts executives','accounts hod','auditing executives', 'accountant',],
+      subItems: [
+        { name: 'Journal entry', route: '/journal-entry', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] },
+        { name: 'Intercash Transfer', route: '/intercash-transfer', roles: ['admin', 'manager', 'auditing executives', 'accounts hod','accountant','supervisor'] }
+      ]
+    },
+    {
       name: 'Reports',
       icon: 'account_balance',
       isExpanded: false,
-      roles: ['admin', 'manager', 'accountant','sales hod','logistics prepaid','logistics cod', 'costing executives','auditing executives','supervisor'],
+      roles: ['admin', 'manager', 'accountant','sales hod','accounts executives','logistics prepaid','logistics cod', 'costing executives','auditing executives','supervisor'],
       subItems: [
-       
- { name: 'Shipping Summary', route: '/shipping-summary', roles: ['admin','logistics prepaid','costing executives','logistics cod', 'manager',] },
-                { name: 'Expenses-Report', route: '/list-report', roles: ['admin','auditing executives','costing executives', 'manager','supervisor'] },
+        { name: 'Shipping Summary', route: '/shipping-summary', roles: ['admin','logistics prepaid','costing executives','costing executives','auditing executives','logistics cod', 'manager',] },
+        { name: 'Expenses-Report', route: '/list-report', roles: ['admin','auditing executives','accounts executives','costing executives','costing executives', 'manager','supervisor'] },
         { name: 'Outstanding Report', route: '/outstanding-report', roles: ['admin','sales hod','costing executives', 'manager','supervisor'] },
-        { name: 'Stock Report', route: '/stock-report', roles: ['admin', 'manager','accounts hod','costing executives','sales hod','supervisor','purchase team'] },
-
-        { name: 'Summary Report', route: '/summary-report', roles: ['admin', 'manager', 'logistics hod','costing executives','accounts hod','supervisor'] },
-         { name: 'Product Sell Report', route: '/product-sell-report', roles: ['admin','logistics cod','accounts hod','costing executives','logistics prepaid','logistics hod','sales hod', 'manager','supervisor'] },
+        { name: 'Stock Report', route: '/stock-report', roles: ['admin', 'manager','costing executives','accounts hod','costing executives','sales hod','supervisor','purchase team'] },
+        { name: ' GST Summary Report', route: '/gst-summary', roles: ['admin', 'manager', 'logistics hod','costing executives','accounts hod','supervisor'] },
+        { name: 'Product Sell Report', route: '/product-sell-report', roles: ['admin','logistics cod','accounts hod','costing executives','logistics prepaid','logistics hod','sales hod', 'manager','supervisor'] },
         { name: 'Sale Shipping Summary', route: '/sale-summary', roles: ['admin', 'manager','accounts hod','costing executives','logistics cod','supervisor'] },
         { name: 'Customer Summary', route: '/customer-summary', roles: ['admin', 'manager','accounts hod','costing executives',,'sales hod' ,'supervisor'] },
-                  { name: 'Sales-Invoice', route: '/sales-invoice', roles: ['admin', 'manager','accounts hod','sales hod','costing executives','auditing executives','supervisor'] },
+        { name: 'Sales-Invoice', route: '/sales-invoice', roles: ['admin', 'manager','accounts hod','sales hod','costing executives','auditing executives','supervisor'] },
         { name: 'Supplier Summary', route: '/supplier-summary', roles: ['admin', 'manager', 'accounts hod','costing executives','supervisor'] },
         { name: 'Product Sell By District', route: '/product-sell', roles: ['admin','auditing executives','costing executives', 'manager','supervisor'] },
         { name: 'Sell Return Report', route: '/sell-return-report', roles: ['admin','auditing executives','costing executives','accounts hod', 'manager', 'supervisor'] },
-
-        { name: 'Input Tax Report', route: '/input-tax-report', roles: ['admin', 'manager','costing executives', 'supervisor'] },
-                                { name: 'Output Tax Report', route: '/output-tax-report', roles: ['admin', 'manager','costing executives','supervisor'] },
-     { name: 'Supplier Report', route: '/supplier-report', roles: ['admin', 'auditing executives','manager','costing executives','supervisor'] },
-     { name: 'Leads Report', route: '/leads-reports', roles: ['admin', 'manager','supervisor'] },
-
-     { name: 'Customer Report', route: '/customer-report', roles: ['admin','sales hod','accounts hod', 'costing executives','manager','supervisor'] },
-
-        { name: 'Expense Orders', route: '/expense-orders', roles: ['admin','auditing executives','accounts hod','costing executives', 'manager', 'supervisor'] },
-
-
+        { name: 'Input Tax Report', route: '/input-tax-report', roles: ['admin', 'manager','costing executives', 'accounts executives','supervisor'] },
+        { name: 'Output Tax Report', route: '/output-tax-report', roles: ['admin', 'manager','costing executives','supervisor'] },
+        { name: 'Supplier Report', route: '/supplier-report', roles: ['admin', 'auditing executives','manager','costing executives','supervisor'] },
+        { name: 'Leads Report', route: '/leads-reports', roles: ['admin', 'manager','supervisor'] },
+        { name: 'Customer Report', route: '/customer-report', roles: ['admin','sales hod','accounts hod', 'costing executives','manager','supervisor'] },
       ]
     },
     {
@@ -221,23 +190,51 @@ export class SidebarComponent implements OnInit {
       icon: 'people',
       isExpanded: false,
       route: '/crm',
-      roles: ['admin', 'auditing executives','sales team','sales hod','accounts hod', 'supervisor','executive'],
+      roles: ['admin', 'auditing executives','sales team','sales hod','accounts hod', 'supervisor','executive','leads'],
     },
     {
       name: 'HRM',
       icon: 'people',
       route: '/hrm',
-      requiredPermissions: ['hrm.view'],
-      roles: ['admin', 'auditing executives','accountant','costing executives','logistics cod','logistics prepaid','logistics hod','costing executives','accounts hod','accounts executives','sales hod','hr manager', 'supervisor','purchase team','executive'] // Accountant not included
+      roles: ['admin', 'auditing executives','accountant','costing executives','logistics cod','logistics prepaid','logistics hod','costing executives','accounts hod','accounts executives','sales hod','hr manager', 'supervisor','purchase team','executive','leads']
     },
-  
-
   ];
   
   constructor(private router: Router, private authService: AuthService) {}
 
   ngOnInit(): void {
     this.filterMenuItems();
+  }
+
+  // ADDED: trackBy functions to solve compilation errors
+  trackByName(index: number, item: any): string {
+    return item.name;
+  }
+
+  trackByRoute(index: number, item: any): string {
+    return item.route;
+  }
+
+  // UPDATED: Added optional event argument to match HTML call
+  handleMenuItemClick(item: any, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    if (item.subItems?.length) {
+      if (!item.isExpanded) {
+        // Close all other expanded items
+        this.filteredMenuItems.forEach(menuItem => {
+          if (menuItem !== item && menuItem.isExpanded) {
+            menuItem.isExpanded = false;
+          }
+        });
+      }
+      // Toggle the clicked item
+      item.isExpanded = !item.isExpanded;
+    } else if (item.route) {
+      this.router.navigate([item.route]);
+    }
   }
 
   private filterMenuItems(): void {
@@ -252,39 +249,14 @@ export class SidebarComponent implements OnInit {
     this.filteredMenuItems = this.allMenuItems
       .filter(item => item.roles.includes(userRole))
       .map(item => {
-        // Clone the item to avoid modifying the original
         const filteredItem = { ...item };
-        
-        // Filter subItems if they exist
         if (filteredItem.subItems && filteredItem.subItems.length > 0) {
           filteredItem.subItems = filteredItem.subItems.filter(subItem => 
             subItem.roles.includes(userRole)
           );
         }
-        
         return filteredItem;
       });
-  }
-
-  handleMenuItemClick(item: any): void {
-    if (item.subItems?.length) {
-      // Only perform the closing of other menus if this menu is being opened
-      // (not when it's being closed)
-      if (!item.isExpanded) {
-        // Close all other expanded items
-        this.filteredMenuItems.forEach(menuItem => {
-          if (menuItem !== item && menuItem.isExpanded) {
-            menuItem.isExpanded = false;
-          }
-        });
-      }
-      
-      // Toggle the clicked item
-      item.isExpanded = !item.isExpanded;
-    } else if (item.route) {
-      // If it has a direct route, navigate
-      this.router.navigate([item.route]);
-    }
   }
 
   navigateTo(route: string): void {

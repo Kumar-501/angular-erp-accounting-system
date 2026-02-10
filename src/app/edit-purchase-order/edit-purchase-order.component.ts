@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, FormArray, Validators, AbstractControl } from '@angular/forms';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { PurchaseOrderService } from '../services/purchase-order.service';
 import { SupplierService } from '../services/supplier.service';
@@ -27,7 +27,6 @@ interface Supplier {
 }
 
 interface Product {
-  defaultSellingPriceIncTax: number | undefined;
   id: string;
   productName: string;
   sku?: string;
@@ -39,13 +38,14 @@ interface Product {
   currentStock?: number;
   totalQuantity?: number;
   taxPercentage?: number;
-  
   notForSelling?: boolean;
   marginPercentage?: number;
   barcode?: string;
   productDescription?: string;
   defaultSellingPriceExcTax?: number;
+  defaultSellingPriceIncTax?: number;
 }
+
 
 @Component({
   selector: 'app-edit-purchase-order',
@@ -53,9 +53,11 @@ interface Product {
   styleUrls: ['./edit-purchase-order.component.scss']
 })
 export class EditPurchaseOrderComponent implements OnInit {
-  [x: string]: any;
   purchaseOrderForm!: FormGroup;
   suppliers: Supplier[] = [];
+   @ViewChild('orderDatePicker') orderDatePicker!: ElementRef;
+  @ViewChild('requiredDatePicker') requiredDatePicker!: ElementRef;
+  @ViewChild('shippingDatePicker') shippingDatePicker!: ElementRef;
   businessLocations: any[] = [];
   productsList: Product[] = [];
   lastEditedShippingField: 'before' | 'after' = 'before';
@@ -79,6 +81,8 @@ export class EditPurchaseOrderComponent implements OnInit {
   orderId: string = '';
   isLoading: boolean = true;
   selectedProductIndex: number = -1;
+  selectedShippingDocument: File | null = null;
+  selectedAttachDocument: File | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -89,65 +93,260 @@ export class EditPurchaseOrderComponent implements OnInit {
     private userService: UserService,
     private router: Router,
     private route: ActivatedRoute,
-    private taxService: TaxService
-  ) { }
+    private taxService: TaxService,
+      private cdr: ChangeDetectorRef
+
+
+  ) {}
 
   ngOnInit(): void {
     this.initForm();
-    this.loadSuppliers();
-    this.loadBusinessLocations();
-    this.loadProducts();
-    this.loadUsers();
-    this.loadTaxRates();
+    this.loadInitialData();
+    this.setupCalculatedFieldListeners();
 
+    
+    // Get order ID from route parameters
     this.route.params.subscribe(params => {
       this.orderId = params['id'];
       if (this.orderId) {
-        this.loadOrderDetails(this.orderId).then(() => {
-          this.initializeProductTaxes();
-        });
+        // Wait for initial data to load before loading order details
+        this.waitForInitialDataAndLoadOrder();
       } else {
         this.isLoading = false;
         this.addEmptyProduct();
       }
     });
+  }
+ getFormattedDateForInput(dateString: any): string {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  openDatePicker(type: 'order' | 'shipping' | 'required'): void {
+    if (type === 'order') this.orderDatePicker.nativeElement.showPicker();
+    else if (type === 'shipping') this.shippingDatePicker.nativeElement.showPicker();
+    else if (type === 'required') this.requiredDatePicker.nativeElement.showPicker();
+  }
+
+  onManualDateInput(event: any, controlName: string): void {
+    const input = event.target.value.trim();
+    const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+    const match = input.match(datePattern);
+    
+    if (match) {
+      const day = match[1];
+      const month = match[2];
+      const year = match[3];
+      
+      const dateObj = new Date(`${year}-${month}-${day}`);
+      if (dateObj && dateObj.getDate() === parseInt(day) && 
+          dateObj.getMonth() + 1 === parseInt(month)) {
+        
+        // Update the reactive form with the YYYY-MM-DD string
+        const formattedDate = `${year}-${month}-${day}`;
+        this.purchaseOrderForm.get(controlName)?.setValue(formattedDate);
+      } else {
+        alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+        this.resetVisibleInput(event, controlName);
+      }
+    } else if (input !== '') {
+      alert('Format must be DD-MM-YYYY');
+      this.resetVisibleInput(event, controlName);
+    }
+  }
+
+  private resetVisibleInput(event: any, controlName: string): void {
+    event.target.value = this.getFormattedDateForInput(this.purchaseOrderForm.get(controlName)?.value);
+  }
+  private async waitForInitialDataAndLoadOrder(): Promise<void> {
+    // Wait for all initial data to be loaded
+    await Promise.all([
+      this.loadSuppliersPromise(),
+      this.loadBusinessLocationsPromise(),
+      this.loadProductsPromise(),
+      this.loadUsersPromise(),
+      this.loadTaxRatesPromise()
+    ]);
+    
+    // Now load the order details
+    await this.loadOrderDetails(this.orderId);
+  }
+
+  private loadInitialData(): void {
+    this.loadSuppliers();
+    this.loadBusinessLocations();
+    this.loadProducts();
+    this.loadUsers();
+    this.loadTaxRates();
+  }
+
+  initForm(): void {
+    this.purchaseOrderForm = this.fb.group({
+      referenceNo: [{ value: '', disabled: true }],
+      orderDate: ['', Validators.required],
+      requiredDate: ['', Validators.required],
+      shippingDate: [''],
+      addedBy: [''],
+      supplier: ['', Validators.required],
+      address: ['N/A'],
+      businessLocation: ['', Validators.required],
+      status: ['Pending'],
+      products: this.fb.array([]),
+      shippingDetails: this.fb.group({
+        shippingDetails: [''],
+        shippingAddress: [''],
+        shippingChargesBeforeTax: [0, [Validators.min(0)]],
+        shippingTaxPercent: [18, [Validators.min(0), Validators.max(100)]],
+        shippingTaxAmount: [0],
+        shippingChargesAfterTax: [0],
+        shippingStatus: [''],
+        deliveredTo: [''],
+        shippingDocuments: [null]
+      }),
+      attachDocument: [null],
+      additionalNotes: ['']
+    });
 
     this.filteredSuppliers = [...this.suppliers];
   }
-initForm(): void {
-  this.purchaseOrderForm = this.fb.group({
-  
-    referenceNo: [{ value: '', disabled: true }],
-    orderDate: [''],
-    requiredDate: [''],
-    shippingDate: [''],
-    addedBy: [''],
-       supplier: [''],
-    address: ['N/A'], 
-    businessLocation: [''],
-    status: ['Pending'],
-    products: this.fb.array([]),
-    shippingDetails: this.fb.group({
-      shippingDetails: [''],
-      shippingAddress: [''],
-      shippingChargesBeforeTax: [0, [Validators.min(0)]],
-      shippingTaxPercent: [18, [Validators.min(0), Validators.max(100)]],
-      shippingTaxAmount: [0],
-      shippingChargesAfterTax: [0],
-      shippingStatus: [''],
-      deliveredTo: [''],
-      shippingDocuments: [null]
-    }),
-    attachDocument: [null],
-    additionalNotes: ['']
-  });
 
-  this.calculateShippingTax();
+  // Convert load methods to return promises
+  private loadSuppliersPromise(): Promise<void> {
+    return new Promise((resolve) => {
+      this.supplierService.getSuppliers().subscribe({
+        next: (suppliers: Supplier[]) => {
+          this.suppliers = suppliers;
+          this.filteredSuppliers = [...this.suppliers];
+          resolve();
+        },
+        error: (err) => {
+          console.error('Error loading suppliers:', err);
+          resolve();
+        }
+      });
+    });
+  }
+
+
+
+  
+  private loadBusinessLocationsPromise(): Promise<void> {
+    return new Promise((resolve) => {
+      this.locationService.getLocations().subscribe({
+        next: (locations) => {
+          this.businessLocations = locations;
+          resolve();
+        },
+        error: (error) => {
+          console.error('Error loading business locations:', error);
+          resolve();
+        }
+      });
+    });
+  }
+
+  private loadProductsPromise(): Promise<void> {
+    return new Promise((resolve) => {
+      this.productsService.getProductsRealTime().subscribe({
+        next: (products: any[]) => {
+          this.productsList = products.map(product => ({
+            ...product,
+            defaultPurchasePrice: product.purchasePrice || product.sellingPrice || 100,
+            currentStock: product.currentStock || 0
+          }));
+          this.filteredProducts = [...this.productsList];
+          resolve();
+        },
+        error: (err) => {
+          console.error('Error loading products:', err);
+          resolve();
+        }
+      });
+    });
+  }
+
+  private loadUsersPromise(): Promise<void> {
+    return new Promise((resolve) => {
+      this.userService.getUsers().subscribe({
+        next: (users) => {
+          this.users = users;
+          resolve();
+        },
+        error: (err) => {
+          console.error('Error loading users:', err);
+          resolve();
+        }
+      });
+    });
+  }
+private setupCalculatedFieldListeners(): void {
+  this.productsFormArray.controls.forEach((control, index) => {
+    // When unitCostBeforeTax changes manually
+    control.get('unitCostBeforeTax')?.valueChanges.subscribe(value => {
+      if (control.get('unitCostBeforeTax')?.dirty) {
+        const unitCostBeforeTax = parseFloat(value) || 0;
+        const quantity = parseFloat(control.get('quantity')?.value) || 0;
+        const taxPercent = parseFloat(control.get('taxPercent')?.value) || 0;
+        
+        const taxAmountPerUnit = (unitCostBeforeTax * taxPercent) / 100;
+        const netCostPerUnit = unitCostBeforeTax + taxAmountPerUnit;
+        const subtotalBeforeTax = unitCostBeforeTax * quantity;
+        const taxAmount = taxAmountPerUnit * quantity;
+        const lineTotal = netCostPerUnit * quantity;
+        
+        control.patchValue({
+          subtotalBeforeTax: this.roundToTwo(subtotalBeforeTax),
+          taxAmount: this.roundToTwo(taxAmount),
+          netCost: this.roundToTwo(netCostPerUnit),
+          lineTotal: this.roundToTwo(lineTotal)
+        }, { emitEvent: false });
+        
+        this.updateTotals();
+      }
+    });
+    
+  });
 }
-getDisplayAddress(): string {
-  const address = this.purchaseOrderForm.get('address')?.value;
-  return address && address.trim() !== '' ? address : 'N/A';
-}
+  private loadTaxRatesPromise(): Promise<void> {
+    return new Promise((resolve) => {
+      this.taxService.getTaxRates().subscribe({
+        next: (rates) => {
+          this.taxRates = rates;
+          this.taxRates.sort((a, b) => a.rate - b.rate);
+          resolve();
+        },
+        error: (err) => {
+          console.error('Error loading tax rates:', err);
+          resolve();
+        }
+      });
+    });
+  }
+
+  // Keep original load methods for backward compatibility
+  loadSuppliers(): void {
+    this.supplierService.getSuppliers().subscribe((suppliers: Supplier[]) => {
+      this.suppliers = suppliers;
+      this.filteredSuppliers = [...this.suppliers];
+    });
+  }
+
+  loadBusinessLocations(): void {
+    this.locationService.getLocations().subscribe(
+      (locations) => {
+        this.businessLocations = locations;
+      },
+      (error) => {
+        console.error('Error loading business locations:', error);
+      }
+    );
+  }
+
   loadProducts(): void {
     this.productsService.getProductsRealTime().subscribe({
       next: (products: any[]) => {
@@ -170,51 +369,6 @@ getDisplayAddress(): string {
     });
   }
 
-  calculateShippingTax(calculationType: 'before' | 'after' | 'both' = 'both'): void {
-    const shippingDetails = this.purchaseOrderForm.get('shippingDetails') as FormGroup;
-    
-    const beforeTaxCtrl = shippingDetails.get('shippingChargesBeforeTax');
-    const afterTaxCtrl = shippingDetails.get('shippingChargesAfterTax');
-    const taxPercentCtrl = shippingDetails.get('shippingTaxPercent');
-    const taxAmountCtrl = shippingDetails.get('shippingTaxAmount');
-    
-    const taxPercent = parseFloat(taxPercentCtrl?.value) || 0;
-    
-    if (calculationType === 'before') {
-      const beforeTax = parseFloat(beforeTaxCtrl?.value) || 0;
-      const taxAmount = beforeTax * (taxPercent / 100);
-      const afterTax = beforeTax + taxAmount;
-      
-      afterTaxCtrl?.setValue(afterTax.toFixed(2), { emitEvent: false });
-      taxAmountCtrl?.setValue(taxAmount.toFixed(2), { emitEvent: false });
-    }
-    else if (calculationType === 'after') {
-      const afterTax = parseFloat(afterTaxCtrl?.value) || 0;
-      
-      if (taxPercent > 0) {
-        const beforeTax = afterTax / (1 + (taxPercent / 100));
-        const taxAmount = afterTax - beforeTax;
-        
-        beforeTaxCtrl?.setValue(beforeTax.toFixed(2), { emitEvent: false });
-        taxAmountCtrl?.setValue(taxAmount.toFixed(2), { emitEvent: false });
-      } else {
-        beforeTaxCtrl?.setValue(afterTax.toFixed(2), { emitEvent: false });
-        taxAmountCtrl?.setValue(0, { emitEvent: false });
-      }
-    }
-    else if (calculationType === 'both') {
-      const lastEdited = this.lastEditedShippingField;
-      
-      if (lastEdited === 'after') {
-        this.calculateShippingTax('after');
-      } else {
-        this.calculateShippingTax('before');
-      }
-    }
-    
-    this.updateTotals();
-  }
-
   loadTaxRates(): void {
     this.taxService.getTaxRates().subscribe(rates => {
       this.taxRates = rates;
@@ -222,80 +376,200 @@ getDisplayAddress(): string {
     });
   }
 
-  loadBusinessLocations(): void {
-    this.locationService.getLocations().subscribe(
-      (locations) => {
-        this.businessLocations = locations;
-      },
-      (error) => {
-        console.error('Error loading business locations:', error);
-      }
-    );
-  }
-
-  filterSuppliers(): void {
-    if (!this.supplierSearchTerm) {
-      this.filteredSuppliers = [...this.suppliers];
-      return;
-    }
-
-    const searchTerm = this.supplierSearchTerm.toLowerCase();
-    this.filteredSuppliers = this.suppliers.filter(supplier => {
-      const name = this.getSupplierDisplayName(supplier).toLowerCase();
-      const businessName = supplier.businessName?.toLowerCase() || '';
-      return name.includes(searchTerm) ||
-        businessName.includes(searchTerm);
-    });
-  }
-
-  selectSupplier(supplier: Supplier): void {
-    this.purchaseOrderForm.get('supplier')?.setValue(supplier.id);
-    this.supplierSearchTerm = this.getSupplierDisplayName(supplier);
-    this.showSupplierDropdown = false;
-    
-    const addressParts = [
-      supplier.address,
-      supplier.addressLine1,
-      supplier.addressLine2,
-      supplier.city,
-      supplier.state,
-      'postalCode' in supplier ? supplier.postalCode : supplier.zipCode,
-      supplier.country
-    ].filter(part => !!part);
-    
-    const fullAddress = addressParts.join(', ');
-    
-    this.purchaseOrderForm.patchValue({
-      address: fullAddress,
-      shippingDetails: {
-        shippingAddress: `${this.getSupplierDisplayName(supplier)}\n${fullAddress}`
-      }
-    });
-    
-    this.onSupplierChange();
-  }
-
-  onSupplierBlur(): void {
-    setTimeout(() => {
-      this.showSupplierDropdown = false;
+  async loadOrderDetails(orderId: string): Promise<void> {
+    this.isLoading = true;
+    try {
+      const orderData = await this.orderService.getOrderById(orderId);
       
-      const selectedSupplierId = this.purchaseOrderForm.get('supplier')?.value;
-      if (selectedSupplierId) {
-        const selectedSupplier = this.suppliers.find(s => s.id === selectedSupplierId);
-        if (selectedSupplier &&
-          !this.getSupplierDisplayName(selectedSupplier).toLowerCase().includes(this.supplierSearchTerm.toLowerCase())) {
-          this.purchaseOrderForm.get('supplier')?.setValue('');
-          this.supplierSearchTerm = '';
+      if (orderData) {
+        // Clear existing products
+        while (this.productsFormArray.length) {
+          this.productsFormArray.removeAt(0);
         }
+  
+        // Set supplier information
+        if (orderData.supplier) {
+          const supplier = this.suppliers.find(s => s.id === orderData.supplier);
+          if (supplier) {
+            this.selectedSupplierDetails = supplier;
+            this.supplierSearchTerm = this.getSupplierDisplayName(supplier);
+            
+            // =================================================================
+            // ### FIX 1: CONSTRUCT THE FULL SUPPLIER ADDRESS ON LOAD ###
+            // =================================================================
+            const addressParts = [
+              supplier.address,
+              supplier.addressLine1,
+              supplier.addressLine2,
+              supplier.city,
+              supplier.state,
+              'postalCode' in supplier ? supplier.postalCode : supplier.zipCode,
+              supplier.country
+            ].filter(part => !!part); // Filter out null/undefined/empty parts
+            
+            const fullAddress = addressParts.join(', ');
+  
+            this.purchaseOrderForm.patchValue({
+              supplier: orderData.supplier,
+              // Use the newly constructed full address
+              address: fullAddress || orderData.address || 'N/A' 
+            });
+          }
+        }
+  
+        // Populate basic form data
+        this.purchaseOrderForm.patchValue({
+          referenceNo: orderData.referenceNo || '',
+          orderDate: this.formatDateForInput(orderData.date || orderData.orderDate),
+          requiredDate: this.formatDateForInput(orderData.requiredByDate || orderData.requiredDate),
+          businessLocation: orderData.businessLocation || orderData.location || '',
+          status: orderData.status || 'Pending',
+          shippingDate: this.formatDateForInput(orderData.shippingDate),
+          additionalNotes: orderData.additionalNotes || ''
+        });
+  
+        // =================================================================
+        // ### FIX 2: POPULATE ALL SHIPPING FIELDS FROM orderData ###
+        // =================================================================
+        if (orderData.shippingDetails) {
+          this.purchaseOrderForm.get('shippingDetails')?.patchValue({
+            // Existing fields
+            shippingDetails: orderData.shippingDetails.shippingDetails || orderData.shippingDetails.note || '',
+            shippingAddress: orderData.shippingDetails.shippingAddress || this.buildShippingAddress(),
+            shippingStatus: orderData.shippingDetails.shippingStatus || '',
+            deliveredTo: orderData.shippingDetails.deliveredTo || '',
+            
+            // Newly added fields to populate the form correctly
+            shippingChargesBeforeTax: orderData.shippingDetails.shippingChargesBeforeTax || 0,
+            shippingTaxPercent: orderData.shippingDetails.shippingTaxPercent ?? 18, // Use ?? to handle 0 value correctly
+            shippingTaxAmount: orderData.shippingDetails.shippingTaxAmount || 0,
+            shippingChargesAfterTax: orderData.shippingDetails.shippingChargesAfterTax || 0
+          });
+        }
+  
+        // Add products/items
+        const items = orderData.items || orderData.products || [];
+        if (items.length > 0) {
+          for (const item of items) {
+            await this.addProductToForm(item);
+          }
+        } else {
+          this.addEmptyProduct();
+        }
+
+        // IMPORTANT: Recalculate all totals after the form is fully populated
+        this.updateTotals();
+
       }
-    }, 200);
+    } catch (error) {
+      console.error('Error loading order details:', error);
+    } finally {
+      this.isLoading = false;
+    }
   }
 
-  loadSuppliers(): void {
-    this.supplierService.getSuppliers().subscribe((suppliers: Supplier[]) => {
-      this.suppliers = suppliers;
-      this.filteredSuppliers = [...this.suppliers];
-    });
+
+formatDateForInput(dateInput: string | Date | null | undefined | Function): string {
+  if (typeof dateInput === 'function') return '';
+  if (!dateInput) return '';
+  
+  try {
+    // Handle both string dates and Date objects
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) return '';
+    
+    // Format as YYYY-MM-DD for the date input
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    
+    return `${year}-${month}-${day}`;
+  } catch {
+    return '';
+  }
+}
+private async addProductToForm(item: any): Promise<void> {
+  const fullProduct = this.productsList.find(p => p.id === item.productId);
+  
+  // Calculate values with proper defaults
+  const unitCost = item.unitCost || item.unitPurchasePrice || 0;
+  const quantity = item.quantity || item.requiredQuantity || 1;
+  const discountType = item.discountType || 'percent';
+  const discountPercent = item.discountPercent || 0;
+  const discountAmount = item.discountAmount || 0;
+  const taxPercent = item.taxPercent || fullProduct?.taxPercentage || 0;
+  
+  // Calculate derived values
+  const discount = discountType === 'percent' ? (unitCost * discountPercent) / 100 : discountAmount;
+  const unitCostBeforeTax = unitCost - discount;
+  const subtotalBeforeTax = unitCostBeforeTax * quantity;
+  const taxAmount = subtotalBeforeTax * (taxPercent / 100);
+  const netCost = unitCostBeforeTax + (unitCostBeforeTax * (taxPercent / 100));
+  const lineTotal = netCost * quantity;
+
+  const productFormGroup = this.fb.group({
+    productId: [item.productId || '', Validators.required],
+    quantity: [quantity, [Validators.required, Validators.min(1)]],
+    unitCost: [unitCost, [Validators.required, Validators.min(0)]],
+    discountType: [discountType],
+    discountPercent: [discountPercent, [Validators.min(0), Validators.max(100)]],
+    discountAmount: [discountAmount, [Validators.min(0)]],
+    unitCostBeforeTax: [this.roundToTwo(unitCostBeforeTax)],
+    subtotalBeforeTax: [this.roundToTwo(subtotalBeforeTax)],
+    taxPercent: [taxPercent, [Validators.min(0), Validators.max(100)]],
+    taxAmount: [this.roundToTwo(taxAmount)],
+    netCost: [this.roundToTwo(netCost)],
+    lineTotal: [this.roundToTwo(lineTotal)],
+    selected: [false]
+  });
+
+  this.productsFormArray.push(productFormGroup);
+}
+
+  private buildShippingAddress(): string {
+    if (this.selectedSupplierDetails) {
+      const supplierName = this.getSupplierDisplayName(this.selectedSupplierDetails);
+      const address = this.purchaseOrderForm.get('address')?.value;
+      return `${supplierName}\n${address}`;
+    }
+    return '';
+  }
+
+
+
+  private roundToTwo(num: number): number {
+    return Math.round((num + Number.EPSILON) * 100) / 100;
+  }
+
+  get productsFormArray() {
+    return this.purchaseOrderForm.get('products') as FormArray;
+  }
+addEmptyProduct() {
+  this.productsFormArray.push(
+    this.fb.group({
+      productId: ['', Validators.required],
+      quantity: [1, [Validators.required, Validators.min(1)]],
+      unitCost: [0, [Validators.required, Validators.min(0)]],
+      discountType: ['percent'],
+      discountPercent: [0, [Validators.min(0), Validators.max(100)]],
+      discountAmount: [0, [Validators.min(0)]],
+      unitCostBeforeTax: [0],
+      subtotalBeforeTax: [0],
+      taxPercent: [0, [Validators.min(0), Validators.max(100)]],
+      taxAmount: [0],
+      netCost: [0],
+      lineTotal: [0],
+      currentStock: [0],
+      selected: [false]
+    })
+  );
+}
+  removeProduct(index: number) {
+    this.discountTypes.splice(index, 1);
+    this.productsFormArray.removeAt(index);
+    this.updateTotals();
   }
 
   getSupplierDisplayName(supplier: Supplier): string {
@@ -341,35 +615,46 @@ getDisplayAddress(): string {
     }
   }
 
-  get productsFormArray() {
-    return this.purchaseOrderForm.get('products') as FormArray;
+  filterSuppliers(): void {
+    if (!this.supplierSearchTerm) {
+      this.filteredSuppliers = [...this.suppliers];
+      return;
+    }
+
+    const searchTerm = this.supplierSearchTerm.toLowerCase();
+    this.filteredSuppliers = this.suppliers.filter(supplier => {
+      const name = this.getSupplierDisplayName(supplier).toLowerCase();
+      const businessName = supplier.businessName?.toLowerCase() || '';
+      return name.includes(searchTerm) || businessName.includes(searchTerm);
+    });
   }
 
-addEmptyProduct() {
-  this.productsFormArray.push(
-    this.fb.group({
-      productId: [''],
-      quantity: [1, [Validators.min(1)]],
-      unitCost: [0, [Validators.min(0)]],
-      discountType: ['percent'],
-      discountPercent: [0, [Validators.min(0), Validators.max(100)]],
-      discountAmount: [0, [Validators.min(0)]],
-      unitCostBeforeTax: [0],
-      subtotalBeforeTax: [0],
-      taxPercent: [0, [Validators.min(0), Validators.max(100)]],
-      taxAmount: [0],
-      netCost: [0],
-      lineTotal: [0],
-      currentStock: [0],
-      selected: [false]
-    })
-  );
-}
-
-  removeProduct(index: number) {
-    this.discountTypes.splice(index, 1);
-    this.productsFormArray.removeAt(index);
-    this.updateTotals();
+  selectSupplier(supplier: Supplier): void {
+    this.purchaseOrderForm.get('supplier')?.setValue(supplier.id);
+    this.supplierSearchTerm = this.getSupplierDisplayName(supplier);
+    this.showSupplierDropdown = false;
+    this.selectedSupplierDetails = supplier;
+    
+    const addressParts = [
+      supplier.address,
+      supplier.addressLine1,
+      supplier.addressLine2,
+      supplier.city,
+      supplier.state,
+      'postalCode' in supplier ? supplier.postalCode : supplier.zipCode,
+      supplier.country
+    ].filter(part => !!part);
+    
+    const fullAddress = addressParts.join(', ');
+    
+    this.purchaseOrderForm.patchValue({
+      address: fullAddress || 'N/A',
+      shippingDetails: {
+        shippingAddress: `${this.getSupplierDisplayName(supplier)}\n${fullAddress}`
+      }
+    });
+    
+    this.onSupplierChange();
   }
 
   onSupplierFocus() {
@@ -377,6 +662,22 @@ addEmptyProduct() {
     if (!this.supplierSearchTerm) {
       this.filteredSuppliers = [...this.suppliers];
     }
+  }
+
+  onSupplierBlur(): void {
+    setTimeout(() => {
+      this.showSupplierDropdown = false;
+      
+      const selectedSupplierId = this.purchaseOrderForm.get('supplier')?.value;
+      if (selectedSupplierId) {
+        const selectedSupplier = this.suppliers.find(s => s.id === selectedSupplierId);
+        if (selectedSupplier &&
+          !this.getSupplierDisplayName(selectedSupplier).toLowerCase().includes(this.supplierSearchTerm.toLowerCase())) {
+          this.purchaseOrderForm.get('supplier')?.setValue('');
+          this.supplierSearchTerm = '';
+        }
+      }
+    }, 200);
   }
 
   onProductSelect(index: number) {
@@ -410,69 +711,117 @@ addEmptyProduct() {
       this.calculateLineTotal(index);
     }
   }
+calculateLineTotal(index: number): void {
+  const productFormGroup = this.productsFormArray.at(index) as FormGroup;
+  
+  const quantity = parseFloat(productFormGroup.get('quantity')?.value) || 0;
+  const unitCost = parseFloat(productFormGroup.get('unitCost')?.value) || 0;
+  const discountType = productFormGroup.get('discountType')?.value;
+  const discountPercent = parseFloat(productFormGroup.get('discountPercent')?.value) || 0;
+  const discountAmount = parseFloat(productFormGroup.get('discountAmount')?.value) || 0;
+  const taxPercent = parseFloat(productFormGroup.get('taxPercent')?.value) || 0;
+  
+  // Calculate discount
+  const discount = discountType === 'percent' ? 
+    (unitCost * discountPercent) / 100 : 
+    discountAmount;
+
+  // Calculate values
+  const unitCostBeforeTax = unitCost - discount;
+  const subtotalBeforeTax = unitCostBeforeTax * quantity;
+  const taxAmount = subtotalBeforeTax * (taxPercent / 100);
+  const netCost = unitCostBeforeTax + (unitCostBeforeTax * (taxPercent / 100));
+  const lineTotal = netCost * quantity;
+
+  // Update form values
+  productFormGroup.patchValue({
+    unitCostBeforeTax: this.roundToTwo(unitCostBeforeTax),
+    subtotalBeforeTax: this.roundToTwo(subtotalBeforeTax),
+    taxAmount: this.roundToTwo(taxAmount),
+    netCost: this.roundToTwo(netCost),
+    lineTotal: this.roundToTwo(lineTotal)
+  }, { emitEvent: false });
+  
+  this.updateTotals();
+}
+
+updateTotals(): void {
+  // Calculate total items
+  this.totalItems = this.productsFormArray.controls.reduce((total, control) => {
+    return total + (parseInt(control.get('quantity')?.value) || 0);
+  }, 0);
+  
+  // Calculate net total amount from products
+  let productsTotal = this.productsFormArray.controls.reduce((total, control) => {
+    return total + (parseFloat(control.get('lineTotal')?.value) || 0);
+  }, 0);
+  
+  // Get shipping charges after tax from the form
+  const shippingCharges = parseFloat(
+    this.purchaseOrderForm.get('shippingDetails.shippingChargesAfterTax')?.value
+  ) || 0;
+  
+  // Final total amount
+  this.netTotalAmount = productsTotal + shippingCharges;
+}
+
+
+  calculateShippingTax(calculationType: 'before' | 'after' | 'both' = 'both'): void {
+    const shippingDetails = this.purchaseOrderForm.get('shippingDetails') as FormGroup;
+    
+    const beforeTaxCtrl = shippingDetails.get('shippingChargesBeforeTax');
+    const afterTaxCtrl = shippingDetails.get('shippingChargesAfterTax');
+    const taxPercentCtrl = shippingDetails.get('shippingTaxPercent');
+    const taxAmountCtrl = shippingDetails.get('shippingTaxAmount');
+    
+    if (!beforeTaxCtrl || !afterTaxCtrl || !taxPercentCtrl || !taxAmountCtrl) return;
+
+    if (calculationType === 'before') {
+      this.lastEditedShippingField = 'before';
+    } else if (calculationType === 'after') {
+      this.lastEditedShippingField = 'after';
+    }
+
+    const taxPercent = parseFloat(taxPercentCtrl.value) || 0;
+    
+    if (calculationType === 'before' || (calculationType === 'both' && this.lastEditedShippingField === 'before')) {
+      const beforeTax = parseFloat(beforeTaxCtrl.value) || 0;
+      const taxAmount = beforeTax * (taxPercent / 100);
+      const afterTax = beforeTax + taxAmount;
+      
+      afterTaxCtrl.setValue(afterTax.toFixed(2), { emitEvent: false });
+      taxAmountCtrl.setValue(taxAmount.toFixed(2), { emitEvent: false });
+    }
+    else if (calculationType === 'after' || (calculationType === 'both' && this.lastEditedShippingField === 'after')) {
+      const afterTax = parseFloat(afterTaxCtrl.value) || 0;
+      
+      if (taxPercent > 0) {
+        const beforeTax = afterTax / (1 + (taxPercent / 100));
+        const taxAmount = afterTax - beforeTax;
+        
+        beforeTaxCtrl.setValue(beforeTax.toFixed(2), { emitEvent: false });
+        taxAmountCtrl.setValue(taxAmount.toFixed(2), { emitEvent: false });
+      } else {
+        beforeTaxCtrl.setValue(afterTax.toFixed(2), { emitEvent: false });
+        taxAmountCtrl.setValue(0, { emitEvent: false });
+      }
+    }
+    
+    this.updateTotals();
+  }
 
   getTaxName(rate: number): string {
     const tax = this.taxRates.find(t => t.rate === rate);
     return tax ? tax.name : 'No Tax';
   }
 
-  calculateLineTotal(index: number): void {
-    const productFormGroup = this.productsFormArray.at(index) as FormGroup;
-    
-    const quantity = productFormGroup.get('quantity')?.value || 0;
-    const unitCost = productFormGroup.get('unitCost')?.value || 0;
-    const discountType = productFormGroup.get('discountType')?.value;
-    let discountPercent = productFormGroup.get('discountPercent')?.value || 0;
-    let discountAmount = productFormGroup.get('discountAmount')?.value || 0;
-    const taxPercent = productFormGroup.get('taxPercent')?.value || 0;
-    
-    if (discountType === 'percent') {
-      discountAmount = (unitCost * discountPercent) / 100;
-      productFormGroup.get('discountAmount')?.setValue(discountAmount.toFixed(2), { emitEvent: false });
-    } else {
-      discountPercent = (discountAmount / unitCost) * 100;
-      productFormGroup.get('discountPercent')?.setValue(discountPercent.toFixed(2), { emitEvent: false });
-    }
-
-    discountAmount = Math.min(discountAmount, unitCost);
-    const unitCostBeforeTax = unitCost - discountAmount;
-    const taxAmountPerUnit = (unitCostBeforeTax * taxPercent) / 100;
-    const netCostPerUnit = unitCostBeforeTax + taxAmountPerUnit;
-    const lineTotal = netCostPerUnit * quantity;
-
-    productFormGroup.patchValue({
-      unitCostBeforeTax: unitCostBeforeTax.toFixed(2),
-      subtotalBeforeTax: (unitCostBeforeTax * quantity).toFixed(2),
-      taxAmount: (taxAmountPerUnit * quantity).toFixed(2),
-      netCost: netCostPerUnit.toFixed(2),
-      lineTotal: lineTotal.toFixed(2)
-    }, { emitEvent: false });
-    
-    this.updateTotals();
-  }
-
-  updateTotals() {
-    this.totalItems = this.productsFormArray.controls.reduce((total, control) => {
-      return total + (parseInt(control.get('quantity')?.value) || 0);
-    }, 0);
-    
-    const productsTotal = this.productsFormArray.controls.reduce((total, control) => {
-      return total + (parseFloat(control.get('lineTotal')?.value) || 0);
-    }, 0);
-    
-    const shippingTotal = parseFloat(this.purchaseOrderForm.get('shippingDetails.shippingChargesAfterTax')?.value) || 0;
-    
-    this.netTotalAmount = productsTotal + shippingTotal;
-  }
-
   onFileChange(event: any, fieldName: string) {
     const file = event.target.files[0];
     if (file && file.size <= 5 * 1024 * 1024) {
       const allowedExtensions = ['.pdf', '.csv', '.zip', '.doc', '.docx', '.jpeg', '.jpg', '.png'];
-      const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
       
       if (allowedExtensions.includes(fileExtension)) {
-        // Store file reference for later upload, don't set directly in form
         if (fieldName === 'shippingDocuments') {
           this.selectedShippingDocument = file;
         } else {
@@ -485,10 +834,6 @@ addEmptyProduct() {
       alert('File size exceeds 5MB!');
     }
   }
-
-  // Add these properties to store file references
-  selectedShippingDocument: File | null = null;
-  selectedAttachDocument: File | null = null;
 
   searchProducts(event: any) {
     const searchTerm = event.target.value.toLowerCase().trim();
@@ -670,161 +1015,6 @@ addEmptyProduct() {
     }
   }
 
-async loadOrderDetails(orderId: string): Promise<void> {
-  this.isLoading = true;
-  try {
-    const orderData = await this.orderService.getOrderById(orderId);
-    
-    if (orderData) {
-      // Clear existing products
-      while (this.productsFormArray.length) {
-        this.productsFormArray.removeAt(0);
-      }
-      
-      // Wait for suppliers to load before setting supplier data
-      if (this.suppliers.length === 0) {
-        await new Promise(resolve => {
-          const subscription = this.supplierService.getSuppliers().subscribe(suppliers => {
-            this.suppliers = suppliers;
-            this.filteredSuppliers = [...this.suppliers];
-            subscription.unsubscribe();
-            resolve(true);
-          });
-        });
-      }
-
-      // Set supplier search term for display
-      if (orderData.supplier) {
-        const supplier = this.suppliers.find(s => s.id === orderData.supplier);
-        if (supplier) {
-          this.supplierSearchTerm = this.getSupplierDisplayName(supplier);
-          this.selectedSupplierDetails = supplier;
-        }
-      }
-      
-      // Populate the form with order data including required date and shipping date
-      this.purchaseOrderForm.patchValue({
-        supplier: orderData.supplier,
-            address: orderData.address || 'N/A', // Fallback to 'N/A'
-
-        referenceNo: orderData.referenceNo,
-        orderDate: this.formatDateForInput(orderData.date || orderData.orderDate),
-        requiredDate: this.formatDateForInput(orderData.requiredDate || orderData.requiredByDate), // This ensures required date is properly set
-        shippingDate: this.formatDateForInput(orderData.shippingDate),
-        businessLocation: orderData.businessLocation,
-        status: orderData.status || 'Pending',
-        additionalNotes: orderData.additionalNotes || '',
-        shippingDetails: {
-          shippingDetails: orderData.shippingDetails?.shippingDetails || '',
-          shippingAddress: orderData.shippingDetails?.shippingAddress || '',
-          shippingChargesBeforeTax: orderData.shippingDetails?.shippingChargesBeforeTax || 0,
-          shippingTaxPercent: orderData.shippingDetails?.shippingTaxPercent || 18,
-          shippingTaxAmount: orderData.shippingDetails?.shippingTaxAmount || 0,
-          shippingChargesAfterTax: orderData.shippingDetails?.shippingChargesAfterTax || orderData.shippingCharges || 0,
-          shippingStatus: orderData.shippingDetails?.shippingStatus || '',
-          deliveredTo: orderData.shippingDetails?.deliveredTo || '',
-        }
-      });
-
-      // Add products if they exist
-      if (orderData.products && orderData.products.length > 0) {
-        for (const product of orderData.products) {
-          const fullProduct = this.productsList.find(p => p.id === product.productId) || product;
-          
-          // Calculate discount values
-          let discountType = 'percent';
-          let discountPercent = 0;
-          let discountAmount = 0;
-          
-          if (product.discountType) {
-            discountType = product.discountType;
-          } else {
-            // Determine discount type from existing values
-            if (product.discountPercent !== undefined) {
-              discountType = 'percent';
-              discountPercent = product.discountPercent;
-              discountAmount = (product.unitCost * discountPercent) / 100;
-            } else if (product.discountAmount !== undefined) {
-              discountType = 'amount';
-              discountAmount = product.discountAmount;
-              discountPercent = (discountAmount / product.unitCost) * 100;
-            }
-          }
-          
-          const unitCostBeforeTax = product.unitCostBeforeTax || 
-                                  (product.unitCost - discountAmount);
-          const subtotalBeforeTax = product.subtotalBeforeTax || 
-                                   (unitCostBeforeTax * product.quantity);
-          
-          const taxPercent = fullProduct?.taxPercentage || product.taxPercent || 0;
-          const taxAmount = product.taxAmount || 
-                           (subtotalBeforeTax * (taxPercent / 100));
-          const netCost = product.netCost || 
-                         (unitCostBeforeTax + (unitCostBeforeTax * (taxPercent / 100)));
-          const lineTotal = product.lineTotal || 
-                          (netCost * product.quantity);
-          
-          const productFormGroup = this.fb.group({
-            productId: [product.productId, Validators.required],
-            quantity: [product.quantity, [Validators.required, Validators.min(1)]],
-            unitCost: [product.unitCost, [Validators.required, Validators.min(0)]],
-            discountType: [discountType],
-            discountPercent: [discountPercent, [Validators.min(0), Validators.max(100)]],
-            discountAmount: [discountAmount, [Validators.min(0)]],
-            unitCostBeforeTax: [this.roundToTwo(unitCostBeforeTax)],
-            subtotalBeforeTax: [this.roundToTwo(subtotalBeforeTax)],
-            taxPercent: [taxPercent, [Validators.min(0), Validators.max(100)]],
-            taxAmount: [this.roundToTwo(taxAmount)],
-            netCost: [this.roundToTwo(netCost)],
-            lineTotal: [this.roundToTwo(lineTotal)],
-            currentStock: [fullProduct?.currentStock || product.currentStock || 0],
-            selected: [false]
-          });
-          
-          this.productsFormArray.push(productFormGroup);
-        }
-        this.updateTotals();
-      } else {
-        this.addEmptyProduct();
-      }
-    }
-  } catch (error) {
-    console.error('Error loading order details:', error);
-  } finally {
-    this.isLoading = false;
-  }
-}
- formatDateForInput(dateInput: string | Date | null | undefined | Function): string {
-    // Handle function case explicitly
-    if (typeof dateInput === 'function') return '';
-    
-    if (!dateInput) return '';
-    
-    try {
-        const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-        return isNaN(date.getTime()) ? '' : date.toISOString().split('T')[0];
-    } catch {
-        return '';
-    }
-}
-
-  private initializeProductTaxes() {
-    this.productsFormArray.controls.forEach((control, index) => {
-      const productId = control.get('productId')?.value;
-      if (productId) {
-        const product = this.productsList.find(p => p.id === productId);
-        if (product && product.taxPercentage !== undefined) {
-          control.get('taxPercent')?.setValue(product.taxPercentage);
-          this.calculateLineTotal(index);
-        }
-      }
-    });
-  }
-
-  private roundToTwo(num: number): number {
-    return Math.round((num + Number.EPSILON) * 100) / 100;
-  }
-
   async updateOrder() {
     if (this.isSaving) return;
 
@@ -861,20 +1051,15 @@ async loadOrderDetails(orderId: string): Promise<void> {
       this.purchaseOrderForm.get('referenceNo')?.enable();
       const formData = this.purchaseOrderForm.value;
       
-      // Handle file uploads separately - don't include File objects in the main data
+      // Handle file uploads separately
       let attachDocumentUrl = null;
       let shippingDocumentUrl = null;
 
-      // Upload files if selected (implement your file upload service here)
       if (this.selectedAttachDocument) {
-        // attachDocumentUrl = await this.uploadFile(this.selectedAttachDocument);
-        // For now, just store the filename
         attachDocumentUrl = this.selectedAttachDocument.name;
       }
 
       if (this.selectedShippingDocument) {
-        // shippingDocumentUrl = await this.uploadFile(this.selectedShippingDocument);
-        // For now, just store the filename
         shippingDocumentUrl = this.selectedShippingDocument.name;
       }
       
@@ -892,7 +1077,6 @@ async loadOrderDetails(orderId: string): Promise<void> {
           taxPercent: product.taxPercent,
           taxAmount: product.taxAmount,
           netCost: product.netCost,
-          
           lineTotal: product.lineTotal,
           currentStock: foundProduct?.currentStock || 0,
           discountType: product.discountType,
@@ -903,7 +1087,6 @@ async loadOrderDetails(orderId: string): Promise<void> {
 
       delete formData.products;
 
-      // Remove File objects and replace with URLs/filenames
       if (attachDocumentUrl) {
         formData.attachDocument = attachDocumentUrl;
       } else {
@@ -915,15 +1098,17 @@ async loadOrderDetails(orderId: string): Promise<void> {
       } else {
         delete formData.shippingDetails.shippingDocuments;
       }
-  if (!formData.address) {
-    formData.address = 'N/A'; // or empty string ''
-  }
+
+      if (!formData.address) {
+        formData.address = 'N/A';
+      }
+
       formData.updatedAt = new Date().toISOString();
       formData.date = formData.orderDate;
       formData.supplierName = this.getSupplierDisplayName(this.selectedSupplierDetails);
       formData.locationName = formData.businessLocation;
       formData.requiredDate = formData.requiredDate || formData.orderDate;
-      formData.shippingDate = formData.shippingDate; // Include shipping date
+      formData.shippingDate = formData.shippingDate;
 
       formData.totalItems = this.totalItems;
       formData.subTotal = this.productsFormArray.controls.reduce((total, control) => {
@@ -948,6 +1133,7 @@ async loadOrderDetails(orderId: string): Promise<void> {
       this.isSaving = false;
       this.purchaseOrderForm.get('referenceNo')?.disable();
     }
+    
   }
 
   private highlightInvalidFields() {
@@ -1015,6 +1201,16 @@ async loadOrderDetails(orderId: string): Promise<void> {
     }
     
     return null;
+  }
+
+  onAddressInput(event: Event) {
+    const inputElement = event.target as HTMLInputElement;
+    this.purchaseOrderForm.get('address')?.setValue(inputElement.value);
+  }
+
+  getDisplayAddress(): string {
+    const address = this.purchaseOrderForm.get('address')?.value;
+    return address && address.trim() !== '' ? address : 'N/A';
   }
 
   cancelEdit() {

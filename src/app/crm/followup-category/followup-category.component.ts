@@ -1,36 +1,35 @@
-import { Component, OnInit } from '@angular/core';
-import { FollowupCategoryService } from '../../services/followup-category.service';
-
-// Define types for better type safety
-interface FollowupCategory {
-  id: string;
-  name: string;
-  description: string;
-  [key: string]: any; // Allow dynamic property access
-}
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import { FollowupCategoryService, FollowupCategory } from '../../services/followup-category.service';
 
 interface VisibleColumns {
-  [key: string]: boolean; // Add index signature
   name: boolean;
   description: boolean;
   action: boolean;
 }
 
 interface ColumnOption {
-  key: keyof VisibleColumns; // Use keyof to ensure keys match VisibleColumns
+  key: keyof VisibleColumns;
   label: string;
 }
 
 @Component({
   selector: 'app-followup-category',
+
   templateUrl: './followup-category.component.html',
   styleUrls: ['./followup-category.component.scss']
 })
-export class FollowupCategoryComponent implements OnInit {
+export class FollowupCategoryComponent implements OnInit, OnDestroy {
+  // Subscription to handle real-time updates
+  private categoriesSubscription?: Subscription;
+  
   // Toggle form visibility
   showForm = false;
   showColumnVisibility = false;
   isEditing = false;
+  isLoading = false;
   
   visibleColumns: VisibleColumns = {
     name: true,
@@ -48,24 +47,48 @@ export class FollowupCategoryComponent implements OnInit {
   currentPage = 1;
   pageSize = 25;
   sortField = 'name';
-  sortDirection = 'asc';
+  sortDirection: 'asc' | 'desc' = 'asc';
   searchText = '';
 
   // Model for the followup category data
   followupCategory: FollowupCategory = {
-    id: '',
     name: '',
     description: ''
   };
 
-  // List of categories fetched from Firestore
+  // List of categories
   followupCategories: FollowupCategory[] = [];
   filteredCategories: FollowupCategory[] = [];
 
   constructor(private followupCategoryService: FollowupCategoryService) {}
 
   ngOnInit(): void {
-    this.loadCategories();  // Load categories when the component is initialized
+    this.subscribeToCategories();
+  }
+
+  ngOnDestroy(): void {
+    if (this.categoriesSubscription) {
+      this.categoriesSubscription.unsubscribe();
+    }
+  }
+
+  // Subscribe to real-time category updates
+  private subscribeToCategories(): void {
+    this.isLoading = true;
+    this.categoriesSubscription = this.followupCategoryService.getFollowupCategories().subscribe({
+      next: (categories) => {
+        this.followupCategories = categories;
+        this.filteredCategories = [...categories];
+        this.applyFilter();
+        this.sortData();
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error fetching categories:', error);
+        alert('Error loading categories. Please try again.');
+        this.isLoading = false;
+      }
+    });
   }
 
   // Toggle form visibility
@@ -81,41 +104,49 @@ export class FollowupCategoryComponent implements OnInit {
     this.showColumnVisibility = !this.showColumnVisibility;
   }
 
-  // Load all categories from Firestore
-  loadCategories(): void {
-    this.followupCategoryService.getFollowupCategories().then(data => {
-      this.followupCategories = data;
-      this.filteredCategories = [...data];
-      this.sortData();
-    }).catch(error => {
-      console.error("Error fetching categories: ", error);
-    });
-  }
+  // Save the follow-up category
+  async onSave(): Promise<void> {
+    if (!this.followupCategory.name?.trim() || !this.followupCategory.description?.trim()) {
+      alert('Please fill in all required fields!');
+      return;
+    }
 
-  // Save the new follow-up category to Firestore
-  onSave(): void {
-    if (this.followupCategory.name && this.followupCategory.description) {
-      if (this.isEditing) {
-        this.followupCategoryService.updateFollowupCategory(this.followupCategory).then(() => {
-          console.log('Category updated!');
-          this.loadCategories();  // Reload categories after updating
-          this.resetForm();  // Reset the form after saving
-          this.toggleForm();  // Close the form
-        }).catch((error) => {
-          console.error('Error updating category: ', error);
-        });
-      } else {
-        this.followupCategoryService.addFollowupCategory(this.followupCategory).then(() => {
-          console.log('Category added!');
-          this.loadCategories();  // Reload categories after adding a new one
-          this.resetForm();  // Reset the form after saving
-          this.toggleForm();  // Close the form
-        }).catch((error) => {
-          console.error('Error adding category: ', error);
-        });
+    try {
+      this.isLoading = true;
+
+      // Check for duplicate names
+      const nameExists = await this.followupCategoryService.categoryNameExists(
+        this.followupCategory.name.trim(), 
+        this.isEditing ? this.followupCategory.id : undefined
+      );
+
+      if (nameExists) {
+        alert('A category with this name already exists. Please choose a different name.');
+        return;
       }
-    } else {
-      alert('Please fill in all fields!');
+
+      if (this.isEditing && this.followupCategory.id) {
+        await this.followupCategoryService.updateFollowupCategory({
+          ...this.followupCategory,
+          name: this.followupCategory.name.trim(),
+          description: this.followupCategory.description.trim()
+        });
+        console.log('Category updated successfully!');
+      } else {
+        await this.followupCategoryService.addFollowupCategory({
+          name: this.followupCategory.name.trim(),
+          description: this.followupCategory.description.trim()
+        });
+        console.log('Category added successfully!');
+      }
+      
+      this.resetForm();
+      this.toggleForm();
+    } catch (error) {
+      console.error('Error saving category: ', error);
+      alert('Error saving category. Please try again.');
+    } finally {
+      this.isLoading = false;
     }
   }
 
@@ -127,21 +158,31 @@ export class FollowupCategoryComponent implements OnInit {
   }
 
   // Delete category
-  deleteCategory(category: FollowupCategory): void {
-    if (confirm('Are you sure you want to delete this category?')) {
-      this.followupCategoryService.deleteFollowupCategory(category.id).then(() => {
-        console.log('Category deleted!');
-        this.loadCategories();  // Reload categories after deletion
-      }).catch((error) => {
-        console.error('Error deleting category: ', error);
-      });
+  async deleteCategory(category: FollowupCategory): Promise<void> {
+    if (!confirm('Are you sure you want to delete this category?')) {
+      return;
+    }
+
+    try {
+      this.isLoading = true;
+      if (category.id) {
+        await this.followupCategoryService.deleteFollowupCategory(category.id);
+        console.log('Category deleted successfully!');
+      } else {
+        console.error('Category ID is missing');
+        alert('Error: Category ID is missing.');
+      }
+    } catch (error) {
+      console.error('Error deleting category: ', error);
+      alert('Error deleting category. Please try again.');
+    } finally {
+      this.isLoading = false;
     }
   }
 
-  // Reset the form after saving data
+  // Reset the form
   resetForm(): void {
     this.followupCategory = {
-      id: '',
       name: '',
       description: ''
     };
@@ -149,7 +190,7 @@ export class FollowupCategoryComponent implements OnInit {
   }
 
   // Sorting functionality
-  sort(field: string): void {
+  sort(field: keyof FollowupCategory): void {
     if (this.sortField === field) {
       this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
@@ -161,8 +202,8 @@ export class FollowupCategoryComponent implements OnInit {
 
   sortData(): void {
     this.filteredCategories.sort((a, b) => {
-      const valueA = a[this.sortField]?.toLowerCase() || '';
-      const valueB = b[this.sortField]?.toLowerCase() || '';
+      const valueA = (a[this.sortField as keyof FollowupCategory] as string)?.toLowerCase() || '';
+      const valueB = (b[this.sortField as keyof FollowupCategory] as string)?.toLowerCase() || '';
       
       if (valueA < valueB) {
         return this.sortDirection === 'asc' ? -1 : 1;
@@ -197,12 +238,12 @@ export class FollowupCategoryComponent implements OnInit {
   }
 
   getStartIndex(): number {
-    return (this.currentPage - 1) * this.pageSize + 1;
+    return Math.min((this.currentPage - 1) * this.pageSize + 1, this.filteredCategories.length);
   }
 
   getEndIndex(): number {
     const endIndex = this.currentPage * this.pageSize;
-    return endIndex > this.filteredCategories.length ? this.filteredCategories.length : endIndex;
+    return Math.min(endIndex, this.filteredCategories.length);
   }
 
   previousPage(): void {
@@ -240,10 +281,10 @@ export class FollowupCategoryComponent implements OnInit {
     }
 
     const csvData = this.filteredCategories.map(category => 
-      dataKeys.map(key => category[key])
+      dataKeys.map(key => `"${category[key] || ''}"`)
     );
 
-    const csvContent = [headers, ...csvData].map(e => e.join(",")).join("\n");
+    const csvContent = [headers.map(h => `"${h}"`), ...csvData].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -254,60 +295,31 @@ export class FollowupCategoryComponent implements OnInit {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }
-
-  // Export to Excel
-  exportToExcel(): void {
-    import('xlsx').then(xlsx => {
-      const dataToExport = this.filteredCategories.map(category => {
-        const item: Record<string, any> = {};
-        if (this.visibleColumns.name) item['Followup Category'] = category.name;
-        if (this.visibleColumns.description) item['Description'] = category.description;
-        return item;
-      });
-
-      const worksheet = xlsx.utils.json_to_sheet(dataToExport);
-      const workbook = { Sheets: { 'data': worksheet }, SheetNames: ['data'] };
-      const excelBuffer = xlsx.write(workbook, { bookType: 'xlsx', type: 'array' });
-      this.saveAsExcelFile(excelBuffer, 'followup_categories');
-    });
-  }
-
-  private saveAsExcelFile(buffer: any, fileName: string): void {
-    import('file-saver').then(FileSaver => {
-      const data: Blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      FileSaver.saveAs(data, `${fileName}_export_${new Date().getTime()}.xlsx`);
-    });
+    URL.revokeObjectURL(url);
   }
 
   // Print functionality
   print(): void {
     const printContent = document.createElement('div');
     
-    // Create table headers based on visible columns
     let tableHeaders = '<tr>';
-    if (this.visibleColumns.name) tableHeaders += '<th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Followup Category</th>';
-    if (this.visibleColumns.description) tableHeaders += '<th style="padding: 8px; text-align: left; background-color: #f2f2f2;">Description</th>';
+    if (this.visibleColumns.name) tableHeaders += '<th style="padding: 8px; text-align: left; background-color: #f2f2f2; border: 1px solid #ddd;">Followup Category</th>';
+    if (this.visibleColumns.description) tableHeaders += '<th style="padding: 8px; text-align: left; background-color: #f2f2f2; border: 1px solid #ddd;">Description</th>';
     tableHeaders += '</tr>';
 
-    // Create table rows based on visible columns
     const tableRows = this.filteredCategories.map(category => {
       let row = '<tr>';
-      if (this.visibleColumns.name) row += `<td style="padding: 8px;">${category.name}</td>`;
-      if (this.visibleColumns.description) row += `<td style="padding: 8px;">${category.description}</td>`;
+      if (this.visibleColumns.name) row += `<td style="padding: 8px; border: 1px solid #ddd;">${category.name}</td>`;
+      if (this.visibleColumns.description) row += `<td style="padding: 8px; border: 1px solid #ddd;">${category.description}</td>`;
       row += '</tr>';
       return row;
     }).join('');
 
     printContent.innerHTML = `
       <h1 style="text-align: center; margin-bottom: 20px;">Followup Categories</h1>
-      <table border="1" style="width: 100%; border-collapse: collapse;">
-        <thead>
-          ${tableHeaders}
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>${tableHeaders}</thead>
+        <tbody>${tableRows}</tbody>
       </table>
       <div style="margin-top: 20px; text-align: right; font-size: 12px;">
         Printed on ${new Date().toLocaleString()}
@@ -322,14 +334,13 @@ export class FollowupCategoryComponent implements OnInit {
             <title>Followup Categories</title>
             <style>
               body { font-family: Arial, sans-serif; margin: 20px; }
-              @media print {
+              @media print { 
                 @page { size: auto; margin: 10mm; }
+                body { margin: 0; }
               }
             </style>
           </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
+          <body>${printContent.innerHTML}</body>
         </html>
       `);
       printWindow.document.close();
@@ -339,40 +350,19 @@ export class FollowupCategoryComponent implements OnInit {
     }
   }
 
-  // Export to PDF
-  exportToPDF(): void {
-    import('jspdf').then(jsPDF => {
-      import('jspdf-autotable').then(x => {
-        const doc = new jsPDF.default();
-        
-        // Prepare columns based on visibility
-        const columns: { header: string; dataKey: string }[] = [];
-        
-        if (this.visibleColumns.name) {
-          columns.push({ header: 'Followup Category', dataKey: 'name' });
-        }
-        if (this.visibleColumns.description) {
-          columns.push({ header: 'Description', dataKey: 'description' });
-        }
-
-        // Prepare data
-        const data = this.filteredCategories.map(category => {
-          const item: Record<string, any> = {};
-          if (this.visibleColumns.name) item['name'] = category.name;
-          if (this.visibleColumns.description) item['description'] = category.description;
-          return item;
-        });
-
-        (doc as any).autoTable({
-          columns: columns,
-          body: data,
-          theme: 'grid',
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [41, 128, 185], textColor: 255 }
-        });
-        
-        doc.save(`followup_categories_${new Date().getTime()}.pdf`);
-      });
-    });
+  // Clear all data (for testing purposes)
+  async clearAllData(): Promise<void> {
+    if (confirm('Are you sure you want to delete ALL categories? This action cannot be undone.')) {
+      try {
+        this.isLoading = true;
+        await this.followupCategoryService.clearAllCategories();
+        console.log('All categories cleared successfully!');
+      } catch (error) {
+        console.error('Error clearing categories:', error);
+        alert('Error clearing categories. Please try again.');
+      } finally {
+        this.isLoading = false;
+      }
+    }
   }
 }

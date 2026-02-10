@@ -1,30 +1,36 @@
-<!-- supplier-purchases.component.html -->
 <div class="container-fluid p-3"> 
+    <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="text-secondary mb-0">Supplier Profile</h4>
+    <button class="btn btn-success" (click)="openPaymentModal()">
+      <i class="fas fa-hand-holding-usd me-2"></i>Pay Cash / Add Payment
+    </button>
+  </div>
+  <app-account-summary [accountData]="accountSummaryData"></app-account-summary>
+  
   <!-- Supplier Details Card -->
   <div class="card mb-4 shadow-sm">
     <div class="card-header text-white d-flex justify-content-between align-items-center" style="background-color: #3d82bb;">
       <h4 class="mb-0">Supplier Details</h4>
-
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-6">
-   <div class="mb-3">
-          <label class="fw-bold text-secondary">Business Name:</label>
-          <p class="mb-1">{{ supplierDetails.businessName || 'N/A' }}</p>
-        </div>
-        <div class="mb-3">
-          <label class="fw-bold text-secondary">Contact Name:</label>
-          <p class="mb-1">{{ supplierDetails.firstName }} {{ supplierDetails.lastName }}</p>
-        </div>
+          <div class="mb-3">
+            <label class="fw-bold text-secondary">Business Name:</label>
+            <p class="mb-1">{{ supplierDetails.businessName || 'N/A' }}</p>
+          </div>
+          <div class="mb-3">
+            <label class="fw-bold text-secondary">Contact Name:</label>
+            <p class="mb-1">{{ supplierDetails.firstName }} {{ supplierDetails.lastName }}</p>
+          </div>
           <div class="mb-3">
             <label class="fw-bold text-secondary">Mobile:</label>
             <p class="mb-1">{{ supplierDetails.mobile || 'N/A' }}</p>
           </div>
           <div class="mb-3">
-  <label class="fw-bold text-secondary">Alternate Contact:</label>
-  <p class="mb-1">{{ supplierDetails.alternateContact || 'N/A' }}</p>
-</div>
+            <label class="fw-bold text-secondary">Alternate Contact:</label>
+            <p class="mb-1">{{ supplierDetails.alternateContact || 'N/A' }}</p>
+          </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
@@ -44,239 +50,355 @@
       </div>
     </div>
   </div>
-<!-- Update the date range filter section in supplier-purchases.component.html -->
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <div class="row">
-      <div class="col-md-6">
-        <label class="form-label">Date Range</label>
-        <div class="d-flex align-items-center mb-2">
-          <select class="form-select me-2" [(ngModel)]="selectedDateFilter" (change)="onDateFilterChange()">
-            <option *ngFor="let option of dateFilterOptions" [value]="option.value">{{option.label}}</option>
-          </select>
-          <div class="date-range-badge bg-light p-2 rounded">
-            {{ fromDate | date:'dd/MM/yyyy' }} - {{ toDate | date:'dd/MM/yyyy' }}
-          </div>
-        </div>
-        <div class="row" *ngIf="showCustomDateRange">
-          <div class="col-md-6">
-            <label class="form-label">From Date</label>
-            <input type="date" class="form-control" [(ngModel)]="customFromDate">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">To Date</label>
-            <input type="date" class="form-control" [(ngModel)]="customToDate">
-          </div>
-          <div class="col-md-12 mt-2">
-            <button class="btn btn-primary w-100" (click)="applyCustomDateRange()">
-              <i class="fas fa-check me-1"></i> Apply Custom Range
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- <div class="col-md-6">
-        <label class="form-label">Location</label>
-        <select class="form-select" [(ngModel)]="selectedLocation" (change)="onLocationChange()">
-          <option value="all">All Locations</option>
-          <option *ngFor="let loc of locations" [value]="loc.id">{{loc.name}}</option>
-        </select>
-      </div> -->
-    </div>
-  </div>
-</div>
-  <!-- <ul class="nav nav-pills nav-fill mb-4 bg-white shadow-sm rounded p-2">
-    <li class="nav-item">
-      <a class="nav-link" [class.active]="activeTab === 'ledger'" (click)="changeTab('ledger')" [ngStyle]="{'background-color': activeTab === 'ledger' ? '#3d82bb' : ''}">
-        <i class="fas fa-book me-1"></i> Ledger
-      </a>
-    </li>
-     <!-- In supplier-purchases.component.html -->
-<!-- Add a new tab for payments -->
-<!-- <li class="nav-item"> -->
 
-<!-- </li>
-    <li class="nav-item">
-      <a class="nav-link" [class.active]="activeTab === 'purchases'" (click)="changeTab('purchases')" [ngStyle]="{'background-color': activeTab === 'purchases' ? '#3d82bb' : ''}">
-        <i class="fas fa-shopping-cart me-1"></i> Purchases
-      </a>  
-    </li>
-    <li class="nav-item">
-  <a class="nav-link" [class.active]="activeTab === 'payments'" 
-     (click)="changeTab('payments'); loadPayments()">
-    <i class="fas fa-money-bill-wave me-1"></i> Payments
-  </a>
-</li> -->
-
-    <!-- <li class="nav-item">
-      <a class="nav-link" [class.active]="activeTab === 'stock-report'" (click)="changeTab('stock-report')" [ngStyle]="{'background-color': activeTab === 'stock-report' ? '#3d82bb' : ''}">
-        <i class="fas fa-boxes me-1"></i> Stock Report
-      </a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" [class.active]="activeTab === 'documents'" (click)="changeTab('documents')" [ngStyle]="{'background-color': activeTab === 'documents' ? '#3d82bb' : ''}">
-        <i class="fas fa-file-alt me-1"></i> Documents & Notes
-      </a>
-    </li>
-  </ul> --> 
-
-  <!-- Purchases Tab Content -->
-<!-- In supplier-purchases.component.html -->
-<div *ngIf="activeTab === 'purchases'">
-  <div class="card shadow-sm">
-   
-      
-      <div class="btn-group" role="group" style="height: 41px;">
-        <button class="btn btn-sm" 
-                [ngClass]="{'btn-primary': viewMode === 'purchases', 'btn-outline-primary': viewMode !== 'purchases'}"
-                (click)="viewMode = 'purchases'">
-          Purchases
-        </button>
-        <button class="btn btn-sm" 
-                [ngClass]="{'btn-primary': viewMode === 'ledger', 'btn-outline-primary': viewMode !== 'ledger'}"
-                (click)="viewMode = 'ledger'; updateLedgerView()">
-          Ledger View
-        </button>
-      </div>
-    </div>
-
-    <!-- Purchases View -->
-    <div *ngIf="viewMode === 'purchases'" class="card-body p-0">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Date</th>
-            <th>Reference</th>
-            <th>Total Amount</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let purchase of filteredPurchases">
-            <td>{{ purchase.purchaseDate | date }}</td>
-            <td>{{ purchase.referenceNo || 'N/A' }}</td>
-            <td>₹ {{ getSafeGrandTotal(purchase).toFixed(2) }}</td>
-            <td>
-              <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">
-                {{ purchase.purchaseStatus }}
-              </span>
-            </td>
-          
-          </tr>
-        </tbody>
-      </table>
-    </div>
-<div *ngIf="viewMode === 'ledger'" class="table-responsive">
-  <table class="table table-hover">
-    <thead class="table-light">
-      <tr>
-        <th>Date</th>
-        <th>Reference No</th>
-        <th>Supplier</th>
-        <th>Description</th>
-        <th>Credit (₹)</th>
-        <th>Debit</th>
-        <th>Balance (₹)</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let entry of ledgerEntries" 
-          [class.clickable]="entry.purchase || entry.payment"
-          (click)="entry.purchase ? viewPurchaseDetails(entry.purchase) : viewPaymentDetails(entry.payment?.id)">
-        <td>{{ entry.date | date:'mediumDate' }}</td>
-        <td>{{ entry.referenceNo }}</td>
-        <td>{{ entry.supplier }}</td>
-        <td>{{ entry.description }}</td>
-        <td class="text-success">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
-        <td class="text-danger">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
-        <td [ngClass]="{'text-danger': entry.balance < 0, 'text-success': entry.balance >= 0}">
-          {{ entry.balance | currency:'INR':'symbol':'1.2-2' }}
-        </td>
-        <td>
-          <span class="badge" [ngClass]="getStatusClass(entry.status)">
-            {{ entry.status }}
-          </span>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-  </div>
-</div>
-
-
-  <div *ngIf="activeTab === 'stock-report'">
+<!-- Tab Navigation -->
+  <div *ngIf="activeTab === 'purchases'">
     <div class="card shadow-sm">
-              <div class="card shadow-sm h-100">
-          <div class="col-md-6">
-            <label class="form-label">Date Range</label>
-            <select class="form-select" [(ngModel)]="selectedDateFilter" (change)="onDateFilterChange()">
-              <option *ngFor="let option of dateFilterOptions" [value]="option.value">{{option.label}}</option>
-            </select>
-          </div>
-          <div class="col-md-6" *ngIf="showCustomDateRange">
-            <div class="input-group">
-              <input type="date" class="form-control" [(ngModel)]="fromDate">
-              <span class="input-group-text">to</span>
-              <input type="date" class="form-control" [(ngModel)]="toDate">
-              <button class="btn btn-primary" type="button" (click)="applyDateFilter()">Apply</button>
-            </div>
-            
-          </div>
-          <div class="col-md-6">
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <label class="form-label">Location</label>
-        <select class="form-select" [(ngModel)]="selectedLocation" (change)="onLocationChange()">
-          <option value="all">All Locations</option>
-          <option *ngFor="let loc of locations" [value]="loc.id">{{loc.name}}</option>
-        </select>
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <div class="btn-group" role="group" style="height: 41px;">
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'purchases', 'btn-outline-primary': viewMode !== 'purchases'}"
+                  (click)="viewMode = 'purchases'">
+            <i class="fas fa-shopping-cart me-1"></i> Purchases
+          </button>
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'ledger', 'btn-outline-primary': viewMode !== 'ledger'}"
+                  (click)="viewMode = 'ledger'; updateLedgerView()">
+            <i class="fas fa-book me-1"></i> Ledger View
+          </button>
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'payments', 'btn-outline-primary': viewMode !== 'payments'}"
+                  (click)="viewMode = 'payments'; loadPayments()">
+            <i class="fas fa-money-bill-wave me-1"></i> Payments
+          </button>
+          <!-- New Documents Button -->
+          <button class="btn btn-sm" 
+                  [ngClass]="{'btn-primary': viewMode === 'documents', 'btn-outline-primary': viewMode !== 'documents'}"
+                  (click)="viewMode = 'documents'">
+            <i class="fas fa-folder-open me-1"></i> Documents & Notes
+          </button>
+        </div>
       </div>
+
+      <!-- Purchases View -->
+      <div *ngIf="viewMode === 'purchases'" class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th style="width: 30%;">Product Details</th>
+              <th>Payment Method</th>
+              <th class="text-end">Total Amount</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let purchase of filteredPurchases">
+              <td>{{ purchase.purchaseDate | date:'mediumDate' }}</td>
+              <td><span class="fw-bold text-primary">{{ purchase.referenceNo || 'N/A' }}</span></td>
+              <td>
+                <div *ngIf="purchase.products && purchase.products.length > 0">
+                  <div *ngFor="let item of purchase.products" class="d-flex justify-content-between small text-muted border-bottom mb-1 pb-1">
+                    <span>{{ item.productName }}</span>
+                    <span class="fw-bold">x{{ item.quantity }}</span>
+                  </div>
+                </div>
+                <small *ngIf="!purchase.products || purchase.products.length === 0" class="text-muted">
+                  No items listed
+                </small>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border">
+                  {{ purchase.paymentMethod || 'Credit/Pending' }}
+                </span>
+              </td>
+              <td class="text-end fw-bold">₹ {{ getSafeGrandTotal(purchase).toFixed(2) }}</td>
+              <td>
+                <span class="badge" [ngClass]="getStatusClass(purchase.purchaseStatus)">
+                  {{ purchase.purchaseStatus }}
+                </span>
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary" (click)="viewPurchaseDetails(purchase)">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredPurchases.length === 0">
+              <td colspan="7" class="text-center py-4 text-muted">No purchases found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Ledger View -->
+      <div *ngIf="viewMode === 'ledger'" class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Reference No</th>
+                <th>Supplier</th>
+                <th>Description</th>
+                <th class="text-end">Credit (₹)</th>
+                <th class="text-end">Debit (₹)</th>
+                <th class="text-end">Balance (₹)</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let entry of ledgerEntries" 
+                  [class.clickable]="entry.purchase || entry.payment"
+                  (click)="entry.purchase ? viewPurchaseDetails(entry.purchase) : viewPaymentDetails(entry.payment?.id)">
+                <td>{{ entry.date | date:'mediumDate' }}</td>
+                <td>{{ entry.referenceNo }}</td>
+                <td>{{ entry.supplier }}</td>
+                <td>{{ entry.description }}</td>
+                <td class="text-end text-success">{{ entry.type === 'credit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+                <td class="text-end text-danger">{{ entry.type === 'debit' ? (entry.amount | currency:'INR':'symbol':'1.2-2') : '-' }}</td>
+                <td class="text-end" [ngClass]="{'text-danger': entry.balance < 0, 'text-success': entry.balance >= 0}">
+                  {{ entry.balance | currency:'INR':'symbol':'1.2-2' }}
+                </td>
+                <td>
+                  <span class="badge" [ngClass]="getStatusClass(entry.status)">
+                    {{ entry.status }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+<!-- Payments View - UPDATED -->
+<div *ngIf="viewMode === 'payments'" class="card-body p-0">
+  <div *ngIf="paymentLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
     </div>
+    <p class="mt-2">Loading payments...</p>
   </div>
-</div>
-       
 
-
-
-
-
+  <div *ngIf="!paymentLoading && payments.length === 0" class="text-center py-5">
+    <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+    <p class="text-muted">No payments found for this supplier</p>
+  </div>
 
   <div *ngIf="!paymentLoading && payments.length > 0" class="table-responsive">
-    <table class="table table-striped">
-      <thead>
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
         <tr>
           <th>Date</th>
           <th>Reference</th>
-          <th>Method</th>
-          <th>Amount</th>
+          <th>Payment Method</th>
+          <th class="text-end">Amount</th>
           <th>Notes</th>
-          <th>Actions</th>
+          <th class="text-center">Action</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let payment of payments">
-          <td>{{ payment.paymentDate | date:'mediumDate' }}</td>
-          <td>{{ payment.referenceNo }}</td>
-          <td>{{ payment.paymentMethod }}</td>
-          <td>{{ payment.amount | currency:'INR':'symbol' }}</td>
-          <td>{{ payment.notes }}</td>
           <td>
-            <button class="btn btn-sm btn-outline-primary" (click)="viewPaymentDetails(payment.id)">
-              <i class="fas fa-eye"></i> View
+            <span class="fw-bold">{{ payment.paymentDate | date:'dd/MM/yyyy' }}</span>
+            <div class="small text-muted">{{ payment.paymentDate | date:'shortTime' }}</div>
+          </td>
+          <td>
+            <span class="fw-bold">{{ payment.referenceNo || 'N/A' }}</span>
+            <div *ngIf="payment.purchaseRef" class="small text-muted">For: {{payment.purchaseRef}}</div>
+          </td>
+          <td>
+            <span class="badge bg-info text-dark bg-opacity-25 border border-info">
+              {{ payment.paymentMethod || 'Cash' }}
+            </span>
+          </td>
+          <td class="text-end fw-bold text-success">
+            {{ payment.amount | currency:'INR':'symbol' }}
+          </td>
+          <td class="small text-muted" style="max-width: 200px;">
+            {{ payment.notes || '-' }}
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary" 
+                    (click)="openReceiptModal(payment)"
+                    title="View Receipt">
+              <i class="fas fa-receipt me-1"></i> View
             </button>
           </td>
         </tr>
       </tbody>
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="3" class="text-end fw-bold">Total Paid:</td>
+          <td class="text-end fw-bold">{{ getTotalPaid() | currency:'INR':'symbol' }}</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
-</div>     
+</div>
 
-      <!-- Location Filter Card -->
+<!-- Documents & Notes View -->
+      <div *ngIf="viewMode === 'documents'" class="card-body">
+        <div class="row">
+          <!-- Notes Section -->
+          <div class="col-md-6 mb-4 border-end">
+            <h6 class="text-muted border-bottom pb-2 mb-3">Notes</h6>
+            
+            <!-- Add New Note -->
+            <div class="card mb-3 bg-light border-0">
+              <div class="card-body p-3">
+                <div class="mb-2">
+                  <input type="text" class="form-control form-control-sm mb-2" [(ngModel)]="newNote.title" placeholder="Note Title">
+                  <textarea class="form-control form-control-sm mb-2" [(ngModel)]="newNote.content" rows="2" placeholder="Note Content"></textarea>
+                </div>
+                <div class="d-flex justify-content-end align-items-center">
+                  <!-- Removed "Private" Checkbox -->
+                  <button class="btn btn-sm btn-primary" (click)="addNote()">
+                    <i class="fas fa-plus me-1"></i> Add
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Notes List -->
+            <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
+              <div class="list-group-item px-0" *ngFor="let note of notes">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h6 class="mb-1">{{note.title}}</h6>
+                    <small class="text-muted d-block mb-1">{{note.content}}</small>
+                    <small class="text-muted" style="font-size: 0.75rem;">
+                      {{note.createdAt | date:'short'}} by {{note.createdBy}}
+                    </small>
+                  </div>
+                  <button class="btn btn-sm text-danger" (click)="deleteNote(note.id || '')">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+              </div>
+              <div *ngIf="notes.length === 0" class="text-center py-3 text-muted">
+                <small>No notes available</small>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Documents Section -->
+          <div class="col-md-6 mb-4">
+            <h6 class="text-muted border-bottom pb-2 mb-3">Documents</h6>
+            
+            <!-- Upload Area -->
+            <div class="mb-3">
+              <div class="input-group input-group-sm mb-2">
+                <input type="file" class="form-control" (change)="onFileSelected($event)" multiple>
+                <button class="btn btn-outline-secondary" type="button" (click)="uploadDocuments()" 
+                        [disabled]="isUploading || selectedFiles.length === 0">
+                  <span *ngIf="isUploading" class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                  <span *ngIf="!isUploading">Upload</span>
+                </button>
+              </div>
+              <!-- Removed "Mark as Private" Checkbox -->
+              
+              <div *ngIf="uploadProgress !== null" class="progress mt-2" style="height: 5px;">
+                <div class="progress-bar bg-success" [style.width]="uploadProgress + '%'"></div>
+              </div>
+            </div>
+
+            <!-- Documents List -->
+            <div class="table-responsive">
+              <table class="table table-sm table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <!-- <th>Date</th> -->
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let doc of documents">
+                    <td>
+                      <i class="fas fa-file-alt text-secondary me-2"></i>
+                      {{doc.name}}
+                    </td>
+                    <!-- <td class="small text-muted">{{doc.uploadedAt | date:'shortDate'}}</td> -->
+                    <td class="text-end">
+                      <!-- Changed View (Eye) to Download -->
+                      <button class="btn btn-link btn-sm p-0 me-2 text-primary" (click)="downloadDocument(doc)" title="Download">
+                        <i class="fas fa-download"></i>
+                      </button>
+                      <button class="btn btn-link btn-sm p-0 text-danger" (click)="deleteDocument(doc.id || '')" title="Delete">
+                        <i class="fas fa-trash-alt"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr *ngIf="documents.length === 0">
+                    <td colspan="3" class="text-center py-3 text-muted">
+                      <small>No documents uploaded</small>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+<div class="modal fade" [ngClass]="{'show': showReceiptModal}" [style.display]="showReceiptModal ? 'block' : 'none'" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title" style="color: #3d82bb;">
+          <i class="fas fa-receipt me-2"></i>Payment Receipt
+        </h5>
+        <button type="button" class="btn-close" (click)="closeReceiptModal()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedPayment">
+        
+        <!-- Receipt Header -->
+        <div class="text-center mb-4">
+          <h3 class="text-success fw-bold">{{ selectedPayment.amount | currency:'INR':'symbol' }}</h3>
+          <p class="text-muted mb-0">Payment Successful</p>
+          <small class="text-muted">{{ selectedPayment.paymentDate | date:'medium' }}</small>
+        </div>
+
+        <!-- Receipt Details -->
+        <div class="list-group list-group-flush">
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span class="text-muted">Reference No</span>
+            <span class="fw-bold">{{ selectedPayment.referenceNo || 'N/A' }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span class="text-muted">Payment Method</span>
+            <span class="badge bg-info text-dark">{{ selectedPayment.paymentMethod || 'Cash' }}</span>
+          </div>
+          <div class="list-group-item d-flex justify-content-between align-items-center">
+            <span class="text-muted">Paid To</span>
+            <span class="fw-bold">{{ supplierDetails.businessName || supplierDetails.firstName }}</span>
+          </div>
+          <div class="list-group-item" *ngIf="selectedPayment.notes">
+            <span class="text-muted d-block mb-1">Notes:</span>
+            <div class="p-2 bg-light rounded small">{{ selectedPayment.notes }}</div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeReceiptModal()">Close</button>
+        <!-- Updated click handler to call component method -->
  
- 
- 
- 
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Backdrop for Modal -->
+<div class="modal-backdrop fade show" *ngIf="showReceiptModal"></div>
+  <!-- Stock Report Tab -->
+  <div *ngIf="activeTab === 'stock-report'">
+    <div class="card shadow-sm">
       <div class="card-header bg-white">
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="mb-0" style="color: #3d82bb;">Stock Purchased from Supplier</h5>
@@ -291,23 +413,6 @@
       </div>
       
       <div class="card-body">
-        <!-- Contact Info Section -->
-        <div class="supplier-contact-info mb-4 bg-light p-3 rounded">
-          <div class="row">
-            <div class="col-md-6">
-              <h6 style="color: #3d82bb;">Contact Information</h6>
-              <p class="mb-1"><i class="fas fa-user me-2"></i> {{supplierDetails.firstName}} {{supplierDetails.lastName}}</p>
-              <p class="mb-1"><i class="fas fa-phone me-2"></i> {{supplierDetails.phone || 'N/A'}}</p>
-              <p class="mb-1"><i class="fas fa-building me-2"></i> {{supplierDetails.businessName}}</p>
-            </div>
-            <div class="col-md-6">
-              <h6 style="color: #3d82bb;">Address</h6>
-              <p class="mb-1">{{supplierDetails.address || 'N/A'}}</p>
-              <p class="mb-1"><i class="fas fa-id-card me-2"></i> {{supplierDetails.taxNumber ? 'Tax Number: ' + supplierDetails.taxNumber : 'N/A'}}</p>
-            </div>
-          </div>
-        </div>
-
         <!-- Loading State -->
         <div *ngIf="stockReportLoading" class="text-center py-4">
           <div class="spinner-border" role="status" style="color: #3d82bb;">
@@ -347,47 +452,14 @@
                   </span>
                 </td>
               </tr>
-              <tr *ngIf="filteredStockReport.length === 0">
-                <td colspan="9" class="text-center py-4">
-                  <i class="fas fa-box-open fa-2x text-muted mb-2"></i>
-                  <p>No stock purchases found</p>
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
-
-        <!-- Totals Section -->
-        <div *ngIf="!stockReportLoading && filteredStockReport.length > 0" class="mt-4">
-          <div class="row">
-            <div class="col-md-8">
-              <div class="card bg-light border-0">
-                <div class="card-body">
-                  <div class="row">
-                    <div class="col-md-6">
-                      <h6 style="color: #3d82bb;">Total Purchased:</h6>
-                      <h4>{{getTotalPurchasedQty()}}</h4>
-                    </div>
-                    <div class="col-md-6">
-                      <h6 style="color: #3d82bb;">Total Amount:</h6>
-                      <h4>{{getTotalAmount() |currency:'INR':'symbol' }}</h4>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 text-end">
-              <button class="btn btn-outline-primary me-2" (click)="exportStockReportToExcel()">
-                <i class="fas fa-file-excel me-1"></i> Export to Excel
-              </button>
-              <button class="btn btn-outline-danger" (click)="exportStockReportToPDF()">
-                <i class="fas fa-file-pdf me-1"></i> Export to PDF
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
+  </div>
+
+  <!-- Documents Tab -->
   <div *ngIf="activeTab === 'documents'">
     <div class="container-fluid p-3">
       <div class="card shadow-sm mb-4">
@@ -515,21 +587,6 @@
                           </button>
                         </div>
                       </td>
-
-
-                      <!-- Inside your purchases table -->
-<!-- <td>
-  <button class="btn btn-sm btn-outline-info" 
-          (click)="purchase && viewPayments(purchase)"
-          title="View Payment History">
-    <i class="fas fa-money-bill-wave"></i>
-  </button>
-  <button class="btn btn-sm btn-outline-primary ms-1" 
-          (click)="purchase && addPayment(purchase)"
-          title="Add Payment">
-    <i class="fas fa-plus"></i>
-  </button>
-</td> -->
                     </tr>
                   </tbody>
                 </table>
@@ -545,3 +602,212 @@
       </div>
     </div>
   </div>
+</div><!-- NEW: Payment Modal -->
+<div class="modal fade" [ngClass]="{'show': showPaymentModal}" [style.display]="showPaymentModal ? 'block' : 'none'" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-money-bill-wave me-2"></i>Record Payment to {{ supplierDetails.businessName || supplierDetails.firstName }}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closePaymentModal()" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body">
+        
+        <!-- NEW: Summary Cards inside Modal -->
+        <div class="row mb-4">
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light text-center">
+              <small class="text-uppercase text-muted fw-bold" style="font-size: 0.75rem;">Total Paid</small>
+              <div class="h5 mb-0 text-success mt-1">{{ accountSummaryData.totalPaid | currency:'INR' }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 border rounded bg-light text-center">
+              <small class="text-uppercase text-muted fw-bold" style="font-size: 0.75rem;">Balance Due</small>
+              <div class="h5 mb-0 text-danger mt-1">{{ accountSummaryData.balanceDue | currency:'INR' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <form [formGroup]="paymentForm">
+          
+          <!-- Amount & Date -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Amount <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">₹</span>
+                <input type="number" class="form-control fw-bold" formControlName="amount" placeholder="0.00">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Payment Date <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" formControlName="paymentDate">
+            </div>
+          </div>
+
+          <!-- Payment Method & Account -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Payment Method</label>
+              <select class="form-select" formControlName="paymentMethod">
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cheque">Cheque</option>
+                <option value="UPI">UPI</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Paid From Account <span class="text-danger">*</span></label>
+              <select class="form-select" formControlName="paymentAccountId">
+                <option [ngValue]="null" disabled>Select Account</option>
+                <option *ngFor="let acc of paymentAccounts" [value]="acc.id">
+                  {{ acc.name }} (Bal: ₹{{ acc.currentBalance | number:'1.2-2' }})
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Reference & Notes -->
+          <div class="mb-3">
+            <label class="form-label">Reference No / Transaction ID</label>
+            <input type="text" class="form-control" formControlName="referenceNo" placeholder="e.g. CHEQUE-1234">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" formControlName="notes" rows="2" placeholder="Enter payment remarks..."></textarea>
+          </div>
+
+        </form>
+      </div>
+      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closePaymentModal()">Cancel</button>
+        <button type="button" class="btn btn-success" (click)="submitPayment()" [disabled]="paymentForm.invalid || isSavingPayment">
+          <span *ngIf="isSavingPayment" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+          {{ isSavingPayment ? 'Processing...' : 'Confirm Payment' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Backdrop -->
+<div class="modal-backdrop fade show" *ngIf="showPaymentModal"></div>
+<!-- Enhanced Receipt Modal -->
+<div class="modal fade" [ngClass]="{'show': showReceiptModal}" [style.display]="showReceiptModal ? 'block' : 'none'" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-receipt me-2"></i>Payment Receipt
+        </h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeReceiptModal()" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body p-4" *ngIf="selectedPayment">
+        
+        <!-- Company Header -->
+        <div class="text-center border-bottom pb-3 mb-4">
+          <h4 class="mb-1">{{ accountSummaryData.companyDetails.name }}</h4>
+          <p class="text-muted mb-0 small">{{ accountSummaryData.companyDetails.address }}</p>
+        </div>
+
+        <!-- Receipt Header -->
+        <div class="text-center mb-4">
+          <div class="badge bg-success fs-5 px-4 py-2 mb-2">
+            <i class="fas fa-check-circle me-2"></i>PAYMENT RECEIVED
+          </div>
+          <h2 class="text-success fw-bold mb-1">{{ selectedPayment.amount | currency:'INR':'symbol' }}</h2>
+          <p class="text-muted mb-0">
+            <i class="fas fa-calendar-alt me-1"></i>
+            {{ selectedPayment.paymentDate | date:'fullDate' }}
+          </p>
+          <small class="text-muted">{{ selectedPayment.paymentDate | date:'shortTime' }}</small>
+        </div>
+
+        <!-- Payment Details Card -->
+        <div class="card bg-light border-0 mb-4">
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="text-muted small mb-1">Reference Number</label>
+                <div class="fw-bold">{{ selectedPayment.referenceNo || 'N/A' }}</div>
+              </div>
+              <div class="col-md-6">
+                <label class="text-muted small mb-1">Payment Method</label>
+                <div>
+                  <span class="badge bg-info text-dark">
+                    <i class="fas fa-credit-card me-1"></i>{{ selectedPayment.paymentMethod || 'Cash' }}
+                  </span>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="text-muted small mb-1">Paid By</label>
+                <div class="fw-bold">{{ supplierDetails.businessName || supplierDetails.firstName + ' ' + supplierDetails.lastName }}</div>
+              </div>
+              <div class="col-md-6">
+                <label class="text-muted small mb-1">Account</label>
+                <div class="fw-bold">{{ selectedPayment.accountName || 'N/A' }}</div>
+              </div>
+              <div class="col-12" *ngIf="selectedPayment.purchaseRef">
+                <label class="text-muted small mb-1">Related Purchase</label>
+                <div class="fw-bold">{{ selectedPayment.purchaseRef }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes Section -->
+        <div *ngIf="selectedPayment.notes" class="mb-4">
+          <label class="text-muted small mb-2">
+            <i class="fas fa-sticky-note me-1"></i>Notes
+          </label>
+          <div class="p-3 bg-light rounded border">
+            {{ selectedPayment.notes }}
+          </div>
+        </div>
+
+        <!-- Payment Breakdown -->
+        <div class="border-top pt-3">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Payment Amount:</span>
+            <span class="fw-bold">{{ selectedPayment.amount | currency:'INR':'symbol' }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Payment Status:</span>
+            <span class="badge bg-success">Paid</span>
+          </div>
+          <div class="d-flex justify-content-between border-top pt-2 mt-2">
+            <span class="fw-bold fs-5">Total Paid:</span>
+            <span class="fw-bold fs-5 text-success">{{ selectedPayment.amount | currency:'INR':'symbol' }}</span>
+          </div>
+        </div>
+
+        <!-- Footer Note -->
+        <div class="text-center mt-4 pt-3 border-top">
+          <small class="text-muted">
+            <i class="fas fa-info-circle me-1"></i>
+            This is a computer-generated receipt and does not require a signature.
+          </small>
+        </div>
+
+      </div>
+      
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" (click)="closeReceiptModal()">
+          <i class="fas fa-times me-1"></i>Close
+        </button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+          <i class="fas fa-print me-1"></i>Print Receipt
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backdrop for Modal -->
+<div class="modal-backdrop fade show" *ngIf="showReceiptModal"></div>

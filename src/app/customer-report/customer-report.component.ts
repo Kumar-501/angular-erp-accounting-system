@@ -1,4 +1,3 @@
-// customer-report.component.ts
 import { Component, OnInit, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CustomerService } from '../services/customer.service';
 import { UserService } from '../services/user.service';

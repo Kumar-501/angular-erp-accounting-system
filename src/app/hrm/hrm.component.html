@@ -1,6 +1,5 @@
-<!-- HRM Dashboard -->
 <div class="hrm-dashboard">
-  <!-- Stats Cards Row -->
+  <!-- Stats Cards Row - Keep existing layout -->
   <div class="cards-container">
     <div class="row">
       <div *ngFor="let card of cards" class="col-md-3 col-sm-6 mb-4">
@@ -19,23 +18,22 @@
     </div>
   </div>
 
-  <!-- HRM Menu (Already exists in your layout) -->
+  <!-- HRM Menu - Updated to show only filtered items -->
   <div class="hrm-menu">
     <span class="title">
       <i class="fa fa-users"></i>
       <span>HRM</span>
     </span>
-    <a routerLink="leave-type" routerLinkActive="active-link">Leave Type</a>
-    <a routerLink="leave" routerLinkActive="active-link">Leave</a>
-    <a routerLink="attendance" routerLinkActive="active-link">Attendance</a>
-    <a routerLink="payroll" routerLinkActive="active-link">Payroll</a>
-    <a routerLink="holiday" routerLinkActive="active-link">Holiday</a>
-    <a routerLink="departments" routerLinkActive="active-link">Departments</a>
-    <a routerLink="designations" routerLinkActive="active-link">Designations</a>
-    <a routerLink="sales-targets" routerLinkActive="active-link">Sales Targets</a>
-    <a routerLink="user1" routerLinkActive="active-link">Users</a>
+    
+    <!-- Filtered menu items -->
+    <a *ngFor="let item of filteredMenuItems" 
+       [routerLink]="item.path" 
+       routerLinkActive="active-link">
+      <i class="fa {{item.icon}}"></i>
+      <span>{{item.name}}</span>
+    </a>
   </div>
 
-  <!-- Router outlet for child components -->
+  <!-- Router outlet remains unchanged -->
   <router-outlet></router-outlet>
 </div>

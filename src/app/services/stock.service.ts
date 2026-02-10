@@ -1,6 +1,9 @@
 import { Injectable } from '@angular/core';
-import { increment } from '@angular/fire/firestore';
+import { increment, runTransaction, writeBatch } from '@angular/fire/firestore';
 import { COLLECTIONS } from '../../utils/constants';
+import { AuthService } from '../auth.service';
+import { LogStockMovementService } from './log-stock-movement.service';
+import { serverTimestamp } from '@angular/fire/firestore';
 
 import {
   Firestore,
@@ -16,43 +19,41 @@ import {
   onSnapshot,
   orderBy,
   setDoc,
-  writeBatch,
   CollectionReference,
-  serverTimestamp
 } from '@angular/fire/firestore';
 import { Observable, from, map, Subject } from 'rxjs';
+import { LocationService } from './location.service';
+
 import { ProductsService } from '../services/products.service';
 import { Product } from '../models/product.model';
 import { DailyStockService } from './daily-stock.service';
+import { StockLog, StockAction } from './log-stock-movement.service';
+import { GinTransfer } from './gin-transfer.service';
+import { SalesOrder } from '../models/sales-order.model';
 
-// Standardized interface for stock history entries
 interface StockHistoryEntry {
   id?: string;
   productId: string;
   locationId: string;
-  action: 'goods_received' | 'transfer' | 'adjustment' | 'sale' | 'initial_stock' | 'return' | 'add' | 'subtract';
+  action: 'goods_received' | 'transfer' | 'adjustment' | 'sale' | 'initial_stock' | 'return' | 'add' | 'subtract' | 'purchase_return' | 'sales_return';
   quantity: number;
   oldStock: number;
   newStock: number;
-  timestamp: Date | any; // Allow both Date and Firestore serverTimestamp
+  timestamp: Date | any;
   userId: string;
   referenceNo?: string;
   invoiceNo?: string;
   notes?: string;
-  // Transfer specific fields
   locationFrom?: string;
   locationTo?: string;
   transferId?: string;
-  // Purchase specific fields
   purchaseOrderId?: string;
   supplierName?: string;
-  // Other reference fields
   adjustmentId?: string;
   saleId?: string;
   returnId?: string;
 }
 
-// Interfaces
 export interface Stock {
   id: string;
   date: string;
@@ -103,7 +104,6 @@ export interface StockReductionParams {
   locationId: string;
   reference: string;
   action: string;
-  userId: string; // Added userId property
 }
 
 export interface StockAdjustmentParams {
@@ -119,6 +119,7 @@ export interface StockAdjustmentParams {
   providedIn: 'root'
 })
 export class StockService {
+  [x: string]: any;
   private stockCollection: CollectionReference;
   private usersCollection: CollectionReference;
   private stockHistoryCollection: CollectionReference;
@@ -126,10 +127,14 @@ export class StockService {
   private stockUpdatedSource = new Subject<void>();
   public stockUpdated$ = this.stockUpdatedSource.asObservable();
   
+  private authService!: AuthService;
+  
   constructor(
     private firestore: Firestore,
     private productService: ProductsService,
-    private dailyStockService: DailyStockService
+    private dailyStockService: DailyStockService,
+    private logStockService: LogStockMovementService,
+    private locationService: LocationService,
   ) {
     this.stockCollection = collection(this.firestore, 'stockTransfers');
     this.usersCollection = collection(this.firestore, 'users');
@@ -140,35 +145,50 @@ export class StockService {
     this.stockUpdatedSource.next();
   }
 
+  private async createReturnStockHistory(entry: {
+    productId: string;
+    locationId: string;
+    action: string;
+    quantity: number;
+    oldStock: number;
+    newStock: number;
+    referenceNo: string;
+    notes: string;
+    userId: string;
+  }): Promise<void> {
+    try {
+      const historyCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
+      await addDoc(historyCollection, {
+        ...entry,
+        timestamp: new Date()
+      });
+    } catch (error) {
+      console.error('Error creating return stock history:', error);
+    }
+  }
+
   async addStock(stockData: any): Promise<string> {
     try {
-      // Extract all product IDs from the transfer
       const productIds = stockData.locationTransfers.flatMap((transfer: any) =>
         transfer.products.map((product: any) => product.product)
       );
 
-      // Add the stock transfer document
       const docRef = await addDoc(this.stockCollection, {
         ...stockData,
         productIds,
         createdAt: new Date()
       });
 
-      // Process each product transfer
       for (const transfer of stockData.locationTransfers) {
         for (const product of transfer.products) {
           if (product.product && product.quantity > 0) {
-            // Get current product data
             const currentProduct = await this.productService.getProductById(product.product);
           
             if (currentProduct) {
-              // Calculate new stock (reducing from source location)
               const newStock = Math.max(0, (currentProduct.currentStock || 0) - product.quantity);
             
-              // Update product stock
               await this.productService.updateProductStock(product.product, newStock);
               
-              // Update daily stock snapshot
               await this.dailyStockService.updateDailySnapshot(
                 product.product,
                 transfer.locationFrom,
@@ -178,7 +198,6 @@ export class StockService {
                 product.quantity
               );
               
-              // Add stock history entry for source location
               await this.addStockHistoryEntry({
                 productId: product.product,
                 locationId: transfer.locationFrom,
@@ -199,7 +218,6 @@ export class StockService {
         }
       }
 
-      // Notify subscribers about the stock update
       this.notifyStockUpdate();
       return docRef.id;
     } catch (error) {
@@ -208,61 +226,209 @@ export class StockService {
     }
   }
 
+  async processGinTransfer(transfer: GinTransfer): Promise<void> {
+      if (!transfer.id || !transfer.locationFrom) {
+          throw new Error('Invalid transfer data: Missing ID or source location.');
+      }
+
+      console.log(`Processing stock movements for GIN: ${transfer.referenceNo}`);
+      const batch = writeBatch(this.firestore);
+      const historyEntries: StockHistoryEntry[] = [];
+      
+      // *** FIX START: In-memory tracker for source stock levels ***
+      const sourceStockTracker = new Map<string, number>();
+
+      if (!transfer.transfers || transfer.transfers.length === 0) {
+          console.warn('Transfer object has no items to process.');
+          return;
+      }
+
+      for (const locationTransfer of transfer.transfers) {
+          for (const product of locationTransfer.products) {
+              const sourceStockDocId = `${product.productId}_${transfer.locationFrom}`;
+              const destStockDocId = `${product.productId}_${locationTransfer.locationId}`;
+
+              const sourceStockRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, sourceStockDocId);
+              const destStockRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, destStockDocId);
+
+              // --- Source Stock Calculation (Corrected Logic) ---
+              let sourceOldStock: number;
+              
+              // 1. Check if we've already processed this product from the source location
+              if (sourceStockTracker.has(sourceStockDocId)) {
+                  sourceOldStock = sourceStockTracker.get(sourceStockDocId)!;
+              } else {
+                  // 2. If not, fetch it from the database for the first time
+                  const sourceStockSnap = await getDoc(sourceStockRef);
+                  sourceOldStock = sourceStockSnap.exists() ? sourceStockSnap.data()['quantity'] || 0 : 0;
+              }
+              
+              if (sourceOldStock < product.quantity) {
+                  throw new Error(`Insufficient stock for ${product.productName} at source location. Available: ${sourceOldStock}, Required: ${product.quantity}`);
+              }
+
+              const sourceNewStock = sourceOldStock - product.quantity;
+              
+              // 3. Update our in-memory tracker for the next iteration
+              sourceStockTracker.set(sourceStockDocId, sourceNewStock);
+              
+              // --- Destination Stock Calculation (Remains the same) ---
+              const destStockSnap = await getDoc(destStockRef);
+              const destOldStock = destStockSnap.exists() ? destStockSnap.data()['quantity'] || 0 : 0;
+              const destNewStock = destOldStock + product.quantity;
+
+              // Use the final tracked value for the source batch operation
+              batch.set(sourceStockRef, { quantity: sourceNewStock, lastUpdated: new Date() }, { merge: true });
+              batch.set(destStockRef, { productId: product.productId, locationId: locationTransfer.locationId, quantity: destNewStock, lastUpdated: new Date() }, { merge: true });
+
+              // --- History & Snapshot Logic (Remains the same) ---
+              historyEntries.push({
+                  productId: product.productId, locationId: transfer.locationFrom, action: 'transfer', quantity: product.quantity,
+                  oldStock: sourceOldStock, newStock: sourceNewStock, userId: 'system', referenceNo: transfer.referenceNo,
+                  notes: `Transfer Out to ${locationTransfer.locationName}`, locationFrom: transfer.locationFrom, locationTo: locationTransfer.locationId,
+                  transferId: transfer.id, 
+                  timestamp: new Date()
+              });
+              historyEntries.push({
+                  productId: product.productId, locationId: locationTransfer.locationId, action: 'transfer', quantity: product.quantity,
+                  oldStock: destOldStock, newStock: destNewStock, userId: 'system', referenceNo: transfer.referenceNo,
+                  notes: `Transfer In from ${transfer.locationFromName}`, locationFrom: transfer.locationFrom, locationTo: locationTransfer.locationId,
+                  transferId: transfer.id, 
+                  timestamp: new Date()
+              });
+
+              await this.dailyStockService.updateDailySnapshot(product.productId, transfer.locationFrom, new Date(), sourceNewStock, 'out', product.quantity, `gin_${transfer.id}`);
+              await this.dailyStockService.updateDailySnapshot(product.productId, locationTransfer.locationId, new Date(), destNewStock, 'in', product.quantity, `gin_${transfer.id}`);
+          }
+      }
+
+      await batch.commit();
+
+      for (const entry of historyEntries) {
+          await this.addStockHistoryEntry(entry);
+      }
+      
+      console.log(`Stock movements for GIN ${transfer.referenceNo} committed successfully.`);
+      this.notifyStockUpdate();
+  }
+
+  async updateStockAfterSale(productId: string, locationId: string, quantitySold: number, action: string, referenceId: string): Promise<void> {
+      const stockDocId = `${productId}_${locationId}`;
+      const stockRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      
+      try {
+        const stockSnap = await getDoc(stockRef);
+        const currentStock = stockSnap.exists() ? (stockSnap.data()['quantity'] || 0) : 0;
+        
+        const newStock = Math.max(0, currentStock - quantitySold);
+        
+        console.log(`🔄 Sale stock reduction: ${productId} at ${locationId} - ${currentStock} → ${newStock} (sold: ${quantitySold})`);
+        
+        await setDoc(stockRef, {
+          productId,
+          locationId,
+          quantity: newStock,
+          lastUpdated: new Date()
+        }, { merge: true });
+        
+        await this.dailyStockService.updateDailySnapshot(
+          productId,
+          locationId,
+          new Date(),
+          newStock,
+          'out',
+          quantitySold,
+          `sale_${referenceId}`
+        );
+        
+        await this.recordStockHistory({
+          productId,
+          locationId,
+          action: 'sale',
+          quantity: quantitySold,
+          oldStock: currentStock,
+          newStock,
+          referenceNo: referenceId,
+          timestamp: new Date(),
+          userId: 'system',
+          saleId: referenceId
+        });
+        
+        this.notifyStockUpdate();
+        console.log(`✅ Sale stock reduction completed for ${productId}`);
+        
+      } catch (error) {
+        console.error('Error updating stock after sale:', error);
+        throw error;
+      }
+  }
+
+  async processReturn(saleId: string, returnedProducts: any[]): Promise<void> {
+    try {
+      for (const product of returnedProducts) {
+        await this.updateStockAfterSale(
+          product.productId,
+          product.locationId,
+          product.returnedQuantity,
+          'return',
+          saleId
+        );
+      }
+    } catch (error) {
+      console.error('Error processing return:', error);
+      throw error;
+    }
+  }
+
+  private async recordStockHistory(historyData: StockHistoryEntry): Promise<void> {
+    try {
+      const historyRef = collection(this.firestore, 'stock-history');
+      await addDoc(historyRef, { ...historyData, timestamp: new Date() });
+    } catch (error) {
+      console.error('Error recording stock history:', error);
+      throw error;
+    }
+  }
+
   private async addStockHistoryEntry(historyData: StockHistoryEntry): Promise<void> {
     try {
-      const stockHistoryCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY);
+      const product = await this.productService.getProductById(historyData.productId);
+      const location = await this.locationService.getLocationById(historyData.locationId);
       
-      // Ensure consistent data structure and filter out undefined values
-      const standardizedEntry: any = {
+      const stockLogData: Omit<StockLog, 'id' | 'timestamp'> = {
         productId: historyData.productId,
+        productName: product?.productName || '',
+        sku: product?.sku || '',
         locationId: historyData.locationId,
-        action: historyData.action,
+        locationName: location?.name || historyData.locationId,
+        action: this.mapActionType(historyData.action),
         quantity: historyData.quantity,
         oldStock: historyData.oldStock,
         newStock: historyData.newStock,
-        timestamp: historyData.timestamp || new Date(),
-        userId: historyData.userId
+        userId: historyData.userId,
+        referenceNo: historyData.referenceNo,
+        notes: historyData.notes,
+        sourceLocationId: historyData.locationFrom,
+        destinationLocationId: historyData.locationTo,
+        transferId: historyData.transferId
       };
 
-      // Only add optional fields if they have values
-      if (historyData.referenceNo !== undefined && historyData.referenceNo !== null) {
-        standardizedEntry.referenceNo = historyData.referenceNo;
-      }
-      if (historyData.invoiceNo !== undefined && historyData.invoiceNo !== null) {
-        standardizedEntry.invoiceNo = historyData.invoiceNo;
-      }
-      if (historyData.notes !== undefined && historyData.notes !== null) {
-        standardizedEntry.notes = historyData.notes;
-      }
-      if (historyData.locationFrom !== undefined && historyData.locationFrom !== null) {
-        standardizedEntry.locationFrom = historyData.locationFrom;
-      }
-      if (historyData.locationTo !== undefined && historyData.locationTo !== null) {
-        standardizedEntry.locationTo = historyData.locationTo;
-      }
-      if (historyData.transferId !== undefined && historyData.transferId !== null) {
-        standardizedEntry.transferId = historyData.transferId;
-      }
-      if (historyData.purchaseOrderId !== undefined && historyData.purchaseOrderId !== null) {
-        standardizedEntry.purchaseOrderId = historyData.purchaseOrderId;
-      }
-      if (historyData.supplierName !== undefined && historyData.supplierName !== null) {
-        standardizedEntry.supplierName = historyData.supplierName;
-      }
-      if (historyData.adjustmentId !== undefined && historyData.adjustmentId !== null) {
-        standardizedEntry.adjustmentId = historyData.adjustmentId;
-      }
-      if (historyData.saleId !== undefined && historyData.saleId !== null) {
-        standardizedEntry.saleId = historyData.saleId;
-      }
-      if (historyData.returnId !== undefined && historyData.returnId !== null) {
-        standardizedEntry.returnId = historyData.returnId;
-      }
-      
-      await addDoc(stockHistoryCollection, standardizedEntry);
+      await this.logStockService.logStockMovement(stockLogData);
+      await addDoc(this.stockHistoryCollection, { ...historyData, timestamp: new Date() });
+
     } catch (error) {
       console.error('Error adding stock history entry:', error);
       throw error;
+    }
+  }
+
+  private mapActionType(action: string): StockAction {
+    switch(action) {
+      case 'add': return 'adjustment';
+      case 'subtract': return 'adjustment';
+      case 'transfer': return 'transfer_out';
+      case 'sales_return': return 'return';
+      default: return action as StockAction;
     }
   }
 
@@ -284,7 +450,6 @@ export class StockService {
     } as Product));
   }
 
-  // Updated stock value methods using DailyStockService
   async getDailyStockValue(date: Date): Promise<number> {
     try {
       return await this.dailyStockService.getStockValueForDate(date, 'closing');
@@ -317,8 +482,8 @@ export class StockService {
   }
 
   getStockListRealTime(): Observable<Stock[]> {
+    const q = query(this.stockCollection, orderBy('createdAt', 'desc'));
     return new Observable<Stock[]>(observer => {
-      const q = query(this.stockCollection, orderBy('createdAt', 'desc'));
       const unsubscribe = onSnapshot(q, snapshot => {
         const stocks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Stock[];
         observer.next(stocks);
@@ -328,7 +493,8 @@ export class StockService {
   }
 
   getStockById(stockId: string): Observable<Stock> {
-    return from(getDoc(doc(this.firestore, `stockTransfers/${stockId}`))).pipe(
+    const stockDocRef = doc(this.firestore, `stockTransfers/${stockId}`);
+    return from(getDoc(stockDocRef)).pipe(
       map(docSnapshot => {
         if (docSnapshot.exists()) {
           return { id: docSnapshot.id, ...docSnapshot.data() } as Stock;
@@ -340,30 +506,33 @@ export class StockService {
   }
 
   updateStock(stockId: string, stockData: any): Promise<void> {
-    return updateDoc(doc(this.firestore, `stockTransfers/${stockId}`), {
+    const stockDocRef = doc(this.firestore, `stockTransfers/${stockId}`);
+    return updateDoc(stockDocRef, {
       ...stockData,
       updatedAt: new Date()
     });
   }
 
   updateStockStatus(stockId: string, status: string): Promise<void> {
-    return updateDoc(doc(this.firestore, `stockTransfers/${stockId}`), {
+    const stockDocRef = doc(this.firestore, `stockTransfers/${stockId}`);
+    return updateDoc(stockDocRef, {
       status,
       updatedAt: new Date()
     });
   }
 
   deleteStock(stockId: string): Promise<void> {
-    return deleteDoc(doc(this.firestore, `stockTransfers/${stockId}`));
+    const stockDocRef = doc(this.firestore, `stockTransfers/${stockId}`);
+    return deleteDoc(stockDocRef);
   }
 
   getStockTransfersByProduct(productId: string): Observable<any[]> {
+    const q = query(
+      this.stockCollection,
+      where('productIds', 'array-contains', productId),
+      orderBy('createdAt', 'desc')
+    );
     return new Observable(observer => {
-      const q = query(
-        this.stockCollection,
-        where('productIds', 'array-contains', productId),
-        orderBy('createdAt', 'desc')
-      );
       const unsubscribe = onSnapshot(q, snapshot => {
         observer.next(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       }, error => observer.error(error));
@@ -371,21 +540,17 @@ export class StockService {
     });
   }
 
+
   async adjustProductStockWithParams(params: StockAdjustmentParams): Promise<void> {
-    // Get current stock from product-stock collection
     const stockDocId = `${params.productId}_${params.locationId}`;
     const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-    const stockDoc = await getDoc(stockDocRef);
     
-    let currentStock = 0;
-    if (stockDoc.exists()) {
-      currentStock = stockDoc.data()['quantity'] || 0;
-    }
+    const stockDoc = await getDoc(stockDocRef);
+    const currentStock = stockDoc.exists() ? (stockDoc.data()['quantity'] || 0) : 0;
     
     const stockChange = params.action === 'add' ? params.quantity : -params.quantity;
     const newStock = Math.max(0, currentStock + stockChange);
 
-    // Update product-stock document
     await setDoc(stockDocRef, {
       productId: params.productId,
       locationId: params.locationId,
@@ -394,7 +559,6 @@ export class StockService {
       updatedBy: params.userId
     }, { merge: true });
 
-    // Update daily stock snapshot
     await this.dailyStockService.updateDailySnapshot(
       params.productId,
       params.locationId,
@@ -419,37 +583,24 @@ export class StockService {
     this.notifyStockUpdate();
   }
 
-  /**
-   * Get consolidated stock history for a product across all locations
-   */
   getProductStockHistoryAllLocations(productId: string): Observable<StockHistoryEntry[]> {
     return this.getStockHistory(productId);
   }
 
-  /**
-   * Get stock history for a specific product at a specific location
-   */
   getProductStockHistoryByLocation(productId: string, locationId: string): Observable<StockHistoryEntry[]> {
     return this.getStockHistory(productId, locationId);
   }
 
-  /**
-   * Get stock movement history between locations for a product
-   */
   getStockTransferHistory(productId: string): Observable<StockHistoryEntry[]> {
+    const q = query(
+      this.stockHistoryCollection,
+      where('productId', '==', productId),
+      where('action', '==', 'transfer'),
+      orderBy('timestamp', 'desc')
+    );
     return new Observable(observer => {
-      const q = query(
-        collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
-        where('productId', '==', productId),
-        where('action', '==', 'transfer'),
-        orderBy('timestamp', 'desc')
-      );
-      
       const unsubscribe = onSnapshot(q, snapshot => {
-        const history = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        } as StockHistoryEntry));
+        const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockHistoryEntry));
         observer.next(history);
       }, error => observer.error(error));
       return unsubscribe;
@@ -458,8 +609,8 @@ export class StockService {
 
   getStockTransfersByLocation(locationId: string, isSource: boolean = true): Observable<Stock[]> {
     const field = isSource ? 'locationFrom' : 'locationTo';
+    const q = query(this.stockCollection, where(field, '==', locationId), orderBy('createdAt', 'desc'));
     return new Observable(observer => {
-      const q = query(this.stockCollection, where(field, '==', locationId), orderBy('createdAt', 'desc'));
       const unsubscribe = onSnapshot(q, snapshot => {
         observer.next(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Stock[]);
       }, error => observer.error(error));
@@ -468,8 +619,8 @@ export class StockService {
   }
 
   getUsers(): Observable<User[]> {
+    const q = query(this.usersCollection, orderBy('name'));
     return new Observable(observer => {
-      const q = query(this.usersCollection, orderBy('name'));
       const unsubscribe = onSnapshot(q, snapshot => {
         observer.next(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[]);
       }, error => observer.error(error));
@@ -478,7 +629,8 @@ export class StockService {
   }
 
   getUserById(userId: string): Observable<User> {
-    return from(getDoc(doc(this.firestore, `users/${userId}`))).pipe(
+    const userDocRef = doc(this.firestore, `users/${userId}`);
+    return from(getDoc(userDocRef)).pipe(
       map(docSnapshot => {
         if (docSnapshot.exists()) {
           return { id: docSnapshot.id, ...docSnapshot.data() } as User;
@@ -499,25 +651,17 @@ export class StockService {
   }): Promise<void> {
     const productRef = doc(this.firestore, `products/${params.productId}`);
     
-    // Get current stock first for verification
     const productSnap = await getDoc(productRef);
     const currentStock = productSnap.exists() ? (productSnap.data()['currentStock'] || 0) : 0;
 
-    console.log(`Updating stock for ${params.productId}: 
-      Current=${currentStock}, 
-      Received=${params.receivedQuantity}, 
-      New Total=${currentStock + params.receivedQuantity}`);
-
-    // ATOMICALLY increment stock
     await updateDoc(productRef, {
       currentStock: increment(params.receivedQuantity),
       totalQuantity: increment(params.receivedQuantity),
-      updatedAt: serverTimestamp()
+      updatedAt: new Date()
     });
 
     const newStock = currentStock + params.receivedQuantity;
 
-    // Update daily stock snapshot
     await this.dailyStockService.updateDailySnapshot(
       params.productId,
       params.locationId,
@@ -527,7 +671,6 @@ export class StockService {
       params.receivedQuantity
     );
 
-    // Add to stock history
     await this.addStockHistoryEntry({
       productId: params.productId,
       action: 'goods_received',
@@ -538,37 +681,31 @@ export class StockService {
       notes: params.notes || `Goods received (Ref: ${params.referenceNo})`,
       oldStock: currentStock,
       newStock: newStock,
-      timestamp: serverTimestamp()
+      timestamp: new Date()
     });
 
     this.notifyStockUpdate();
   }
 
   getStockHistory(productId: string, locationId?: string): Observable<StockHistoryEntry[]> {
+    let q;
+    if (locationId) {
+      q = query(
+        this.stockHistoryCollection,
+        where('productId', '==', productId),
+        where('locationId', '==', locationId),
+        orderBy('timestamp', 'desc')
+      );
+    } else {
+      q = query(
+        this.stockHistoryCollection,
+        where('productId', '==', productId),
+        orderBy('timestamp', 'desc')
+      );
+    }
     return new Observable(observer => {
-      let q;
-      if (locationId) {
-        // Get history for specific product at specific location
-        q = query(
-          collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
-          where('productId', '==', productId),
-          where('locationId', '==', locationId),
-          orderBy('timestamp', 'desc')
-        );
-      } else {
-        // Get history for product across all locations
-        q = query(
-          collection(this.firestore, COLLECTIONS.PRODUCT_STOCK_HISTORY),
-          where('productId', '==', productId),
-          orderBy('timestamp', 'desc')
-        );
-      }
-      
       const unsubscribe = onSnapshot(q, snapshot => {
-        const history = snapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        } as StockHistoryEntry));
+        const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as StockHistoryEntry));
         observer.next(history);
       }, error => observer.error(error));
       return unsubscribe;
@@ -576,13 +713,13 @@ export class StockService {
   }
 
   getStockTransactionsByDateRange(startDate: Date, endDate: Date): Observable<Stock[]> {
+    const q = query(
+      this.stockCollection,
+      where('createdAt', '>=', startDate),
+      where('createdAt', '<=', endDate),
+      orderBy('createdAt', 'desc')
+    );
     return new Observable(observer => {
-      const q = query(
-        this.stockCollection,
-        where('createdAt', '>=', startDate),
-        where('createdAt', '<=', endDate),
-        orderBy('createdAt', 'desc')
-      );
       const unsubscribe = onSnapshot(q, snapshot => {
         observer.next(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Stock[]);
       }, error => observer.error(error));
@@ -590,13 +727,7 @@ export class StockService {
     });
   }
 
-  // Legacy methods for backward compatibility - now use DailyStockService
-  private getDailyStockCollectionRef(date: Date) {
-    return collection(this.firestore, `dailyStock/${date.toISOString().split('T')[0]}/products`);
-  }
-
   async recordDailyStock(productId: string, stockData: { openingStock: number; closingStock: number; date: Date }): Promise<void> {
-    // Delegate to DailyStockService
     await this.dailyStockService.initializeDailySnapshotsIfNeeded(stockData.date);
   }
 
@@ -607,74 +738,15 @@ export class StockService {
       
       snapshots.forEach(snapshot => {
         const key = `${snapshot.productId}_${snapshot.locationId}`;
-        result[key] = {
-          opening: snapshot.openingStock,
-          closing: snapshot.closingStock
-        };
+        result[key] = { opening: snapshot.openingStock, closing: snapshot.closingStock };
       });
-      
       return result;
     } catch (error) {
       console.error('Error getting daily stock snapshot:', error);
       return {};
     }
   }
-// In stock.service.ts
 
-async reduceProductStock(params: StockReductionParams): Promise<void> {
-  try {
-    // Get current stock
-    const stockDocId = `${params.productId}_${params.locationId}`;
-    const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
-    const stockSnap = await getDoc(stockDocRef);
-    
-    let currentStock = 0;
-    if (stockSnap.exists()) {
-      currentStock = stockSnap.data()['quantity'] || 0;
-    }
-    
-    // Calculate new stock
-    const newStock = Math.max(0, currentStock - params.quantity);
-    
-    // Update stock document
-    await setDoc(stockDocRef, {
-      productId: params.productId,
-      locationId: params.locationId,
-      quantity: newStock,
-      lastUpdated: new Date(),
-      updatedBy: params.userId
-    }, { merge: true });
-    
-    // Update daily stock snapshot
-    await this.dailyStockService.updateDailySnapshot(
-      params.productId,
-      params.locationId,
-      new Date(),
-      newStock,
-      'out',
-      params.quantity
-    );
-    
-    // Add stock history entry
-    await this.addStockHistoryEntry({
-      productId: params.productId,
-      locationId: params.locationId,
-      action: params.action as StockHistoryEntry['action'],
-      quantity: params.quantity,
-      oldStock: currentStock,
-      newStock: newStock,
-      referenceNo: params.reference,
-      userId: params.userId,
-      notes: `Stock reduced for ${params.action}`,
-      timestamp: new Date()
-    });
-    
-    this.notifyStockUpdate();
-  } catch (error) {
-    console.error('Error reducing product stock:', error);
-    throw error;
-  }
-}
   async initializeDailyStock(date: Date): Promise<void> {
     await this.dailyStockService.createDailySnapshot(date);
   }
@@ -693,72 +765,22 @@ async reduceProductStock(params: StockReductionParams): Promise<void> {
     await this.dailyStockService.createDailySnapshot(nextDay);
   }
 
-  async reduceStock(params: StockReductionParams): Promise<void> {
-    const productRef = doc(this.firestore, `products/${params.productId}`);
-    const productSnap = await getDoc(productRef);
-
-    if (!productSnap.exists()) return;
-
-    const currentStock = productSnap.data()['currentStock'] || 0;
-    const newStock = Math.max(0, currentStock - params.quantity);
-
-    await updateDoc(productRef, { currentStock: newStock });
-
-    // Update daily stock snapshot
-    await this.dailyStockService.updateDailySnapshot(
+  async reduceStock(params: {
+    productId: string;
+    quantity: number;
+    locationId: string;
+    reference: string;
+    action: string;
+  }): Promise<void> {
+    await this.updateStockAfterSale(
       params.productId,
       params.locationId,
-      new Date(),
-      newStock,
-      'out',
-      params.quantity
+      params.quantity,
+      params.action,
+      params.reference
     );
-
-    await addDoc(collection(this.firestore, 'stockMovements'), {
-      productId: params.productId,
-      locationId: params.locationId,
-      action: params.action,
-      quantityChange: -params.quantity,
-      reference: params.reference,
-      timestamp: new Date()
-    });
-
-    await this.updateDailyStock(params.productId, params.locationId);
-    this.notifyStockUpdate();
   }
 
-  private async updateDailyStock(productId: string, locationId: string): Promise<void> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dailyStockRef = collection(this.firestore, 'dailyStock');
-    const q = query(
-      dailyStockRef,
-      where('productId', '==', productId),
-      where('locationId', '==', locationId),
-      where('date', '==', today)
-    );
-    const snapshot = await getDocs(q);
-    const currentProduct = await this.productService.getProductById(productId);
-
-    if (!snapshot.empty) {
-      await updateDoc(doc(this.firestore, `dailyStock/${snapshot.docs[0].id}`), {
-        closingStock: currentProduct?.currentStock || 0,
-        updatedAt: new Date()
-      });
-    } else {
-      await addDoc(dailyStockRef, {
-        productId,
-        locationId,
-        date: today,
-        openingStock: currentProduct?.currentStock || 0,
-        closingStock: currentProduct?.currentStock || 0,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    }
-  }
-
-  // Updated adjustProductStock method with daily stock tracking
   async adjustProductStock(
     productId: string,
     quantity: number,
@@ -768,87 +790,178 @@ async reduceProductStock(params: StockReductionParams): Promise<void> {
     userId: string,
     context?: any
   ): Promise<void> {
-    // Get current stock from product-stock collection
     const stockDocId = `${productId}_${locationId}`;
     const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+    
     const stockDoc = await getDoc(stockDocRef);
     const currentStock = stockDoc.exists() ? (stockDoc.data()?.['quantity'] || 0) : 0;
     
     let newStock = currentStock;
-    
-    // Calculate new stock based on action
     switch (action) {
-      case 'add':
-        newStock = currentStock + quantity;
-        break;
-      case 'subtract':
-        newStock = Math.max(0, currentStock - quantity);
-        break;
-      case 'set':
-        newStock = quantity;
-        break;
+      case 'add': newStock = currentStock + quantity; break;
+      case 'subtract': newStock = Math.max(0, currentStock - quantity); break;
+      case 'set': newStock = quantity; break;
     }
     
-    // Update product-stock collection
     await setDoc(stockDocRef, {
-      productId,
-      locationId,
-      quantity: newStock,
-      lastUpdated: new Date(),
-      updatedBy: userId
+      productId, locationId, quantity: newStock,
+      lastUpdated: new Date(), updatedBy: userId
     }, { merge: true });
     
-    // Update daily stock snapshot
     const movementType = newStock > currentStock ? 'in' : 'out';
     const movementQuantity = Math.abs(newStock - currentStock);
     
     await this.dailyStockService.updateDailySnapshot(
-      productId,
-      locationId,
-      new Date(),
-      newStock,
-      movementType,
-      movementQuantity
+      productId, locationId, new Date(),
+      newStock, movementType, movementQuantity
     );
     
-    // Update legacy product record (for backward compatibility)
     const productRef = doc(this.firestore, `products/${productId}`);
-    const updateData: any = {
-      updatedAt: serverTimestamp()
-    };
+    const updateData: any = { updatedAt: new Date() };
     
-    // Handle different stock adjustment types for legacy field
     switch (action) {
-      case 'add':
-        updateData.totalQuantity = increment(quantity);
-        break;
-      case 'subtract':
-        updateData.currentStock = increment(-quantity);
-        break;
-      case 'set':
-        updateData.currentStock = quantity;
-        break;
+      case 'add': updateData.totalQuantity = increment(quantity); break;
+      case 'subtract': updateData.currentStock = increment(-quantity); break;
+      case 'set': updateData.currentStock = quantity; break;
     }
     
     await updateDoc(productRef, updateData);
     
-    // Add stock history record with proper oldStock and newStock
     const historyEntry: StockHistoryEntry = {
-      productId,
-      quantity: Math.abs(newStock - currentStock),
-      oldStock: currentStock,
-      newStock: newStock,
-      locationId,
-      referenceNo: reference,
-      userId,
-      timestamp: new Date(),
-      action: 'goods_received',
+      productId, quantity: Math.abs(newStock - currentStock),
+      oldStock: currentStock, newStock, locationId, referenceNo: reference,
+      userId, timestamp: new Date(), action: 'goods_received',
       notes: `Added ${quantity} units (Ref: ${reference})`,
       ...(context || {})
     };
     
     await this.addStockHistoryEntry(historyEntry);
-    this.notifyStockUpdate(); // This will refresh components listening to stock updates
+    this.notifyStockUpdate();
+  }
+
+  /**
+   * *** THIS IS THE PRIMARY FIX ***
+   * This is the definitive method for processing a purchase return.
+   * It uses a Firestore Transaction to guarantee the stock update is atomic and reliable.
+   */
+  async processPurchaseReturn(returnData: any): Promise<void> {
+    console.log('🔄 [TRANSACTION START] Processing purchase return:', returnData);
+
+    try {
+      // A transaction ensures all database writes succeed or fail together.
+      await runTransaction(this.firestore, async (transaction) => {
+        for (const product of returnData.products) {
+          const productId = product.productId || product.id;
+          const locationId = returnData.businessLocationId;
+          const returnQuantity = product.returnQuantity || product.quantity || 0;
+
+          if (!productId || !locationId || returnQuantity <= 0) {
+            console.warn('⚠️ Skipping invalid product in return:', { productId, locationId, returnQuantity });
+            continue;
+          }
+
+          console.log(`📦 Processing item: ${productId} at ${locationId}, quantity: ${returnQuantity}`);
+
+          const stockDocId = `${productId}_${locationId}`;
+          const stockRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+          
+          // 1. READ the current stock within the transaction
+          const stockDoc = await transaction.get(stockRef);
+          const currentStock = stockDoc.exists() ? (stockDoc.data()['quantity'] || 0) : 0;
+          console.log(`📊 Current stock for ${productId} is: ${currentStock}`);
+
+          const newStock = Math.max(0, currentStock - returnQuantity);
+          console.log(`📉 New calculated stock will be: ${newStock}`);
+
+          // 2. WRITE the new stock value within the transaction
+          transaction.set(stockRef, {
+            quantity: newStock,
+            lastUpdated: new Date()
+          }, { merge: true });
+
+          // 3. UPDATE the daily snapshot for accurate reporting
+          await this.dailyStockService.updateDailySnapshot(
+            productId,
+            locationId,
+            new Date(returnData.returnDate),
+            newStock,
+            'out', // A purchase return is an 'out' movement
+            returnQuantity,
+            `purchase_return_${returnData.referenceNo}`
+          );
+
+          // 4. Create a history log entry
+          await this.createReturnStockHistory({
+              productId,
+              locationId,
+              action: 'purchase_return',
+              quantity: returnQuantity,
+              oldStock: currentStock,
+              newStock,
+              referenceNo: returnData.referenceNo || `RETURN-${returnData.id}`,
+              notes: `Purchase return: ${returnData.reason || 'No reason provided'}`,
+              userId: returnData.createdBy || 'system'
+          });
+        }
+      });
+
+      this.notifyStockUpdate();
+      console.log('✅ [TRANSACTION SUCCESS] Purchase return processed.');
+
+    } catch (error) {
+      console.error('❌ [TRANSACTION FAILED] Error processing purchase return:', error);
+      throw new Error('Failed to process purchase return. Stock was not updated.');
+    }
+  }
+
+  async processSalesReturn(returnData: {
+    productId: string;
+    locationId: string;
+    returnQuantity: number;
+    referenceNo: string;
+    notes: string;
+    userId: string;
+  }): Promise<void> {
+    try {
+      console.log('🔄 Processing sales return:', returnData);
+
+      const { productId, locationId, returnQuantity, referenceNo, notes, userId } = returnData;
+
+      if (!productId || !locationId || returnQuantity <= 0) {
+        console.warn('⚠️ Invalid sales return data:', returnData);
+        return;
+      }
+
+      const stockDocId = `${productId}_${locationId}`;
+      const stockRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+      const stockDoc = await getDoc(stockRef);
+      
+      const currentStock = stockDoc.exists() ? (stockDoc.data()['quantity'] || 0) : 0;
+      const newStock = currentStock + returnQuantity;
+      
+      await setDoc(stockRef, {
+        productId, locationId, quantity: newStock,
+        lastUpdated: new Date(), updatedBy: userId
+      }, { merge: true });
+
+      await this.dailyStockService.updateDailySnapshot(
+        productId, locationId, new Date(),
+        newStock, 'in', returnQuantity, referenceNo
+      );
+
+      await this.createReturnStockHistory({
+        productId, locationId, action: 'sales_return',
+        quantity: returnQuantity, oldStock: currentStock, newStock,
+        referenceNo, notes, userId
+      });
+
+      this.notifyStockUpdate();
+      console.log(`✅ Sales return processed successfully for ${productId}, stock restored`);
+      
+    } catch (error) {
+      console.error('❌ Error processing sales return:', error);
+      throw error;
+    }
   }
 
   async initializeProductStock(product: any, initialQuantity: number, locationId: string): Promise<void> {
@@ -856,7 +969,6 @@ async reduceProductStock(params: StockReductionParams): Promise<void> {
       throw new Error('Invalid product, quantity, or location');
     }
 
-    // Update product-stock collection instead of product
     const stockDocId = `${product.id}_${locationId}`;
     const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
     
@@ -869,7 +981,6 @@ async reduceProductStock(params: StockReductionParams): Promise<void> {
         updatedBy: 'system'
       }, { merge: true });
 
-      // Initialize daily stock snapshot
       await this.dailyStockService.updateDailySnapshot(
         product.id,
         locationId,
@@ -898,4 +1009,111 @@ async reduceProductStock(params: StockReductionParams): Promise<void> {
       throw error;
     }
   }
+
+
+  async getProductStock(productId: string): Promise<any> {
+    try {
+      const stockCollection = collection(this.firestore, COLLECTIONS.PRODUCT_STOCK);
+      const q = query(stockCollection, where('productId', '==', productId));
+      const querySnapshot = await getDocs(q);
+
+      const stockData: any = {};
+      querySnapshot.forEach(doc => {
+        const data = doc.data();
+        stockData[data['locationId']] = {
+          quantity: data['quantity'] || 0,
+          locationId: data['locationId']
+        };
+      });
+
+      return stockData;
+    } catch (error) {
+      console.error('Error getting product stock:', error);
+      throw error;
+    }
+  }
+
+  async reduceProductStockForSale(sale: SalesOrder): Promise<void> {
+    if (!sale.id) throw new Error('Sale ID is required to reduce stock.');
+    if (!sale.products || sale.products.length === 0) {
+      console.warn(`Sale ${sale.id} has no products. Skipping stock reduction.`);
+      return;
+    }
+
+    try {
+      await runTransaction(this.firestore, async (transaction) => {
+        for (const product of sale.products!) {
+          const productId = product.productId || product.id;
+          if (!productId) continue;
+
+          const locationId = sale.businessLocationId || sale.businessLocation || 'default';
+          const stockDocId = `${productId}_${locationId}`;
+          const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+
+          const stockSnap = await transaction.get(stockDocRef);
+          const currentStock = stockSnap.exists() ? (stockSnap.data()['quantity'] || 0) : 0;
+          const quantitySold = product.quantity ?? 0;
+          const newStock = currentStock - quantitySold;
+
+          transaction.set(stockDocRef, { quantity: newStock, lastUpdated: serverTimestamp() }, { merge: true });
+
+          await this.dailyStockService.updateDailySnapshot(
+            productId,
+            locationId,
+            new Date(),
+            newStock,
+            'out',
+            quantitySold,
+            `sale_${sale.id}`
+          );
+        }
+      });
+      console.log(`Stock successfully reduced for sale ${sale.id}`);
+    } catch (error) {
+      console.error('Error in batch stock reduction transaction:', error);
+      throw error;
+    }
+  }
+
+  private async restoreProductStockForSale(sale: SalesOrder): Promise<void> {
+    if (!sale.id) throw new Error('Sale ID is required to restore stock.');
+    if (!sale.products || sale.products.length === 0) {
+      console.warn(`Sale ${sale.id} has no products to restore stock for. Skipping.`);
+      return;
+    }
+    
+    try {
+      await runTransaction(this.firestore, async (transaction) => {
+        for (const product of sale.products!) {
+          const productId = product.productId || product.id;
+          if (!productId) continue;
+
+          const locationId = sale.businessLocationId || sale.businessLocation || 'default';
+          const stockDocId = `${productId}_${locationId}`;
+          const stockDocRef = doc(this.firestore, COLLECTIONS.PRODUCT_STOCK, stockDocId);
+
+          const stockSnap = await transaction.get(stockDocRef);
+          const currentStock = stockSnap.exists() ? (stockSnap.data()['quantity'] || 0) : 0;
+          const quantityToRestore = product.quantity ?? 0;
+          const newStock = currentStock + quantityToRestore;
+
+          transaction.set(stockDocRef, { quantity: newStock, lastUpdated: serverTimestamp() }, { merge: true });
+
+          await this.dailyStockService.updateDailySnapshot(
+            productId,
+            locationId,
+            new Date(),
+            newStock,
+            'in',
+            quantityToRestore,
+            `reversal_sale_${sale.id}`
+          );
+        }
+      });
+      console.log(`Stock successfully restored for reverted sale ${sale.id}`);
+    } catch (error) {
+        console.error('Error restoring product stock:', error);
+        throw error;
+    }
+  }  
 }

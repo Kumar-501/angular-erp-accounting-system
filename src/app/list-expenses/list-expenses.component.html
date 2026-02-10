@@ -19,14 +19,13 @@
         <button class="btn-filter" [class.active]="activeFilter === 'payroll'" (click)="applyFilter('payroll')">
           <i class="fa fa-money-bill-wave icon-payroll"></i> Payroll
         </button>
-
-
         <button class="btn-filter" [class.active]="activeFilter === 'purchase'" (click)="applyFilter('purchase')">
-  <i class="fa fa-shopping-bag icon-purchase"></i> Purchases
-</button>
+          <i class="fa fa-shopping-bag icon-purchase"></i> Purchases
+        </button>
       </div>
     </div>
   </div>
+  
   <div class="expenses-card">
     <div class="expenses-header">
       <h2 class="section-title">All entries</h2>
@@ -35,17 +34,18 @@
           <span class="add-icon">+</span> Add Expense
         </button>
         <div class="action-buttons">
-  
-  <button class="btn-delete" (click)="deleteSelectedEntries()" [disabled]="selectedEntries.size === 0">
-    <i class="fa fa-trash"></i> Delete Selected ({{selectedEntries.size}})
-  </button>
-</div>
+          <button class="btn-delete" (click)="deleteSelectedEntries()" [disabled]="selectedEntries.size === 0">
+            <i class="fa fa-trash"></i> Delete Selected ({{selectedEntries.size}})
+          </button>
+        </div>
       </div>
     </div>
+    
     <div class="table-controls">
       <div class="table-options">
         <span>Show</span>
         <select class="entries-select" [(ngModel)]="entriesPerPage" (change)="changeEntriesPerPage($event)">
+          <option value="10">10</option>
           <option value="25">25</option>
           <option value="50">50</option>
           <option value="100">100</option>
@@ -61,7 +61,6 @@
         <button class="btn-export" (click)="printTable()">
           <i class="fa fa-print"></i> Print
         </button>
-     
       </div>
       
       <div class="search-container">
@@ -77,258 +76,395 @@
         </div>
       </div>
       
-<table class="expenses-table" *ngIf="!isLoading">
-  <thead>
-    <tr>
-      <th>
-        <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
-      </th>
-      <th (click)="sortData('entryType')">
-        Type
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'entryType' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'entryType' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'entryType'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('date')">
-        Date
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'date' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'date' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'date'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('referenceNo')">
-        Reference No
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'referenceNo' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'referenceNo' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'referenceNo'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('businessLocationName')">
-        Business Location
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'businessLocationName' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'businessLocationName' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'businessLocationName'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('categoryName')">
-        Category
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'categoryName' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'categoryName' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'categoryName'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('expenseType')">
-        Expense Type
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'expenseType' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'expenseType' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'expenseType'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('accountHead')">
-        Account Head
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'accountHead' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'accountHead' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'accountHead'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('expenseFor')">
-        Expense For/Customer
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'expenseFor' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'expenseFor' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'expenseFor'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('totalAmount')">
-        Total Amount
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'totalAmount'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('paymentMethod')">
-        Payment Method
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'paymentMethod' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'paymentMethod' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'paymentMethod'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('taxAmount')"> 
-  Tax Amount 
-  <i class="fas ms-1" [ngClass]="{
-    'fa-sort-up': sortField === 'taxAmount' && sortDirection === 'asc',
-    'fa-sort-down': sortField === 'taxAmount' && sortDirection === 'desc',
-    'fa-sort': sortField !== 'taxAmount'
-  }"></i>
-</th>
-<th>CGST</th>
-<th>SGST</th>
-<th>IGST</th>
-      <th (click)="sortData('paymentAccount')">
-        Payment Account
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort': sortField !== 'paymentAccount', 
-             'fa-sort-up': sortField === 'paymentAccount' && sortDirection === 'asc', 
-             'fa-sort-down': sortField === 'paymentAccount' && sortDirection === 'desc'
-           }">
-        </i>
-      </th>
-      <th (click)="sortData('paymentStatus')">
-        Payment Status
-        <i class="fas ms-1" 
-           [ngClass]="{
-             'fa-sort-up': sortField === 'paymentStatus' && sortDirection === 'asc',
-             'fa-sort-down': sortField === 'paymentStatus' && sortDirection === 'desc',
-             'fa-sort': sortField !== 'paymentStatus'
-           }">
-        </i>
-      </th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody>
-    <ng-container *ngFor="let entry of paginatedEntries">
-      <tr [ngClass]="getEntryTypeClass(entry.entryType)">
-        <td>
-          <input type="checkbox" 
-                 [checked]="selectedEntries.has(entry.id)"
-                 (change)="toggleEntrySelection(entry.id)">
-        </td>
-        <td>
-          <span class="badge" 
-                [ngClass]="{
-                  'bg-info': entry.entryType === 'expense',
-                  'bg-success': entry.entryType === 'income',
-                  'bg-primary': entry.entryType === 'sale',
-                  'bg-danger': entry.entryType === 'purchase',
-                  'bg-warning': entry.entryType === 'shipment',
-                  'bg-payroll': entry.entryType === 'payroll'
+      <table class="expenses-table" *ngIf="!isLoading">
+        <thead>
+          <tr>
+            <th>
+              <input type="checkbox" [checked]="allSelected" (change)="toggleSelectAll()">
+            </th>
+            <th (click)="sortData('entryType')">
+              Type
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'entryType' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'entryType' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'entryType'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('referenceNo')">
+              Reference No
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'referenceNo' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'referenceNo' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'referenceNo'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('businessLocationName')">
+              Business Location
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'businessLocationName' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'businessLocationName' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'businessLocationName'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('categoryName')">
+              Category
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'categoryName' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'categoryName' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'categoryName'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('expenseType')">
+              Expense Type
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'expenseType' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'expenseType' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'expenseType'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('accountHead')">
+              Account Head
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'accountHead' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'accountHead' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'accountHead'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('expenseFor')">
+              Expense For/Customer
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'expenseFor' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'expenseFor' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'expenseFor'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('totalAmount')">
+              Total Amount
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'totalAmount'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('paymentMethod')">
+              Payment Method
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'paymentMethod' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'paymentMethod' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'paymentMethod'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('taxAmount')"> 
+              Tax Amount 
+              <i class="fas ms-1" [ngClass]="{
+                'fa-sort-up': sortField === 'taxAmount' && sortDirection === 'asc',
+                'fa-sort-down': sortField === 'taxAmount' && sortDirection === 'desc',
+                'fa-sort': sortField !== 'taxAmount'
+              }"></i>
+            </th>
+            <th>CGST</th>
+            <th>SGST</th>
+            <th>IGST</th>
+            <th (click)="sortData('paymentAccount')">
+              Payment Account
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort': sortField !== 'paymentAccount', 
+                   'fa-sort-up': sortField === 'paymentAccount' && sortDirection === 'asc', 
+                   'fa-sort-down': sortField === 'paymentAccount' && sortDirection === 'desc'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('paymentStatus')">
+              Payment Status
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'paymentStatus' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'paymentStatus' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'paymentStatus'
+                 }">
+              </i>
+            </th>
+            <th (click)="sortData('balanceAmount')">
+              Balance Amount
+              <i class="fas ms-1" 
+                 [ngClass]="{
+                   'fa-sort-up': sortField === 'balanceAmount' && sortDirection === 'asc',
+                   'fa-sort-down': sortField === 'balanceAmount' && sortDirection === 'desc',
+                   'fa-sort': sortField !== 'balanceAmount'
+                 }">
+              </i>
+            </th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let entry of paginatedEntries">
+            <tr [ngClass]="getEntryTypeClass(entry.entryType)">
+              <td>
+                <input type="checkbox" 
+                       [checked]="selectedEntries.has(entry.id)"
+                       (change)="toggleEntrySelection(entry.id)">
+              </td>
+              <td>
+                <span class="badge" 
+                      [ngClass]="{
+                        'bg-info': entry.entryType === 'expense',
+                        'bg-success': entry.entryType === 'income',
+                        'bg-primary': entry.entryType === 'sale',
+                        'bg-danger': entry.entryType === 'purchase',
+                        'bg-warning': entry.entryType === 'shipment',
+                        'bg-payroll': entry.entryType === 'payroll'
+                      }">
+                  {{ getEntryTypeDisplay(entry.entryType) }}
+                </span>
+              </td>
+              <td>{{ entry.referenceNo || '-' }}</td>
+              <td>{{ entry.businessLocationName || '-' }}</td>
+              <td>{{ entry.categoryName || '-' }}</td>
+              <td>{{ entry.expenseType || '-' }}</td>
+              <td>{{ entry.accountHead || '-' }}</td>
+              <td>{{ entry.expenseFor || entry.customer || '-' }}</td>
+              <td>₹ {{ entry.totalAmount | number:'1.2-2' }}</td>
+              <td>{{ entry.paymentMethod || '-' }}</td>
+              <td>₹ {{ entry.taxAmount | number:'1.2-2' }}</td>
+              <td>₹ {{ entry.cgstAmount | number:'1.2-2' }}</td>
+              <td>₹ {{ entry.sgstAmount | number:'1.2-2' }}</td>
+              <td>₹ {{ entry.igstAmount | number:'1.2-2' }}</td>
+              <td>{{ entry.paymentAccount || '-' }}</td>
+              <td>
+                <span [ngClass]="{
+                  'badge bg-success': entry.paymentStatus === 'Paid',
+                  'badge bg-warning': entry.paymentStatus === 'Partial',
+                  'badge bg-danger': entry.paymentStatus === 'Unpaid' || entry.paymentStatus === 'Due'
                 }">
-            {{ getEntryTypeDisplay(entry.entryType) }}
-          </span>
-        </td>
-        <td>{{ entry.date | date:'shortDate' }}</td>
-        <td>{{ entry.referenceNo || '-' }}</td>
-        <td>{{ entry.businessLocationName || '-' }}</td>
-        <td>{{ entry.categoryName || '-' }}</td>
-        <td>{{ entry.expenseType || '-' }}</td>
-        <td>{{ entry.accountHead || '-' }}</td>
-        <td>{{ entry.expenseFor || entry.customer || '-' }}</td>
-        <td>₹ {{ entry.totalAmount || '0.00' }}</td>
-        <td>{{ entry.paymentMethod || '-' }}</td>
-      <td>₹ {{ entry.taxAmount | number:'1.2-2' }}</td>
-<td>₹ {{ entry.cgstAmount | number:'1.2-2' }}</td>
-<td>₹ {{ entry.sgstAmount | number:'1.2-2' }}</td>
-<td>₹ {{ entry.igstAmount | number:'1.2-2' }}</td>
-        <td>{{ entry.paymentAccount || '-' }}</td>
-        <td>
-          <span [ngClass]="{
-            'badge bg-success': entry.paymentStatus === 'Paid',
-            'badge bg-warning': entry.paymentStatus === 'Partial',
-            'badge bg-danger': entry.paymentStatus === 'Unpaid'
-          }">
-            {{ entry.paymentStatus || '-' }}
-          </span>
-        </td>
-        <td class="actions">
-          <button (click)="deleteEntry(entry)" class="btn-action">
-            <i class="fa fa-trash"></i>
-          </button>
-        </td>
-      </tr>
-      <!-- Expanded view for sales/shipments entries -->
-      <tr *ngIf="expandedEntryId === entry.id && (entry.entryType === 'sale' || entry.entryType === 'shipment')">
-        <td colspan="18">
-          <div class="bg-light p-3">
-            <h6 class="mb-2">Product Details</h6>
-            <table class="table table-sm table-bordered">
-              <thead>
-                <tr>
-                  <th>Product Name</th>
-                  <th>Quantity</th>
-                  <th>Unit Price</th>
-                  <th>Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let product of entry.products">
-                  <td>{{ product.name }}</td>
-                  <td>{{ product.quantity }}</td>
-                  <td>{{ product.unitPrice | currency }}</td>
-                  <td>{{ product.subtotal | currency }}</td>
-                </tr>
-                <tr *ngIf="!entry.products || entry.products.length === 0">
-                  <td colspan="4" class="text-center">No products found</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </td>
-      </tr>
-    </ng-container>
-    <tr *ngIf="filteredEntries.length === 0 && !isLoading">
-      <td colspan="18" class="no-data">No data available in table</td>
-    </tr>
-  </tbody>
-  <tfoot>
-    <tr class="total-row">
-      <td colspan="9">Total:</td>
-      <td>₹ {{ getTotalAmount() | number:'1.2-2' }}</td>
-      <td colspan="8"></td>
-    </tr>
-  </tfoot>
-</table>
+                  {{ entry.paymentStatus || '-' }}
+                </span>
+              </td>
+              <td>
+                <div class="balance-cell">
+                  <span [ngClass]="{
+                    'text-success': getBalanceAmount(entry) === 0,
+                    'text-warning': getBalanceAmount(entry) > 0,
+                    'text-danger': getBalanceAmount(entry) < 0
+                  }">
+                    ₹ {{ getBalanceAmount(entry) | number:'1.2-2' }}
+                  </span>
+                  <button *ngIf="getBalanceAmount(entry) > 0 && (entry.entryType === 'expense' || entry.entryType === 'income')" 
+                          class="btn btn-sm btn-primary ms-2" 
+                          (click)="openPayBalanceModal(entry)">
+                    <i class="fa fa-credit-card"></i> Pay
+                  </button>
+                </div>
+              </td>
+              <td class="actions">
+                <button (click)="deleteEntry(entry)" class="btn-action">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <!-- Expanded view for sales/shipments entries -->
+            <tr *ngIf="expandedEntryId === entry.id && (entry.entryType === 'sale' || entry.entryType === 'shipment' || entry.entryType === 'purchase')">
+              <td colspan="18">
+                <div class="bg-light p-3">
+                  <h6 class="mb-2">Product Details</h6>
+                  <table class="table table-sm table-bordered">
+                    <thead>
+                      <tr>
+                        <th>Product Name</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let product of entry.products">
+                        <td>{{ product.name || product.productName }}</td>
+                        <td>{{ product.quantity }}</td>
+                        <td>{{ (product.unitPrice || product.purchasePrice) | currency:'INR' }}</td>
+                        <td>{{ product.subtotal | currency:'INR' }}</td>
+                      </tr>
+                      <tr *ngIf="!entry.products || entry.products.length === 0">
+                        <td colspan="4" class="text-center">No products found</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="filteredEntries.length === 0 && !isLoading">
+            <td colspan="18" class="no-data">No data available in table</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="9" class="text-end fw-bold">Total:</td>
+            <td class="fw-bold">₹ {{ getTotalAmount() | number:'1.2-2' }}</td>
+            <td></td>
+            <td></td>
+            <td class="fw-bold">₹ {{ getTotalTaxAmount() | number:'1.2-2' }}</td>
+            <td class="fw-bold">₹ {{ getTotalCgstAmount() | number:'1.2-2' }}</td>
+            <td class="fw-bold">₹ {{ getTotalSgstAmount() | number:'1.2-2' }}</td>
+            <td class="fw-bold">₹ {{ getTotalIgstAmount() | number:'1.2-2' }}</td>
+            <td class="fw-bold">₹ {{ getTotalBalanceAmount() | number:'1.2-2' }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
     
-    <div class="pagination" *ngIf="!isLoading">
+    <div class="pagination" *ngIf="!isLoading && filteredEntries.length > 0">
       <div class="entries-info">
-        Showing {{ (paginatedEntries.length > 0) ? ((currentPage - 1) * entriesPerPage + 1) : 0 }} 
+        Showing {{ (currentPage - 1) * entriesPerPage + 1 }} 
         to {{ getPaginatedEndIndex() }} 
         of {{ totalEntries }} entries
       </div>
       
       <div class="pagination-controls">
-        <button class="btn-page" [disabled]="currentPage === 1" (click)="previousPage()">Previous</button>
-        <button class="btn-page" [disabled]="currentPage * entriesPerPage >= totalEntries" (click)="nextPage()">Next</button>
+        <button class="btn-page" [disabled]="currentPage === 1" (click)="previousPage()">
+          <i class="fa fa-chevron-left"></i> Previous
+        </button>
+        
+        <!-- Page numbers -->
+        <button *ngFor="let page of getPageNumbers()" 
+                class="btn-page" 
+                [class.active]="page === currentPage"
+                (click)="goToPage(page)">
+          {{ page }}
+        </button>
+        
+        <button class="btn-page" 
+                [disabled]="currentPage * entriesPerPage >= totalEntries" 
+                (click)="nextPage()">
+          Next <i class="fa fa-chevron-right"></i>
+        </button>
       </div>
     </div>
   </div>
-</div><tfoot>
-  <tr class="total-row">
-    <td colspan="9">Total:</td>
-    <td>₹ {{ getTotalAmount() | number:'1.2-2' }}</td>
-    <td>₹ {{ getTotalTaxAmount() | number:'1.2-2' }}</td>
-    <td colspan="3"></td>
-  </tr>
-</tfoot>
+</div>
+
+<div class="modal-overlay" *ngIf="isPayBalanceModalVisible">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" *ngIf="selectedEntryForPayment">
+          <i class="fa fa-credit-card me-2"></i>Pay Balance - {{ selectedEntryForPayment.referenceNo }}
+        </h5>
+        <!-- FIX: Replaced data-bs-dismiss with (click) event -->
+        <button type="button" class="btn-close" (click)="closePayBalanceModal()" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body" *ngIf="selectedEntryForPayment">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="info-card">
+              <h6 class="card-title">Transaction Details</h6>
+              <p><strong>Type:</strong> {{ getEntryTypeDisplay(selectedEntryForPayment.entryType) }}</p>
+              <p><strong>Category:</strong> {{ selectedEntryForPayment.categoryName }}</p>
+              <p><strong>Total Amount:</strong> ₹{{ selectedEntryForPayment.totalAmount | number:'1.2-2' }}</p>
+              <p><strong>Paid Amount:</strong> ₹{{ getPaidAmount(selectedEntryForPayment) | number:'1.2-2' }}</p>
+              <p><strong>Balance Due:</strong> <span class="text-danger fw-bold">₹{{ getBalanceAmount(selectedEntryForPayment) | number:'1.2-2' }}</span></p>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="payment-form">
+              <form [formGroup]="paymentForm" (ngSubmit)="processPayment()">
+                <div class="form-group mb-3">
+                  <label for="paymentAmount" class="form-label">Payment Amount:*</label>
+                  <input 
+                    id="paymentAmount" 
+                    type="number" 
+                    class="form-control" 
+                    formControlName="paymentAmount"
+                    [max]="getBalanceAmount(selectedEntryForPayment)"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="Enter amount to pay">
+                  <div class="invalid-feedback" *ngIf="paymentForm.get('paymentAmount')?.invalid && paymentForm.get('paymentAmount')?.touched">
+                    Please enter a valid payment amount
+                  </div>
+                </div>
+                
+                <div class="form-group mb-3">
+                  <label for="paymentDate" class="form-label">Payment Date:*</label>
+                  <input 
+                    id="paymentDate" 
+                    type="datetime-local" 
+                    class="form-control" 
+                    formControlName="paymentDate">
+                </div>
+                
+                <div class="form-group mb-3">
+                  <label for="paymentMethod" class="form-label">Payment Method:*</label>
+                  <select id="paymentMethod" class="form-control" formControlName="paymentMethod">
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                  <label for="paymentAccount" class="form-label">Payment Account:*</label>
+                  <select id="paymentAccount" class="form-control" formControlName="paymentAccount">
+                    <option value="">Select Payment Account</option>
+                    <option *ngFor="let account of paymentAccounts" [value]="account.id">
+                      {{ account.name }} ({{ account.accountType }}) - ₹{{ account.balance | number:'1.2-2' }}
+                    </option>
+                  </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                  <label for="paymentNote" class="form-label">Payment Note:</label>
+                  <textarea 
+                    id="paymentNote" 
+                    class="form-control" 
+                    formControlName="paymentNote" 
+                    rows="3"
+                    placeholder="Enter payment note (optional)"></textarea>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <!-- FIX: Replaced data-bs-dismiss with (click) event -->
+        <button type="button" class="btn btn-secondary" (click)="closePayBalanceModal()">
+          <i class="fa fa-times me-1"></i>Cancel
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-primary" 
+          [disabled]="!paymentForm.valid || isProcessingPayment"
+          (click)="processPayment()">
+          <i class="fa fa-credit-card me-1"></i>
+          {{ isProcessingPayment ? 'Processing...' : 'Pay Balance' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

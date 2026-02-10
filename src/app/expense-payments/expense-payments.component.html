@@ -1,0 +1,196 @@
+<!-- src/app/expense-payments/expense-payments.component.html -->
+<div class="container">
+  <header class="page-header">
+    <h1>Payments</h1>
+    <p>Manage outgoing payments and expenses</p>
+    <button class="btn btn-primary new-payment-btn" (click)="openModal()">+ New Payment</button>
+  </header>
+
+  <div class="summary-cards">
+      <div class="card">Total Payments<span>{{ totalPaymentsAmount | currency:'INR' }}</span></div>
+      <!-- <div class.bind="card">This Month<span>{{ thisMonthCount }}</span></div> -->
+      <div class="card">Pending<span>{{ pendingCount }}</span></div>
+  </div>
+
+  <div class="table-container">
+    <h2>Payment Transactions ({{ payments.length }})</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <!-- REMOVED Payee Header -->
+          <th>Reference</th>
+          <!-- REMOVED Account Header -->
+          <th>Amount</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let payment of payments">
+          <td>{{ payment.date.toDate() | date:'yyyy-MM-dd' }}</td>
+          <!-- REMOVED Payee Cell -->
+          <td>{{ payment.referenceNo }}</td>
+          <!-- REMOVED Account Cell -->
+          <td class="amount-debit">{{ payment.totalAmount | currency:'INR' }}</td>
+          <td><span class="status" [ngClass]="payment.status.toLowerCase()">{{ payment.status }}</span></td>
+          <td class="actions">
+            <button class="btn-icon" (click)="openViewModal(payment)" title="View Details">👁️</button>
+            <button class="btn-icon" (click)="openModal(payment)" title="Edit Payment">✏️</button>
+            <!-- ADDED Attachment Download Button -->
+            <button *ngIf="payment.attachment" class="btn-icon" (click)="downloadAttachment(payment)" title="Download Attachment">💾</button>
+            <button class="btn-icon" (click)="deletePayment(payment.id)" title="Delete Payment">🗑️</button>
+          </td>
+        </tr>
+        <tr *ngIf="payments.length === 0">
+            <td colspan="5" style="text-align: center;">No payments found.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New/Edit Payment Modal -->
+<div class="modal-overlay" *ngIf="showModal">
+  <div class="modal-content large">
+    <header class="modal-header">
+      <h2>{{ isEditMode ? 'Edit' : 'New' }} Payment Entry</h2>
+      <button class="close-button" (click)="closeModal()">&times;</button>
+    </header>
+
+    <form [formGroup]="paymentForm" (ngSubmit)="savePayment()">
+      <fieldset class="transaction-details">
+        <legend>Transaction Details</legend>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="date">Date*</label>
+            <input type="date" id="date" formControlName="date" required>
+          </div>
+          <div class="form-group">
+            <label for="referenceNo">Reference</label>
+            <input type="text" id="referenceNo" formControlName="referenceNo">
+          </div>
+           <div class="form-group">
+            <label for="status">Status*</label>
+            <select id="status" formControlName="status" required>
+                <option value="Posted">Posted</option>
+                <option value="Pending">Pending</option>
+            </select>
+          </div>
+          <div class="form-group description-group">
+            <label for="description">Description*</label>
+            <input type="text" id="description" formControlName="description" required placeholder="Transaction description">
+          </div>
+        </div>
+        <!-- ADDED Attachment Field -->
+        <div class="form-row" formGroupName="attachment">
+          <div class="form-group">
+            <label for="attachment-file">Attachment</label>
+            <input type="file" id="attachment-file" (change)="onFileSelect($event)">
+            <span *ngIf="paymentForm.get('attachment.name')?.value" class="file-name">
+              Selected: {{ paymentForm.get('attachment.name')?.value }}
+            </span>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="journal-header">
+          <legend>Journal Entries</legend>
+          <button type="button" class="btn-add-entry" (click)="addItem()">+ Add Entry</button>
+        </div>
+        <div class="journal-items-table">
+          <table>
+            <thead>
+              <!-- REMOVED Description Header -->
+              <tr><th>Account*</th><th>Credit</th><th>Debit</th><th>Actions</th></tr>
+            </thead>
+            <tbody formArrayName="items">
+              <!-- MODIFIED: Added trackBy function to the *ngFor loop -->
+              <tr *ngFor="let item of items.controls; let i = index; trackBy: trackByFn" [formGroupName]="i">
+                <td>
+                  <select formControlName="accountId" (change)="onAccountSelect(i)" required [disabled]="isLoadingDropdowns">
+                    <option value="" disabled>{{ isLoadingDropdowns ? 'Loading...' : 'Select an item...' }}</option>
+                    <optgroup label="Accounts"><option *ngFor="let acc of accounts" [value]="acc.id">{{ acc.name }}</option></optgroup>
+                    <optgroup label="Expense Categories"><option *ngFor="let cat of expenseCategories" [value]="cat.id">{{ cat.categoryName }}</option></optgroup>
+                    <optgroup label="Income Categories"><option *ngFor="let cat of incomeCategories" [value]="cat.id">{{ cat.categoryName }}</option></optgroup>
+                    <optgroup label="Tax Rates"><option *ngFor="let tax of taxRates" [value]="tax.id">{{ tax.name }} ({{ tax.rate }}%)</option></optgroup>
+                  </select>
+                </td>
+                <!-- REMOVED Description Input -->
+                <td><input type="number" formControlName="debit" min="0"></td>
+                <td><input type="number" formControlName="credit" min="0"></td>
+                <td><button type="button" class="btn-icon" (click)="removeItem(i)" title="Remove Entry">🗑️</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </fieldset>
+      
+      <div class="totals-section">
+          <div>Total Credits: <span>{{ totalDebits | currency:'INR' }}</span></div>
+          <div>Total Debits: <span>{{ totalCredits | currency:'INR' }}</span></div>
+          <div class="difference" [class.unbalanced]="difference !== 0">
+              Difference: <span>{{ difference | currency:'INR' }}</span>
+          </div>
+      </div>
+
+      <footer class="modal-footer">
+        <button type="submit" class="btn btn-primary" [disabled]="paymentForm.invalid || difference !== 0 || isSaving">
+          {{ isSaving ? 'Saving...' : 'Save Payment' }}
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="closeModal()">Cancel</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<!-- View Payment Details Modal (READ-ONLY) -->
+<div class="modal-overlay" *ngIf="showViewModal">
+  <div class="modal-content large" *ngIf="selectedPaymentForView">
+      <header class="modal-header">
+          <h2>Payment Details</h2>
+          <button class="close-button" (click)="closeModal()">&times;</button>
+      </header>
+      <div class="view-details-body">
+          <fieldset class="transaction-details">
+              <legend>Transaction Details</legend>
+              <div class="details-grid">
+                  <div><strong>Date:</strong> {{ selectedPaymentForView.date.toDate() | date:'longDate' }}</div>
+                  <div><strong>Reference:</strong> {{ selectedPaymentForView.referenceNo }}</div>
+                  <div><strong>Status:</strong> <span class="status" [ngClass]="selectedPaymentForView.status.toLowerCase()">{{ selectedPaymentForView.status }}</span></div>
+                  <div class="description-view"><strong>Description:</strong> {{ selectedPaymentForView.description }}</div>
+              </div>
+          </fieldset>
+          <fieldset>
+              <legend>Journal Entries</legend>
+              <div class="journal-items-table">
+                  <table>
+                      <thead>
+                          <!-- REMOVED Description Header -->
+                          <tr><th>Account</th><th class="text-right">Credit</th><th class="text-right">Debit</th></tr>
+                      </thead>
+                      <tbody>
+                          <tr *ngFor="let item of selectedPaymentForView.items">
+                              <td>{{ item.accountName }}</td>
+                              <!-- REMOVED Description Cell -->
+                              <td class="text-right">{{ item.debit | currency:'INR' }}</td>
+                              <td class="text-right">{{ item.credit | currency:'INR' }}</td>
+                          </tr>
+                      </tbody>
+                      <tfoot>
+                          <tr>
+                              <td class="text-right"><strong>Totals:</strong></td>
+                              <td class="text-right"><strong>{{ selectedPaymentForView.totalAmount | currency:'INR' }}</strong></td>
+                              <td class="text-right"><strong>{{ selectedPaymentForView.totalAmount | currency:'INR' }}</strong></td>
+                          </tr>
+                      </tfoot>
+                  </table>
+              </div>
+          </fieldset>
+      </div>
+      <footer class="modal-footer">
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
+      </footer>
+  </div>
+</div>

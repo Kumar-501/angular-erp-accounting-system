@@ -1,11 +1,11 @@
-// outstanding-report.component.ts
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { PurchaseService } from '../services/purchase.service';
 import { DatePipe } from '@angular/common';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+
 
 interface Purchase {
   id: string;
@@ -31,6 +31,8 @@ interface Purchase {
 export class OutstandingReportComponent implements OnInit {
   purchases: Purchase[] = [];
   filteredPurchases: Purchase[] = [];
+  @ViewChild('startDatePicker') startDatePicker!: ElementRef;
+@ViewChild('endDatePicker') endDatePicker!: ElementRef;
   isLoading = true;
   searchText = '';
   dateFilter = {
@@ -149,21 +151,78 @@ exportToPDF(): void {
     )];
   }
 
-  private getFormattedDate(date: any): string {
-    if (!date) return '';
-    try {
-      if (typeof date === 'object' && 'toDate' in date) {
-        return this.datePipe.transform(date.toDate(), 'mediumDate') || '';
-      } else if (date instanceof Date) {
-        return this.datePipe.transform(date, 'mediumDate') || '';
-      } else {
-        return this.datePipe.transform(new Date(date), 'mediumDate') || '';
-      }
-    } catch (e) {
-      return '';
-    }
-  }
 
+getFormattedDateForInput(dateString: any): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+// 2. Trigger the hidden native picker
+openDatePicker(type: 'start' | 'end'): void {
+  if (type === 'start') {
+    this.startDatePicker.nativeElement.showPicker();
+  } else {
+    this.endDatePicker.nativeElement.showPicker();
+  }
+}
+
+// 3. Handle manual entry with validation
+onManualDateInput(event: any, type: 'start' | 'end'): void {
+  const input = event.target.value.trim();
+  const datePattern = /^(\d{2})-(\d{2})-(\d{4})$/;
+  const match = input.match(datePattern);
+  
+  if (match) {
+    const day = match[1];
+    const month = match[2];
+    const year = match[3];
+    
+    const dateObj = new Date(`${year}-${month}-${day}`);
+    if (dateObj && dateObj.getDate() === parseInt(day) && 
+        dateObj.getMonth() + 1 === parseInt(month)) {
+      
+      const formattedDate = `${year}-${month}-${day}`;
+      if (type === 'start') {
+        this.dateFilter.startDate = formattedDate;
+      } else {
+        this.dateFilter.endDate = formattedDate;
+      }
+      this.applyFilters();
+    } else {
+      alert('Invalid date! Please enter a valid date in DD-MM-YYYY format.');
+      this.resetVisibleInput(event, type);
+    }
+  } else if (input !== '') {
+    alert('Format must be DD-MM-YYYY');
+    this.resetVisibleInput(event, type);
+  }
+}
+
+private resetVisibleInput(event: any, type: 'start' | 'end'): void {
+  const value = type === 'start' ? this.dateFilter.startDate : this.dateFilter.endDate;
+  event.target.value = this.getFormattedDateForInput(value);
+}
+
+// 4. Update table display date to use dd-MM-yyyy as well
+private getFormattedDate(date: any): string {
+  if (!date) return '';
+  try {
+    let dateObj: Date;
+    if (typeof date === 'object' && 'toDate' in date) {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+    return this.datePipe.transform(dateObj, 'dd-MM-yyyy') || ''; // Changed to dd-MM-yyyy
+  } catch (e) {
+    return '';
+  }
+}
   applyFilters(): void {
     let filtered = [...this.purchases];
     

@@ -1,12 +1,55 @@
 <div class="report-container">
+  <!-- The Filter container remains unchanged -->
+  <div class="filters-container" *ngIf="showFilters">
+    <div class="filter-group">
+      <label>Date Range:</label>
+      <div class="date-range-inputs">
+        <input type="date" [(ngModel)]="startDate" />
+        <span>to</span>
+        <input type="date" [(ngModel)]="endDate" />
+      </div>
+      <div class="date-range-presets">
+        <button (click)="setPresetDateRange('Today')">Today</button>
+        <button (click)="setPresetDateRange('Yesterday')">Yesterday</button>
+        <button (click)="setPresetDateRange('Last 7 Days')">Last 7 Days</button>
+        <button (click)="setPresetDateRange('Last 30 Days')">Last 30 Days</button>
+        <button (click)="setPresetDateRange('This Month')">This Month</button>
+        <button (click)="setPresetDateRange('Last Month')">Last Month</button>
+        <button (click)="setPresetDateRange('This Financial Year')">This Financial Year</button>
+        <button (click)="setPresetDateRange('Last Financial Year')">Last Financial Year</button>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button (click)="applyFilters()">Apply</button>
+      <button (click)="clearFilters()">Clear</button>
+    </div>
+  </div>
+
   <h2>Financial Report</h2>
   
+  <!-- Type Tabs (replaces Category Tabs) -->
+  <div class="category-tabs">
+    <button class="tab-button" [class.active]="activeTypeFilter === 'All'" (click)="applyTypeFilter('All')">All</button>
+    <button class="tab-button" [class.active]="activeTypeFilter === 'Purchase'" (click)="applyTypeFilter('Purchase')">Purchase</button>
+    <button class="tab-button" [class.active]="activeTypeFilter === 'Sale'" (click)="applyTypeFilter('Sale')">Sale</button>
+    <button class="tab-button" [class.active]="activeTypeFilter === 'Expense'" (click)="applyTypeFilter('Expense')">Expense</button>
+    <button class="tab-button" [class.active]="activeTypeFilter === 'Income'" (click)="applyTypeFilter('Income')">Income</button>
+    <button class="tab-button" [class.active]="activeTypeFilter === 'Payroll'" (click)="applyTypeFilter('Payroll')">Payroll</button>
+  </div>
+
+  <div class="export-buttons">
+    <button class="export-btn" (click)="exportToCSV()">
+      <i class="fas fa-file-csv"></i> Export to CSV
+    </button>
+    <button class="export-btn" (click)="exportToExcel()">
+      <i class="fas fa-file-excel"></i> Export to Excel
+    </button>
+  </div>
+
   <div class="report-controls">
     <div class="search-container">
-      <input type="text" class="search-input" placeholder="Search by date or category..." 
-             [(ngModel)]="searchTerm" (input)="onSearch($event)" />
+      <input type="text" class="search-input" placeholder="Search by type..." [(ngModel)]="searchTerm" (input)="applyFilters()"/>
     </div>
-    
     <div class="entries-selector">
       <span>Show</span>
       <select [(ngModel)]="entriesPerPage" (change)="changeEntriesPerPage($event)">
@@ -16,55 +59,27 @@
       </select>
       <span>entries</span>
     </div>
+    <button class="filter-btn" (click)="toggleFilters()">
+      <i class="fas fa-filter"></i> Filter
+    </button>
   </div>
-  
+
   <div class="report-table">
     <table *ngIf="!isLoading">
       <thead>
         <tr>
-          <th (click)="sortData('date')">
-            Date
-            <i class="fas" 
-               [ngClass]="{
-                 'fa-sort-up': sortField === 'date' && sortDirection === 'asc',
-                 'fa-sort-down': sortField === 'date' && sortDirection === 'desc',
-                 'fa-sort': sortField !== 'date'
-               }">
-            </i>
-          </th>
-          <th (click)="sortData('category')">
-            Category
-            <i class="fas" 
-               [ngClass]="{
-                 'fa-sort-up': sortField === 'category' && sortDirection === 'asc',
-                 'fa-sort-down': sortField === 'category' && sortDirection === 'desc',
-                 'fa-sort': sortField !== 'category'
-               }">
-            </i>
-          </th>
-          <th (click)="sortData('totalAmount')">
-            Amount
-            <i class="fas" 
-               [ngClass]="{
-                 'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc',
-                 'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc',
-                 'fa-sort': sortField !== 'totalAmount'
-               }">
-            </i>
-          </th>
+          <th (click)="sortData('date')">Date <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'date' && sortDirection === 'asc', 'fa-sort-down': sortField === 'date' && sortDirection === 'desc', 'fa-sort': sortField !== 'date'}"></i></th>
+          <th (click)="sortData('type')">Type <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'type' && sortDirection === 'asc', 'fa-sort-down': sortField === 'type' && sortDirection === 'desc', 'fa-sort': sortField !== 'type'}"></i></th>
+          <th (click)="sortData('totalAmount')">Amount <i class="fas" [ngClass]="{'fa-sort-up': sortField === 'totalAmount' && sortDirection === 'asc', 'fa-sort-down': sortField === 'totalAmount' && sortDirection === 'desc', 'fa-sort': sortField !== 'totalAmount'}"></i></th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let entry of paginatedEntries">
           <td>{{ formatDate(entry.date) }}</td>
-          <td>{{ entry.category }}</td>
-          <td>₹{{ entry.totalAmount | number:'1.2-2' }}</td>
-          <td>
-            <button class="delete-btn" (click)="deleteEntry(entry)">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
+          <td>{{ entry.type }}</td>
+          <td>₹{{ entry.totalAmount | number : "1.2-2" }}</td>
+          <td><button class="delete-btn" (click)="deleteEntry(entry)"><i class="fas fa-trash"></i></button></td>
         </tr>
         <tr *ngIf="filteredEntries.length === 0">
           <td colspan="4" class="no-data">No matching records found</td>
@@ -72,25 +87,20 @@
       </tbody>
       <tfoot>
         <tr class="total-row">
-          <td colspan="3">Total:</td>
-          <td>₹{{ getTotalAmount() | number:'1.2-2' }}</td>
+          <td colspan="2" class="text-end fw-bold">Total:</td>
+          <td class="fw-bold">₹{{ getTotalAmount() | number : "1.2-2" }}</td>
+          <td></td> <!-- Empty cell for actions column -->
         </tr>
       </tfoot>
     </table>
-    
     <div *ngIf="isLoading" class="loading-spinner">
       <div class="spinner"></div>
       <span>Loading data...</span>
     </div>
   </div>
-  
+
   <div class="pagination" *ngIf="!isLoading && filteredEntries.length > 0">
-    <div class="entries-info">
-      Showing {{ (currentPage - 1) * entriesPerPage + 1 }} to 
-      {{ Math.min(currentPage * entriesPerPage, totalEntries) }} of 
-      {{ totalEntries }} entries
-    </div>
-    
+    <div class="entries-info">Showing {{ (currentPage - 1) * entriesPerPage + 1 }} to {{ Math.min(currentPage * entriesPerPage, totalEntries) }} of {{ totalEntries }} entries</div>
     <div class="pagination-buttons">
       <button (click)="previousPage()" [disabled]="currentPage === 1">Previous</button>
       <button (click)="nextPage()" [disabled]="currentPage * entriesPerPage >= totalEntries">Next</button>

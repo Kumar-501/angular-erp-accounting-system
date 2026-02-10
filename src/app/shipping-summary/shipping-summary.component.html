@@ -4,42 +4,46 @@
   <div class="card mb-4 border">
     <div class="card-body">
       <h6 class="card-title mb-3 text-secondary">Date Filter</h6>
-      <div class="row align-items-end">
-        <div class="col-md-2">
-          <label class="form-label small text-secondary mb-1">From Date</label>
-          <div class="input-group">
-            <input type="date" class="form-control" [(ngModel)]="startDate" (change)="applyFilters()">
-            <span class="input-group-text">
-              <i class="bi bi-calendar3"></i>
-            </span>
-          </div>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label small text-secondary mb-1">To Date</label>
-          <div class="input-group">
-            <input type="date" class="form-control" [(ngModel)]="endDate" (change)="applyFilters()">
-            <span class="input-group-text">
-              <i class="bi bi-calendar3"></i>
-            </span>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <button class="btn btn-primary me-2" (click)="applyFilters()">
-            <i class="bi bi-funnel me-1"></i> Apply
-          </button>
-          <button class="btn btn-secondary" (click)="clearDateFilter()" *ngIf="dateFilterActive">
-            <i class="bi bi-arrow-clockwise me-1"></i> Reset
-          </button>
-        </div>
-        <div class="col-md-5 text-end">
-          <button class="btn btn-success" (click)="exportToExcel()">
-            <i class="bi bi-download me-1"></i> Export to Excel
-          </button>
-          <button class="btn btn-danger ms-2" (click)="exportToPDF()">
-            <i class="bi bi-download me-1"></i> Export to PDF
-          </button>
-        </div>
-      </div>
+<div class="row align-items-end">
+  <div class="col-md-3">
+    <label class="form-label small text-secondary mb-1">From Date</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(startDate)"
+             (blur)="onManualDateInput($event, 'start')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+        <i class="bi bi-calendar3"></i>
+      </button>
+      <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="startDate" (change)="applyFilters()">
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <label class="form-label small text-secondary mb-1">To Date</label>
+    <div class="date-input-wrapper">
+      <input type="text" 
+             class="form-control date-input" 
+             [value]="getFormattedDateForInput(endDate)"
+             (blur)="onManualDateInput($event, 'end')"
+             placeholder="DD-MM-YYYY">
+      <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+        <i class="bi bi-calendar3"></i>
+      </button>
+      <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="endDate" (change)="applyFilters()">
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <button class="btn btn-primary me-2" (click)="applyFilters()">
+      <i class="bi bi-funnel me-1"></i> Apply
+    </button>
+    <button class="btn btn-secondary" (click)="clearDateFilter()" *ngIf="dateFilterActive">
+      <i class="bi bi-arrow-clockwise me-1"></i> Reset
+    </button>
+  </div>
+</div>
       
       <div class="mt-2" *ngIf="dateFilterActive">
         <small class="text-info">
@@ -63,9 +67,9 @@
             Invoice Number <i class="bi bi-caret-up-fill ms-1"></i>
           </th>
           <th class="fw-semibold text-dark">Shipping Status</th>
-          <th class="fw-semibold text-dark">
+          <!-- <th class="fw-semibold text-dark">
             Date <i class="bi bi-caret-down-fill ms-1"></i>
-          </th>
+          </th> -->
         </tr>
       </thead>
       <tbody>
@@ -98,7 +102,7 @@
               {{shipment.shippingStatus}}
             </span>
           </td>
-          <td class="fw-medium">{{shipment.date}}</td>
+          <!-- <td class="fw-medium">{{shipment.date}}</td> -->
         </tr>
       </tbody>
     </table>

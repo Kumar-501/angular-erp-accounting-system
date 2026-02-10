@@ -5,7 +5,6 @@ import { ProductsService, Product as ServiceProduct } from '../services/products
 import { Router } from '@angular/router';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
 interface ProductDetails {
   taxPercentage: any;
   id?: string;
@@ -37,6 +36,8 @@ export class PurchaseOrderViewComponent implements OnInit {
     private router: Router
   ) {}
 
+
+ 
   async ngOnInit(): Promise<void> {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
@@ -46,6 +47,7 @@ export class PurchaseOrderViewComponent implements OnInit {
       this.isLoading = false;
     }
   }
+
 
   async loadOrder(id: string): Promise<void> {
     try {
@@ -127,15 +129,19 @@ export class PurchaseOrderViewComponent implements OnInit {
     if (!this.order?.products && !this.order?.items) return 0;
     
     const items = this.order.items || this.order.products || [];
-    return items.reduce((total: number, item: any) => {
+    const subtotal = items.reduce((total: number, item: any) => {
       return total + this.calculateLineTotal(item);
     }, 0);
+    
+    // Add shipping charges to the total
+    const shippingCharges = this.order.shippingCharges || 0;
+    return subtotal + shippingCharges;
   }
+
 
   printOrder(): void {
     window.print();
   }
-
   downloadPDF(): void {
     const doc = new jsPDF();
     
@@ -154,7 +160,8 @@ export class PurchaseOrderViewComponent implements OnInit {
       [`Status:`, this.order.status || 'N/A'],
       [`Shipping Status:`, this.order.shippingStatus || 'N/A'],
       [`Required By Date:`, this.order.requiredByDate || 'N/A'],
-      [`Added By:`, this.order.addedBy || 'N/A']
+      [`Added By:`, this.order.addedBy || 'N/A'],
+      [`Shipping Charges:`, this.getShippingAmount().toFixed(2)]  // Add shipping charges to basic info
     ];
     
     autoTable(doc, {
@@ -182,7 +189,9 @@ export class PurchaseOrderViewComponent implements OnInit {
         this.calculateLineTotal(item).toFixed(2)
       ]);
       
-      // Add total row
+      // Add total rows including shipping
+      productsData.push(['', '', '', '', 'Subtotal:', (this.getTotalAmount() - this.getShippingAmount()).toFixed(2)]);
+      productsData.push(['', '', '', '', 'Shipping:', this.getShippingAmount().toFixed(2)]);
       productsData.push(['', '', '', '', 'Total:', this.getTotalAmount().toFixed(2)]);
       
       autoTable(doc, {
@@ -196,7 +205,8 @@ export class PurchaseOrderViewComponent implements OnInit {
           5: { halign: 'right' }
         },
         didDrawCell: (data) => {
-          if (data.row.index === items.length) {
+          // Make the last three rows (subtotal, shipping, total) bold
+          if (data.row.index >= items.length) {
             doc.setFont('helvetica', 'bold');
           }
         }
@@ -205,6 +215,10 @@ export class PurchaseOrderViewComponent implements OnInit {
     
     // Save the PDF
     doc.save(`purchase_order_${this.order.referenceNo}.pdf`);
+  }
+
+  getShippingAmount(): number {
+    return this.order?.shippingCharges || 0;
   }
 
   calculateLineTotal(item: any): number {
@@ -217,16 +231,15 @@ export class PurchaseOrderViewComponent implements OnInit {
     const discountAmount = subtotal * (discount / 100);
     const subtotalAfterDiscount = subtotal - discountAmount;
     
-    // Get tax rate from product details or item
+    // FIX: Prioritize tax rate from the line item, then fallback to product details.
     let taxRate = 0;
-    if (item.productId) {
+    if (item.taxPercent !== undefined && item.taxPercent !== null) {
+      taxRate = item.taxPercent;
+    } else if (item.taxRate !== undefined && item.taxRate !== null) {
+      taxRate = item.taxRate; // Fallback for older property name
+    } else if (item.productId) {
       const productDetails = this.getProductDetails(item.productId);
       taxRate = productDetails.taxPercentage || 0;
-    }
-    
-    // If tax rate is not found in product details, check if it's stored in the item itself
-    if (taxRate === 0 && item.taxRate) {
-      taxRate = item.taxRate;
     }
     
     // Calculate tax amount
@@ -247,13 +260,13 @@ export class PurchaseOrderViewComponent implements OnInit {
     const subtotalAfterDiscount = subtotal - discountAmount;
     
     let taxRate = 0;
-    if (item.productId) {
+    if (item.taxPercent !== undefined && item.taxPercent !== null) {
+      taxRate = item.taxPercent;
+    } else if (item.taxRate !== undefined && item.taxRate !== null) {
+      taxRate = item.taxRate;
+    } else if (item.productId) {
       const productDetails = this.getProductDetails(item.productId);
       taxRate = productDetails.taxPercentage || 0;
-    }
-    
-    if (taxRate === 0 && item.taxRate) {
-      taxRate = item.taxRate;
     }
     
     return subtotalAfterDiscount * (taxRate / 100);

@@ -7,17 +7,37 @@
     <div class="card-body">
       <!-- Filters Section -->
       <div class="row mb-3">
-        <div class="col-md-3">
-          <label class="form-label">Date Range</label>
-          <div class="input-group input-group-sm mb-2">
-            <span class="input-group-text">From</span>
-            <input type="date" class="form-control" [(ngModel)]="dateFilter.startDate" (change)="applyFilters()">
-          </div>
-          <div class="input-group input-group-sm">
-            <span class="input-group-text">To</span>
-            <input type="date" class="form-control" [(ngModel)]="dateFilter.endDate" (change)="applyFilters()">
-          </div>
-        </div>
+<div class="col-md-3">
+  <label class="form-label">Date Range</label>
+  
+  <!-- From Date -->
+  <div class="date-input-wrapper mb-2">
+    <span class="label-hint">From</span>
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(dateFilter.startDate)"
+           (blur)="onManualDateInput($event, 'start')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('start')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #startDatePicker type="date" class="hidden-date-picker" [(ngModel)]="dateFilter.startDate" (change)="applyFilters()">
+  </div>
+
+  <!-- To Date -->
+  <div class="date-input-wrapper">
+    <span class="label-hint">To</span>
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(dateFilter.endDate)"
+           (blur)="onManualDateInput($event, 'end')"
+           placeholder="DD-MM-YYYY">
+    <button type="button" class="calendar-btn" (click)="openDatePicker('end')">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    <input #endDatePicker type="date" class="hidden-date-picker" [(ngModel)]="dateFilter.endDate" (change)="applyFilters()">
+  </div>
+</div>
         
         <div class="col-md-3">
           <label class="form-label">Status</label>

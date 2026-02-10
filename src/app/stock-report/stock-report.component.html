@@ -17,29 +17,24 @@
     <p>Loading stock report...</p>
   </div>
 
-  <!-- End of Day Controls -->
-  <div class="eod-controls">
-    <button (click)="processEndOfDay()" class="eod-button" [disabled]="eodProcessing">
-      <span *ngIf="!eodProcessing">Process End of Day</span>
-      <span *ngIf="eodProcessing">Processing...</span>
-    </button>
-    <div *ngIf="eodProcessing" class="eod-status">
-      Processing end of day...
-    </div>
-    <div *ngIf="eodError" class="eod-error">
-      Error: {{eodError}}
-    </div>
-    <div *ngIf="eodSuccess" class="eod-success">
-      End of day processed successfully!
-    </div>
-  </div>
-
-  <!-- Controls -->
+  <!-- Enhanced Controls with Total Sold Actions -->
   <div class="report-controls">
     <div class="search-box">
       <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" 
              placeholder="Search products, SKU, category, brand...">
       <button class="search-icon" (click)="applyFilter()">🔍</button>
+    </div>
+    
+    <div class="action-buttons">
+      <button class="refresh-total-sold-btn" (click)="refreshTotalSoldData()" [disabled]="isLoading">
+        📊 Refresh Total Sold
+      </button>
+      <button class="export-total-sold-btn" (click)="exportTotalSoldData()">
+        📤 Export Total Sold
+      </button>
+      <button class="validate-data-btn" (click)="validateTotalSoldData()">
+        ✅ Validate Data
+      </button>
     </div>
     
     <div class="pagination-controls">
@@ -72,7 +67,8 @@
           <th (click)="sortData('brand')" class="sortable-header">
             Brand
             <span *ngIf="sortColumn === 'brand'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
-          </th>          <th (click)="sortData('unit')" class="sortable-header">
+          </th>
+          <th (click)="sortData('unit')" class="sortable-header">
             Unit
             <span *ngIf="sortColumn === 'unit'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
           </th>
@@ -100,9 +96,25 @@
           <th class="closing-stock-column">
             Closing Stock (11:59 PM)
           </th>
-          <th class="total-sold-column">
-            Total Sold
+          
+          <!-- Enhanced Total Sold Column -->
+        <th (click)="sortData('totalSold')" class="total-sold-column sortable-header">
+          Total Sold (All Time)
+          <div class="column-info"><small>📊 From all sales data</small></div>
+        </th>
+          <th (click)="sortData('totalSalesReturned')" class="total-returned-column sortable-header">
+          Total Sales Returned
+          <div class="column-info"><small>🔄 From sales returns</small></div>
+        </th>
+          <!-- NEW: Total Returned Column -->
+          <th (click)="sortData('totalReturned')" class="total-returned-column sortable-header">
+            Total Returned (All Time)
+            <span *ngIf="sortColumn === 'totalReturned'">{{sortDirection === 'asc' ? '↑' : '↓'}}</span>
+            <div class="column-info">
+              <small>🔄 From purchase returns</small>
+            </div>
           </th>
+          
           <th class="last-updated-column">
             Last Updated
           </th>
@@ -114,16 +126,18 @@
               <span class="subheader">Current</span>
               <span class="subheader">Alert</span>
             </div>
-          </th>          <!-- Summary Columns -->
+          </th>
+          
+          <!-- Summary Columns -->
           <th class="summary-column">
             Total Stock
           </th>
-          <th class="action-column">Actions</th>
         </tr>
       </thead>
 
       <tbody>
-        <tr *ngFor="let item of paginatedData" [class.low-stock-row]="hasLowStockAlert(item)">          <!-- Fixed Product Information -->
+        <tr *ngFor="let item of paginatedData" [class.low-stock-row]="hasLowStockAlert(item)">
+          <!-- Fixed Product Information -->
           <td>{{item.productName}}</td>
           <td>{{item.sku}}</td>
           <td>{{item.category || '-'}}</td>
@@ -141,9 +155,33 @@
           <td class="closing-stock-data">
             {{item.closingStock}}
           </td>
-          <td class="total-sold-data">
-            {{item.totalSold}}
+          
+         <td class="total-sold-data">
+          <div class="total-sold-value">{{item.totalSold}}</div>
+          <div *ngIf="item.totalSold === 0"><small class="no-sales-badge">📦 No sales</small></div>
+        </td>
+        
+        <!-- *** MODIFIED: This cell now displays the new totalSalesReturned property *** -->
+        <td class="total-returned-data">
+          <div class="total-returned-value">{{item.totalSalesReturned}}</div>
+          <div *ngIf="item.totalSalesReturned > 0"><small class="returned-badge">🔄 {{item.totalSalesReturned}} returned</small></div>
+          <div *ngIf="item.totalSalesReturned === 0"><small class="no-returns-badge">📦 No returns</small></div>
+        </td>
+        
+          
+          <!-- NEW: Enhanced Total Returned Data -->
+          <td class="total-returned-data enhanced-total-returned">
+            <div class="total-returned-value">
+              {{item.totalReturned}}
+            </div>
+            <div class="total-returned-indicator" *ngIf="item.totalReturned > 0">
+              <small class="returned-badge">🔄 {{item.totalReturned}} returned</small>
+            </div>
+            <div class="no-returns-indicator" *ngIf="item.totalReturned === 0">
+              <small class="no-returns-badge">📦 No returns</small>
+            </div>
           </td>
+          
           <td class="last-updated-data">
             {{item.lastUpdated | date:'short'}}
           </td>
@@ -162,26 +200,36 @@
             <ng-template #noStock>
               <div class="no-stock">-</div>
             </ng-template>
-          </td>          <!-- Summary Data -->
-          <td class="total-stock">
-            {{getTotalStock(item)}}
           </td>
-          <td class="action-cell">
-            <button class="view-btn" (click)="viewStockDetails(item.id)">View Details</button>
+          
+          <!-- Summary Data -->
+          <td class="total-stock-data">
+            {{getTotalStock(item)}}
           </td>
         </tr>
 
         <tr *ngIf="filteredData.length === 0 && !isLoading">
-          <td [attr.colspan]="13 + locations.length" class="no-data">
+          <td [attr.colspan]="14 + locations.length" class="no-data">
             No products found. Try adjusting your search criteria.
           </td>
         </tr>
       </tbody>
 
-      <!-- Summary Footer -->
+      <!-- Summary Footer with Total Sold and Returned Information -->
       <tfoot>
         <tr class="summary-row">
-          <td colspan="5" class="summary-label">Summary:</td>
+          <td colspan="11" class="summary-label">Summary:</td>
+          <td class="total-sold-summary">
+            <div class="summary-total-sold">
+              Total Sold: {{getTotalSold()}}
+            </div>
+          </td>
+          <td class="total-returned-summary">
+            <div class="summary-total-returned">
+              Total Returned: {{getTotalReturned()}}
+            </div>
+          </td>
+          <td></td> <!-- Last Updated column -->
           <td *ngFor="let location of locations" class="location-summary">
             <div class="location-total">
               Total: {{getTotalStockForLocation(location.id)}}
@@ -190,29 +238,37 @@
           <td class="grand-total">
             {{getGrandTotalStock()}}
           </td>
-          <td>{{totalPurchasePrice | currency:'INR':'symbol'}}</td>
-          <td>{{totalSellingPrice | currency:'INR':'symbol'}}</td>
-          <td></td>
         </tr>
       </tfoot>
     </table>
   </div>
 
-  <!-- Stock Alerts Summary -->
+  <!-- Enhanced Stock Alerts Summary -->
   <div class="alerts-summary" *ngIf="getLowStockProducts().length > 0">
     <h3>⚠ Low Stock Alerts ({{getLowStockProducts().length}} products)</h3>
     <div class="alert-items">
       <div *ngFor="let item of getLowStockProducts()" class="alert-item">
         <span class="product-name">{{item.productName}} ({{item.sku}})</span>
+        <span class="total-sold-info">Total Sold: {{item.totalSold}}</span>
+        <span class="total-returned-info">Total Returned: {{item.totalReturned}}</span>
         <span class="locations-affected">
           Locations: {{getLocationsWithLowStock(item).join(', ')}}
         </span>
       </div>
     </div>
   </div>
+
   <div class="footer">
     <div class="report-generated">
       Report generated on: {{getCurrentDate()}}
+    </div>
+    <div class="summary-stats">
+      <div class="total-sold-info">
+        Total products with sales: {{getProductsWithSalesCount()}} / {{filteredData.length || 0}}
+      </div>
+      <div class="total-returned-info">
+        Total products with returns: {{getProductsWithReturnsCount()}} / {{filteredData.length || 0}}
+      </div>
     </div>
     <div class="copyright">
       HYBRID CRM - v6.2 | Copyright © {{currentYear}} All rights reserved.

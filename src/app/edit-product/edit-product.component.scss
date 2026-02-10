@@ -10,10 +10,279 @@ body {
 .container {
   background-color: white;
   border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   padding: 20px;
   margin-bottom: 20px;
   margin-top: 5%;
+}
+/* Not For Selling Products Section */
+.not-for-selling-section {
+  margin: 25px 0;
+  padding: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+
+  h3 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.2rem;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 20px;
+  }
+
+  .product-search {
+    margin-bottom: 20px;
+
+    input {
+      width: 100%;
+      padding: 10px 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      transition: border-color 0.3s;
+
+      &:focus {
+        outline: none;
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+      }
+    }
+  }
+
+  .available-products {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+    overflow: hidden;
+
+    h4 {
+      background-color: #f1f3f5;
+      padding: 12px 15px;
+      margin: 0;
+      font-size: 1rem;
+      color: #495057;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .product-list {
+      max-height: 300px;
+      overflow-y: auto;
+
+      .product-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid #f1f3f5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background-color: #f8f9fa;
+        }
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .product-info {
+          flex: 1;
+          min-width: 0;
+
+          .product-name {
+            font-weight: 500;
+            color: #212529;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .product-sku {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-right: 10px;
+          }
+
+          .product-stock {
+            font-size: 0.85rem;
+            color: #28a745;
+            font-weight: 500;
+          }
+        }
+
+        .quantity-controls {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
+          label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin: 0;
+          }
+
+          input {
+            width: 70px;
+            padding: 6px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            text-align: center;
+
+            &:focus {
+              border-color: #4a90e2;
+              outline: none;
+            }
+          }
+
+          .btn-add-product {
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+
+            &:hover {
+              background-color: #3a7bc8;
+            }
+
+            &:disabled {
+              background-color: #adb5bd;
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  .selected-products {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+    h4 {
+      background-color: #f1f3f5;
+      padding: 12px 15px;
+      margin: 0;
+      font-size: 1rem;
+      color: #495057;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .selected-products-table {
+      width: 100%;
+      border-collapse: collapse;
+
+      th,
+      td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: 500;
+        color: #495057;
+        font-size: 0.9rem;
+      }
+
+      td {
+        vertical-align: middle;
+
+        input {
+          width: 70px;
+          padding: 6px 8px;
+          border: 1px solid #ced4da;
+          border-radius: 4px;
+          text-align: center;
+
+          &:focus {
+            border-color: #4a90e2;
+            outline: none;
+          }
+        }
+      }
+
+      .btn-remove {
+        background-color: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background-color 0.2s;
+
+        &:hover {
+          background-color: #c82333;
+        }
+      }
+    }
+  }
+
+  .not-selling-summary {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-top: 1px solid #e9ecef;
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      span:first-child {
+        color: #6c757d;
+      }
+
+      span:last-child {
+        font-weight: 500;
+        color: #212529;
+      }
+    }
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .not-for-selling-section {
+    .product-item {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .product-info {
+        margin-bottom: 10px;
+        width: 100%;
+      }
+
+      .quantity-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
+    .selected-products-table {
+      display: block;
+      overflow-x: auto;
+
+      th,
+      td {
+        white-space: nowrap;
+      }
+    }
+  }
 }
 .form-row {
   display: flex;
@@ -72,23 +341,8 @@ select {
   text-align: center;
   line-height: 16px;
   font-size: 12px;
-  font-weight: bold;
-  margin-left: 5px;
+  font-weight: bold;  margin-left: 5px;
   cursor: help;
-}
-.location-tag {
-  display: inline-block;
-  background-color: #e1f5fe;
-  border-radius: 4px;
-  padding: 5px 10px;
-  margin-right: 5px;
-  margin-bottom: 5px;
-  font-size: 13px;
-}
-.location-tag .close {
-  margin-right: 5px;
-  color: #0078d7;
-  font-weight: bold;
 }
 .text-editor {
   border: 1px solid #ddd;
@@ -138,7 +392,7 @@ select {
   font-weight: 500;
   font-size: 14px;
   transition: background-color 0.2s;
-  gap:20px ;
+  gap: 20px;
 }
 .btn-primary {
   background-color: #5156be;
@@ -186,12 +440,22 @@ select {
   background-color: #4caf50;
   color: white;
   text-align: left;
-  padding: 12px;
+  padding: 12px 5px;
   font-weight: 500;
+  width: 5%; /* Changed from 30% to 20% */
 }
 .pricing-table td {
   padding: 10px 12px;
   border-bottom: 1px solid #f2f2f2;
+  vertical-align: top; /* Added for better alignment */
+}
+
+/* Optional: Add responsive behavior */
+@media (max-width: 768px) {
+  .pricing-table {
+    display: block;
+    overflow-x: auto;
+  }
 }
 .footer {
   text-align: center;
@@ -209,294 +473,807 @@ select {
 
 /* Variant Section Styles */
 .variant-section {
-margin: 20px 0;
-padding: 15px;
-border: 1px solid #ddd;
-border-radius: 4px;
-background-color: #f9f9f9;
-
-h3 {
-  margin-top: 0;
-  color: #333;
-}
-
-.variation-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.variation-option {
-  background: white;
-  padding: 10px 15px;
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
+  background-color: #f9f9f9;
 
-.variation-values {
-  margin-top: 10px;
-  padding-left: 20px;
-}
-
-.value-option {
-  margin: 5px 0;
-}
-
-.variant-combinations {
-  margin-top: 20px;
-}
-
-.variant-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-
-  th, td {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    text-align: left;
+  h3 {
+    margin-top: 0;
+    color: #333;
   }
 
-  th {
-    background-color: #f2f2f2;
+  .variation-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
   }
 
-  input {
+  .variation-option {
+    background: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .variation-values {
+    margin-top: 10px;
+    padding-left: 20px;
+  }
+
+  .value-option {
+    margin: 5px 0;
+  }
+
+  .variant-combinations {
+    margin-top: 20px;
+  }
+
+  .variant-table {
     width: 100%;
-    padding: 5px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
+    border-collapse: collapse;
+    margin-top: 10px;
+
+    th,
+    td {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f2f2f2;
+    }
+
+    input {
+      width: 100%;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
   }
-}
 }
 
 /* Combination Section Styles */
 .combination-section {
-margin: 20px 0;
-padding: 15px;
-border: 1px solid #ddd;
-border-radius: 4px;
-background-color: #f9f9f9;
-
-h3 {
-  margin-top: 0;
-  color: #333;
-}
-
-.component-list {
-  margin: 15px 0;
-}
-
-.component-item {
-  background: white;
-  padding: 10px 15px;
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  margin-bottom: 10px;
-}
+  background-color: #f9f9f9;
 
-.component-details {
+  h3 {
+    margin-top: 0;
+    color: #333;
+  }
+
+  .component-list {
+    margin: 15px 0;
+  }
+
+  .component-item {
+    background: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+  }
+
+  .component-details {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+
+  .product-select {
+    flex: 1;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+  }
+
+  .quantity-input {
+    width: 60px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+  }
+
+  .btn-remove {
+    background: #ff4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: #cc0000;
+    }
+  }
+
+  .component-info {
+    display: flex;
+    gap: 15px;
+    font-size: 0.9em;
+    color: #666;
+  }
+
+  .btn-add-component {
+    background: #4caf50;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+
+    &:hover {
+      background: #3e8e41;
+    }
+  }
+
+  .combination-summary {
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+    h4 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #eee;
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+  }
+}
+.form-actions {
   display: flex;
   gap: 10px;
-  align-items: center;
+  padding: 15px 0;
+  background-color: #f5f7f8;
+}
+
+.btn {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 120px;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Purple button for Save & Add Opening Stock */
+.btn-opening-stock {
+  background-color: #6356cc;
+}
+
+/* Red/Pink button for Save And Add Another */
+.btn-another {
+  background-color: #e6196e;
+}
+
+/* Blue button for Save/Update */
+.btn-save {
+  background-color: #4d4dff;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+}
+.invalid {
+  border: 1px solid red;
+}
+
+.error-message {
+  color: red;
+  font-size: 0.8em;
+  margin-top: 5px;
+}
+
+.tax-info {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 5px;
+} /* Style the form group */
+.added-date-group {
+  margin-bottom: 1rem;
+}
+
+/* Style the label */
+.added-date-group label {
+  display: block;
+  font-weight: bold;
   margin-bottom: 5px;
 }
 
-.product-select {
-  flex: 1;
-  padding: 5px;
-  border: 1px solid #ddd;
-  border-radius: 3px;
+/* Style the input */
+.added-date-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 
-.quantity-input {
-  width: 60px;
-  padding: 5px;
+/* Optional: style for disabled input */
+.added-date-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+.searchable-multiselect {
+  position: relative;
+  width: 100%;
+
+  input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+  }
+
+  .dropdown-options {
+    position: absolute;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    background: white;
+    z-index: 1000;
+
+    div {
+      padding: 8px;
+      cursor: pointer;
+
+      &:hover {
+        background-color: #f5f5f5;
+      }
+
+      &.selected {
+        background-color: #e0f7fa;
+      }
+    }
+  }
+
+  .selected-items {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 8px;
+
+    .selected-tag {
+      background: #e0f7fa;
+      padding: 4px 8px;
+      margin: 2px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+
+      span {
+        margin-left: 5px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+    }
+  }
+} /* Add this to your existing styles */
+.form-group {
+  input[type="date"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+  }
+} /* Add this to your component's CSS file */
+.searchable-multiselect {
+  position: relative;
+}
+
+.dropdown-options {
+  position: absolute;
+  z-index: 1000;
+  width: 100%;
+  max-height: 200px; /* Adjust as needed */
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-options div {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.dropdown-options div:hover {
+  background-color: #f5f5f5;
+}
+
+.dropdown-options div.selected {
+  background-color: #e9f7fe;
+}
+
+.selected-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.selected-tag {
+  background: #e0e0e0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.selected-tag span {
+  cursor: pointer;
+  font-size: 14px;
+} /* Add this to your existing styles */
+.form-group {
+  input[type="date"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+  }
+}
+.searchable-multiselect {
+  position: relative;
+}
+
+.dropdown-options {
+  position: absolute;
+  z-index: 1000;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+
+.dropdown-options div {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.dropdown-options div:hover {
+  background-color: #f5f5f5;
+}
+
+.dropdown-options div.selected {
+  background-color: #e8f4ff;
+}
+/* Component selection area */
+.component-selection {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.component-selection input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.available-products-list {
+  max-height: 300px;
+  overflow-y: auto;
   border: 1px solid #ddd;
-  border-radius: 3px;
+  border-radius: 4px;
+}
+
+.product-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.product-item:hover {
+  background-color: #f0f0f0;
+}
+
+.product-item.selected {
+  background-color: #e0f7fa;
+}
+
+.product-item input[type="checkbox"] {
+  margin-right: 10px;
+}
+
+.product-price {
+  margin-left: auto;
+  color: #666;
+}
+
+.btn-add-selected {
+  margin-top: 10px;
+  padding: 8px 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-add-selected:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+/* Selected components list */
+.selected-components {
+  margin-top: 20px;
+}
+
+.component-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.component-info {
+  flex-grow: 1;
+}
+
+.product-name {
+  font-weight: bold;
+}
+
+.product-sku {
+  color: #666;
+  margin-left: 5px;
+}
+
+.quantity-control {
+  margin: 0 15px;
+  display: flex;
+  align-items: center;
+}
+
+.quantity-control input {
+  width: 60px;
+  margin-left: 5px;
 }
 
 .btn-remove {
-  background: #ff4444;
+  background: #f44336;
   color: white;
   border: none;
   border-radius: 50%;
   width: 24px;
   height: 24px;
-  cursor: pointer;
-  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  &:hover {
-    background: #cc0000;
-  }
+  cursor: pointer;
+}.component-details {
+  display: flex;
+  align-items: center;
+  gap: 15px;
 }
 
-.component-info {
+.component-price-stock {
   display: flex;
-  gap: 15px;
+  flex-direction: column;
   font-size: 0.9em;
   color: #666;
 }
 
-.btn-add-component {
-  background: #4CAF50;
-  color: white;
-  border: none;
-  padding: 8px 15px;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-top: 10px;
-
-  &:hover {
-    background: #3e8e41;
-  }
+.component-price-stock span {
+  margin: 2px 0;
 }
 
-.combination-summary {
-  margin-top: 20px;
-  padding: 15px;
-  background: white;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-
-  h4 {
-    margin-top: 0;
-    color: #333;
-  }
-
-  .summary-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 5px 0;
-    border-bottom: 1px solid #eee;
-
-    &:last-child {
-      border-bottom: none;
- }
-}
-}
-}
-/* Button Container */
-.form-actions {
+.quantity-control {
   display: flex;
-  gap: 10px;
-  margin-top: 20px;
-  padding: 15px 0;
-  border-top: 1px solid #e0e0e0;
-}
-
-/* Base Button Style */
-.btn {
-  padding: 10px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 4px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 120px;
 }
 
-/* Primary Save Button */
-.btn-save {
-  background-color: #4caf50;
-  color: white;
+.quantity-control input {
+  width: 60px;
+  margin-left: 5px;
+}/* Add these styles to your component's CSS file */
+.component-search-container {
+  margin-bottom: 20px;
 }
 
-.btn-save:hover {
-  background-color: #45a049;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.searchable-multiselect {
+  position: relative;
+  margin-bottom: 10px;
 }
 
-.btn-save:active {
-  background-color: #3d8b40;
-  transform: translateY(1px);
+.searchable-multiselect input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
 }
 
-/* Secondary Button */
-.btn-secondary {
+.dropdown {
+  position: absolute;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  z-index: 1000;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+}
+
+.dropdown-item:hover {
   background-color: #f5f5f5;
-  color: #333;
-  border: 1px solid #d9d9d9;
 }
 
-.btn-secondary:hover {
-  background-color: #e8e8e8;
-  border-color: #c9c9c9;
+.stock-info {
+  float: right;
+  color: #666;
+  font-size: 0.9em;
 }
 
-.btn-secondary:active {
-  background-color: #dcdcdc;
-  transform: translateY(1px);
+.selected-components-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
-/* Danger Button */
-.btn-danger {
-  background-color: #f44336;
-  color: white;
+.tag {
+  display: flex;
+  align-items: center;
+  background: #e9ecef;
+  padding: 5px 10px;
+  border-radius: 20px;
+  gap: 5px;
 }
 
-.btn-danger:hover {
-  background-color: #e53935;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.tag input {
+  width: 50px;
+  padding: 3px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
 }
 
-.btn-danger:active {
-  background-color: #d32f2f;
-  transform: translateY(1px);
+.remove-tag {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 1.2em;
+  line-height: 1;
+  padding: 0 0 0 5px;
 }
 
-/* Disabled State for all buttons */
-.btn[disabled] {
-  opacity: 0.6;
+.remove-tag:hover {
+  color: #dc3545;
+}.warning {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.warning-icon {
+  margin-left: 5px;
+}.not-selling-info {
+  color: #666;
+  font-style: italic;
+  margin-top: 10px;
+}
+
+input[disabled] {
+  background-color: #f5f5f5;
   cursor: not-allowed;
-  box-shadow: none;
+}/* CSS for Method 1 and 2 - Add this to your component's CSS file */
+.red-highlight {
+  border: 2px solid red !important;
+  background-color: #ffe6e6 !important;
 }
 
-/* Responsive adjustments */
-@media (max-width: 576px) {
-  .form-actions {
+/* Alternative CSS with box-shadow for a softer look */
+.red-highlight {
+  border: 1px solid red !important;
+  box-shadow: 0 0 5px rgba(255, 0, 0, 0.5) !important;
+  background-color: #fff5f5 !important;
+}/* src/app/edit-product/edit-product.component.scss */
+
+/* --- START: Replace the old styles with this improved block --- */
+
+// Style the main container for the file input and the preview
+.file-upload-container {
+  width: 100%;
+
+  .current-file-info {
+    margin-top: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 10px;
+    background-color: #f9f9f9;
+  }
+
+  .file-info.image-file-info {
+    display: flex;
+    // Align items to the top for a cleaner look with variable height images
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  // --- IMPROVED IMAGE PREVIEW STYLES ---
+  .image-preview {
+    // Remove fixed width and height, use max values instead
+    max-width: 200px;  // Allows the preview to be larger
+    max-height: 150px; // Prevents it from becoming too tall
+    width: auto;
+    height: auto;
+
+    flex-shrink: 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #fff;
+    display: flex; // Center the image inside
+    align-items: center;
+    justify-content: center;
+
+    img {
+      width: 100%;
+      height: 100%;
+      // Use 'contain' to ensure the entire image is visible without distortion
+      object-fit: contain;
+      border-radius: 4px;
+    }
+  }
+
+  .file-details {
+    display: flex;
     flex-direction: column;
-    gap: 8px;
+    justify-content: center;
+    flex-grow: 1;
+    min-width: 0;
+    padding-top: 5px; // Add some padding to align better with the image
+  }
+
+  .file-name {
+    font-weight: 500;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-size {
+    font-size: 0.8rem;
+    color: #777;
+    margin-top: 4px;
+  }
+
+  .btn-remove-file {
+    background: transparent;
+    border: none;
+    color: #e74c3c;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 5px;
+    margin-left: auto;
+    transition: color 0.2s ease;
+
+    &:hover {
+      color: #c0392b;
+    }
+  }
+}
+
+// Custom styling for the file input itself
+.file-upload {
+  position: relative; // Needed for label positioning if you enhance it later
+  
+  // A cleaner look for the default file input button
+  input[type="file"]::-webkit-file-upload-button {
+    background: #3498db;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+    margin-right: 10px;
   }
   
-  .btn {
-    width: 100%;
+  input[type="file"]::-webkit-file-upload-button:hover {
+    background: #2980b9;
   }
-}/* Add these styles to your component's CSS file */
-.required:after {
-  content: " *";
-  color: red;
-}
-
-.invalid {
-  color: #dc3545; /* Bootstrap's danger color */
-}
-
-input.ng-invalid.ng-touched, 
-select.ng-invalid.ng-touched {
-  border-color: #dc3545;
-}
-
-.validation-error {
-  color: #dc3545;
-  font-size: 0.875em;
-  margin-top: 0.25rem;
-}
-
-.form-group {
+}.date-input-wrapper {
   position: relative;
-  margin-bottom: 1rem;
-}.tax-info-above {
-  font-size: 0.9em;
-  color: #666;
-  margin-bottom: 5px;
-  font-weight: bold;
+  display: flex;
+  align-items: center;
+  width: 100%;
+
+  .date-input {
+    flex: 1;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    height: 38px;
+    box-sizing: border-box;
+
+    &:disabled {
+      background-color: #f5f5f5;
+      cursor: not-allowed;
+    }
+  }
+
+  .calendar-btn {
+    background-color: #eee;
+    border: 1px solid #ccc;
+    border-left: none;
+    padding: 0 12px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    color: #555;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+
+    &:hover:not(:disabled) {
+      background-color: #ddd;
+    }
+    
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+  }
+
+  .hidden-date-picker {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
 }

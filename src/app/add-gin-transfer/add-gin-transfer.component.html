@@ -1,168 +1,276 @@
 <div class="add-gin-transfer-container">
   <h2>Add GIN Transfer</h2>
 
-  <form [formGroup]="ginTransferForm">
-    <div class="form-row">
-      <div class="form-group">
-        <label for="date">Date*</label>
-        <div class="date-input">
-          <i class="fa fa-calendar"></i>
-          <input type="text" id="date" formControlName="date" [value]="currentDate" readonly>
-        </div>
-        <div class="error-message" *ngIf="ginTransferForm.get('date')?.invalid && ginTransferForm.get('date')?.touched">
-          Date is required
-        </div>
-      </div>
-
-      <div class="form-group">
-          <label for="referenceNo">Reference No:</label>
-          <input type="text" id="referenceNo" formControlName="referenceNo" readonly>
-        </div>
-
-      <div class="form-group">
-        <label for="status">Status*</label>
-        <select id="status" formControlName="status">
-          <option value="" disabled selected>Please Select</option>
-          <option value="Draft">Draft</option>
-          <option value="Pending">Pending</option>
-          <option value="Completed">Completed</option>
-        </select>
-        <div class="error-message" *ngIf="ginTransferForm.get('status')?.invalid && ginTransferForm.get('status')?.touched">
-          Status is required
-        </div>
-      </div>
-    </div>
-
-    <div class="form-row">
-      <div class="form-group">
-        <label for="locationFrom">Location (From)*</label>        <select id="locationFrom" formControlName="locationFrom" (change)="onLocationFromChange()">
-          <option value="" disabled selected>Please Select</option>
-          <option *ngFor="let location of locations" [value]="location.id">{{location.name}}</option>
-        </select>
-        <div class="error-message" *ngIf="ginTransferForm.get('locationFrom')?.invalid && ginTransferForm.get('locationFrom')?.touched">
-          From location is required
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="locationTo">Location (To)*</label>
-        <select id="locationTo" formControlName="locationTo">
-          <option value="" disabled selected>Please Select</option>
-          <option *ngFor="let location of locations" [value]="location.id">{{location.name}}</option>
-        </select>
-        <div class="error-message" *ngIf="ginTransferForm.get('locationTo')?.invalid && ginTransferForm.get('locationTo')?.touched">
-          To location is required
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="locationTo2">Secondary Location (To)</label>
-        <select id="locationTo2" formControlName="locationTo2">
-          <option value="" selected>None</option>
-          <option *ngFor="let location of locations" [value]="location.id">{{location.name}}</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="search-section">
-      <h3>Search Products</h3>      <div class="search-box">
-        <input 
-          type="text" 
-          [(ngModel)]="searchTerm" 
-          [ngModelOptions]="{standalone: true}"
-          placeholder="Search products for transfer" 
-          (input)="searchProducts()">
-        <button type="button" class="search-btn" (click)="searchProducts()"><i class="fa fa-search"></i></button>
-        <button type="button" class="refresh-btn" (click)="refreshStockDisplay()" title="Refresh stock information">
-          <i class="fa fa-refresh"></i>
-        </button>
-      </div>
-      
-<div class="product-results" *ngIf="showSearchResults">
-  <div *ngIf="!ginTransferForm.get('locationFrom')?.value" class="no-location-message">
-    <i class="fa fa-info-circle"></i>
-    Please select a source location first to search for products
+  <!-- Debug Information (remove in production) -->
+  <div *ngIf="debugMode" class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px;">
+    <h4>Debug Information</h4>
+    <p><strong>Form Valid:</strong> {{ ginTransferForm.valid }}</p>
+    <p><strong>Has Products:</strong> {{ hasProductsToTransfer() }}</p>
+    <p><strong>Transfers Count:</strong> {{ locationTransfers.length }}</p>
+    <p><strong>Is Saving:</strong> {{ isSaving }}</p>
+    <p *ngIf="lastError"><strong>Last Error:</strong> <span style="color: red;">{{ lastError }}</span></p>
   </div>
-  <div *ngIf="ginTransferForm.get('locationFrom')?.value && filteredProducts.length === 0" class="no-products-message">
-    <i class="fa fa-info-circle"></i>
-    No products found at this location
-    <span *ngIf="searchTerm"> matching "{{searchTerm}}"</span>
+
+  <form [formGroup]="ginTransferForm" (ngSubmit)="saveGinTransfer()">
+    <!-- Basic Information -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3>Transfer Information</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+  <div class="col-md-4 mb-3">
+  <label for="date" class="form-label">Date*</label>
+  <div class="date-input-wrapper">
+    <!-- Visible Text Input for DD-MM-YYYY -->
+    <input type="text" 
+           class="form-control date-input" 
+           [value]="getFormattedDateForInput(ginTransferForm.get('date')?.value)"
+           (blur)="onManualDateInput($event, 'date')"
+           placeholder="DD-MM-YYYY">
+    
+    <!-- Calendar Button -->
+    <button type="button" class="calendar-btn" (click)="openDatePicker()">
+      <i class="fas fa-calendar-alt"></i>
+    </button>
+    
+    <!-- Hidden Native Picker -->
+    <input #datePicker 
+           type="date" 
+           formControlName="date" 
+           class="hidden-date-picker">
   </div>
-  <div class="product-item" *ngFor="let product of filteredProducts" (click)="addProduct(product)">
-    <span class="product-name">{{product.productName}}</span>
-    <div class="product-details">
-      <span class="sku">SKU: {{product.sku}}</span>
-      <span *ngIf="product.barcode" class="barcode">| Barcode: {{product.barcode}}</span>
-      <span class="location">| Location: {{getLocationName(ginTransferForm.get('locationFrom')?.value)}}</span>
-      <span class="stock">| Stock: {{getStockDisplayText(product.id)}} {{product.unit}}</span>
-    </div>
+  
+  <div *ngIf="ginTransferForm.get('date')?.invalid && ginTransferForm.get('date')?.touched" class="text-danger small">
+    Date is required
   </div>
 </div>
-    </div>
 
-    <div class="products-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Secondary Qty</th>
-            <!-- <th>Unit Price</th>
-            <th>Subtotal</th> -->
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>          <tr *ngFor="let item of selectedProducts; let i = index">
-            <td>
-              <div>{{item.productName}}</div>
-              <small class="text-muted">SKU: {{item.sku}}</small>
-            </td>
-            <td>
-              <input 
-                type="number" 
-                [value]="item.quantity" 
-                min="1" 
-                (change)="updateQuantity(i, $any($event.target).value)">
-            </td>
-            <td>
-              <input 
-                type="number" 
-                [value]="item.secondaryQuantity" 
-                min="0" 
-                (change)="updateSecondaryQuantity(i, $any($event.target).value)">
-            </td>
-            <td>
-              <button type="button" class="delete-btn" (click)="removeProduct(i)">
-                <i class="fa fa-trash"></i>
-              </button>
-            </td>
-          </tr>          <tr *ngIf="selectedProducts.length === 0">
-            <td colspan="4" class="text-center">No products added</td>
-          </tr>
-        </tbody>
-        <tfoot>
-          
-        </tfoot>
-      </table>
-    </div>
+          <div class="col-md-4 mb-3">
+            <label for="referenceNo" class="form-label">Reference No:</label>
+            <input type="text" id="referenceNo" class="form-control" formControlName="referenceNo" readonly>
+          </div>
 
-    <div class="form-row">
-    
+          <div class="col-md-4 mb-3">
+            <label for="status" class="form-label">Status*</label>
+            <select id="status" class="form-select" formControlName="status">
+              <option value="" disabled selected>Please Select</option>
+              <option value="Draft">Draft</option>
+              <option value="Pending">Pending</option>
+              <option value="Completed">Completed</option>
+            </select>
+            <div *ngIf="ginTransferForm.get('status')?.invalid && ginTransferForm.get('status')?.touched" class="text-danger small">
+              Status is required
+            </div>
+          </div>
+        </div>
 
-      <div class="form-group">
-        <label for="additionalNotes">Additional Notes</label>
-        <textarea id="additionalNotes" formControlName="additionalNotes" rows="4"></textarea>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="locationFrom" class="form-label">Location (From)*</label>
+            <select id="locationFrom" class="form-select" formControlName="locationFrom" (change)="onLocationFromChange()">
+              <option value="" disabled selected>Please Select</option>
+              <option *ngFor="let location of locations" [value]="location.id">{{location.name}}</option>
+            </select>
+            <div *ngIf="ginTransferForm.get('locationFrom')?.invalid && ginTransferForm.get('locationFrom')?.touched" class="text-danger small">
+              From location is required
+            </div>
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label for="shippingCharges" class="form-label">Shipping Charges</label>
+            <input type="number" id="shippingCharges" class="form-control" formControlName="shippingCharges" min="0" step="0.01" (input)="calculateTotal()">
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Stock validation note -->
-    <div class="info-note" *ngIf="selectedProducts.length > 0 && ginTransferForm.get('locationFrom')?.value">
-      <i class="fa fa-info-circle"></i>
-      <span>Stock availability will be validated when you save the transfer</span>
+    <!-- Multiple Location Transfers -->
+    <div formArrayName="locationTransfers">
+      <div *ngFor="let transfer of locationTransfers.controls; let i = index" [formGroupName]="i" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5>Transfer #{{i + 1}}</h5>
+          <button *ngIf="i > 0" type="button" class="btn btn-sm btn-danger" (click)="removeLocationTransfer(i)">
+            <i class="fas fa-trash"></i> Remove
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label [for]="'locationTo_' + i" class="form-label">Location (To)*</label>
+              <select [id]="'locationTo_' + i" class="form-select" formControlName="locationTo">
+                <option value="" disabled>Select destination</option>
+                <option *ngFor="let location of getFilteredToLocations(i)" [value]="location.id">
+                  {{ location.name }}
+                </option>
+              </select>
+              <div *ngIf="transfer.get('locationTo')?.invalid && transfer.get('locationTo')?.touched" class="text-danger small">
+                Destination location is required
+              </div>
+            </div>
+          </div>
+
+          <!-- Stock validation error -->
+          <div *ngIf="stockValidationErrors[i]" class="alert alert-danger mt-2">
+            {{ stockValidationErrors[i] }}
+          </div>
+
+          <!-- Product Search -->
+          <div class="mb-4">
+            <div class="mb-3 position-relative">
+              <div class="input-group">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" 
+                       class="form-control" 
+                       placeholder="Enter Product name / SKU / Scan bar code"
+                       [(ngModel)]="searchTerm"
+                       [ngModelOptions]="{standalone: true}"
+                       (keyup)="onSearchInput($event)"
+                       (focus)="onSearchFocus()"
+                       (blur)="onSearchBlur()"/>
+              </div>
+              <div *ngIf="showSearchResults" class="search-results-dropdown position-absolute w-100 bg-white border rounded shadow-sm" 
+                   style="top: 100%; z-index: 1050; max-height: 300px; overflow-y: auto;">
+                <div class="list-group">
+                  <button type="button" 
+                          class="list-group-item list-group-item-action text-start"
+                          *ngFor="let product of filteredProducts"
+                          (mousedown)="addProductFromSearch(i, product); $event.preventDefault()"
+                          tabindex="0">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                        <strong>{{ product.productName }}</strong>
+                        <small *ngIf="product.sku" class="text-muted ms-2">
+                          SKU: {{ product.sku }}
+                        </small>
+                      </div>
+                      <div class="text-end">
+                        <span class="badge bg-primary me-1">Stock: {{ getStockDisplayText(product.id) }}</span>
+                        <span class="badge bg-success">₹{{ product.defaultSellingPriceExcTax || 0 | number:'1.2-2'}}</span>
+                      </div>
+                    </div>
+                    <small *ngIf="product.barcode" class="text-muted d-block">
+                      Barcode: {{ product.barcode }}
+                    </small>
+                  </button>
+                  <div *ngIf="filteredProducts.length === 0 && ginTransferForm.get('locationFrom')?.value" class="list-group-item text-muted">
+                    No products found
+                    <span *ngIf="searchTerm"> matching "{{ searchTerm }}"</span>
+                  </div>
+                  <div *ngIf="!ginTransferForm.get('locationFrom')?.value" class="list-group-item text-muted">
+                    Please select a source location first
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Products Table -->
+            <div class="table-responsive">
+              <table class="table table-bordered">
+                <thead class="table-light">
+                  <tr>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Unit Price</th>
+                    <th>Subtotal</th>
+                    <th style="width: 50px;"></th>
+                  </tr>
+                </thead>
+                <tbody formArrayName="products">
+                  <tr *ngFor="let product of getProductsArray(transfer).controls; let j = index" [formGroupName]="j">
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div>
+                          <strong>{{ product.get('productName')?.value }}</strong>
+                          <small class="text-muted d-block">SKU: {{ product.get('sku')?.value }}</small>
+                          <small class="text-muted">Stock: {{ product.get('currentStock')?.value }}</small>
+                        </div>
+                        <input type="hidden" formControlName="productId" />
+                        <input type="hidden" formControlName="productName" />
+                        <input type="hidden" formControlName="sku" />
+                        <input type="hidden" formControlName="barcode" />
+                        <input type="hidden" formControlName="unit" />
+                        <input type="hidden" formControlName="currentStock" />
+                      </div>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control" formControlName="quantity" 
+                             (input)="calculateSubtotal(i, j)" placeholder="Quantity" min="1" />
+                      <div *ngIf="getProductsArray(transfer).at(j).get('quantity')?.invalid && 
+                                  getProductsArray(transfer).at(j).get('quantity')?.touched" 
+                           class="text-danger small">
+                        Valid quantity is required
+                      </div>
+                    </td>
+                    <td>
+                      <input type="number" class="form-control" formControlName="unitPrice" 
+                             (input)="calculateSubtotal(i, j)" placeholder="Unit Price" min="0.01" step="0.01" />
+                      <div *ngIf="getProductsArray(transfer).at(j).get('unitPrice')?.invalid && 
+                                  getProductsArray(transfer).at(j).get('unitPrice')?.touched" 
+                           class="text-danger small">
+                        Valid price is required
+                      </div>
+                    </td>
+                    <td>{{ getSubtotal(i, j) | currency:'INR' }}</td>
+                    <td>
+                      <button type="button" (click)="removeProduct(i, j)" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Transfer Subtotal -->
+          <div class="text-end">
+            <strong>Transfer Subtotal: {{ getTransferSubtotal(i) | currency:'INR' }}</strong>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="form-actions">
-      <button type="button" class="save-btn" (click)="saveGinTransfer()">Save</button>
+    <!-- Add Another Location Button -->
+    <div class="row mb-4">
+      <div class="col-12 text-center">
+        <button type="button" (click)="addLocationTransfer()" class="btn btn-success">
+          <i class="fas fa-plus"></i> Add Another Location Transfer
+        </button>
+      </div>
+    </div>
+
+    <!-- Notes and Total -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-12 mb-3">
+            <label for="additionalNotes" class="form-label">Additional Notes:</label>
+            <textarea id="additionalNotes" class="form-control" formControlName="additionalNotes" rows="3"></textarea>
+          </div>
+        </div>
+        
+        <div class="row">
+          <div class="col-12 text-end">
+            <h5>Grand Total: <span class="fw-bold">{{ grandTotal | currency:'INR' }}</span></h5>
+          </div>
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-12 text-center">
+            <button type="submit" [disabled]="isSaving || !ginTransferForm.valid || !hasProductsToTransfer()" class="btn btn-lg btn-primary px-5">
+              <span *ngIf="!isSaving">Save GIN Transfer</span>
+              <span *ngIf="isSaving">
+                <i class="fas fa-spinner fa-spin"></i> Saving...
+              </span>
+            </button>
+          </div>
+        </div>
+        
+        <div *ngIf="submitError" class="alert alert-danger mt-3">
+          {{ submitError }}
+        </div>
+      </div>
     </div>
   </form>
 </div>

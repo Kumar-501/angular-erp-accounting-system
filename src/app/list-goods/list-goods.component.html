@@ -5,19 +5,7 @@
   </div>
 
   <div class="filter-controls">
-    <div class="date-range">
-      <label for="dateRange">Date Range:</label>
-      <input type="text" id="dateRange" class="form-control" readonly [value]="formatDateRange()" />
-    </div>
-    <div class="filter-options">
-      <button class="filter-btn" (click)="openFilters()">
-        <i class="fa fa-filter"></i> Filters
-      </button>
-    </div>
-  </div>
-
-  <div class="view-selector">
-    <button [class.active]="currentView === 'all'" (click)="setView('all')">All GRNs</button>
+    <!-- Add your filter controls here if needed -->
   </div>
 
   <div class="action-bar">
@@ -31,12 +19,20 @@
       </select>
       <span>entries</span>
     </div>
-    
-    <div class="search-box">
-      <label for="search">Search:</label>
-      <input type="text" id="search" [(ngModel)]="searchQuery" (input)="applySearch()" class="form-control">
+
+    <div class="filter-buttons">
+      <button class="btn btn-sm"
+              [class.btn-primary]="showOnlyPartial"
+              [class.btn-outline-primary]="!showOnlyPartial"
+              (click)="togglePartialFilter()">
+        <i class="fa fa-filter"></i>
+        {{ showOnlyPartial ? 'Show All' : 'Show Partial Only' }}
+      </button>
+      <button class="btn btn-sm btn-success" (click)="exportToExcel()">
+        <i class="fa fa-file-excel-o"></i> Export to Excel
+      </button>
     </div>
-    
+
     <div class="add-button">
       <button class="btn btn-primary" routerLink="/add-goods">
         <i class="fa fa-plus"></i> Add
@@ -45,91 +41,135 @@
   </div>
 
   <div class="table-responsive">
-   <table class="table">
-  <thead>
-    <tr>
-      <th>Actions</th>
-      <th (click)="sortBy('purchaseDate')">Purchase Date 
-        <i *ngIf="sortColumn === 'purchaseDate'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('productName')">Product Name
-        <i *ngIf="sortColumn === 'productName'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('referenceNo')">Reference No
-        <i *ngIf="sortColumn === 'referenceNo'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('invoiceNo')">Invoice No
-        <i *ngIf="sortColumn === 'invoiceNo'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <!-- <th (click)="sortBy('locationName')">Location
-        <i *ngIf="sortColumn === 'locationName'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th> -->
-      <th (click)="sortBy('supplierName')">Supplier
-        <i *ngIf="sortColumn === 'supplierName'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('status')">Status
-        <i *ngIf="sortColumn === 'status'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('receivedDate')">Received Date
-        <i *ngIf="sortColumn === 'receivedDate'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-      <th (click)="sortBy('addedBy')">Added By
-        <i *ngIf="sortColumn === 'addedBy'" 
-           [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
-      </th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr *ngFor="let grn of paginatedGoodsReceived">
-      <td>
-        <div class="action-buttons">
-          <!-- <button class="btn btn-sm btn-info" (click)="viewProducts(grn)" title="View Products">
-            <i class="fa fa-eye"></i>
-          </button> -->
-          <button class="btn btn-sm btn-danger" (click)="deleteGrn(grn.id)" title="Delete">
-            <i class="fa fa-trash"></i>
-          </button>
-        </div>
-      </td>
-      <td>{{ grn.purchaseDate | date:'dd-MM-yyyy HH:mm' }}</td>
-      <td>
-        <div *ngIf="grn.products && grn.products.length > 0">
-          {{ grn.products[0].productName || grn.products[0].name }}
-          <span *ngIf="grn.products.length > 1" class="more-products">
-            +{{ grn.products.length - 1 }} more
-          </span>
-        </div>
-        <div *ngIf="!grn.products || grn.products.length === 0">
-          N/A
-        </div>
-      </td>
-      <td>{{ grn.referenceNo || 'N/A' }}</td>
-      <td>{{ grn.invoiceNo || 'N/A' }}</td>
-      <!-- <td>{{ getLocationName(grn) }}</td> -->
-      <td>{{ getSupplierName(grn) }}</td>
-      <td>
-        <span class="status-badge" [ngClass]="getStatusClass(grn.status)">
-          {{ formatStatus(grn.status) }}
-        </span>
-      </td>
-      <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
-      <td>{{ grn.addedBy || 'N/A' }}</td>
-    </tr>
-    <tr *ngIf="paginatedGoodsReceived.length === 0">
-      <td colspan="9" class="no-data">No data available</td>
-    </tr>
-  </tbody>
-</table>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Actions</th>
+          <th (click)="sortBy('purchaseDate')">Purchase Date
+            <i *ngIf="sortColumn === 'purchaseDate'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('purchaseReferenceNo')">Purchase Order
+            <i *ngIf="sortColumn === 'purchaseReferenceNo'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('productName')">Product Name
+            <i *ngIf="sortColumn === 'productName'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th>Order Qty</th>
+          <th>Received Qty</th>
+          <th>Pending Qty</th>
+          <th (click)="sortBy('referenceNo')">Reference No
+            <i *ngIf="sortColumn === 'referenceNo'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('invoiceNo')">Invoice No
+            <i *ngIf="sortColumn === 'invoiceNo'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('supplierName')">Supplier
+            <i *ngIf="sortColumn === 'supplierName'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('status')">Status
+            <i *ngIf="sortColumn === 'status'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('receivedDate')">Received Date
+            <i *ngIf="sortColumn === 'receivedDate'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+       
+          <th (click)="sortBy('purchasePriceWithTax')">Total (Incl. Tax)
+            <i *ngIf="sortColumn === 'purchasePriceWithTax'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+          <th (click)="sortBy('addedBy')">Added By
+            <i *ngIf="sortColumn === 'addedBy'"
+               [class]="sortDirection === 'asc' ? 'fa fa-arrow-up' : 'fa fa-arrow-down'"></i>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let grn of paginatedGoodsReceived" [ngClass]="{'has-partial-deliveries': grn.hasPartialDeliveries, 'additional-delivery': isAdditionalDelivery(grn)}">
+          <td>
+            <div class="action-buttons">
+              <button class="btn btn-sm btn-info" (click)="viewProducts(grn)" title="View Products">
+                <i class="fa fa-eye"></i>
+              </button>
+              <button *ngIf="grn.hasPartialDeliveries"
+                      class="btn btn-sm btn-warning"
+                      (click)="viewPendingDeliveries(grn)"
+                      title="Manage Pending Deliveries">
+                <i class="fa fa-clock-o"></i>
+              </button>
+              <button class="btn btn-sm btn-danger" (click)="deleteGrn(grn.id)" title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </td>
+          <td>{{ grn.purchaseDate | date:'dd-MM-yyyy ' }}</td>
+          <td>
+            <span class="purchase-order-number">{{ getPurchaseOrderNumber(grn) }}</span>
+          </td>
+          <td>
+            <div *ngIf="grn.products && grn.products.length > 0">
+              {{ grn.products[0].productName || grn.products[0].name }}
+              <span *ngIf="grn.products.length > 1" class="more-products">
+                +{{ grn.products.length - 1 }} more
+              </span>
+              <div *ngIf="grn.hasPartialDeliveries" class="partial-indicator">
+                <i class="fa fa-exclamation-triangle"></i> Partial Delivery
+              </div>
+              <div *ngIf="isAdditionalDelivery(grn)" class="additional-indicator">
+                <i class="fa fa-plus-circle"></i> Additional Delivery
+              </div>
+            </div>
+            <div *ngIf="!grn.products || grn.products.length === 0">
+              N/A
+            </div>
+          </td>
+          <td>
+            <span class="quantity-display">{{ getTotalOrderedQuantity(grn) }}</span>
+          </td>
+          <td>
+            <span class="quantity-display">{{ getTotalReceivedQuantity(grn) }}</span>
+          </td>
+          <td>
+            <span class="pending-quantity-display" [ngClass]="{'has-pending': getTotalPendingQuantity(grn.products) > 0}">
+              {{ getTotalPendingQuantity(grn.products) }}
+            </span>
+          </td>
+          <td>
+            <span class="reference-number">{{ grn.referenceNo || 'N/A' }}</span>
+            <div *ngIf="isAdditionalDelivery(grn)" class="additional-note">
+              <small class="text-muted">Additional Delivery</small>
+            </div>
+          </td>
+          <td>{{ grn.invoiceNo || 'N/A' }}</td>
+          <td>{{ getSupplierName(grn) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getGrnStatusClass(grn)">
+              {{ grn.hasPartialDeliveries ? 'Partial' : formatStatus(grn.status) }}
+            </span>
+          </td>
+          <td>{{ grn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</td>
+       
+          <td>
+            <span class="price-with-tax" [title]="getTaxBreakdown(grn)">
+              {{ getPurchasePriceWithTax(grn) | currency:'INR':'symbol':'1.2-2' }}
+            </span>
+          </td>
+          <td>{{ grn.addedBy || 'N/A' }}</td>
+        </tr>
+        <tr *ngIf="paginatedGoodsReceived.length === 0">
+          <td colspan="14" class="no-data">No data available</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
-  
+
   <div class="pagination-controls">
     <div class="pagination-info">
       Showing {{ startItem }} to {{ endItem }} of {{ filteredGoodsReceived.length }} entries
@@ -145,43 +185,62 @@
 </div>
 
 <!-- Products View Modal -->
+<!-- Products View Modal -->
 <div class="modal-overlay" *ngIf="selectedGrn" (click)="closeProductsView()">
-  <div class="modal-content" (click)="$event.stopPropagation()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Products Details - {{ selectedGrn.referenceNo }}</h3>
       <div class="grn-summary">
         <p><strong>Supplier:</strong> {{ getSupplierName(selectedGrn) }}</p>
-        <!-- <p><strong>Location:</strong> {{ getLocationName(selectedGrn) }}</p> -->
+        <p><strong>Location:</strong> {{ getLocationName(selectedGrn) }}</p>
+        <p><strong>Purchase Order:</strong> {{ getPurchaseOrderNumber(selectedGrn) }}</p>
         <p><strong>Received Date:</strong> {{ selectedGrn.receivedDate | date:'dd-MM-yyyy HH:mm' }}</p>
         <p><strong>Invoice No:</strong> {{ selectedGrn.invoiceNo || 'N/A' }}</p>
+        <p><strong>Purchase Price (Excl. Tax):</strong> {{ getPurchasePrice(selectedGrn) | currency:'INR':'symbol':'1.2-2' }}</p>
+        <p><strong>Total (Incl. Tax):</strong> {{ getPurchasePriceWithTax(selectedGrn) | currency:'INR':'symbol':'1.2-2' }}</p>
+        <p *ngIf="selectedGrn.hasPartialDeliveries" class="partial-warning">
+          <i class="fa fa-exclamation-triangle"></i> This GRN contains partial deliveries
+        </p>
+        <p *ngIf="isAdditionalDelivery(selectedGrn)" class="additional-warning">
+          <i class="fa fa-plus-circle"></i> This is an additional delivery
+        </p>
       </div>
-      <button class="close-btn" (click)="closeProductsView()">&times;</button>
+      <button class="close-btn" (click)="closeProductsView()">×</button>
     </div>
-    
+
     <div class="modal-body">
       <div class="products-summary">
         <div class="summary-card">
           <h4>Total Products: {{ selectedGrn.products?.length || 0 }}</h4>
-          <h4>Total Quantity: {{ getTotalQuantity(selectedGrn.products) }}</h4>
-          <h4>Total Value: {{ getTotalValue(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</h4>
+          <h4>Total Ordered: {{ getTotalOrderedQuantity(selectedGrn) }}</h4>
+          <h4>Total Received: {{ getTotalReceivedQuantity(selectedGrn) }}</h4>
+          <h4>Total Pending: {{ getTotalPendingQuantity(selectedGrn.products) }}</h4>
+          <h4>Subtotal: {{ getTotalValue(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</h4>
+          <h4>Tax: {{ getTotalTaxAmount(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</h4>
+          <h4>Total Value: {{ getTotalValueWithTax(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</h4>
         </div>
       </div>
-      
+
       <div class="products-table-container">
         <table class="products-table">
           <thead>
             <tr>
               <th>#</th>
               <th>Product Name</th>
+              <th>SKU</th>
               <th>Order Qty</th>
               <th>Received Qty</th>
+              <th>Pending Qty</th>
               <th>Unit Price</th>
-              <th>Total</th>
+              <th>Tax Rate</th>
+              <!-- <th>Tax Amount</th>
+              <th>Total</th> -->
               <th>Status</th>
+              <th>Reason</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let product of selectedGrn.products; let i = index" 
+            <tr *ngFor="let product of selectedGrn.products; let i = index"
                 [ngClass]="getProductRowClass(product)">
               <td>{{ i + 1 }}</td>
               <td>
@@ -190,41 +249,150 @@
                   <small>{{ product.description }}</small>
                 </div>
               </td>
+              <td>{{ product.sku || 'N/A' }}</td>
               <td>{{ product.orderQuantity || product.orderedQty || 0 }}</td>
               <td>
                 <strong>{{ product.quantity || product.receivedQuantity || 0 }}</strong>
               </td>
-              <td>{{ product.unitCost || product.unitPrice | currency:'INR':'symbol':'1.2-2' }}</td>
               <td>
-                <strong>{{ getProductLineTotal(product) | currency:'INR':'symbol':'1.2-2' }}</strong>
+                <span class="pending-quantity" [ngClass]="{'has-pending': (product.pendingQuantity || 0) > 0}">
+                  {{ product.pendingQuantity || 0 }}
+                </span>
               </td>
+              <td>{{ product.unitCost || product.unitPrice | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>{{ (product.taxRate || 18) }}%</td>
+              <!-- <td>{{ getProductTaxAmount(product) | currency:'INR':'symbol':'1.2-2' }}</td>
+              <td>
+                <strong>{{ getProductLineTotalWithTax(product) | currency:'INR':'symbol':'1.2-2' }}</strong>
+              </td> -->
               <td>
                 <span class="product-status" [ngClass]="getProductStatusClass(product)">
                   {{ getProductStatus(product) }}
                 </span>
               </td>
+              <td>
+                <span *ngIf="product.pendingReason" class="pending-reason">
+                  {{ product.pendingReason }}
+                </span>
+                <span *ngIf="!product.pendingReason" class="no-reason">-</span>
+              </td>
             </tr>
             <tr *ngIf="!selectedGrn.products || selectedGrn.products.length === 0">
-              <td colspan="8" class="no-products">No products found</td>
+              <td colspan="12" class="no-products">No products found</td>
             </tr>
           </tbody>
           <tfoot *ngIf="selectedGrn.products && selectedGrn.products.length > 0">
             <tr class="total-row">
-              <td colspan="4"><strong>Total</strong></td>
-              <td><strong>{{ getTotalQuantity(selectedGrn.products) }}</strong></td>
+              <!-- <td colspan="3"><strong>Total</strong></td>
+              <td><strong>{{ getTotalOrderedQuantity(selectedGrn) }}</strong></td>
+              <td><strong>{{ getTotalReceivedQuantity(selectedGrn) }}</strong></td>
+              <td><strong>{{ getTotalPendingQuantity(selectedGrn.products) }}</strong></td>
               <td></td>
-              <td><strong>{{ getTotalValue(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</strong></td>
-              <td></td>
+              <td></td> -->
+              <!-- <td><strong>{{ getTotalTaxAmount(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</strong></td>
+              <td><strong>{{ getTotalValueWithTax(selectedGrn.products) | currency:'INR':'symbol':'1.2-2' }}</strong></td> -->
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>
       </div>
     </div>
-    
+
     <div class="modal-footer">
       <button class="btn btn-secondary" (click)="closeProductsView()">Close</button>
       <button class="btn btn-primary" (click)="printProductsList()">
         <i class="fa fa-print"></i> Print
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Pending Deliveries Management Modal -->
+<div class="modal-overlay" *ngIf="showPendingModal" (click)="closePendingModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Manage Pending Deliveries - {{ selectedPendingGrn?.referenceNo }}</h3>
+      <div class="grn-summary">
+        <p><strong>Supplier:</strong> {{ getSupplierName(selectedPendingGrn) }}</p>
+        <p><strong>Location:</strong> {{ getLocationName(selectedPendingGrn) }}</p>
+        <p><strong>Purchase Order:</strong> {{ getPurchaseOrderNumber(selectedPendingGrn) }}</p>
+        <p><strong>Original Date:</strong> {{ selectedPendingGrn?.receivedDate | date:'dd-MM-yyyy HH:mm' }}</p>
+      </div>
+      <button class="close-btn" (click)="closePendingModal()">×</button>
+    </div>
+
+    <div class="modal-body">
+      <form [formGroup]="pendingProductsForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="receivedDate">New Received Date<span class="required">*</span></label>
+            <input type="datetime-local"
+                   formControlName="receivedDate"
+                   id="receivedDate"
+                   class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="additionalNotes">Additional Notes</label>
+            <textarea formControlName="additionalNotes"
+                      id="additionalNotes"
+                      class="form-control"
+                      rows="2"></textarea>
+          </div>
+        </div>
+      </form>
+
+      <h4>Pending Products</h4>
+      <div class="pending-products-table-container">
+        <table class="pending-products-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Product Name</th>
+              <th>SKU</th>
+              <th>Pending Qty</th>
+              <th>Additional Qty to Receive</th>
+              <th>Reason for Previous Shortage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let product of pendingProducts; let i = index">
+              <td>{{ i + 1 }}</td>
+              <td>
+                <strong>{{ product.productName }}</strong>
+              </td>
+              <td>{{ product.sku }}</td>
+              <td>
+                <span class="pending-quantity-badge">{{ product.pendingQuantity }}</span>
+              </td>
+              <td>
+                <input type="number"
+                       class="form-control quantity-input"
+                       [(ngModel)]="product.additionalQuantity"
+                       (ngModelChange)="onAdditionalQuantityChange(i)"
+                       [max]="product.pendingQuantity"
+                       min="0"
+                       placeholder="0">
+              </td>
+              <td>
+                <div class="reason-display">{{ product.pendingReason || 'No reason provided' }}</div>
+              </td>
+            </tr>
+            <tr *ngIf="pendingProducts.length === 0">
+              <td colspan="6" class="no-products">No pending products found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closePendingModal()">Cancel</button>
+      <button class="btn btn-success"
+              (click)="saveAdditionalDelivery()"
+              [disabled]="pendingProductsForm.invalid || isSavingAdditionalDelivery">
+        <i class="fa fa-save"></i>
+        <span *ngIf="!isSavingAdditionalDelivery">Save Additional Delivery</span>
+        <span *ngIf="isSavingAdditionalDelivery">Saving...</span>
       </button>
     </div>
   </div>
@@ -235,7 +403,7 @@
   <div class="modal-content confirmation-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Confirm Deletion</h3>
-      <button class="close-btn" (click)="cancelDelete()">&times;</button>
+      <button class="close-btn" (click)="cancelDelete()">×</button>
     </div>
     <div class="modal-body">
       <p>Are you sure you want to delete this Goods Received Note?</p>
